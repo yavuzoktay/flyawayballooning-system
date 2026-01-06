@@ -3659,16 +3659,8 @@ setBookingDetail(finalVoucherDetail);
                     
                     console.log('Booking created successfully:', createBookingResponse.data);
                     
-                    // If this is a rebook (existing booking exists), delete the old booking after payment history is transferred
-                    if (existingBookingId) {
-                        try {
-                            await axios.delete(`/api/deleteBooking/${existingBookingId}`);
-                            console.log('Old booking deleted successfully:', existingBookingId);
-                        } catch (deleteErr) {
-                            console.error('Error deleting old booking:', deleteErr);
-                            // Continue anyway - payment history should already be transferred
-                        }
-                    }
+                    const newBookingId = createBookingResponse.data.bookingId || createBookingResponse.data.id;
+                    console.log('New booking ID:', newBookingId);
                     
                     // Note: Voucher is already marked as redeemed by /api/createBooking endpoint
                     // when activitySelect === 'Redeem Voucher' and voucher_code exists
@@ -3678,7 +3670,7 @@ setBookingDetail(finalVoucherDetail);
                         try {
                             const redeemResponse = await axios.post('/api/redeem-voucher', {
                                 voucher_code: voucherCode,
-                                booking_id: createBookingResponse.data.bookingId || createBookingResponse.data.id
+                                booking_id: newBookingId
                             });
                             
                             if (!redeemResponse.data.success) {
@@ -3697,11 +3689,13 @@ setBookingDetail(finalVoucherDetail);
                     setBookingDetail(null);
                     setBookingHistory([]);
                     
-                    // Refresh all data
+                    // Refresh all data FIRST before deleting old booking
+                    // This ensures the new booking appears in the table
                     // Refresh booking data
                     const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: filters });
-                    setBooking(bookingResponse.data.data || []);
-                    setFilteredBookingData(bookingResponse.data.data || []);
+                    const newBookingData = bookingResponse.data.data || [];
+                    setBooking(newBookingData);
+                    setFilteredBookingData(newBookingData);
                 
                 // Refresh voucher data
                     const voucherResponse = await axios.get(`/api/getAllVoucherData`, { params: filters });
@@ -3710,10 +3704,19 @@ setBookingDetail(finalVoucherDetail);
                     
                     // Update filteredData based on active tab
                     if (activeTab === 'bookings') {
-                        setFilteredData(bookingResponse.data.data || []);
+                        setFilteredData(newBookingData);
                     } else if (activeTab === 'vouchers') {
                         setFilteredData(voucherResponse.data.data || []);
                     }
+                    
+                    // Verify booking is in the list
+                    // If rebook_from_booking_id was sent, backend UPDATEs the same booking (no delete needed)
+                    // If no rebook_from_booking_id, it's a new booking (no delete needed)
+                    const bookingFound = newBookingData.find(b => b.id === newBookingId || b.bookingId === newBookingId);
+                    console.log('Booking found in refreshed data:', bookingFound ? 'Yes' : 'No', 'Booking ID:', newBookingId, 'Is rebook:', !!existingBookingId);
+                    
+                    // NO DELETE needed - if rebook_from_booking_id was sent, backend UPDATEs the same booking
+                    // If no rebook_from_booking_id, it's a new booking and there's nothing to delete
                     
                     alert(existingBookingId 
                         ? 'Flight Voucher successfully rebooked! Confirmation email has been sent.' 
@@ -3909,11 +3912,16 @@ setBookingDetail(finalVoucherDetail);
                 rebook_from_booking_id: bookingDetail.booking.id // Add old booking ID for payment history transfer
             };
 
-            // Create the new booking first (this will transfer payment history from old booking)
+            // Update existing booking (rebook_from_booking_id is provided, so backend will UPDATE instead of INSERT)
             const createResponse = await axios.post('/api/createBooking', payload);
             
-            // Then delete the old booking after payment history is transferred
-            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
+            if (!createResponse.data.success) {
+                throw new Error(createResponse.data.message || 'Failed to update booking');
+            }
+            
+            const updatedBookingId = createResponse.data.bookingId || createResponse.data.id || createResponse.data.data?.id || bookingDetail.booking.id;
+            const oldBookingId = bookingDetail.booking.id;
+            console.log('Rebook - Updated booking ID:', updatedBookingId, 'Old booking ID:', oldBookingId);
             
             // Clear all states
             setRebookModalOpen(false);
@@ -3922,12 +3930,13 @@ setBookingDetail(finalVoucherDetail);
             setBookingDetail(null);
             setBookingHistory([]);
             
-            // Refresh all data
+            // Refresh all data - NO DELETE needed because backend UPDATEs the same booking
             if (activeTab === 'bookings') {
                 const response = await axios.get(`/api/getAllBookingData`, { params: filters });
-                setBooking(response.data.data || []);
-                setFilteredBookingData(response.data.data || []);
-                setFilteredData(response.data.data || []);
+                const updatedBookingData = response.data.data || [];
+                setBooking(updatedBookingData);
+                setFilteredBookingData(updatedBookingData);
+                setFilteredData(updatedBookingData);
             }
             
             // Refresh voucher data
@@ -7229,13 +7238,13 @@ setBookingDetail(finalVoucherDetail);
                                                                                 size="small" 
                                                                                 onClick={() => handleEditPassengerClick(p)}
                                                                                 sx={{ 
-                                                                                    padding: !isMobile ? '4px' : '8px',
+                                                                                    padding: isMobile ? '2px' : '8px',
                                                                                     '& .MuiSvgIcon-root': {
-                                                                                        fontSize: !isMobile ? '14px' : 'small'
+                                                                                        fontSize: isMobile ? '12px' : 'inherit'
                                                                                     }
                                                                                 }}
                                                                             >
-                                                                                <EditIcon fontSize={!isMobile ? '14px' : 'small'} />
+                                                                                <EditIcon fontSize={isMobile ? '12px' : 'small'} />
                                                                             </IconButton>
                                                                             {i > 0 && ( // Only show delete button for additional passengers (not the first one)
                                                                                 <IconButton 
@@ -7243,13 +7252,13 @@ setBookingDetail(finalVoucherDetail);
                                                                                     onClick={() => handleDeletePassenger(p.id)}
                                                                                     sx={{ 
                                                                                         color: 'red',
-                                                                                        padding: !isMobile ? '4px' : '8px',
+                                                                                        padding: isMobile ? '2px' : '8px',
                                                                                         '& .MuiSvgIcon-root': {
-                                                                                            fontSize: !isMobile ? '14px' : 'small'
+                                                                                            fontSize: isMobile ? '12px' : 'inherit'
                                                                                         }
                                                                                     }}
                                                                                 >
-                                                                                    <DeleteIcon fontSize={!isMobile ? '14px' : 'small'} />
+                                                                                    <DeleteIcon fontSize={isMobile ? '12px' : 'small'} />
                                                                                 </IconButton>
                                                                             )}
                                                                         </>

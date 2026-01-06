@@ -2509,10 +2509,14 @@ const Manifest = () => {
                 created_at: originalCreatedAt, // Preserve original created_at to maintain table position
                 rebook_from_booking_id: bookingDetail.booking.id // Add old booking ID for payment history transfer
             };
-            // Create the new booking first (this will transfer payment history from old booking)
+            // Update existing booking (rebook_from_booking_id is provided, so backend will UPDATE instead of INSERT)
             const createResponse = await axios.post('/api/createBooking', payload);
-            // Then delete the old booking after payment history is transferred
-            await axios.delete(`/api/deleteBooking/${bookingDetail.booking.id}`);
+            
+            if (!createResponse.data.success) {
+                throw new Error(createResponse.data.message || 'Failed to update booking');
+            }
+            
+            // NO DELETE needed - backend UPDATEs the same booking when rebook_from_booking_id is provided
             
             // Clear all states
             setRebookModalOpen(false);
@@ -4578,7 +4582,16 @@ const Manifest = () => {
                                                         ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
                                                         : '';
                                                     handleEditClick('name', passenger1Name || bookingDetail.booking.name || '');
-                                                }}><EditIcon fontSize="small" /></IconButton>
+                                                }}
+                                                sx={{
+                                                    padding: isMobile ? '2px' : '8px',
+                                                    '& .MuiSvgIcon-root': {
+                                                        fontSize: isMobile ? '12px' : 'inherit'
+                                                    }
+                                                }}
+                                            >
+                                                <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                            </IconButton>
                                             </>
                                         )}</Typography>
                                         <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
@@ -4592,7 +4605,18 @@ const Manifest = () => {
                                         ) : (
                                             <>
                                                 {bookingDetail.booking.phone || '-'}
-                                                <IconButton size="small" onClick={() => handleEditClick('phone', bookingDetail.booking.phone)}><EditIcon fontSize="small" /></IconButton>
+                                                <IconButton 
+                                                    size="small" 
+                                                    onClick={() => handleEditClick('phone', bookingDetail.booking.phone)}
+                                                    sx={{
+                                                        padding: isMobile ? '2px' : '8px',
+                                                        '& .MuiSvgIcon-root': {
+                                                            fontSize: isMobile ? '12px' : 'inherit'
+                                                        }
+                                                    }}
+                                                >
+                                                    <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                </IconButton>
                                             </>
                                         )}</Typography>
                                         <Typography><b>Email:</b> {editField === 'email' ? (
@@ -4604,7 +4628,18 @@ const Manifest = () => {
                                         ) : (
                                             <>
                                                 {bookingDetail.booking.email || '-'}
-                                                <IconButton size="small" onClick={() => handleEditClick('email', bookingDetail.booking.email)}><EditIcon fontSize="small" /></IconButton>
+                                                <IconButton 
+                                                    size="small" 
+                                                    onClick={() => handleEditClick('email', bookingDetail.booking.email)}
+                                                    sx={{
+                                                        padding: isMobile ? '2px' : '8px',
+                                                        '& .MuiSvgIcon-root': {
+                                                            fontSize: isMobile ? '12px' : 'inherit'
+                                                        }
+                                                    }}
+                                                >
+                                                    <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                </IconButton>
                                             </>
                                         )}</Typography>
                                         <Typography><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts ?? 0}</Typography>
@@ -4657,7 +4692,18 @@ const Manifest = () => {
         return calculateExpiresDate(bookingDetail.booking.expires, flightAttempts);
       })()
     ) : '-'}
-    <IconButton size="small" onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}><EditIcon fontSize="small" /></IconButton>
+    <IconButton 
+        size="small" 
+        onClick={() => handleEditClick('expires', bookingDetail.booking.expires)}
+        sx={{
+            padding: isMobile ? '2px' : '8px',
+            '& .MuiSvgIcon-root': {
+                fontSize: isMobile ? '12px' : 'inherit'
+            }
+        }}
+    >
+        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+    </IconButton>
   </>
 )}</Typography>
                                         <Typography><b>Paid:</b> {editField === 'paid' ? (
@@ -4707,7 +4753,18 @@ const Manifest = () => {
 ) : (
   <>
     £{bookingDetail.booking.paid}
-    <IconButton size="small" onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}><EditIcon fontSize="small" /></IconButton>
+    <IconButton 
+        size="small" 
+        onClick={() => handleEditClick('paid', bookingDetail.booking.paid)}
+        sx={{
+            padding: isMobile ? '2px' : '8px',
+            '& .MuiSvgIcon-root': {
+                fontSize: isMobile ? '12px' : 'inherit'
+            }
+        }}
+    >
+        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+    </IconButton>
   </>
 )}</Typography>
                                         <Typography><b>Due:</b> {editField === 'due' ? (
@@ -4769,7 +4826,18 @@ const Manifest = () => {
         return `£${currentDue.toFixed(2)}`;
       })()}
     </span>
-    <IconButton size="small" onClick={() => handleEditClick('due', bookingDetail.booking.due)}><EditIcon fontSize="small" /></IconButton>
+    <IconButton 
+        size="small" 
+        onClick={() => handleEditClick('due', bookingDetail.booking.due)}
+        sx={{
+            padding: isMobile ? '2px' : '8px',
+            '& .MuiSvgIcon-root': {
+                fontSize: isMobile ? '12px' : 'inherit'
+            }
+        }}
+    >
+        <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+    </IconButton>
   </>
 )}</Typography>
                                     </Box>
@@ -4913,7 +4981,11 @@ const Manifest = () => {
                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
-                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                    background: '#2ECC71',
+                                                    '&:hover': {
+                                                        background: '#27AE60'
+                                                    }
                                                 }} onClick={handleRebook}>Rebook</Button>
                                                 <Button variant="contained" color="primary" sx={{ 
                                                     mb: isMobile ? 0 : 1, 
@@ -4923,40 +4995,53 @@ const Manifest = () => {
                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
-                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                    background: '#1ABC9C',
+                                                    '&:hover': {
+                                                        background: '#16A085'
+                                                    }
                                                 }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                 <Button variant="contained" color="info" sx={{ 
                                                     mb: isMobile ? 0 : 1, 
                                                     borderRadius: 2, 
                                                     fontWeight: 600, 
                                                     textTransform: 'none', 
-                                                    background: '#6c757d',
+                                                    background: '#E74C3C',
                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
-                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                    '&:hover': {
+                                                        background: '#C0392B'
+                                                    }
                                                 }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                 <Button variant="contained" color="success" sx={{ 
                                                     borderRadius: 2, 
                                                     fontWeight: 600, 
                                                     textTransform: 'none', 
-                                                    background: '#28a745',
+                                                    background: '#3498DB',
                                                     mb: isMobile ? 0 : 1,
                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
-                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                    '&:hover': {
+                                                        background: '#2980B9'
+                                                    }
                                                 }} onClick={handleEmailBooking}>Email</Button>
                                                 <Button variant="contained" color="info" sx={{ 
                                                     borderRadius: 2, 
                                                     fontWeight: 600, 
                                                     textTransform: 'none', 
-                                                    background: '#17a2b8',
+                                                    background: '#3498DB',
                                                     mb: isMobile ? 0 : 1,
                                                     flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
-                                                    padding: isMobile ? '6px 8px' : '8px 16px'
+                                                    padding: isMobile ? '6px 8px' : '8px 16px',
+                                                    '&:hover': {
+                                                        background: '#2980B9'
+                                                    }
                                                 }} onClick={handleSmsBooking}>SMS</Button>
                                                 <Button
                                                     variant="contained"
@@ -4965,12 +5050,15 @@ const Manifest = () => {
                                                         borderRadius: 2, 
                                                         fontWeight: 600, 
                                                         textTransform: 'none', 
-                                                        background: '#17a2b8',
+                                                        background: '#5B6CFF',
                                                         mb: isMobile ? 0 : 1,
                                                         flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                         minWidth: isMobile ? 'auto' : 'auto',
                                                         fontSize: isMobile ? '12px' : '14px',
-                                                        padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        padding: isMobile ? '6px 8px' : '8px 16px',
+                                                        '&:hover': {
+                                                            background: '#4A5AE8'
+                                                        }
                                                     }}
                                                     onClick={() => bookingDetail?.booking && handleMessagesClick(bookingDetail.booking)}
                                                     disabled={!bookingDetail?.booking}
@@ -4984,12 +5072,16 @@ const Manifest = () => {
                                                         borderRadius: 2, 
                                                         fontWeight: 600, 
                                                         textTransform: 'none', 
-                                                        background: '#6c757d', 
+                                                        background: '#8E44AD',
                                                         mt: isMobile ? 0 : 1,
+                                                        mb: isMobile ? 0 : 1,
                                                         flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                         minWidth: isMobile ? 'auto' : 'auto',
                                                         fontSize: isMobile ? '12px' : '14px',
-                                                        padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        padding: isMobile ? '6px 8px' : '8px 16px',
+                                                        '&:hover': {
+                                                            background: '#7D3C98'
+                                                        }
                                                     }}
                                                     onClick={() => {
                                                         if (bookingDetail?.booking?.id) {
@@ -5010,12 +5102,15 @@ const Manifest = () => {
                                                         borderRadius: 2, 
                                                         fontWeight: 600, 
                                                         textTransform: 'none', 
-                                                        background: '#6c757d', 
+                                                        background: '#7F8C8D',
                                                         mt: isMobile ? 0 : 1,
                                                         flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
                                                         minWidth: isMobile ? 'auto' : 'auto',
                                                         fontSize: isMobile ? '12px' : '14px',
-                                                        padding: isMobile ? '6px 8px' : '8px 16px'
+                                                        padding: isMobile ? '6px 8px' : '8px 16px',
+                                                        '&:hover': {
+                                                            background: '#6C7A7B'
+                                                        }
                                                     }}
                                                     onClick={() => {
                                                         if (bookingDetail?.booking?.id) {
@@ -5144,14 +5239,31 @@ const Manifest = () => {
                                                                                     </>
                                                                                 );
                                                                             })()}
-                                                                          <IconButton size="small" onClick={() => handleEditPassengerClick(p)}><EditIcon fontSize="small" /></IconButton>
+                                                                          <IconButton 
+                                                                              size="small" 
+                                                                              onClick={() => handleEditPassengerClick(p)}
+                                                                              sx={{
+                                                                                  padding: isMobile ? '2px' : '8px',
+                                                                                  '& .MuiSvgIcon-root': {
+                                                                                      fontSize: isMobile ? '12px' : 'inherit'
+                                                                                  }
+                                                                              }}
+                                                                          >
+                                                                              <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                                          </IconButton>
                                                                           {i > 0 && ( // Only show delete button for additional passengers (not the first one)
                                                                               <IconButton 
                                                                                   size="small" 
                                                                                   onClick={() => handleDeletePassenger(p.id)}
-                                                                                  sx={{ color: 'red' }}
+                                                                                  sx={{ 
+                                                                                      color: 'red',
+                                                                                      padding: isMobile ? '2px' : '8px',
+                                                                                      '& .MuiSvgIcon-root': {
+                                                                                          fontSize: isMobile ? '12px' : 'inherit'
+                                                                                      }
+                                                                                  }}
                                                                               >
-                                                                                  <DeleteIcon fontSize="small" />
+                                                                                  <DeleteIcon fontSize={isMobile ? '12px' : 'small'} />
                                                                               </IconButton>
                                                                           )}
                                                                         </>

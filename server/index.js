@@ -10691,7 +10691,7 @@ app.post('/api/createBooking', (req, res) => {
         
         function insertBookingWithFinalPaid() {
         // Define handleBookingUpdateSuccess function before proceedWithBookingInsert
-        function handleBookingUpdateSuccess(bookingId) {
+        function handleBookingUpdateSuccess(bookingId, rebookCleanupPromise = Promise.resolve(), oldBookingCalendarEventId = null) {
             console.log('✅ [Update] Booking updated successfully:', bookingId);
             
             // Copy history entries if provided
@@ -10737,7 +10737,12 @@ app.post('/api/createBooking', (req, res) => {
                         
                         con.query(insertHistorySql, [bookingId, statusValue, normalizedChangedAt, normalizedFlightDate], (histErr) => {
                             if (histErr) {
-                                console.error('Error inserting history entry:', histErr);
+                                // Check if error is due to missing table
+                                if (histErr.code === 'ER_NO_SUCH_TABLE' || histErr.errno === 1146) {
+                                    console.warn('⚠️ booking_history table does not exist, skipping history entry');
+                                } else {
+                                    console.error('Error inserting history entry:', histErr);
+                                }
                             } else {
                                 console.log(`✅ History entry ${idx + 1} inserted for booking ${bookingId}`);
                             }
@@ -10776,10 +10781,441 @@ app.post('/api/createBooking', (req, res) => {
                 }
             }
             
-            // Note: Google Calendar event update is handled by the existing booking's event
-            // Since we're updating an existing booking, the calendar event should already exist
-            // and will be updated automatically when the booking is updated
-            res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+            // Create/Update Google Calendar event for rebook operations
+            // For rebook: old event was deleted, create new event with updated details
+            // For regular update: update existing event if it exists
+            console.log('📅 [updateBooking] Checking Google Calendar event creation/update conditions:', {
+                bookingDateTime: bookingDateTime,
+                bookingStatus: bookingStatus,
+                shouldCreate: bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingStatus === 'Scheduled',
+                isRebook: !!rebook_from_booking_id
+            });
+            
+            if (bookingDateTime && bookingDateTime.trim() !== '' && bookingDateTime !== 'null' && bookingStatus === 'Scheduled') {
+                console.log('📅 [updateBooking] ✅ Conditions met! Creating/updating Google Calendar event for scheduled flight');
+                
+                // For rebook operations: wait for old event cleanup to complete before creating new event
+                rebookCleanupPromise.then(() => {
+                    console.log('✅ [Rebook Update] ========== OLD BOOKING CLEANUP COMPLETED ==========');
+                    console.log('✅ [Rebook Update] Old booking cleanup completed, proceeding with new calendar event creation');
+                    console.log('📅 [Rebook Update] New booking details:', {
+                        bookingId: bookingId,
+                        flightDate: bookingDateTime,
+                        location: chooseLocation,
+                        flightType: chooseFlightType.type,
+                        timeSlot: selectedTime
+                    });
+                    
+                    // Determine if this is a private or shared flight
+                    const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
+                    
+                    // For rebook operations: old event was already deleted, so we need to CREATE a new event
+                    // For regular updates: get current event ID from database and UPDATE it
+                    console.log('📅 [updateBooking] Checking for existing Google Calendar event...');
+                    console.log('📅 [updateBooking] Is rebook:', !!rebook_from_booking_id);
+                    console.log('📅 [updateBooking] Old booking calendar event ID (should be null after deletion):', oldBookingCalendarEventId);
+                    
+                    // Get existing Google Calendar event ID for this booking
+                    con.query(
+                        'SELECT google_calendar_event_id FROM all_booking WHERE id = ?',
+                        [bookingId],
+                        (eventIdErr, eventIdResult) => {
+                            const existingEventId = (eventIdResult && eventIdResult.length > 0) ? eventIdResult[0].google_calendar_event_id : null;
+                            
+                            // For rebook: always create new event (old event was deleted in cleanup)
+                            // For regular updates: use existing event ID to update
+                            const isRebook = !!rebook_from_booking_id;
+                            const eventIdForUpdate = isRebook ? null : existingEventId;
+                            
+                            console.log('📅 [updateBooking] Event ID for update:', eventIdForUpdate);
+                            console.log('📅 [updateBooking] Existing event ID from DB:', existingEventId);
+                            console.log('📅 [updateBooking] Is rebook (will create new event):', isRebook);
+                            
+                            if (eventIdForUpdate && !isRebook) {
+                                // Update existing event (for both regular updates and rebooks)
+                                console.log('📅 [updateBooking] ========== UPDATING EXISTING GOOGLE CALENDAR EVENT ==========');
+                                console.log('📅 [updateBooking] Updating existing Google Calendar event:', eventIdForUpdate);
+                                console.log('📅 [updateBooking] Is rebook:', !!rebook_from_booking_id);
+                                
+                                // Get total passenger count for this flight slot
+                                const getTotalPassengersSql = `
+                                    SELECT SUM(pax) as total_passengers 
+                                    FROM all_booking 
+                                    WHERE flight_date = ? 
+                                    AND location = ? 
+                                    AND flight_type = ? 
+                                    AND time_slot = ?
+                                    AND status != 'Cancelled'
+                                `;
+                                
+                                con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                                    const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                        ? parseInt(paxResult[0].total_passengers) 
+                                        : actualPaxCount;
+                                    
+                                    console.log('📅 [updateBooking] Updating event with new details:', {
+                                        eventId: eventIdForUpdate,
+                                        location: chooseLocation,
+                                        flightType: chooseFlightType.type,
+                                        passengerCount: totalPassengers,
+                                        flightDate: bookingDateTime
+                                    });
+                                    
+                                    try {
+                                        await updateCalendarEvent(eventIdForUpdate, {
+                                            location: chooseLocation,
+                                            flightType: chooseFlightType.type,
+                                            passengerCount: totalPassengers,
+                                            flightDate: bookingDateTime,
+                                            bookingId: bookingId.toString()
+                                        });
+                                        console.log('✅ [updateBooking] Google Calendar event updated successfully');
+                                        console.log('✅ [updateBooking] Event ID maintained in database:', eventIdForUpdate);
+                                        
+                                        res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                    } catch (updateErr) {
+                                        console.error('❌ [updateBooking] Error updating Google Calendar event:', updateErr);
+                                        console.error('❌ [updateBooking] Error details:', JSON.stringify(updateErr, null, 2));
+                                        res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                    }
+                                });
+                            } else {
+                                // No existing event OR this is a rebook: create new event
+                                console.log('📅 [updateBooking] ========== CREATING NEW GOOGLE CALENDAR EVENT ==========');
+                                console.log('📅 [updateBooking] Creating new Google Calendar event');
+                                console.log('📅 [updateBooking] Is rebook:', !!rebook_from_booking_id);
+                                console.log('📅 [updateBooking] Existing event ID:', existingEventId);
+                                if (isRebook) {
+                                    console.log('📅 [updateBooking] REBOOK: Old event was deleted, creating new event for new date');
+                                }
+                                
+                                if (isPrivateFlight) {
+                                    createGoogleCalendarEventForUpdate(() => {
+                                        res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                    });
+                                } else {
+                                    // Shared flight: check if this is the first booking for this slot
+                                    const checkSharedFlightSql = `
+                                        SELECT COUNT(*) as booking_count 
+                                        FROM all_booking 
+                                        WHERE flight_date = ? 
+                                        AND location = ? 
+                                        AND flight_type = ? 
+                                        AND time_slot = ? 
+                                        AND status != 'Cancelled'
+                                        AND id != ?
+                                    `;
+                                    
+                                    con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null, bookingId], (checkErr, checkResult) => {
+                                        if (!checkErr && checkResult.length > 0) {
+                                            const existingBookings = checkResult[0].booking_count || 0;
+                                            if (existingBookings === 0) {
+                                                createGoogleCalendarEventForUpdate(() => {
+                                                    res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                                });
+                                            } else {
+                                                updateGoogleCalendarEventForSharedFlightUpdate(() => {
+                                                    res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                                });
+                                            }
+                                        } else {
+                                            createGoogleCalendarEventForUpdate(() => {
+                                                res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    );
+                }).catch((cleanupErr) => {
+                    console.error('❌ [Rebook Update] Error during old booking cleanup, but proceeding with new calendar event creation:', cleanupErr);
+                    console.error('❌ [Rebook Update] Cleanup error details:', JSON.stringify(cleanupErr, null, 2));
+                    // Even if cleanup fails, still try to create/update calendar event
+                    // For rebooks: always create new event (cleanup may have partially failed)
+                    // For regular updates: try to update existing event if available
+                    console.log('📅 [updateBooking] Proceeding with calendar event creation despite cleanup error');
+                    console.log('📅 [updateBooking] Is rebook:', !!rebook_from_booking_id);
+                    
+                    // Determine if this is a private or shared flight
+                    const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
+                    const isRebook = !!rebook_from_booking_id;
+                    
+                    // Get existing Google Calendar event ID for this booking
+                    con.query(
+                        'SELECT google_calendar_event_id FROM all_booking WHERE id = ?',
+                        [bookingId],
+                        (eventIdErr, eventIdResult) => {
+                            const existingEventId = (eventIdResult && eventIdResult.length > 0) ? eventIdResult[0].google_calendar_event_id : null;
+                            
+                            // For rebooks: always create new event (even if cleanup failed, we want a new event for the new date)
+                            // For regular updates: try to update existing event
+                            const eventIdForUpdate = isRebook ? null : existingEventId;
+                            
+                            console.log('📅 [updateBooking] Event ID for update (after cleanup error):', eventIdForUpdate);
+                            console.log('📅 [updateBooking] Is rebook (will create new event):', isRebook);
+                            
+                            if (eventIdForUpdate && !isRebook) {
+                                // Update existing event
+                                console.log('📅 [updateBooking] Updating existing Google Calendar event:', eventIdForUpdate);
+                                
+                                const getTotalPassengersSql = `
+                                    SELECT SUM(pax) as total_passengers 
+                                    FROM all_booking 
+                                    WHERE flight_date = ? 
+                                    AND location = ? 
+                                    AND flight_type = ? 
+                                    AND time_slot = ?
+                                    AND status != 'Cancelled'
+                                `;
+                                
+                                con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                                    const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                                        ? parseInt(paxResult[0].total_passengers) 
+                                        : actualPaxCount;
+                                    
+                                    try {
+                                        await updateCalendarEvent(eventIdForUpdate, {
+                                            location: chooseLocation,
+                                            flightType: chooseFlightType.type,
+                                            passengerCount: totalPassengers,
+                                            flightDate: bookingDateTime,
+                                            bookingId: bookingId.toString()
+                                        });
+                                        console.log('✅ [updateBooking] Google Calendar event updated successfully (after cleanup error)');
+                                        res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                    } catch (updateErr) {
+                                        console.error('❌ [updateBooking] Error updating Google Calendar event:', updateErr);
+                                        res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                    }
+                                });
+                            } else {
+                                // No existing event OR this is a rebook: create new event
+                                console.log('📅 [updateBooking] Creating new Google Calendar event (cleanup failed or rebook)');
+                                if (isRebook) {
+                                    console.log('📅 [updateBooking] REBOOK: Creating new event for new date (cleanup may have partially failed)');
+                                }
+                                
+                                if (isPrivateFlight) {
+                                    createGoogleCalendarEventForUpdate(() => {
+                                        res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                    });
+                                } else {
+                                    const checkSharedFlightSql = `
+                                        SELECT COUNT(*) as booking_count 
+                                        FROM all_booking 
+                                        WHERE flight_date = ? 
+                                        AND location = ? 
+                                        AND flight_type = ? 
+                                        AND time_slot = ? 
+                                        AND status != 'Cancelled'
+                                        AND id != ?
+                                    `;
+                                    
+                                    con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null, bookingId], (checkErr, checkResult) => {
+                                        if (!checkErr && checkResult.length > 0) {
+                                            const existingBookings = checkResult[0].booking_count || 0;
+                                            if (existingBookings === 0) {
+                                                createGoogleCalendarEventForUpdate(() => {
+                                                    res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                                });
+                                            } else {
+                                                updateGoogleCalendarEventForSharedFlightUpdate(() => {
+                                                    res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                                });
+                                            }
+                                        } else {
+                                            createGoogleCalendarEventForUpdate(() => {
+                                                res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    );
+                });
+            } else {
+                const skipReason = !bookingDateTime ? 'No booking date/time' 
+                    : (bookingDateTime.trim() === '' || bookingDateTime === 'null') ? 'Booking date/time is empty/null'
+                    : bookingStatus !== 'Scheduled' ? `Status is '${bookingStatus}' (not 'Scheduled')`
+                    : 'Unknown reason';
+                console.log('⏭️ [updateBooking] Skipping Google Calendar event creation. Reason:', skipReason);
+                res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+            }
+            
+            // Helper function to create Google Calendar event for update
+            function createGoogleCalendarEventForUpdate(onComplete) {
+                console.log('📅 [createGoogleCalendarEventForUpdate] ========== CREATING NEW GOOGLE CALENDAR EVENT ==========');
+                console.log('📅 [createGoogleCalendarEventForUpdate] Function called for booking:', bookingId);
+                console.log('📅 [createGoogleCalendarEventForUpdate] Is rebook operation:', !!rebook_from_booking_id);
+                if (rebook_from_booking_id) {
+                    console.log('📅 [createGoogleCalendarEventForUpdate] REBOOK: Old event was deleted, creating new event for new date');
+                }
+                console.log('📅 [createGoogleCalendarEventForUpdate] Event details:', {
+                    location: chooseLocation,
+                    flightType: chooseFlightType.type,
+                    flightDate: bookingDateTime,
+                    timeSlot: selectedTime,
+                    bookingId: bookingId,
+                    isRebook: !!rebook_from_booking_id
+                });
+                
+                const getTotalPassengersSql = `
+                    SELECT SUM(pax) as total_passengers 
+                    FROM all_booking 
+                    WHERE flight_date = ? 
+                    AND location = ? 
+                    AND flight_type = ? 
+                    AND time_slot = ?
+                    AND status != 'Cancelled'
+                `;
+                
+                con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                    const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                        ? parseInt(paxResult[0].total_passengers) 
+                        : actualPaxCount;
+                    
+                    try {
+                        const eventId = await createCalendarEvent({
+                            location: chooseLocation,
+                            flightType: chooseFlightType.type,
+                            passengerCount: totalPassengers,
+                            flightDate: bookingDateTime,
+                            bookingId: bookingId.toString()
+                        });
+                        
+                        console.log('✅ [createGoogleCalendarEventForUpdate] Event created successfully, ID:', eventId);
+                        if (rebook_from_booking_id) {
+                            console.log('✅ [createGoogleCalendarEventForUpdate] REBOOK: New calendar event created for new date');
+                            console.log('✅ [createGoogleCalendarEventForUpdate] REBOOK: Old event should have been deleted in cleanup phase');
+                        }
+                        
+                        const isPrivateFlight = chooseFlightType.type === 'Private Charter' || chooseFlightType.type === 'Private';
+                        
+                        if (isPrivateFlight) {
+                            con.query(
+                                'UPDATE all_booking SET google_calendar_event_id = ? WHERE id = ?',
+                                [eventId, bookingId],
+                                (updateErr) => {
+                                    if (updateErr) {
+                                        console.error('❌ Error updating booking with Google Calendar event ID:', updateErr);
+                                    } else {
+                                        console.log('✅ Google Calendar event ID saved to booking:', eventId);
+                                    }
+                                    if (onComplete) onComplete();
+                                }
+                            );
+                        } else {
+                            const updateAllBookingsSql = `
+                                UPDATE all_booking 
+                                SET google_calendar_event_id = ? 
+                                WHERE flight_date = ? 
+                                AND location = ? 
+                                AND flight_type = ? 
+                                AND time_slot = ?
+                                AND status != 'Cancelled'
+                            `;
+                            con.query(
+                                updateAllBookingsSql,
+                                [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null],
+                                (updateErr, updateResult) => {
+                                    if (updateErr) {
+                                        console.error('❌ Error updating bookings with Google Calendar event ID:', updateErr);
+                                    } else {
+                                        console.log(`✅ Google Calendar event ID saved to ${updateResult.affectedRows} bookings for shared flight:`, eventId);
+                                    }
+                                    if (onComplete) onComplete();
+                                }
+                            );
+                        }
+                    } catch (calendarError) {
+                        console.error('❌ Error creating Google Calendar event:', calendarError);
+                        if (onComplete) onComplete();
+                    }
+                });
+            }
+            
+            // Helper function to update Google Calendar event for shared flight
+            function updateGoogleCalendarEventForSharedFlightUpdate(onComplete) {
+                console.log('📅 [updateGoogleCalendarEventForSharedFlightUpdate] Function called for booking:', bookingId);
+                
+                // Get existing event ID for this flight slot
+                const getEventIdSql = `
+                    SELECT google_calendar_event_id 
+                    FROM all_booking 
+                    WHERE flight_date = ? 
+                    AND location = ? 
+                    AND flight_type = ? 
+                    AND time_slot = ?
+                    AND status != 'Cancelled'
+                    AND google_calendar_event_id IS NOT NULL
+                    LIMIT 1
+                `;
+                
+                con.query(getEventIdSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (eventIdErr, eventIdResult) => {
+                    if (eventIdErr || !eventIdResult || eventIdResult.length === 0) {
+                        console.log('⚠️ [updateGoogleCalendarEventForSharedFlightUpdate] No existing event found, creating new one');
+                        createGoogleCalendarEventForUpdate(onComplete);
+                        return;
+                    }
+                    
+                    const existingEventId = eventIdResult[0].google_calendar_event_id;
+                    
+                    // Get total passenger count
+                    const getTotalPassengersSql = `
+                        SELECT SUM(pax) as total_passengers 
+                        FROM all_booking 
+                        WHERE flight_date = ? 
+                        AND location = ? 
+                        AND flight_type = ? 
+                        AND time_slot = ?
+                        AND status != 'Cancelled'
+                    `;
+                    
+                    con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                        const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
+                            ? parseInt(paxResult[0].total_passengers) 
+                            : actualPaxCount;
+                        
+                        try {
+                            await updateCalendarEvent(existingEventId, {
+                                location: chooseLocation,
+                                flightType: chooseFlightType.type,
+                                passengerCount: totalPassengers,
+                                flightDate: bookingDateTime,
+                                bookingId: bookingId.toString()
+                            });
+                            
+                            // Update all bookings for this flight slot with the event ID
+                            const updateAllBookingsSql = `
+                                UPDATE all_booking 
+                                SET google_calendar_event_id = ? 
+                                WHERE flight_date = ? 
+                                AND location = ? 
+                                AND flight_type = ? 
+                                AND time_slot = ?
+                                AND status != 'Cancelled'
+                            `;
+                            con.query(
+                                updateAllBookingsSql,
+                                [existingEventId, bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null],
+                                (updateErr, updateResult) => {
+                                    if (updateErr) {
+                                        console.error('❌ Error updating bookings with Google Calendar event ID:', updateErr);
+                                    } else {
+                                        console.log(`✅ Google Calendar event updated for ${updateResult.affectedRows} bookings for shared flight:`, existingEventId);
+                                    }
+                                    if (onComplete) onComplete();
+                                }
+                            );
+                        } catch (updateErr) {
+                            console.error('❌ Error updating Google Calendar event:', updateErr);
+                            if (onComplete) onComplete();
+                        }
+                    });
+                });
+            }
         }
         
         // Ensure voucher_code exists in voucher_codes table before inserting booking
@@ -10860,7 +11296,133 @@ app.post('/api/createBooking', (req, res) => {
         function updateExistingBooking(bookingId) {
             console.log('🔄 Updating existing booking:', bookingId);
             
+            // For rebook operations: handle old Google Calendar event deletion
+            // Get old booking's Google Calendar event ID BEFORE updating (because UPDATE will change the booking)
+            let oldBookingCalendarEventId = null;
+            let oldBookingFlightType = null;
+            let oldBookingFlightDate = null;
+            let oldBookingLocation = null;
+            let oldBookingTimeSlot = null;
+            let rebookCleanupPromise = Promise.resolve();
+            
+            if (rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
+                console.log('🔄 [Rebook Update] ========== STARTING REBOOK CLEANUP ==========');
+                console.log('🔄 [Rebook Update] Getting old booking details for Google Calendar cleanup:', rebook_from_booking_id);
+                
+                rebookCleanupPromise = new Promise((resolve) => {
+                    // Get old booking details BEFORE UPDATE (including old flight_date, location, time_slot)
+                    con.query(
+                        'SELECT google_calendar_event_id, flight_type, flight_date, location, time_slot FROM all_booking WHERE id = ?',
+                        [parseInt(rebook_from_booking_id)],
+                        (oldBookingErr, oldBookingResult) => {
+                            if (oldBookingErr) {
+                                console.error('❌ [Rebook Update] ERROR getting old booking details:', oldBookingErr);
+                                console.error('❌ [Rebook Update] Error details:', JSON.stringify(oldBookingErr, null, 2));
+                                resolve(); // Continue even on error
+                                return;
+                            }
+                            
+                            if (!oldBookingResult || oldBookingResult.length === 0) {
+                                console.error('❌ [Rebook Update] Old booking not found in database:', rebook_from_booking_id);
+                                resolve(); // Continue even if not found
+                                return;
+                            }
+                            
+                            oldBookingCalendarEventId = oldBookingResult[0].google_calendar_event_id;
+                            oldBookingFlightType = oldBookingResult[0].flight_type;
+                            oldBookingFlightDate = oldBookingResult[0].flight_date;
+                            oldBookingLocation = oldBookingResult[0].location;
+                            oldBookingTimeSlot = oldBookingResult[0].time_slot;
+                            
+                            console.log('📅 [Rebook Update] Old booking details retrieved:', {
+                                eventId: oldBookingCalendarEventId,
+                                flightType: oldBookingFlightType,
+                                flightDate: oldBookingFlightDate,
+                                location: oldBookingLocation,
+                                timeSlot: oldBookingTimeSlot,
+                                hasEventId: !!oldBookingCalendarEventId
+                            });
+                            
+                            if (!oldBookingCalendarEventId) {
+                                console.log('⚠️ [Rebook Update] Old booking has no Google Calendar event ID - will create new event');
+                                resolve();
+                                return;
+                            }
+                            
+                            // For rebook: DELETE the old event and CREATE a new one
+                            // This ensures the old date is removed from Google Calendar and only the new date exists
+                            console.log('🗑️ [Rebook Update] Old booking has Google Calendar event ID - will DELETE old event and CREATE new one');
+                            console.log('🗑️ [Rebook Update] Event ID to delete:', oldBookingCalendarEventId);
+                            console.log('🗑️ [Rebook Update] Old date:', oldBookingFlightDate);
+                            console.log('🗑️ [Rebook Update] New date will be:', bookingDateTime);
+                            console.log('🗑️ [Rebook Update] Old location:', oldBookingLocation);
+                            console.log('🗑️ [Rebook Update] New location will be:', chooseLocation);
+                            
+                            // Delete the old Google Calendar event
+                            const isOldPrivateFlight = oldBookingFlightType === 'Private Charter' || oldBookingFlightType === 'Private';
+                            
+                            deleteCalendarEvent(oldBookingCalendarEventId)
+                                .then((deleteResult) => {
+                                    if (deleteResult && deleteResult.success) {
+                                        if (deleteResult.alreadyDeleted) {
+                                            console.log('✅ [Rebook Update] Old Google Calendar event was already deleted:', oldBookingCalendarEventId);
+                                        } else {
+                                            console.log('✅ [Rebook Update] Old Google Calendar event deleted successfully:', oldBookingCalendarEventId);
+                                        }
+                                    } else {
+                                        console.log('⚠️ [Rebook Update] Old Google Calendar event deletion returned unexpected result:', deleteResult);
+                                    }
+                                    
+                                    // Clear old booking's Google Calendar event ID from database
+                                    if (isOldPrivateFlight) {
+                                        // Private flight: only clear from old booking
+                                        con.query(
+                                            'UPDATE all_booking SET google_calendar_event_id = NULL WHERE id = ?',
+                                            [parseInt(rebook_from_booking_id)],
+                                            (clearErr) => {
+                                                if (clearErr) {
+                                                    console.error('❌ [Rebook Update] Error clearing old booking Google Calendar event ID:', clearErr);
+                                                } else {
+                                                    console.log('✅ [Rebook Update] Old booking Google Calendar event ID cleared (private flight)');
+                                                }
+                                                console.log('✅ [Rebook Update] ========== OLD BOOKING CLEANUP COMPLETED ==========');
+                                                resolve();
+                                            }
+                                        );
+                                    } else {
+                                        // Shared flight: clear from all bookings that share this event
+                                        con.query(
+                                            'UPDATE all_booking SET google_calendar_event_id = NULL WHERE google_calendar_event_id = ?',
+                                            [oldBookingCalendarEventId],
+                                            (clearErr, clearResult) => {
+                                                if (clearErr) {
+                                                    console.error('❌ [Rebook Update] Error clearing Google Calendar event ID from shared flight bookings:', clearErr);
+                                                } else {
+                                                    console.log('✅ [Rebook Update] Google Calendar event ID cleared from', clearResult.affectedRows, 'shared flight booking(s)');
+                                                }
+                                                console.log('✅ [Rebook Update] ========== OLD BOOKING CLEANUP COMPLETED ==========');
+                                                resolve();
+                                            }
+                                        );
+                                    }
+                                })
+                                .catch((deleteErr) => {
+                                    console.error('❌ [Rebook Update] Error deleting old Google Calendar event:', deleteErr);
+                                    console.error('❌ [Rebook Update] Error details:', JSON.stringify(deleteErr, null, 2));
+                                    // Continue even if deletion fails - we'll create a new event anyway
+                                    console.log('⚠️ [Rebook Update] Continuing with rebook despite deletion error - will create new event');
+                                    console.log('✅ [Rebook Update] ========== OLD BOOKING CLEANUP COMPLETED (with errors) ==========');
+                                    resolve();
+                                });
+                        }
+                    );
+                });
+            }
+            
             // Prepare UPDATE SQL (same fields as INSERT but without id and created_at)
+            // For rebook: keep google_calendar_event_id so we can UPDATE the existing event instead of creating new one
+            // For regular updates: also keep google_calendar_event_id
+            // We will UPDATE the existing Google Calendar event, not delete and create new one
             const updateBookingSql = `
                 UPDATE all_booking SET
                     name = ?,
@@ -10958,21 +11520,48 @@ app.post('/api/createBooking', (req, res) => {
                 bookingId // WHERE clause
             ];
             
-            console.log('=== EXECUTING BOOKING UPDATE SQL ===');
-            console.log('SQL:', updateBookingSql);
-            console.log('Values:', updateValues);
-            
-            con.query(updateBookingSql, updateValues, (err, result) => {
-                if (err) {
-                    console.error('=== DATABASE ERROR DETAILS ===');
-                    console.error('Error code:', err.code);
-                    console.error('Error message:', err.message);
-                    return res.status(500).json({ success: false, error: 'Database query failed to update booking', details: err.message });
-                }
+            // For rebook operations: wait for old event cleanup to complete BEFORE updating
+            // This ensures old event is deleted from Google Calendar before booking is updated
+            rebookCleanupPromise.then(() => {
+                console.log('✅ [Rebook Update] Old event cleanup completed, now executing UPDATE SQL');
+                console.log('=== EXECUTING BOOKING UPDATE SQL ===');
+                console.log('SQL:', updateBookingSql);
+                console.log('Values:', updateValues);
                 
-                console.log('✅ Booking updated successfully:', bookingId);
-                // Use the same success handler as insert, but with existing bookingId
-                handleBookingUpdateSuccess(bookingId);
+                con.query(updateBookingSql, updateValues, (err, result) => {
+                    if (err) {
+                        console.error('=== DATABASE ERROR DETAILS ===');
+                        console.error('Error code:', err.code);
+                        console.error('Error message:', err.message);
+                        return res.status(500).json({ success: false, error: 'Database query failed to update booking', details: err.message });
+                    }
+                    
+                    console.log('✅ Booking updated successfully:', bookingId);
+                    console.log('✅ [Rebook Update] UPDATE SQL completed, affected rows:', result?.affectedRows || 0);
+                    // Use the same success handler as insert, but with existing bookingId
+                    // Pass resolved promise since cleanup is already done
+                    // Pass oldBookingCalendarEventId so it can be used to update the Google Calendar event
+                    handleBookingUpdateSuccess(bookingId, Promise.resolve(), oldBookingCalendarEventId);
+                });
+            }).catch((cleanupErr) => {
+                console.error('❌ [Rebook Update] Error during old event cleanup, but proceeding with UPDATE:', cleanupErr);
+                // Even if cleanup fails, proceed with UPDATE
+                console.log('=== EXECUTING BOOKING UPDATE SQL (cleanup failed) ===');
+                console.log('SQL:', updateBookingSql);
+                console.log('Values:', updateValues);
+                
+                con.query(updateBookingSql, updateValues, (err, result) => {
+                    if (err) {
+                        console.error('=== DATABASE ERROR DETAILS ===');
+                        console.error('Error code:', err.code);
+                        console.error('Error message:', err.message);
+                        return res.status(500).json({ success: false, error: 'Database query failed to update booking', details: err.message });
+                    }
+                    
+                    console.log('✅ Booking updated successfully:', bookingId);
+                    // Pass oldBookingCalendarEventId so it can be used to update the Google Calendar event
+                    handleBookingUpdateSuccess(bookingId, Promise.resolve(), oldBookingCalendarEventId);
+                });
             });
         }
         
