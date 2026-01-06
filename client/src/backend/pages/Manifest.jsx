@@ -4339,7 +4339,7 @@ const Manifest = () => {
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
                                                     <TableRow>
                                                         <TableCell sx={isMobile ? { width: '45px', minWidth: '45px', maxWidth: '45px', padding: '8px 2px', fontSize: '12px' } : {}}>Booking ID</TableCell>
-                                                        <TableCell>Name</TableCell>
+                                                        <TableCell sx={isMobile ? { minWidth: '120px', width: '120px', padding: '8px 4px', fontSize: '12px' } : {}}>Name</TableCell>
                                                         <TableCell>Weight</TableCell>
                                                         <TableCell>Mobile</TableCell>
                                                         <TableCell>Email</TableCell>
@@ -4388,7 +4388,7 @@ const Manifest = () => {
                                                                         {flight.id || ''}
                                                                     </span>
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell sx={isMobile ? { minWidth: '120px', width: '120px', padding: '8px 4px' } : {}}>
                                                                     <span style={{ 
                                                                         color: 'rgb(50, 116, 180)', 
                                                                         cursor: 'pointer', 
@@ -4417,7 +4417,7 @@ const Manifest = () => {
                                                                         <div>
                                                                             {flight.passengers.map((p, i) => (
                                                                                 <div key={`${flight.id}-weight-${i}`} style={{ 
-                                                                                    fontSize: '8px',
+                                                                                    fontSize: isMobile ? '12px' : '8px',
                                                                                     marginBottom: i < flight.passengers.length - 1 ? '2px' : '0'
                                                                                 }}>
                                                                                     {p.weight ? `${p.weight}kg` : ''}
@@ -4483,6 +4483,7 @@ const Manifest = () => {
                                                         {isMobile ? (
                                                             <TableCell 
                                                                 colSpan={9}
+                                                                className="manifest-total-price-mobile"
                                                                 sx={{ 
                                                                     textAlign: 'left', 
                                                                     fontWeight: 600, 

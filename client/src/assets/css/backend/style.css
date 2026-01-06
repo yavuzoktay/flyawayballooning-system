@@ -1671,5 +1671,10 @@ a.edit-activity svg {
     .settings-card > div:not(.card-header) {
         padding: 12px !important;
     }
+    
+    /* Manifest Total Price Mobile */
+    .manifest-total-price-mobile {
+        font-size: 8px !important;
+    }
 }
 /* End Manifest Page Mobile Responsive Styles */
