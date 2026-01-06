@@ -4789,6 +4789,13 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
             }
         }
 
+        // Check if booking_id is required (cannot be null)
+        // If booking_id is null and voucher_id is provided, skip insertion or use a default booking_id
+        if (!bookingId && !voucherId) {
+            console.warn('⚠️ Cannot save payment history: both booking_id and voucher_id are null');
+            return;
+        }
+
         // Insert payment history (try with voucher_id and voucher_ref first, fall back without if columns don't exist)
         const insertPaymentHistoryWithVoucher = `
             INSERT INTO payment_history (
@@ -4806,11 +4813,15 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
+        // Use a default booking_id of 0 if bookingId is null but voucherId exists
+        // This is a workaround since booking_id cannot be null in the database
+        const finalBookingId = bookingId || (voucherId ? 0 : null);
+
         // Try inserting with voucher_id and voucher_ref first
         con.query(
             insertPaymentHistoryWithVoucher,
             [
-                bookingId || null,
+                finalBookingId,
                 voucherId || null,
                 voucherRef || null,
                 sessionId,
@@ -4837,7 +4848,7 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
                         con.query(
                             insertPaymentHistoryWithoutVoucher,
                             [
-                                bookingId || null,
+                                finalBookingId,
                                 sessionId,
                                 chargeId,
                                 paymentIntentId,
@@ -8137,9 +8148,9 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                 }));
             }
         } catch (err) {
-            // voucher_id column might not exist
-            if (err.code !== 'ER_BAD_FIELD_ERROR') {
-                console.error('Error querying by voucher_id:', err);
+            // voucher_id column might not exist - silently skip
+            if (err.code !== 'ER_BAD_FIELD_ERROR' && err.code !== 'ER_BAD_NULL_ERROR') {
+                console.warn('Error querying payment history by voucher_id:', err.message);
             }
         }
 
@@ -8305,9 +8316,10 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                         
                         // Re-fetch payment history after sync
                         try {
+                            // Check if voucher_id column exists before querying
                             const [syncedResults] = await con.promise().query(
-                                `SELECT * FROM payment_history WHERE voucher_id = ? OR voucher_ref = ? ORDER BY created_at DESC LIMIT 5`,
-                                [voucher.id, voucher.voucher_ref]
+                                `SELECT * FROM payment_history WHERE stripe_payment_intent_id = ? OR stripe_charge_id = ? ORDER BY created_at DESC LIMIT 5`,
+                                [sessionData.stripe_payment_intent_id, sessionData.stripe_charge_id]
                             );
                             if (syncedResults && syncedResults.length > 0) {
                                 console.log('✅ Found payment history after Stripe sync:', syncedResults.length, 'records');
@@ -8318,7 +8330,26 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                                 }));
                             }
                         } catch (refetchErr) {
-                            console.warn('Error re-fetching payment history after sync:', refetchErr.message);
+                            // If voucher_id column doesn't exist, try alternative query
+                            if (refetchErr.code === 'ER_BAD_FIELD_ERROR') {
+                                try {
+                                    const [altResults] = await con.promise().query(
+                                        `SELECT * FROM payment_history WHERE stripe_payment_intent_id = ? OR stripe_charge_id = ? ORDER BY created_at DESC LIMIT 5`,
+                                        [sessionData.stripe_payment_intent_id, sessionData.stripe_charge_id]
+                                    );
+                                    if (altResults && altResults.length > 0) {
+                                        paymentHistory = altResults.map(p => ({
+                                            ...p,
+                                            voucher_id: p.voucher_id || voucher.id,
+                                            voucher_ref: p.voucher_ref || voucher.voucher_ref
+                                        }));
+                                    }
+                                } catch (altErr) {
+                                    console.warn('Error re-fetching payment history after sync (alternative query):', altErr.message);
+                                }
+                            } else {
+                                console.warn('Error re-fetching payment history after sync:', refetchErr.message);
+                            }
                         }
                     }
                 }

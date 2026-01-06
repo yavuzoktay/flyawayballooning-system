@@ -112,10 +112,6 @@ const PaginatedTable = ({
     columns.forEach((item) => {
         mainHead.push(getColLabel(item));
     });
-    // Add Actions column for bookings/vouchers context
-    if ((context === 'bookings' || context === 'vouchers') && onEmailClick) {
-        mainHead.push('Actions');
-    }
 
     // Checkbox logic for infinite scroll
     const isAllSelected = visibleData.length > 0 && visibleData.every((row, idx) => selectedRows.includes(idx));
@@ -426,8 +422,6 @@ const PaginatedTable = ({
                             />
                         );
                     })}
-                    {/* Actions column for bookings/vouchers */}
-                    {(context === 'bookings' || context === 'vouchers') && onEmailClick && <col style={{ width: '220px', minWidth: '220px' }} />}
                 </colgroup>
                 <thead style={{ background: "#3274b4", color: "#FFF" }}>
                     <tr>
@@ -795,54 +789,6 @@ const PaginatedTable = ({
                                         </td>
                                     );
                                 })}
-                                {/* Actions column for bookings/vouchers */}
-                                {(context === 'bookings' || context === 'vouchers') && onEmailClick && (
-                                    <td style={{ 
-                                        textAlign: "center", 
-                                        padding: "8px",
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden"
-                                    }}>
-                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'nowrap' }}>
-                                            <button
-                                                onClick={() => onEmailClick(item)}
-                                                style={{
-                                                    padding: "5px 10px",
-                                                    backgroundColor: "#28a745",
-                                                    color: "white",
-                                                    border: "none",
-                                                    borderRadius: "4px",
-                                                    cursor: "pointer",
-                                                    fontSize: "15px",
-                                                    fontWeight: "500",
-                                                    lineHeight: 1.2
-                                                }}
-                                                title="Send Email"
-                                            >
-                                                📧 Email
-                                            </button>
-                                            {typeof onSmsClick === 'function' && (
-                                                <button
-                                                    onClick={() => onSmsClick(item)}
-                                                    style={{
-                                                        padding: "5px 10px",
-                                                        backgroundColor: "#17a2b8",
-                                                        color: "white",
-                                                        border: "none",
-                                                        borderRadius: "4px",
-                                                        cursor: "pointer",
-                                                        fontSize: "15px",
-                                                        fontWeight: "500",
-                                                        lineHeight: 1.2
-                                                    }}
-                                                    title="Send SMS"
-                                                >
-                                                    📱 SMS
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                )}
                             </tr>
                         );
                     })}

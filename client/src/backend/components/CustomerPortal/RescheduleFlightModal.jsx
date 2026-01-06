@@ -50,7 +50,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     // Get activity ID, location, and voucher type from booking data
     const activityId = bookingData?.activity_id || bookingData?.activityId;
     const location = bookingData?.location;
-    const voucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail;
+    // Get real voucher type - check multiple fields and exclude book_flight values
+    let voucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail;
+    // If voucherType is "Flight Voucher" or "Gift Voucher", try to find real voucher type
+    if (!voucherType || voucherType === 'Flight Voucher' || voucherType === 'Gift Voucher') {
+        voucherType = bookingData?.voucher?.voucher_type || 
+                     bookingData?.voucher?.actual_voucher_type || 
+                     bookingData?.voucher_type_detail ||
+                     bookingData?.voucher_type ||
+                     null;
+    }
     const experience = bookingData?.experience || bookingData?.flight_type || bookingData?.flight_type_source;
     const pax = Number(bookingData?.pax || bookingData?.passengers?.length || 0);
     
@@ -213,17 +222,53 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
     const matchesExperience = (availability) => {
         const selectedType = (experience || '').toLowerCase().trim();
-        if (!selectedType) return true;
-
-        if (!Array.isArray(availability?.flight_types_array) || availability.flight_types_array.length === 0) {
-            if (availability?.flight_types) {
-                const flightTypesStr = String(availability.flight_types).toLowerCase();
-                if (selectedType.includes('shared') && flightTypesStr.includes('shared')) return true;
-                if (selectedType.includes('private') && flightTypesStr.includes('private')) return true;
+        
+        // Determine if this is a shared or private experience based on voucher type
+        // Shared voucher types: "Any Day Flight", "Weekday Morning", "Flexible Weekday"
+        // Private voucher types: "Private Charter", "Proposal Flight"
+        const voucherTypeStr = String(voucherType || '').toLowerCase().trim();
+        const isBookFlightValue = voucherTypeStr === 'flight voucher' || voucherTypeStr === 'gift voucher';
+        const sharedVoucherTypes = ['any day flight', 'weekday morning', 'flexible weekday', 'anytime', 'any day'];
+        const privateVoucherTypes = ['private charter', 'proposal flight', 'proposal'];
+        
+        // Check slot's voucher_types to determine if it's shared or private
+        // This is more reliable than using booking's voucherType which might be "Flight Voucher"
+        const slotVoucherTypes = getVoucherTypesForAvailability(availability);
+        const slotVoucherTypesLower = slotVoucherTypes.map(vt => String(vt).toLowerCase().trim());
+        const slotIsShared = slotVoucherTypesLower.some(vt => sharedVoucherTypes.some(svt => vt.includes(svt)));
+        const slotIsPrivate = slotVoucherTypesLower.some(vt => privateVoucherTypes.some(pvt => vt.includes(pvt)));
+        
+        // If voucher type is specified and not a book_flight value, use it to determine experience
+        let expectedExperience = null;
+        if (voucherType && !isBookFlightValue) {
+            if (sharedVoucherTypes.some(vt => voucherTypeStr.includes(vt))) {
+                expectedExperience = 'shared';
+            } else if (privateVoucherTypes.some(vt => voucherTypeStr.includes(vt))) {
+                expectedExperience = 'private';
             }
-            return true;
         }
+        
+        // If booking's voucher type is "Flight Voucher" (book_flight value), we need to determine experience differently
+        // Since we can't get the real voucher type from bookingData, we'll use slot's voucher_types
+        // But ONLY if the slot's voucher_types match shared or private voucher types
+        // This is a fallback - ideally we'd have the real voucher type from bookingData
+        if (isBookFlightValue) {
+            // Use slot's voucher_types to determine experience
+            // If slot has shared voucher types only, expect shared experience
+            // If slot has private voucher types only, expect private experience
+            if (slotIsShared && !slotIsPrivate) {
+                expectedExperience = 'shared';
+            } else if (slotIsPrivate && !slotIsShared) {
+                expectedExperience = 'private';
+            }
+            // If slot has both or neither, don't filter by experience (let voucher matching handle it)
+        }
+        
+        // If no experience specified and no voucher type constraint, allow all
+        if (!selectedType && !expectedExperience) return true;
 
+        // Check flight_types_array first
+        if (Array.isArray(availability?.flight_types_array) && availability.flight_types_array.length > 0) {
         const normalize = (value = '') => value.toLowerCase().trim();
         const selectedKeywords = {
             shared: selectedType.includes('shared'),
@@ -231,7 +276,13 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             charter: selectedType.includes('charter'),
         };
 
-        return availability.flight_types_array.some(type => {
+            // If expectedExperience is set from voucher type, use it instead of selectedType
+            if (expectedExperience) {
+                selectedKeywords.shared = expectedExperience === 'shared';
+                selectedKeywords.private = expectedExperience === 'private';
+            }
+
+            const matches = availability.flight_types_array.some(type => {
             const normalizedType = normalize(type);
             if (!normalizedType) return false;
             if (normalizedType === selectedType) return true;
@@ -247,7 +298,34 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             if (selectedKeywords.private && typeKeywords.private) return true;
             if (selectedKeywords.charter && typeKeywords.charter) return true;
             return false;
-        });
+            });
+            
+            return matches;
+        }
+
+        // Fallback to flight_types string
+        if (availability?.flight_types) {
+            const flightTypesStr = String(availability.flight_types).toLowerCase();
+            const isShared = flightTypesStr.includes('shared');
+            const isPrivate = flightTypesStr.includes('private');
+            
+            // If expectedExperience is set from voucher type, use it
+            if (expectedExperience) {
+                if (expectedExperience === 'shared' && isShared) return true;
+                if (expectedExperience === 'private' && isPrivate) return true;
+                return false;
+            }
+            
+            // Otherwise use selectedType
+            if (selectedType.includes('shared') && isShared) return true;
+            if (selectedType.includes('private') && isPrivate) return true;
+            
+            // If no match found, return false (don't show slot)
+            return false;
+        }
+
+        // If no flight type information available, return false (don't show slot)
+        return false;
     };
 
     // Voucher-type date/time filtering (mirrors LiveAvailabilitySection)
@@ -442,10 +520,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             const withLoc = data.map(d => {
                                 const slotLocation = d.location || loc;
                                 return {
-                                    ...d,
+                                ...d,
                                     location: slotLocation,
                                     normalized_location: normalizeLocation(slotLocation), // Store normalized for easier debugging
-                                    activity_id: d.activity_id || finalActivityId
+                                activity_id: d.activity_id || finalActivityId
                                 };
                             });
                             collected.push(...withLoc);
@@ -481,32 +559,60 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         fetchAvailabilitiesForLocations();
     }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData, isFlightVoucher]);
 
-    // Final filtered availabilities - match LiveAvailabilitySection behaviour as closely as possible
+    // Filtered availabilities - similar to Change Flight Location modal
+    // Filter by location, experience, voucher type, and past slots
+    // This matches the filtering logic used in Change Flight Location modal
     const finalFilteredAvailabilities = availabilities.filter(a => {
         // Location filter (selected checkboxes). If none selected, allow all.
-        // Normalize locations for case-insensitive comparison
         const normalizedSelectedLocations = selectedLocations.map(normalizeLocation);
         const normalizedAvailabilityLocation = normalizeLocation(a?.location);
         const matchesLoc = normalizedSelectedLocations.length === 0 || !normalizedAvailabilityLocation || normalizedSelectedLocations.includes(normalizedAvailabilityLocation);
-        const matchesExp = matchesExperience(a);
-
-        const slotStatus = getSlotStatus(a);
-        const availableForSelection = getAvailableSeatsForSelection(a);
-        const isOpen = slotStatus === 'open' || availableForSelection > 0;
-        const hasCapacity = availableForSelection > 0 || (a.capacity && Number(a.capacity) > 0);
+        
+        // Experience filter - if no experience specified, allow all
+        const matchesExp = !experience || matchesExperience(a);
 
         // Keep only future slots
         const slotDateTime = dayjs(`${a.date} ${a.time}`);
         const isFuture = slotDateTime.isAfter(dayjs());
 
+        // Check status and availability (like Change Flight Location)
+        const status = getSlotStatus(a);
+        const available = Number(a.available) || Number(a.calculated_available) || 0;
+        const isOpen = status === 'open' || available > 0;
+
         // Voucher matching (if backend provides voucher_types on each availability)
+        // IMPORTANT: "Flight Voucher" and "Gift Voucher" are book_flight values, not voucher types
+        // Voucher types are like "Any Day Flight", "Weekday Morning", "Private Charter", etc.
+        let matchesVoucher = true;
+        const voucherTypeStr = String(voucherType || '').trim();
+        const isBookFlightValue = voucherTypeStr === 'Flight Voucher' || voucherTypeStr === 'Gift Voucher';
+        
+        // Get slot's voucher types
         const availabilityVoucherTypes = getVoucherTypesForAvailability(a);
         const normalizedAvailabilityTypes = availabilityVoucherTypes.map(normalizeVoucherName);
-        const normalizedSelectedVoucher = normalizeVoucherName(String(voucherType || ''));
+        
+        // If booking's voucher type is "Flight Voucher" (book_flight value), we need to filter by slot's voucher_types
+        // Only show slots that have shared voucher types (like "Any Day Flight", "Weekday Morning")
+        // and exclude slots that only have private voucher types (like "Private Charter", "Proposal Flight")
+        if (voucherType && isBookFlightValue) {
+            const sharedVoucherTypes = ['any day flight', 'weekday morning', 'flexible weekday', 'anytime', 'any day'];
+            const privateVoucherTypes = ['private charter', 'proposal flight', 'proposal'];
+            
+            const slotIsShared = normalizedAvailabilityTypes.some(vt => sharedVoucherTypes.some(svt => vt.includes(svt)));
+            const slotIsPrivate = normalizedAvailabilityTypes.some(vt => privateVoucherTypes.some(pvt => vt.includes(pvt)));
+            
+            // Only show slots with shared voucher types (exclude private-only slots)
+            // This assumes the booking is for a shared voucher type like "Any Day Flight"
+            // If slot has both shared and private, show it (it's available for shared)
+            // If slot has only private, don't show it
+            matchesVoucher = slotIsShared; // Show if slot has any shared voucher types
+        }
+        // Only apply voucher type filtering if voucherType is a real voucher type (not book_flight value)
+        else if (voucherType && !isBookFlightValue) {
+            const normalizedSelectedVoucher = normalizeVoucherName(voucherTypeStr);
         const isWildcardVoucher = normalizedAvailabilityTypes.length === 0 ||
             normalizedAvailabilityTypes.some(type => voucherWildcardTerms.includes(type));
 
-        let matchesVoucher = true;
         if (normalizedSelectedVoucher && !isWildcardVoucher) {
             matchesVoucher = normalizedAvailabilityTypes.some(type => {
                 const t = String(type || '').trim();
@@ -515,8 +621,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         }
 
         const matchesVoucherTypeFilter = filterByVoucherType(a);
+            matchesVoucher = matchesVoucher && matchesVoucherTypeFilter;
+        }
 
-        return isFuture && isOpen && hasCapacity && matchesLoc && matchesExp && matchesVoucher && matchesVoucherTypeFilter;
+        const passes = isFuture && matchesLoc && matchesExp && isOpen && matchesVoucher;
+
+        return passes;
     });
 
     // Debug: Log filtered results
@@ -524,61 +634,78 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         if (availabilities.length > 0 && selectedLocations.length > 0) {
             console.log('RescheduleFlightModal - Filtering results:', {
                 totalAvailabilities: availabilities.length,
-                filteredAvailabilities: finalFilteredAvailabilities.length,
+                finalFilteredAvailabilities: finalFilteredAvailabilities.length,
                 selectedLocations: selectedLocations,
                 normalizedSelectedLocations: selectedLocations.map(normalizeLocation),
+                experience: experience,
+                voucherType: voucherType,
                 uniqueLocationsInAvailabilities: [...new Set(availabilities.map(a => a.location))],
                 uniqueLocationsInFiltered: [...new Set(finalFilteredAvailabilities.map(a => a.location))]
             });
         }
-    }, [availabilities.length, finalFilteredAvailabilities.length, selectedLocations.join(',')]);
+    }, [availabilities.length, finalFilteredAvailabilities.length, selectedLocations.join(','), experience, voucherType]);
 
     const getTimesForDate = (date) => {
         if (!date) return [];
         const dateStr = getLocalDateStr(date);
 
-        // IMPORTANT: return ALL slots for the popup (including 0 available) so users can see Sold Out times
-        let matchingSlots = finalFilteredAvailabilities.filter(a => {
-            const slotDate = a.date?.includes('T') ? a.date.split('T')[0] : a.date;
+        // Use finalFilteredAvailabilities (already filtered by location, experience, voucher type)
+        // Similar to Change Flight Location modal
+        const matchingSlots = finalFilteredAvailabilities.filter(a => {
+            if (!a.date) return false;
+            const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
             return slotDate === dateStr;
         });
         
-        // Apply additional voucher type filtering for Weekday Morning (must be morning times)
-        const vtLower = String(voucherType || '').toLowerCase().trim();
-        if (vtLower === 'weekday morning' || vtLower === 'weekday morning flight') {
-                matchingSlots = matchingSlots.filter(a => isMorning(a.time));
-        }
-
-        return matchingSlots.sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
+        // Calculate available seats for each slot based on resource usage
+        const slotsWithAvailability = matchingSlots.map(slot => ({
+            ...slot,
+            availableSeats: getAvailableSeatsForSelection(slot)
+        }));
+        
+        // IMPORTANT: return ALL slots for the popup (including 0 available) so users can see Sold Out times
+        // But sort by availability (available first)
+        return slotsWithAvailability.sort((a, b) => {
+            // First sort by availability (available first)
+            if (a.availableSeats > 0 && b.availableSeats === 0) return -1;
+            if (a.availableSeats === 0 && b.availableSeats > 0) return 1;
+            // Then sort by time
+            return String(a.time || '').localeCompare(String(b.time || ''));
+        });
     };
 
     const getSpacesForDate = (date) => {
         const dateStr = getLocalDateStr(date);
-        const allSlotsForDate = finalFilteredAvailabilities.filter(a => {
-            const slotDate = a.date?.includes('T') ? a.date.split('T')[0] : a.date;
+        
+        // Use finalFilteredAvailabilities (location + experience + voucher type filtered) 
+        // Similar to Change Flight Location modal which uses filtered availabilities directly
+        const slots = finalFilteredAvailabilities.filter(a => {
+            if (!a.date) return false;
+            const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
             return slotDate === dateStr;
         });
 
-        const total = allSlotsForDate.reduce((sum, s) => sum + getAvailableSeatsForSelection(s), 0);
-        const sharedTotal = allSlotsForDate.reduce((sum, s) => sum + getRemainingSeats(s), 0);
-
-        const hasOpenSlots = allSlotsForDate.some(slot => getSlotStatus(slot) === 'open' || getRemainingSeats(slot) > 0);
-        const allSlotsClosed = allSlotsForDate.length > 0 && allSlotsForDate.every(slot => getSlotStatus(slot) === 'closed' && getRemainingSeats(slot) <= 0);
-        const selectionHasAvailability = allSlotsForDate.some(slot => getAvailableSeatsForSelection(slot) > 0);
-        const sharedSoldOut = (allSlotsForDate.length > 0 && sharedTotal === 0 && !hasOpenSlots) || allSlotsClosed;
+        // Calculate total available - use available or calculated_available directly (like Change Flight Location)
+        // This matches the logic in Change Flight Location modal
+        const totalAvailable = slots.reduce((acc, s) => {
+            const available = Number(s.available) || Number(s.calculated_available) || 0;
+            return acc + available;
+        }, 0);
         
-        // Check if there's enough space for all passengers
+        // Get passenger count from booking data
         const passengerCount = pax || 1;
-        const hasEnoughSpace = total >= passengerCount;
-        const selectionSoldOut = allSlotsForDate.length === 0 || !selectionHasAvailability || !hasEnoughSpace;
+        // Check if there's enough space for all passengers
+        const hasEnoughSpace = totalAvailable >= passengerCount;
+        const soldOut = slots.length > 0 && (totalAvailable <= 0 || !hasEnoughSpace);
 
         return {
-            total,
-            sharedTotal,
-            sharedSoldOut,
-            soldOut: selectionSoldOut,
-            slots: allSlotsForDate,
-            hasEnoughSpace
+            total: totalAvailable,
+            sharedTotal: totalAvailable,
+            sharedSoldOut: soldOut,
+            soldOut: soldOut,
+            slots: slots,
+            hasEnoughSpace,
+            allSlots: slots
         };
     };
 
@@ -603,8 +730,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             
             const { total, soldOut, slots, hasEnoughSpace } = getSpacesForDate(d.toDate());
             const hasAnySlots = slots.length > 0;
+            
             // Date is selectable only if there's enough space for all passengers
-            const isSelectable = inCurrentMonth && !isPast && hasAnySlots && hasEnoughSpace;
+            // Similar to Change Flight Location modal logic
+            const isSelectable = inCurrentMonth && !isPast && hasAnySlots && !soldOut && hasEnoughSpace;
             
             cells.push(
                 <div
@@ -636,18 +765,14 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ? '#f0f0f0'
                                 : soldOut
                                     ? '#888'
-                                    : hasAnySlots
-                                        ? '#22c55e'  // Green for available dates
-                                        : '#f0f0f0',  // Light grey for dates with no slots
+                                    : '#22c55e',  // Green for available dates (like Change Flight Location)
                         color: isSelected
                             ? '#fff'
                             : isPast
                                 ? '#999'
                                 : soldOut
                                     ? '#fff'
-                                    : hasAnySlots
-                                        ? '#fff'
-                                        : '#999',
+                                    : '#fff',
                         display: 'flex',
                         opacity: !inCurrentMonth ? 0 : (isSelectable ? 1 : 0.6),
                         pointerEvents: inCurrentMonth && isSelectable ? 'auto' : 'none',
@@ -1087,9 +1212,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                         </Box>
                                     ) : (
                                         getTimesForDate(selectedDate).map(slot => {
-                                            // Use the same availability logic as calendar totals:
-                                            // this accounts for shared/private resource constraints (Balloon 210 / 105) and global locks.
-                                            const availableForSelection = getAvailableSeatsForSelection(slot);
+                                            // Use availableSeats from getTimesForDate (already calculated with resource usage)
+                                            // This accounts for shared/private resource constraints (Balloon 210 / 105) and global locks.
+                                            const availableForSelection = slot.availableSeats || getAvailableSeatsForSelection(slot);
                                             const passengerCount = pax || 1;
                                             // Check if there's enough space for all passengers
                                             const hasEnoughSpace = availableForSelection >= passengerCount;
