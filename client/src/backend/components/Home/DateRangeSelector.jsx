@@ -216,7 +216,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                         alignSelf: isMobile ? 'flex-end' : 'flex-start',
                         whiteSpace: 'nowrap',
                         fontSize: isMobile ? '11px' : 'inherit',
-                        height: isMobile ? '30px' : '36px',
+                        height: isMobile ? '35px' : '36px',
                         marginTop: isMobile ? 0 : '20px'
                     }}
                 >
