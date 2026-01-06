@@ -612,7 +612,10 @@ const PaginatedTable = ({
                                                     return `${day}/${month}/${year}`;
                                                 })()
                                             ) : id === 'voucher_type' ? (
-                                                item[id] || ''
+                                                // For vouchers context, show book_flight if available, otherwise fallback to voucher_type
+                                                (context === 'vouchers' && (item.book_flight || item._original?.book_flight)) 
+                                                    ? (item.book_flight || item._original?.book_flight || item[id] || '')
+                                                    : (item[id] || '')
                                             ) : id === 'voucher_ref' ? (
                                                 (() => {
                                                     if (!item[id]) return '';

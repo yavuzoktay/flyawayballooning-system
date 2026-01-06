@@ -10659,6 +10659,98 @@ app.post('/api/createBooking', (req, res) => {
         insertBookingWithFinalPaid();
         
         function insertBookingWithFinalPaid() {
+        // Define handleBookingUpdateSuccess function before proceedWithBookingInsert
+        function handleBookingUpdateSuccess(bookingId) {
+            console.log('✅ [Update] Booking updated successfully:', bookingId);
+            
+            // Copy history entries if provided
+            const incomingHistoryEntriesRaw = Array.isArray(req.body.history_entries) ? req.body.history_entries : [];
+            if (incomingHistoryEntriesRaw.length > 0) {
+                console.log('📜 Copying history entries to updated booking:', {
+                    booking_id: bookingId,
+                    entries: incomingHistoryEntriesRaw.length
+                });
+                
+                const flightDate = bookingDateTime || selectedDate || null;
+                
+                incomingHistoryEntriesRaw
+                    .filter(entry => entry && typeof entry.status === 'string' && entry.status.trim() !== '')
+                    .forEach((entry, idx) => {
+                        const statusValue = entry.status.trim();
+                        let normalizedChangedAt = null;
+                        let normalizedFlightDate = null;
+                        
+                        if (entry.changed_at) {
+                            const parsed = moment(entry.changed_at);
+                            if (parsed.isValid()) {
+                                normalizedChangedAt = parsed.format('YYYY-MM-DD HH:mm:ss');
+                            }
+                        }
+                        
+                        if (entry.flight_date) {
+                            const parsed = moment(entry.flight_date);
+                            if (parsed.isValid()) {
+                                normalizedFlightDate = parsed.format('YYYY-MM-DD');
+                            }
+                        } else if (flightDate) {
+                            const parsed = moment(flightDate);
+                            if (parsed.isValid()) {
+                                normalizedFlightDate = parsed.format('YYYY-MM-DD');
+                            }
+                        }
+                        
+                        const insertHistorySql = `
+                            INSERT INTO booking_history (booking_id, status, changed_at, flight_date)
+                            VALUES (?, ?, ?, ?)
+                        `;
+                        
+                        con.query(insertHistorySql, [bookingId, statusValue, normalizedChangedAt, normalizedFlightDate], (histErr) => {
+                            if (histErr) {
+                                console.error('Error inserting history entry:', histErr);
+                            } else {
+                                console.log(`✅ History entry ${idx + 1} inserted for booking ${bookingId}`);
+                            }
+                        });
+                    });
+            }
+            
+            // Send automatic booking confirmation email
+            console.log('========================================');
+            console.log('📧 [updateBooking] EMAIL SEND PROCESS STARTING');
+            console.log('📧 [updateBooking] Booking ID:', bookingId);
+            console.log('📧 [updateBooking] Calling sendAutomaticBookingConfirmationEmail...');
+            console.log('========================================');
+            
+            try {
+                const emailOptions = deriveEmailOptionsForAutoSend();
+                sendAutomaticBookingConfirmationEmail(bookingId, emailOptions || undefined);
+                console.log('✅ [updateBooking] sendAutomaticBookingConfirmationEmail function called successfully');
+            } catch (emailError) {
+                console.error('❌ [updateBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
+            }
+            
+            // Send automatic booking rescheduled SMS if this is a rebook operation
+            if (email_template_override === 'Booking Rescheduled') {
+                console.log('========================================');
+                console.log('📱 [updateBooking] BOOKING RESCHEDULED SMS SEND PROCESS STARTING');
+                console.log('📱 [updateBooking] Booking ID:', bookingId);
+                console.log('📱 [updateBooking] Calling sendAutomaticBookingRescheduledSms...');
+                console.log('========================================');
+                
+                try {
+                    sendAutomaticBookingRescheduledSms(bookingId);
+                    console.log('✅ [updateBooking] sendAutomaticBookingRescheduledSms function called successfully');
+                } catch (smsError) {
+                    console.error('❌ [updateBooking] Error calling sendAutomaticBookingRescheduledSms:', smsError);
+                }
+            }
+            
+            // Note: Google Calendar event update is handled by the existing booking's event
+            // Since we're updating an existing booking, the calendar event should already exist
+            // and will be updated automatically when the booking is updated
+            res.status(200).json({ success: true, message: 'Booking updated successfully!', bookingId: bookingId });
+        }
+        
         // Ensure voucher_code exists in voucher_codes table before inserting booking
         // This prevents foreign key constraint errors
         if (voucher_code && voucher_code.trim() !== '') {
@@ -10705,6 +10797,155 @@ app.post('/api/createBooking', (req, res) => {
         }
         
         function proceedWithBookingInsert() {
+        // If rebook_from_booking_id is provided, update existing booking instead of creating new one
+        if (rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
+            const existingBookingId = parseInt(rebook_from_booking_id);
+            console.log('🔄 Rebook detected - Updating existing booking:', existingBookingId);
+            
+            // Check if booking exists
+            const checkBookingSql = `SELECT id FROM all_booking WHERE id = ? LIMIT 1`;
+            con.query(checkBookingSql, [existingBookingId], (checkErr, checkRows) => {
+                if (checkErr) {
+                    console.error('❌ Error checking existing booking:', checkErr);
+                    return res.status(500).json({ success: false, message: 'Error checking existing booking.' });
+                }
+                
+                if (!checkRows || checkRows.length === 0) {
+                    console.log('⚠️ Existing booking not found, creating new booking instead');
+                    // Booking doesn't exist, proceed with normal insert
+                    insertNewBooking();
+                    return;
+                }
+                
+                // Booking exists, update it
+                updateExistingBooking(existingBookingId);
+            });
+            return; // Exit early, will continue in callback
+        }
+        
+        // No rebook_from_booking_id, proceed with normal insert
+        insertNewBooking();
+        
+        function updateExistingBooking(bookingId) {
+            console.log('🔄 Updating existing booking:', bookingId);
+            
+            // Prepare UPDATE SQL (same fields as INSERT but without id and created_at)
+            const updateBookingSql = `
+                UPDATE all_booking SET
+                    name = ?,
+                    flight_type = ?,
+                    flight_date = ?,
+                    pax = ?,
+                    location = ?,
+                    status = ?,
+                    paid = ?,
+                    due = ?,
+                    voucher_code = ?,
+                    expires = ?,
+                    manual_status_override = ?,
+                    additional_notes = ?,
+                    hear_about_us = ?,
+                    ballooning_reason = ?,
+                    prefer = ?,
+                    weight = ?,
+                    email = ?,
+                    phone = ?,
+                    choose_add_on = ?,
+                    preferred_location = ?,
+                    preferred_time = ?,
+                    preferred_day = ?,
+                    flight_attempts = ?,
+                    activity_id = ?,
+                    time_slot = ?,
+                    experience = ?,
+                    voucher_type = ?,
+                    voucher_discount = ?,
+                    original_amount = ?,
+                    add_to_booking_items_total_price = ?,
+                    weather_refund_total_price = ?,
+                    flight_type_source = ?,
+                    resources = ?
+                WHERE id = ?
+            `;
+            
+            // Prepare update values (same as insert but without google_calendar_event_id and with bookingId at the end)
+            const updateValues = [
+                passengerName,
+                chooseFlightType.type,
+                bookingDateTime,
+                actualPaxCount,
+                chooseLocation,
+                bookingStatus,
+                finalPaidAmount,
+                0,
+                voucher_code || null,
+                expiresDateFinal,
+                0, // manual_status_override
+                (additionalInfo && additionalInfo.notes) || null,
+                (additionalInfo && additionalInfo.hearAboutUs) || null,
+                (additionalInfo && additionalInfo.reason) || null,
+                (additionalInfo && additionalInfo.prefer && typeof additionalInfo.prefer === 'object' && Object.keys(additionalInfo.prefer).length > 0
+                    ? Object.keys(additionalInfo.prefer).filter(k => additionalInfo.prefer[k]).join(', ')
+                    : (typeof additionalInfo?.prefer === 'string' && additionalInfo.prefer ? additionalInfo.prefer : null)),
+                mainPassenger.weight || null,
+                bookingEmail || mainPassenger.email || null,
+                mainPassengerPhone || null,
+                choose_add_on_str,
+                preferred_location || null,
+                preferred_time || null,
+                preferred_day || null,
+                finalFlightAttempts,
+                req.body.activity_id || null,
+                selectedTime || null,
+                experience || chooseFlightType.type,
+                (voucher_type && voucher_type.trim() !== '' && !isGenericExperienceValue(voucher_type)) 
+                    ? voucher_type 
+                    : (() => {
+                        if (voucher_code && typeof voucher_code === 'string' && voucher_code.length >= 3) {
+                            const upperCode = voucher_code.toUpperCase();
+                            const categoryMap = {
+                                'AT': 'Any Day Flight',
+                                'WM': 'Weekday Morning',
+                                'WF': 'Flexible Weekday',
+                                'WX': 'Weekday Flex'
+                            };
+                            if (upperCode.startsWith('B') && upperCode.length >= 3) {
+                                const category = upperCode.substring(1, 3);
+                                if (categoryMap[category]) {
+                                    return categoryMap[category];
+                                }
+                            }
+                        }
+                        return null;
+                    })(),
+                0, // voucher_discount
+                base_original_amount,
+                add_on_total_price,
+                weather_refund_total_price,
+                flight_type_source,
+                getAssignedResource(chooseFlightType.type || experience, actualPaxCount),
+                bookingId // WHERE clause
+            ];
+            
+            console.log('=== EXECUTING BOOKING UPDATE SQL ===');
+            console.log('SQL:', updateBookingSql);
+            console.log('Values:', updateValues);
+            
+            con.query(updateBookingSql, updateValues, (err, result) => {
+                if (err) {
+                    console.error('=== DATABASE ERROR DETAILS ===');
+                    console.error('Error code:', err.code);
+                    console.error('Error message:', err.message);
+                    return res.status(500).json({ success: false, error: 'Database query failed to update booking', details: err.message });
+                }
+                
+                console.log('✅ Booking updated successfully:', bookingId);
+                // Use the same success handler as insert, but with existing bookingId
+                handleBookingUpdateSuccess(bookingId);
+            });
+        }
+        
+        function insertNewBooking() {
         const bookingValues = [
             passengerName,
             chooseFlightType.type,
@@ -12186,6 +12427,7 @@ app.post('/api/createBooking', (req, res) => {
                 insertPassengers();
             }
         } // End of handleBookingInsertSuccess function
+        } // End of insertNewBooking function
         } // End of proceedWithBookingInsert function
         } // End of insertBookingWithFinalPaid function
     } // End of insertBookingAndPassengers function

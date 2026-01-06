@@ -292,6 +292,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return `${year}-${month}-${day}`;
     };
 
+    // Helper function to normalize location names for comparison
+    const normalizeLocation = (loc) => {
+        if (!loc) return '';
+        return String(loc).trim().toLowerCase();
+    };
+
     // Fetch activities / locations when modal opens (Flight Voucher style)
     useEffect(() => {
         if (!open) {
@@ -431,13 +437,19 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         if (availResponse.data?.success) {
                             const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
                             // Preserve location on slots (fallback to loc)
-                            const withLoc = data.map(d => ({
-                                ...d,
-                                location: d.location || loc,
-                                activity_id: d.activity_id || finalActivityId
-                            }));
+                            // Normalize location to ensure consistent matching
+                            const normalizedLoc = normalizeLocation(loc);
+                            const withLoc = data.map(d => {
+                                const slotLocation = d.location || loc;
+                                return {
+                                    ...d,
+                                    location: slotLocation,
+                                    normalized_location: normalizeLocation(slotLocation), // Store normalized for easier debugging
+                                    activity_id: d.activity_id || finalActivityId
+                                };
+                            });
                             collected.push(...withLoc);
-                            console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', loc, 'activityId:', finalActivityId);
+                            console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', loc, 'activityId:', finalActivityId, 'normalized:', normalizedLoc);
                         } else {
                             console.warn('RescheduleFlightModal - Failed to fetch availabilities for location:', loc, 'response:', availResponse.data);
                         }
@@ -455,6 +467,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 
                 setAvailabilities(collected);
                 console.log('RescheduleFlightModal - Total availabilities collected:', collected.length, 'for locations:', targetLocations);
+                console.log('RescheduleFlightModal - Selected locations:', selectedLocations, 'normalized:', selectedLocations.map(normalizeLocation));
+                console.log('RescheduleFlightModal - Unique locations in availabilities:', [...new Set(collected.map(a => a.location))]);
             } catch (err) {
                 console.error('RescheduleFlightModal - Error loading availabilities:', err);
                 setError('Could not fetch availabilities. Please try again later.');
@@ -470,7 +484,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     // Final filtered availabilities - match LiveAvailabilitySection behaviour as closely as possible
     const finalFilteredAvailabilities = availabilities.filter(a => {
         // Location filter (selected checkboxes). If none selected, allow all.
-        const matchesLoc = selectedLocations.length === 0 || !a?.location || selectedLocations.includes(a.location);
+        // Normalize locations for case-insensitive comparison
+        const normalizedSelectedLocations = selectedLocations.map(normalizeLocation);
+        const normalizedAvailabilityLocation = normalizeLocation(a?.location);
+        const matchesLoc = normalizedSelectedLocations.length === 0 || !normalizedAvailabilityLocation || normalizedSelectedLocations.includes(normalizedAvailabilityLocation);
         const matchesExp = matchesExperience(a);
 
         const slotStatus = getSlotStatus(a);
@@ -501,6 +518,20 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
         return isFuture && isOpen && hasCapacity && matchesLoc && matchesExp && matchesVoucher && matchesVoucherTypeFilter;
     });
+
+    // Debug: Log filtered results
+    React.useEffect(() => {
+        if (availabilities.length > 0 && selectedLocations.length > 0) {
+            console.log('RescheduleFlightModal - Filtering results:', {
+                totalAvailabilities: availabilities.length,
+                filteredAvailabilities: finalFilteredAvailabilities.length,
+                selectedLocations: selectedLocations,
+                normalizedSelectedLocations: selectedLocations.map(normalizeLocation),
+                uniqueLocationsInAvailabilities: [...new Set(availabilities.map(a => a.location))],
+                uniqueLocationsInFiltered: [...new Set(finalFilteredAvailabilities.map(a => a.location))]
+            });
+        }
+    }, [availabilities.length, finalFilteredAvailabilities.length, selectedLocations.join(',')]);
 
     const getTimesForDate = (date) => {
         if (!date) return [];

@@ -1215,6 +1215,7 @@ const BookingPage = () => {
                     name: item.name || '',
                     flight_type: item.flight_type || '',
                     voucher_type: item.voucher_type || '',
+                    book_flight: item.book_flight || '', // Add book_flight from getAllVoucherData
                     email: item.email || '',
                     phone: item.phone || '',
                     expires: item.expires || '',
@@ -3600,6 +3601,9 @@ setBookingDetail(finalVoucherDetail);
                         }
                     }
                     
+                    // Check if voucher already has a booking_id (rebook scenario)
+                    const existingBookingId = voucher.booking_id || voucher.bookingId || null;
+                    
                     // Prepare booking payload
                     const bookingPayloadBase = {
                         activitySelect: 'Redeem Voucher',
@@ -3620,7 +3624,8 @@ setBookingDetail(finalVoucherDetail);
                         activity_id: finalActivityId, // Add activity_id for backend
                         experience: experience, // Add experience from voucher
                         voucher_type: voucherType, // Add voucher_type from voucher
-                        selectedVoucherType: { title: voucherType } // Add selectedVoucherType for backend compatibility
+                        selectedVoucherType: { title: voucherType }, // Add selectedVoucherType for backend compatibility
+                        ...(existingBookingId ? { rebook_from_booking_id: existingBookingId } : {}) // Add rebook_from_booking_id if existing booking exists
                     };
                     
                     console.log('Flight Voucher Booking Payload:', bookingPayloadBase);
@@ -3653,6 +3658,17 @@ setBookingDetail(finalVoucherDetail);
                     }
                     
                     console.log('Booking created successfully:', createBookingResponse.data);
+                    
+                    // If this is a rebook (existing booking exists), delete the old booking after payment history is transferred
+                    if (existingBookingId) {
+                        try {
+                            await axios.delete(`/api/deleteBooking/${existingBookingId}`);
+                            console.log('Old booking deleted successfully:', existingBookingId);
+                        } catch (deleteErr) {
+                            console.error('Error deleting old booking:', deleteErr);
+                            // Continue anyway - payment history should already be transferred
+                        }
+                    }
                     
                     // Note: Voucher is already marked as redeemed by /api/createBooking endpoint
                     // when activitySelect === 'Redeem Voucher' and voucher_code exists
@@ -3699,7 +3715,9 @@ setBookingDetail(finalVoucherDetail);
                         setFilteredData(voucherResponse.data.data || []);
                     }
                     
-                    alert('Flight Voucher successfully redeemed and booking created! Confirmation email has been sent.');
+                    alert(existingBookingId 
+                        ? 'Flight Voucher successfully rebooked! Confirmation email has been sent.' 
+                        : 'Flight Voucher successfully redeemed and booking created! Confirmation email has been sent.');
                     setRebookLoading(false);
                     return;
                 } catch (error) {
@@ -4717,13 +4735,13 @@ setBookingDetail(finalVoucherDetail);
                                 <div className="booking-top-wrap">
                                     {/* Mobile: All Bookings heading with Export and Filter buttons */}
                                     {isMobile && (
-                                        <div className="booking-filter-heading" style={{
-                                            display: 'flex', 
-                                            alignItems: 'center', 
+                                    <div className="booking-filter-heading" style={{
+                                        display: 'flex', 
+                                        alignItems: 'center', 
                                             gap: '8px',
                                             flexWrap: 'nowrap',
                                             marginBottom: '10px'
-                                        }}>
+                                    }}>
                                             <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: 'auto' }}>ALL BOOKINGS</h3>
                                             <OutlinedInput
                                                 readOnly
@@ -4733,7 +4751,7 @@ setBookingDetail(finalVoucherDetail);
                                                     cursor: 'pointer',
                                                     height: '32px',
                                                     fontSize: 12,
-                                                    minWidth: '80px',
+                                                        minWidth: '80px',
                                                     '& input': {
                                                         cursor: 'pointer',
                                                         textAlign: 'center',
@@ -4761,7 +4779,7 @@ setBookingDetail(finalVoucherDetail);
                                                     cursor: 'pointer',
                                                     height: '32px',
                                                     fontSize: 12,
-                                                    minWidth: '80px',
+                                                        minWidth: '80px',
                                                     '& input': {
                                                         cursor: 'pointer',
                                                         textAlign: 'center',
@@ -4781,7 +4799,7 @@ setBookingDetail(finalVoucherDetail);
                                                     </InputAdornment>
                                                 }
                                             />
-                                        </div>
+                                    </div>
                                     )}
                                     <div className="booking-search-booking" style={{ 
                                         display: 'flex', 
@@ -4922,10 +4940,10 @@ setBookingDetail(finalVoucherDetail);
                                                 }
                                             />
                                         ) : (
-                                            <OutlinedInput
+                                        <OutlinedInput
                                                 placeholder="Search"
-                                                value={filters.search}
-                                                onChange={(e) => handleFilterChange("search", e.target.value)}
+                                            value={filters.search}
+                                            onChange={(e) => handleFilterChange("search", e.target.value)}
                                                 sx={{ 
                                                     fontSize: 14, 
                                                     '& input::placeholder': { fontSize: 14 },
@@ -4937,7 +4955,7 @@ setBookingDetail(finalVoucherDetail);
                                                         <SearchIcon />
                                                     </InputAdornment>
                                                 }
-                                            />
+                                        />
                                         )}
                                     </div>
                                     {/* Show active advanced filters as chips */}
@@ -5258,13 +5276,13 @@ setBookingDetail(finalVoucherDetail);
                                 <div className="booking-top-wrap">
                                     {/* Mobile heading + Export input for vouchers */}
                                     {isMobile && (
-                                        <div className="booking-filter-heading" style={{
-                                            display: 'flex', 
-                                            alignItems: 'center', 
+                                    <div className="booking-filter-heading" style={{
+                                        display: 'flex', 
+                                        alignItems: 'center', 
                                             gap: '8px',
                                             flexWrap: 'nowrap',
                                             marginBottom: '10px'
-                                        }}>
+                                    }}>
                                             <h3 style={{ fontFamily: "Gilroy Light", margin: 0, marginRight: 'auto' }}>ALL VOUCHERS</h3>
                                             <OutlinedInput
                                                 readOnly
@@ -5294,7 +5312,7 @@ setBookingDetail(finalVoucherDetail);
                                                     </InputAdornment>
                                                 }
                                             />
-                                        </div>
+                                    </div>
                                     )}
                                     <div className="booking-search-booking" style={{ 
                                         display: 'flex', 
@@ -5512,7 +5530,8 @@ setBookingDetail(finalVoucherDetail);
                                                                                             const flightType = (item.flight_type || "").toLowerCase();
                                             const voucherType = (item.voucher_type || "").toLowerCase();
                                             const actualVoucherType = (item.actual_voucher_type || "").toLowerCase();
-                                            return name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search) || actualVoucherType.includes(search);
+                                            const bookFlight = ((item.book_flight || item._original?.book_flight) || "").toLowerCase();
+                                            return name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search) || actualVoucherType.includes(search) || bookFlight.includes(search);
                                             }).length} vouchers found
                                         </Typography>
                                     </div>
@@ -5521,8 +5540,11 @@ setBookingDetail(finalVoucherDetail);
                                 <PaginatedTable
                                     itemsPerPage={10}
                                     data={filteredData.filter(item => {
-                                        // Voucher Type filter
-                                        if (filters.voucherType && item.voucher_type !== filters.voucherType) return false;
+                                        // Book Flight filter (use book_flight from getAllVoucherData)
+                                        if (filters.voucherType) {
+                                            const itemBookFlight = item.book_flight || item._original?.book_flight || item.voucher_type || '';
+                                            if (itemBookFlight !== filters.voucherType) return false;
+                                        }
                                         // Actual Voucher Type filter
                                         if (filters.actualVoucherType && item.actual_voucher_type !== filters.actualVoucherType) return false;
                                         // Experience filter
@@ -5542,13 +5564,14 @@ setBookingDetail(finalVoucherDetail);
                                             const offerCode = (item.offer_code || "").toLowerCase();
                                             const flightType = (item.flight_type || "").toLowerCase();
                                             const voucherType = (item.voucher_type || "").toLowerCase();
+                                            const bookFlight = ((item.book_flight || item._original?.book_flight) || "").toLowerCase();
                                             
                                             // Debug logging for search
-                                            if (search && (name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search))) {
-                                                console.log('Search match found:', { search, name, email, phone, voucherRef, offerCode, flightType, voucherType });
+                                            if (search && (name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search) || bookFlight.includes(search))) {
+                                                console.log('Search match found:', { search, name, email, phone, voucherRef, offerCode, flightType, voucherType, bookFlight });
                                             }
                                             
-                                            if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !voucherRef.includes(search) && !offerCode.includes(search) && !flightType.includes(search) && !voucherType.includes(search)) {
+                                            if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !voucherRef.includes(search) && !offerCode.includes(search) && !flightType.includes(search) && !voucherType.includes(search) && !bookFlight.includes(search)) {
                                                 return false;
                                             }
                                         }
