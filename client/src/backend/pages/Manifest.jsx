@@ -4943,10 +4943,18 @@ const Manifest = () => {
                                                 {(() => {
                                                     const b = bookingDetail.booking || {};
                                                     const v = bookingDetail.voucher || {};
+                                                    const originalVoucher = bookingDetail.originalVoucher || null;
                                                     const redeemed = (b.redeemed === true) || (b.voucher_redeemed === 1) || (typeof b.redeemed_at === 'string' && b.redeemed_at) || (v.redeemed === 'Yes' || v.redeemed === true) || (b.redeemed_voucher === 'Yes');
+                                                    
+                                                    // For redeemed vouchers, show the original voucher_ref instead of the new booking voucher_code
+                                                    // This fixes the issue where rebooked vouchers show the new code (e.g., BAT26JGS) instead of original (e.g., GATESMEOR)
+                                                    const voucherCodeToDisplay = (b.redeemed_voucher === 'Yes' || b.redeemed_voucher === 1) && originalVoucher && originalVoucher.voucher_ref
+                                                        ? originalVoucher.voucher_ref
+                                                        : (b.voucher_code || '');
+                                                    
                                                     return (
                                                         <Typography>
-                                                            <b>Redeemed Voucher:</b> {redeemed ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{b.voucher_code || ''}</span>
+                                                            <b>Redeemed Voucher:</b> {redeemed ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{voucherCodeToDisplay}</span>
                                                         </Typography>
                                                     );
                                                 })()}

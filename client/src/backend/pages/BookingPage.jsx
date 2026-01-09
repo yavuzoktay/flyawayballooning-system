@@ -1290,6 +1290,7 @@ const BookingPage = () => {
                 
                 return {
                     ...item,
+                    id: item.id || item._original?.id || null, // Ensure id is always at top level
                     created: formattedDate,
                     name: item.name || '',
                     flight_type: item.flight_type || '',
@@ -1665,6 +1666,7 @@ const BookingPage = () => {
                                 : (item.phone || item.mobile || ''));
                         
                         return {
+                    id: item.id || null, // Ensure id is always at top level
                     created: formattedDate,
                     name: displayName,
                     flight_type: item.experience_type || '', // Updated field name
@@ -2925,6 +2927,63 @@ setBookingDetail(finalVoucherDetail);
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
     }
+
+    // Delete selected items function
+    const handleDeleteSelected = async () => {
+        const selectedIds = activeTab === 'vouchers' ? selectedVoucherIds : selectedBookingIds;
+        
+        if (!selectedIds || selectedIds.length === 0) {
+            alert('Lütfen silmek için en az bir kayıt seçin!');
+            return;
+        }
+
+        const itemType = activeTab === 'vouchers' ? 'voucher' : 'booking';
+        const itemCount = selectedIds.length;
+        const confirmMessage = `Are you sure you want to delete ${itemCount} ${itemType}${itemCount > 1 ? 's' : ''}? This action cannot be undone.`;
+        
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            const deletePromises = selectedIds.map(id => {
+                if (activeTab === 'vouchers') {
+                    return axios.delete(`/api/deleteVoucher/${id}`);
+                } else {
+                    return axios.delete(`/api/deleteBooking/${id}`);
+                }
+            });
+
+            const results = await Promise.allSettled(deletePromises);
+            
+            const successful = results.filter(r => r.status === 'fulfilled').length;
+            const failed = results.filter(r => r.status === 'rejected').length;
+
+            if (failed > 0) {
+                const errorMessages = results
+                    .filter(r => r.status === 'rejected')
+                    .map(r => r.reason?.response?.data?.message || r.reason?.message || 'Unknown error')
+                    .join('\n');
+                
+                alert(`Some items could not be deleted:\n${errorMessages}\n\nSuccessfully deleted: ${successful} of ${itemCount}`);
+            } else {
+                alert(`Successfully deleted ${successful} ${itemType}${successful > 1 ? 's' : ''}`);
+            }
+
+            // Clear selections
+            if (activeTab === 'vouchers') {
+                setSelectedVoucherIds([]);
+            } else {
+                setSelectedBookingIds([]);
+            }
+
+            // Refresh data
+            window.location.reload();
+        } catch (error) {
+            console.error('Error deleting items:', error);
+            alert('An error occurred while deleting items. Please try again.');
+        }
+    };
 
     const handleCancelFlight = async () => {
         if (!bookingDetail?.booking?.id) return;
@@ -4709,6 +4768,16 @@ setBookingDetail(finalVoucherDetail);
                                 </Button>
                                 <Button
                                     variant="outlined"
+                                    color="error"
+                                    onClick={handleDeleteSelected}
+                                    disabled={!selectedBookingIds || selectedBookingIds.length === 0}
+                                    startIcon={<DeleteIcon />}
+                                    style={{ height: 40 }}
+                                >
+                                    Delete
+                                </Button>
+                                <Button
+                                    variant="outlined"
                                     color="secondary"
                                     onClick={() => setFilterDialogOpen(true)}
                                     startIcon={<FilterListIcon />}
@@ -4736,6 +4805,16 @@ setBookingDetail(finalVoucherDetail);
                                     style={{ height: 40 }}
                                 >
                                     Export
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={handleDeleteSelected}
+                                    disabled={!selectedVoucherIds || selectedVoucherIds.length === 0}
+                                    startIcon={<DeleteIcon />}
+                                    style={{ height: 40 }}
+                                >
+                                    Delete
                                 </Button>
                             </div>
                         </div>
@@ -4922,6 +5001,36 @@ setBookingDetail(finalVoucherDetail);
                                                 startAdornment={
                                                     <InputAdornment position="start">
                                                         <FileDownloadIcon fontSize="small" color="primary" />
+                                                    </InputAdornment>
+                                                }
+                                            />
+                                            <OutlinedInput
+                                                readOnly
+                                                onClick={handleDeleteSelected}
+                                                disabled={!selectedBookingIds || selectedBookingIds.length === 0}
+                                                value="Delete"
+                                                sx={{
+                                                    cursor: (!selectedBookingIds || selectedBookingIds.length === 0) ? 'not-allowed' : 'pointer',
+                                                    height: '32px',
+                                                    fontSize: 12,
+                                                    minWidth: '80px',
+                                                    opacity: (!selectedBookingIds || selectedBookingIds.length === 0) ? 0.5 : 1,
+                                                    '& input': {
+                                                        cursor: (!selectedBookingIds || selectedBookingIds.length === 0) ? 'not-allowed' : 'pointer',
+                                                        textAlign: 'center',
+                                                        padding: '8px 12px'
+                                                    },
+                                                    '& fieldset': {
+                                                        borderColor: 'error.main'
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: (!selectedBookingIds || selectedBookingIds.length === 0) ? 'error.main' : 'error.dark'
+                                                    }
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <DeleteIcon fontSize="small" color="error" />
                                                     </InputAdornment>
                                                 }
                                             />
@@ -5463,6 +5572,36 @@ setBookingDetail(finalVoucherDetail);
                                                 startAdornment={
                                                     <InputAdornment position="start">
                                                         <FileDownloadIcon fontSize="small" color="primary" />
+                                                    </InputAdornment>
+                                                }
+                                            />
+                                            <OutlinedInput
+                                                readOnly
+                                                onClick={handleDeleteSelected}
+                                                disabled={!selectedVoucherIds || selectedVoucherIds.length === 0}
+                                                value="Delete"
+                                                sx={{
+                                                    cursor: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 'not-allowed' : 'pointer',
+                                                    height: '32px',
+                                                    fontSize: 12,
+                                                    minWidth: '80px',
+                                                    opacity: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 0.5 : 1,
+                                                    '& input': {
+                                                        cursor: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 'not-allowed' : 'pointer',
+                                                        textAlign: 'center',
+                                                        padding: '8px 12px'
+                                                    },
+                                                    '& fieldset': {
+                                                        borderColor: 'error.main'
+                                                    },
+                                                    '&:hover fieldset': {
+                                                        borderColor: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 'error.main' : 'error.dark'
+                                                    }
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start">
+                                                        <DeleteIcon fontSize="small" color="error" />
                                                     </InputAdornment>
                                                 }
                                             />
@@ -6923,10 +7062,18 @@ setBookingDetail(finalVoucherDetail);
                                                         // Consider voucher redeemed ONLY if explicit redeemed flag is present
                                                         const b = bookingDetail.booking || {};
                                                         const v = bookingDetail.voucher || {};
+                                                        const originalVoucher = bookingDetail.originalVoucher || null;
                                                         const redeemed = (b.redeemed === true) || (b.voucher_redeemed === 1) || (typeof b.redeemed_at === 'string' && b.redeemed_at) || (v.redeemed === 'Yes' || v.redeemed === true) || (b.redeemed_voucher === 'Yes');
+                                                        
+                                                        // For redeemed vouchers, show the original voucher_ref instead of the new booking voucher_code
+                                                        // This fixes the issue where rebooked vouchers show the new code (e.g., BAT26JGS) instead of original (e.g., GATESMEOR)
+                                                        const voucherCodeToDisplay = (b.redeemed_voucher === 'Yes' || b.redeemed_voucher === 1) && originalVoucher && originalVoucher.voucher_ref
+                                                            ? originalVoucher.voucher_ref
+                                                            : (b.voucher_code || '');
+                                                        
                                                         return (
                                                             <Typography>
-                                                                <b>Redeemed Voucher:</b> {redeemed ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{b.voucher_code || ''}</span>
+                                                                <b>Redeemed Voucher:</b> {redeemed ? <span style={{ color: 'green', fontWeight: 600 }}>Yes</span> : <span style={{ color: 'red', fontWeight: 600 }}>No</span>} <span style={{ fontWeight: 500 }}>{voucherCodeToDisplay}</span>
                                                             </Typography>
                                                         );
                                                     })()}

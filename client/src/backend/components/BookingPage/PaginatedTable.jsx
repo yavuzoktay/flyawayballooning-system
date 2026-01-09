@@ -52,16 +52,29 @@ const PaginatedTable = ({
     // Reset visible count when data length changes (filters, tab switch, etc.)
     // Use ref to track previous length to avoid unnecessary resets
     const prevDataLengthRef = useRef(data?.length || 0);
+    const prevDataRef = useRef(data);
     
     useEffect(() => {
         const currentLength = data?.length || 0;
+        const prevLength = prevDataLengthRef.current;
+        const dataChanged = prevDataRef.current !== data;
+        
         // Only reset if length actually changed (not just data reference)
-        if (currentLength !== prevDataLengthRef.current) {
+        if (currentLength !== prevLength) {
             setVisibleCount(10);
             loadingRef.current = false;
             prevDataLengthRef.current = currentLength;
         }
-    }, [data?.length]); // Only depend on length, not the entire data array
+        
+        // If data array reference changed significantly (different length or completely new data),
+        // reset selected rows to avoid stale index references
+        if (dataChanged && (Math.abs(currentLength - prevLength) > 2 || currentLength === 0 || prevLength === 0)) {
+            setSelectedRows([]);
+            prevSelectedIdsRef.current = [];
+        }
+        
+        prevDataRef.current = data;
+    }, [data, data?.length]); // Depend on both data reference and length
 
     // Infinite scroll logic
     useEffect(() => {
@@ -140,7 +153,14 @@ const PaginatedTable = ({
     // Use useRef to track previous selectedIds to avoid infinite loops
     useEffect(() => {
         if (selectable && typeof onSelectionChange === 'function') {
-            const selectedIds = selectedRows.map(idx => data[idx]?.id).filter(Boolean);
+            // Filter out invalid indices (out of bounds)
+            const validSelectedRows = selectedRows.filter(idx => idx >= 0 && idx < (data?.length || 0));
+            // Get ID from item.id or item._original.id (vouchers sometimes have id in _original)
+            const selectedIds = validSelectedRows.map(idx => {
+                const item = data[idx];
+                return item?.id || item?._original?.id || null;
+            }).filter(Boolean);
+            
             // Only call onSelectionChange if the IDs actually changed
             const idsChanged = selectedIds.length !== prevSelectedIdsRef.current.length ||
                 selectedIds.some((id, idx) => id !== prevSelectedIdsRef.current[idx]);
@@ -150,7 +170,7 @@ const PaginatedTable = ({
                 onSelectionChange(selectedIds);
             }
         }
-    }, [selectedRows, selectable, onSelectionChange]); // Removed 'data' from dependencies
+    }, [selectedRows, selectable, onSelectionChange, data]); // Added 'data' to dependencies to fix stale closure
 
     return (
         <>
@@ -388,6 +408,7 @@ const PaginatedTable = ({
                                        id === 'status' ? '120px' : 
                                         id === 'voucher_type'
                                             ? (context === 'vouchers' ? '220px' : '180px') :
+                                       id === 'actual_voucher_type' ? '150px' :
                                        id === 'voucher_ref' ? '160px' :
                                        id === 'passenger_info' ? '200px' :
                                        id === 'created_at' || id === 'created' ? '120px' :
@@ -398,6 +419,7 @@ const PaginatedTable = ({
                                        id === 'expires' ? '140px' :
                                        id === 'location' ? '140px' :
                                        id === 'redeemed' ? '120px' :
+                                       id === 'phone' ? '140px' :
                                        'auto', 
                                     minWidth:
                                         id === 'email' ? '240px' :
@@ -406,6 +428,7 @@ const PaginatedTable = ({
                                          id === 'status' ? '120px' : 
                                         id === 'voucher_type'
                                             ? (context === 'vouchers' ? '220px' : '180px') :
+                                         id === 'actual_voucher_type' ? '150px' :
                                          id === 'voucher_ref' ? '160px' :
                                          id === 'passenger_info' ? '200px' :
                                          id === 'created_at' || id === 'created' ? '120px' :
@@ -416,6 +439,7 @@ const PaginatedTable = ({
                                          id === 'expires' ? '140px' :
                                          id === 'location' ? '140px' :
                                          id === 'redeemed' ? '120px' :
+                                         id === 'phone' ? '140px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                                 }}

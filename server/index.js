@@ -14250,11 +14250,12 @@ app.get('/api/getBookingDetail', async (req, res) => {
 
         // Fetch voucher info (type, flight attempts) when booking has voucher_code
         let voucherInfo = null;
+        let originalVoucherInfo = null; // For redeemed vouchers, store original voucher info
         if (booking.voucher_code) {
             try {
                 const [voucherRows] = await new Promise((resolve, reject) => {
                     con.query(
-                        'SELECT id, voucher_type, book_flight, flight_attempts FROM all_vouchers WHERE voucher_ref = ? LIMIT 1',
+                        'SELECT id, voucher_type, book_flight, flight_attempts, voucher_ref FROM all_vouchers WHERE voucher_ref = ? LIMIT 1',
                         [booking.voucher_code],
                         (err, rows) => {
                             if (err) reject(err);
@@ -14267,6 +14268,66 @@ app.get('/api/getBookingDetail', async (req, res) => {
                     if ((!booking.voucher_type || booking.voucher_type.trim() === '') && voucherInfo.voucher_type) {
                         booking.voucher_type = voucherInfo.voucher_type;
                         console.log('✅ getBookingDetail - voucher_type fetched from voucher:', booking.voucher_type);
+                    }
+                }
+                
+                // If this is a redeemed voucher booking, find the original voucher
+                // For rebooked vouchers, the booking.voucher_code is the NEW booking code (e.g., BAT26JGS)
+                // We need to find the ORIGINAL voucher_ref (e.g., GATESMEOR) that was used to create this booking
+                if (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) {
+                    try {
+                        // First, try to find original voucher by email and created_at (voucher created before booking)
+                        // This is the most reliable method for rebooked vouchers
+                        const [originalVoucherRowsByEmail] = await new Promise((resolve, reject) => {
+                            con.query(
+                                `SELECT id, voucher_ref, voucher_type, book_flight, flight_attempts 
+                                 FROM all_vouchers 
+                                 WHERE (email = ? OR purchaser_email = ?) 
+                                 AND created_at < ? 
+                                 AND (book_flight = 'Flight Voucher' OR book_flight = 'Gift Voucher')
+                                 ORDER BY created_at DESC 
+                                 LIMIT 1`,
+                                [booking.email, booking.email, booking.created_at || '9999-12-31'],
+                                (err, rows) => {
+                                    if (err) reject(err);
+                                    else resolve([rows]);
+                                }
+                            );
+                        });
+                        
+                        if (originalVoucherRowsByEmail && originalVoucherRowsByEmail.length > 0) {
+                            originalVoucherInfo = originalVoucherRowsByEmail[0];
+                            console.log('✅ getBookingDetail - Found original voucher by email:', originalVoucherInfo.voucher_ref);
+                        } else {
+                            // Fallback: try to find by voucher_code (in case the current voucher_code is the original)
+                            const [originalVoucherRowsByCode] = await new Promise((resolve, reject) => {
+                                con.query(
+                                    `SELECT id, voucher_ref, voucher_type, book_flight, flight_attempts 
+                                     FROM all_vouchers 
+                                     WHERE voucher_ref = ? 
+                                     AND created_at < ? 
+                                     AND (book_flight = 'Flight Voucher' OR book_flight = 'Gift Voucher')
+                                     ORDER BY created_at DESC 
+                                     LIMIT 1`,
+                                    [booking.voucher_code, booking.created_at || '9999-12-31'],
+                                    (err, rows) => {
+                                        if (err) reject(err);
+                                        else resolve([rows]);
+                                    }
+                                );
+                            });
+                            
+                            if (originalVoucherRowsByCode && originalVoucherRowsByCode.length > 0) {
+                                originalVoucherInfo = originalVoucherRowsByCode[0];
+                                console.log('✅ getBookingDetail - Found original voucher by voucher_code:', originalVoucherInfo.voucher_ref);
+                            } else if (voucherInfo) {
+                                // Last fallback: use the voucher found by voucher_code
+                                originalVoucherInfo = voucherInfo;
+                                console.log('✅ getBookingDetail - Using voucher found by voucher_code as original:', originalVoucherInfo.voucher_ref);
+                            }
+                        }
+                    } catch (originalVoucherErr) {
+                        console.warn('⚠️ getBookingDetail - Could not fetch original voucher info:', originalVoucherErr.message);
                     }
                 }
             } catch (voucherErr) {
@@ -14882,7 +14943,8 @@ app.get('/api/getBookingDetail', async (req, res) => {
             booking,
             passengers,
             notes: notesRows,
-            additional_information: additionalInformation
+            additional_information: additionalInformation,
+            originalVoucher: originalVoucherInfo || null // Include original voucher info for redeemed vouchers
         });
     } catch (err) {
         console.error('Error fetching booking detail:', err);
@@ -22649,6 +22711,44 @@ app.delete('/api/deleteBooking/:id', (req, res) => {
                 console.log('No date/time information available for availability restoration');
                 res.json({ success: true, message: 'Booking deleted successfully (availability restoration skipped)' });
             }
+        });
+    });
+});
+
+// Delete a voucher by ID
+app.delete('/api/deleteVoucher/:id', (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ success: false, message: 'Missing voucher id' });
+
+    // Check if voucher is redeemed (has associated booking)
+    const checkRedeemedSql = 'SELECT COUNT(*) as booking_count FROM all_booking WHERE voucher_code IN (SELECT voucher_ref FROM all_vouchers WHERE id = ?)';
+    con.query(checkRedeemedSql, [id], (checkErr, checkResult) => {
+        if (checkErr) {
+            console.error('Error checking voucher redemption status:', checkErr);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+
+        const bookingCount = checkResult[0]?.booking_count || 0;
+        if (bookingCount > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Cannot delete voucher that has been redeemed. Please delete associated bookings first.' 
+            });
+        }
+
+        // Delete the voucher
+        const deleteSql = 'DELETE FROM all_vouchers WHERE id = ?';
+        con.query(deleteSql, [id], (err, result) => {
+            if (err) {
+                console.error('Error deleting voucher:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'Voucher not found' });
+            }
+
+            res.json({ success: true, message: 'Voucher deleted successfully' });
         });
     });
 });
