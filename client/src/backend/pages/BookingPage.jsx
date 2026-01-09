@@ -4979,27 +4979,26 @@ setBookingDetail(finalVoucherDetail);
                                             <OutlinedInput
                                                 readOnly
                                                 onClick={handleExportCSV}
-                                                value="Export"
+                                                value=""
                                                 sx={{
                                                     cursor: 'pointer',
                                                     height: '32px',
-                                                    fontSize: 12,
-                                                        minWidth: '80px',
+                                                    width: '40px',
+                                                    minWidth: '40px',
+                                                    maxWidth: '40px',
                                                     '& input': {
                                                         cursor: 'pointer',
                                                         textAlign: 'center',
-                                                        padding: '8px 12px'
+                                                        padding: '0',
+                                                        display: 'none'
                                                     },
                                                     '& fieldset': {
-                                                        borderColor: 'primary.main'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: 'primary.dark'
+                                                        border: 'none'
                                                     }
                                                 }}
                                                 size="small"
                                                 startAdornment={
-                                                    <InputAdornment position="start">
+                                                    <InputAdornment position="start" sx={{ margin: 0 }}>
                                                         <FileDownloadIcon fontSize="small" color="primary" />
                                                     </InputAdornment>
                                                 }
@@ -5008,28 +5007,27 @@ setBookingDetail(finalVoucherDetail);
                                                 readOnly
                                                 onClick={handleDeleteSelected}
                                                 disabled={!selectedBookingIds || selectedBookingIds.length === 0}
-                                                value="Delete"
+                                                value=""
                                                 sx={{
                                                     cursor: (!selectedBookingIds || selectedBookingIds.length === 0) ? 'not-allowed' : 'pointer',
                                                     height: '32px',
-                                                    fontSize: 12,
-                                                    minWidth: '80px',
+                                                    width: '40px',
+                                                    minWidth: '40px',
+                                                    maxWidth: '40px',
                                                     opacity: (!selectedBookingIds || selectedBookingIds.length === 0) ? 0.5 : 1,
                                                     '& input': {
                                                         cursor: (!selectedBookingIds || selectedBookingIds.length === 0) ? 'not-allowed' : 'pointer',
                                                         textAlign: 'center',
-                                                        padding: '8px 12px'
+                                                        padding: '0',
+                                                        display: 'none'
                                                     },
                                                     '& fieldset': {
-                                                        borderColor: 'error.main'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: (!selectedBookingIds || selectedBookingIds.length === 0) ? 'error.main' : 'error.dark'
+                                                        border: 'none'
                                                     }
                                                 }}
                                                 size="small"
                                                 startAdornment={
-                                                    <InputAdornment position="start">
+                                                    <InputAdornment position="start" sx={{ margin: 0 }}>
                                                         <DeleteIcon fontSize="small" color="error" />
                                                     </InputAdornment>
                                                 }
@@ -5037,27 +5035,26 @@ setBookingDetail(finalVoucherDetail);
                                             <OutlinedInput
                                                 readOnly
                                                 onClick={() => setFilterDialogOpen(true)}
-                                                value="Filter"
+                                                value=""
                                                 sx={{
                                                     cursor: 'pointer',
                                                     height: '32px',
-                                                    fontSize: 12,
-                                                        minWidth: '80px',
+                                                    width: '40px',
+                                                    minWidth: '40px',
+                                                    maxWidth: '40px',
                                                     '& input': {
                                                         cursor: 'pointer',
                                                         textAlign: 'center',
-                                                        padding: '8px 12px'
+                                                        padding: '0',
+                                                        display: 'none'
                                                     },
                                                     '& fieldset': {
-                                                        borderColor: 'secondary.main'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: 'secondary.dark'
+                                                        border: 'none'
                                                     }
                                                 }}
                                                 size="small"
                                                 startAdornment={
-                                                    <InputAdornment position="start">
+                                                    <InputAdornment position="start" sx={{ margin: 0 }}>
                                                         <FilterListIcon fontSize="small" color="secondary" />
                                                     </InputAdornment>
                                                 }
@@ -5550,27 +5547,26 @@ setBookingDetail(finalVoucherDetail);
                                             <OutlinedInput
                                                 readOnly
                                                 onClick={handleExportCSV}
-                                                value="Export"
+                                                value=""
                                                 sx={{
                                                     cursor: 'pointer',
                                                     height: '32px',
-                                                    fontSize: 12,
-                                                    minWidth: '80px',
+                                                    width: '40px',
+                                                    minWidth: '40px',
+                                                    maxWidth: '40px',
                                                     '& input': {
                                                         cursor: 'pointer',
                                                         textAlign: 'center',
-                                                        padding: '8px 12px'
+                                                        padding: '0',
+                                                        display: 'none'
                                                     },
                                                     '& fieldset': {
-                                                        borderColor: 'primary.main'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: 'primary.dark'
+                                                        border: 'none'
                                                     }
                                                 }}
                                                 size="small"
                                                 startAdornment={
-                                                    <InputAdornment position="start">
+                                                    <InputAdornment position="start" sx={{ margin: 0 }}>
                                                         <FileDownloadIcon fontSize="small" color="primary" />
                                                     </InputAdornment>
                                                 }
@@ -5579,28 +5575,27 @@ setBookingDetail(finalVoucherDetail);
                                                 readOnly
                                                 onClick={handleDeleteSelected}
                                                 disabled={!selectedVoucherIds || selectedVoucherIds.length === 0}
-                                                value="Delete"
+                                                value=""
                                                 sx={{
                                                     cursor: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 'not-allowed' : 'pointer',
                                                     height: '32px',
-                                                    fontSize: 12,
-                                                    minWidth: '80px',
+                                                    width: '40px',
+                                                    minWidth: '40px',
+                                                    maxWidth: '40px',
                                                     opacity: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 0.5 : 1,
                                                     '& input': {
                                                         cursor: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 'not-allowed' : 'pointer',
                                                         textAlign: 'center',
-                                                        padding: '8px 12px'
+                                                        padding: '0',
+                                                        display: 'none'
                                                     },
                                                     '& fieldset': {
-                                                        borderColor: 'error.main'
-                                                    },
-                                                    '&:hover fieldset': {
-                                                        borderColor: (!selectedVoucherIds || selectedVoucherIds.length === 0) ? 'error.main' : 'error.dark'
+                                                        border: 'none'
                                                     }
                                                 }}
                                                 size="small"
                                                 startAdornment={
-                                                    <InputAdornment position="start">
+                                                    <InputAdornment position="start" sx={{ margin: 0 }}>
                                                         <DeleteIcon fontSize="small" color="error" />
                                                     </InputAdornment>
                                                 }
