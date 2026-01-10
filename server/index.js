@@ -930,7 +930,7 @@ app.post('/api/generate-voucher-code', async (req, res) => {
 // Get all voucher codes
 app.get('/api/voucher-codes', (req, res) => {
     // For User Generated Codes, show codes from both all_vouchers and all_booking tables
-    // Fix collation issues by using COLLATE or BINARY comparison
+    // Fix collation issues by using COLLATE utf8mb4_unicode_ci for all string comparisons
     const sql = `
         SELECT 
             vc.id,
@@ -959,18 +959,18 @@ app.get('/api/voucher-codes', (req, res) => {
         LEFT JOIN voucher_code_usage vcu ON vc.id = vcu.voucher_code_id
         WHERE 
             -- For user_generated codes, only show if they exist in all_vouchers or all_booking
-            (vc.source_type != 'user_generated' OR 
+            (vc.source_type COLLATE utf8mb4_unicode_ci != 'user_generated' COLLATE utf8mb4_unicode_ci OR 
              EXISTS (
                  SELECT 1 FROM all_vouchers av 
                  WHERE av.voucher_ref COLLATE utf8mb4_unicode_ci = vc.code COLLATE utf8mb4_unicode_ci
                  AND av.voucher_ref IS NOT NULL 
-                 AND av.voucher_ref != ''
+                 AND av.voucher_ref COLLATE utf8mb4_unicode_ci != '' COLLATE utf8mb4_unicode_ci
              ) OR 
              EXISTS (
                  SELECT 1 FROM all_booking ab 
                  WHERE ab.voucher_code COLLATE utf8mb4_unicode_ci = vc.code COLLATE utf8mb4_unicode_ci
                  AND ab.voucher_code IS NOT NULL 
-                 AND ab.voucher_code != ''
+                 AND ab.voucher_code COLLATE utf8mb4_unicode_ci != '' COLLATE utf8mb4_unicode_ci
              ))
         GROUP BY vc.id, vc.code, vc.title, vc.valid_from, vc.valid_until, vc.max_uses, vc.current_uses,
                  vc.applicable_locations, vc.applicable_experiences, vc.applicable_voucher_types,
@@ -987,11 +987,11 @@ app.get('/api/voucher-codes', (req, res) => {
             NULL as valid_from,
             av.expires as valid_until,
             1 as max_uses,
-            CASE WHEN av.redeemed = 'Yes' THEN 1 ELSE 0 END as current_uses,
+            CASE WHEN av.redeemed COLLATE utf8mb4_unicode_ci = 'Yes' COLLATE utf8mb4_unicode_ci THEN 1 ELSE 0 END as current_uses,
             NULL as applicable_locations,
             NULL as applicable_experiences,
             NULL as applicable_voucher_types,
-            CASE WHEN av.redeemed = 'Yes' THEN 0 ELSE 1 END as is_active,
+            CASE WHEN av.redeemed COLLATE utf8mb4_unicode_ci = 'Yes' COLLATE utf8mb4_unicode_ci THEN 0 ELSE 1 END as is_active,
             NULL as created_by,
             'user_generated' as source_type,
             COALESCE(av.email, av.purchaser_email) as customer_email,
@@ -1002,8 +1002,9 @@ app.get('/api/voucher-codes', (req, res) => {
             '1/1' as usage_status
         FROM all_vouchers av
         WHERE av.voucher_ref IS NOT NULL 
-        AND av.voucher_ref != ''
-        AND av.voucher_ref NOT IN ('', '-', ' ')
+        AND av.voucher_ref COLLATE utf8mb4_unicode_ci != '' COLLATE utf8mb4_unicode_ci
+        AND av.voucher_ref COLLATE utf8mb4_unicode_ci != '-' COLLATE utf8mb4_unicode_ci
+        AND av.voucher_ref COLLATE utf8mb4_unicode_ci != ' ' COLLATE utf8mb4_unicode_ci
         AND NOT EXISTS (
             SELECT 1 FROM voucher_codes vc2 
             WHERE vc2.code COLLATE utf8mb4_unicode_ci = av.voucher_ref COLLATE utf8mb4_unicode_ci
@@ -1019,11 +1020,11 @@ app.get('/api/voucher-codes', (req, res) => {
             NULL as valid_from,
             ab.expires as valid_until,
             1 as max_uses,
-            CASE WHEN ab.redeemed_voucher = 'Yes' THEN 1 ELSE 0 END as current_uses,
+            CASE WHEN ab.redeemed_voucher COLLATE utf8mb4_unicode_ci = 'Yes' COLLATE utf8mb4_unicode_ci THEN 1 ELSE 0 END as current_uses,
             NULL as applicable_locations,
             NULL as applicable_experiences,
             NULL as applicable_voucher_types,
-            CASE WHEN ab.redeemed_voucher = 'Yes' THEN 0 ELSE 1 END as is_active,
+            CASE WHEN ab.redeemed_voucher COLLATE utf8mb4_unicode_ci = 'Yes' COLLATE utf8mb4_unicode_ci THEN 0 ELSE 1 END as is_active,
             NULL as created_by,
             'user_generated' as source_type,
             ab.email as customer_email,
@@ -1034,12 +1035,13 @@ app.get('/api/voucher-codes', (req, res) => {
             '1/1' as usage_status
         FROM all_booking ab
         WHERE ab.voucher_code IS NOT NULL 
-        AND ab.voucher_code != ''
-        AND ab.voucher_code NOT IN ('', '-', ' ')
+        AND ab.voucher_code COLLATE utf8mb4_unicode_ci != '' COLLATE utf8mb4_unicode_ci
+        AND ab.voucher_code COLLATE utf8mb4_unicode_ci != '-' COLLATE utf8mb4_unicode_ci
+        AND ab.voucher_code COLLATE utf8mb4_unicode_ci != ' ' COLLATE utf8mb4_unicode_ci
         -- Exclude booking IDs (numeric strings that match booking IDs)
         AND NOT EXISTS (
             SELECT 1 FROM all_booking ab2 
-            WHERE CAST(ab2.id AS CHAR) = ab.voucher_code
+            WHERE CAST(ab2.id AS CHAR) COLLATE utf8mb4_unicode_ci = ab.voucher_code COLLATE utf8mb4_unicode_ci
         )
         AND NOT EXISTS (
             SELECT 1 FROM voucher_codes vc3 
@@ -2347,7 +2349,16 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
                 // Update availability if date and time are provided
                 if (selectedDate && selectedTime && req.body.activity_id) {
-                    const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                    // Parse selectedDate string directly to avoid timezone issues
+                    // selectedDate is already in format "YYYY-MM-DD HH:mm:ss" from frontend
+                    let bookingDate;
+                    if (typeof selectedDate === 'string') {
+                        // Extract date part (YYYY-MM-DD) from string, avoiding timezone conversion
+                        bookingDate = selectedDate.split(' ')[0] || selectedDate.substring(0, 10);
+                    } else {
+                        // Fallback: use moment but in UTC mode to avoid timezone shifts
+                        bookingDate = moment.utc(selectedDate).format('YYYY-MM-DD');
+                    }
                     const bookingTime = selectedTime;
 
                     console.log('=== REDEEM BOOKING AVAILABILITY UPDATE ===');
@@ -2367,7 +2378,16 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     updateSpecificAvailability(bookingDate, bookingTime, req.body.activity_id, actualPassengerCount);
                 } else if (selectedDate && selectedTime && chooseLocation) {
                     // Get activity_id first, then update availability
-                    const bookingDate = moment(selectedDate).format('YYYY-MM-DD');
+                    // Parse selectedDate string directly to avoid timezone issues
+                    // selectedDate is already in format "YYYY-MM-DD HH:mm:ss" from frontend
+                    let bookingDate;
+                    if (typeof selectedDate === 'string') {
+                        // Extract date part (YYYY-MM-DD) from string, avoiding timezone conversion
+                        bookingDate = selectedDate.split(' ')[0] || selectedDate.substring(0, 10);
+                    } else {
+                        // Fallback: use moment but in UTC mode to avoid timezone shifts
+                        bookingDate = moment.utc(selectedDate).format('YYYY-MM-DD');
+                    }
                     const bookingTime = selectedTime;
                     // Use actual passenger count from passengerData array (real passenger count entered by user)
                     const actualPassengerCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
@@ -6922,6 +6942,99 @@ app.get('/api/getAllBookingData', (req, res) => {
                 }
             }
 
+            // Fix activity_id if it's null but flight_date, time_slot, and location are available
+            // This ensures activity_id is always set for bookings from balloning-book
+            let finalActivityId = rest.activity_id;
+            if (!finalActivityId && rest.flight_date && rest.location) {
+                try {
+                    // First, get activity_id from activity table based on location
+                    const [activityRows] = await con.promise().query(
+                        'SELECT id FROM activity WHERE location = ? AND status = ? LIMIT 1',
+                        [rest.location, 'Live']
+                    );
+                    
+                    if (activityRows && activityRows.length > 0) {
+                        const activityId = activityRows[0].id;
+                        
+                        // Verify that this activity_id has availability for the flight_date and time_slot
+                        const flightDate = moment(rest.flight_date).format('YYYY-MM-DD');
+                        // Get time from time_slot or flight_date, format as HH:mm:ss
+                        let flightTime = null;
+                        if (rest.time_slot) {
+                            // time_slot might be in HH:mm:ss or HH:mm format
+                            const timeSlotStr = String(rest.time_slot).trim();
+                            if (timeSlotStr.length === 5) {
+                                // HH:mm format, add :00
+                                flightTime = timeSlotStr + ':00';
+                            } else if (timeSlotStr.length >= 8) {
+                                // HH:mm:ss format, take first 8 characters
+                                flightTime = timeSlotStr.substring(0, 8);
+                            } else {
+                                flightTime = timeSlotStr;
+                            }
+                        } else if (rest.flight_date) {
+                            // Extract time from flight_date
+                            const flightDateMoment = moment(rest.flight_date);
+                            if (flightDateMoment.isValid()) {
+                                flightTime = flightDateMoment.format('HH:mm:ss');
+                            }
+                        }
+                        
+                        if (flightTime) {
+                            // Check if activity_availability exists for this activity_id, date, and time
+                            // Try both exact match and time format variations
+                            const [availabilityRows] = await con.promise().query(
+                                `SELECT activity_id FROM activity_availability 
+                                 WHERE activity_id = ? AND date = ? 
+                                 AND (time = ? OR time = ? OR TIME_FORMAT(time, '%H:%i:%s') = ?)
+                                 LIMIT 1`,
+                                [activityId, flightDate, flightTime, flightTime.substring(0, 5) + ':00', flightTime]
+                            );
+                            
+                            if (availabilityRows && availabilityRows.length > 0) {
+                                finalActivityId = activityId;
+                                // Update database if booking exists
+                                if (rest.id) {
+                                    con.query('UPDATE all_booking SET activity_id = ? WHERE id = ?', [activityId, rest.id], (updateErr) => {
+                                        if (updateErr) {
+                                            console.warn('Failed to update activity_id for booking', rest.id, updateErr.message);
+                                        } else {
+                                            console.log('✅ Updated activity_id for booking:', rest.id, 'activity_id:', activityId);
+                                        }
+                                    });
+                                }
+                            } else {
+                                // If no availability found, still set activity_id based on location (fallback)
+                                finalActivityId = activityId;
+                                if (rest.id) {
+                                    con.query('UPDATE all_booking SET activity_id = ? WHERE id = ?', [activityId, rest.id], (updateErr) => {
+                                        if (updateErr) {
+                                            console.warn('Failed to update activity_id (fallback) for booking', rest.id, updateErr.message);
+                                        } else {
+                                            console.log('✅ Updated activity_id (fallback) for booking:', rest.id, 'activity_id:', activityId);
+                                        }
+                                    });
+                                }
+                            }
+                        } else {
+                            // If no time_slot, still set activity_id based on location (fallback)
+                            finalActivityId = activityId;
+                            if (rest.id) {
+                                con.query('UPDATE all_booking SET activity_id = ? WHERE id = ?', [activityId, rest.id], (updateErr) => {
+                                    if (updateErr) {
+                                        console.warn('Failed to update activity_id (no time) for booking', rest.id, updateErr.message);
+                                    } else {
+                                        console.log('✅ Updated activity_id (no time) for booking:', rest.id, 'activity_id:', activityId);
+                                    }
+                                });
+                            }
+                        }
+                    }
+                } catch (activityErr) {
+                    console.warn('Error fixing activity_id for booking', rest.id, activityErr.message);
+                }
+            }
+
             // If flight_date is set, status should be 'Scheduled' (not 'Open')
             // BUT: Preserve existing statuses like 'Flown', 'Checked In', 'No Show', 'Cancelled'
             let finalStatus = rest.status;
@@ -6959,6 +7072,23 @@ app.get('/api/getAllBookingData', (req, res) => {
                             console.warn('Failed to update status to Scheduled for redeem voucher booking', rest.id, updateErr.message);
                         } else {
                             console.log('✅ Updated status to Scheduled for redeem voucher booking:', rest.id);
+                        }
+                    });
+                }
+            }
+
+            // For Weekday Morning and Flexible Weekday voucher types with activity_id (from balloning-book),
+            // if status is 'Open', change it to 'Scheduled'
+            const isWeekdayVoucherType = finalVoucherType === 'Weekday Morning' || finalVoucherType === 'Flexible Weekday';
+            if (isWeekdayVoucherType && finalActivityId && finalActivityId !== null && finalStatus === 'Open') {
+                finalStatus = 'Scheduled';
+                // Update database if booking exists
+                if (rest.id) {
+                    con.query('UPDATE all_booking SET status = ? WHERE id = ?', ['Scheduled', rest.id], (updateErr) => {
+                        if (updateErr) {
+                            console.warn('Failed to update status to Scheduled for weekday voucher booking with activity_id', rest.id, updateErr.message);
+                        } else {
+                            console.log('✅ Updated status to Scheduled for weekday voucher booking with activity_id:', rest.id, 'voucher_type:', finalVoucherType);
                         }
                     });
                 }
@@ -7037,7 +7167,8 @@ app.get('/api/getAllBookingData', (req, res) => {
                 flight_attempts: finalFlightAttempts,
                 flight_type_source: flight_type_source,
                 is_redeem_voucher: isRedeemVoucher,
-                resources: assignedResource
+                resources: assignedResource,
+                activity_id: finalActivityId // Use fixed activity_id if it was null
             };
         }));
 

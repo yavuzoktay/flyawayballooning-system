@@ -6137,7 +6137,10 @@ setBookingDetail(finalVoucherDetail);
                                         }
                                         return true;
                                     })}
-                                    columns={["created", "name", "voucher_type", "actual_voucher_type", "phone", "expires", "redeemed", "paid", "voucher_ref"]}
+                                    columns={isMobile 
+                                        ? ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
+                                        : ["created", "name", "voucher_type", "actual_voucher_type", "phone", "expires", "redeemed", "paid", "voucher_ref"]
+                                    }
                                     onNameClick={handleNameClick}
                                     onVoucherRefClick={handleVoucherRefClick}
                                     onEmailClick={(voucher) => {
