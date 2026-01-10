@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
+const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [summary, setSummary] = useState({});
@@ -30,8 +30,8 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
 
     useEffect(() => {
         // Calculate summary for all data on page load
-        calculateSummary(bookingData);
-    }, [bookingData]);
+        calculateSummary(bookingData, voucherData);
+    }, [bookingData, voucherData]);
 
     const filterData = (start, end) => {
         setStartDate(start);
@@ -65,7 +65,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
             return createdDate >= startDateObj && createdDate <= endDateObj;
         });
 
-        calculateSummary(filtered);
+        calculateSummary(filtered, voucherData);
     };
 
     // Updated Quick Links
@@ -76,7 +76,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
             if (onDateRangeChange) {
                 onDateRangeChange({ start: null, end: null });
             }
-            calculateSummary(bookingData);
+            calculateSummary(bookingData, voucherData);
         },
         last12Months: () => {
             const today = new Date();
@@ -111,7 +111,7 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
     };
 
     // Add All Values Result
-    const calculateSummary = (data) => {
+    const calculateSummary = (data, vouchers = []) => {
         const safeValue = (value) => isNaN(value) ? 0 : value;
         if(data){
             // Filter flown flights: only count flights where status is exactly "Flown"
@@ -128,13 +128,50 @@ const DateRangeSelector = ({ bookingData, onDateRangeChange }) => {
                 return true;
             });
             
+            // Filter completed flights: only count flights where status is exactly "Flown" for Flights Completed column
+            const completedFlightsData = data?.filter(item => {
+                if (!item || typeof item !== 'object') return false;
+                
+                // Status must be exactly "Flown" (case-insensitive check)
+                const status = (item.status || '').trim();
+                return status.toLowerCase() === 'flown';
+            });
+            
+            // Filter non-flown bookings: all bookings where status is NOT "Flown" for Total Liability calculation
+            const nonFlownBookings = data?.filter(item => {
+                if (!item || typeof item !== 'object') return false;
+                
+                // Status must NOT be "Flown" (case-insensitive check)
+                const status = (item.status || '').trim();
+                return status.toLowerCase() !== 'flown';
+            });
+            
+            // Calculate Sales: All Booking paid values + All Vouchers with "Redeemed: No" paid values
+            // 1. All Booking tablosundaki tüm paid değerleri
+            const bookingSales = data?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", ""))), 0) || 0;
+            
+            // 2. All Vouchers tablosunda "Redeemed: No" olan tüm paid değerleri
+            const nonRedeemedVouchers = vouchers?.filter(voucher => {
+                if (!voucher || typeof voucher !== 'object') return false;
+                const redeemed = (voucher.redeemed || '').trim();
+                return redeemed.toLowerCase() !== 'yes';
+            }) || [];
+            
+            const voucherSales = nonRedeemedVouchers.reduce((sum, item) => {
+                const paidValue = safeValue(parseFloat((item.paid || "0").replace("£", "")));
+                return sum + paidValue;
+            }, 0);
+            
+            // Total Sales = Booking Sales + Voucher Sales
+            const totalSales = bookingSales + voucherSales;
+            
             const summary = {
                 totalFlights: flownFlights?.length || 0,
                 totalPax: flownFlights?.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0) || 0,
-                completedFlights: data?.reduce((sum, item) => sum + safeValue(parseInt((item.paid || "0").replace("£", ""), 10)), 0),
-                totalSales: data?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", ""))), 0),
-                totalLiability: data?.reduce((sum, item) => sum + safeValue(parseFloat((item.due || "0").replace("£", ""))), 0),
-                totalVAT: data?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", "")) * 0.2), 0),
+                completedFlights: completedFlightsData?.reduce((sum, item) => sum + safeValue(parseInt((item.paid || "0").replace("£", ""), 10)), 0) || 0,
+                totalSales: totalSales,
+                totalLiability: nonFlownBookings?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", ""))), 0) || 0,
+                totalVAT: totalSales * 0.2, // VAT is 20% of total sales
             };
             setSummary(summary);
         }

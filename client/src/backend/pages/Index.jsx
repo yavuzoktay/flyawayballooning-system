@@ -6,6 +6,7 @@ import AnalyticsDashboard from '../components/Home/AnalyticsDashboard';
 
 const Index = () => {
     const [bookingData, setBookingData] = useState([]);
+    const [voucherData, setVoucherData] = useState([]);
     const [dateRange, setDateRange] = useState({ start: null, end: null });
 
     function getAllBookingData() {
@@ -19,8 +20,24 @@ const Index = () => {
             });
     }
 
+    function getAllVoucherData() {
+        axios
+            .get(
+                `/api/getAllVoucherData`
+            )
+            .then((response) => {
+                var final_data = response.data.data || [];
+                setVoucherData(final_data);
+            })
+            .catch((error) => {
+                console.error("Error fetching voucher data:", error);
+                setVoucherData([]);
+            });
+    }
+
     useEffect(() => {
         getAllBookingData();
+        getAllVoucherData();
     }, []);
     return (
         <div className="home-page-wrap">
@@ -32,7 +49,7 @@ const Index = () => {
                     <hr />
                 </div>
                 <div className="home-body-wrap">
-                    <DateRangeSelector bookingData={bookingData} onDateRangeChange={setDateRange} />
+                    <DateRangeSelector bookingData={bookingData} voucherData={voucherData} onDateRangeChange={setDateRange} />
                     <AnalyticsDashboard dateRange={dateRange} />
                 </div>
             </Container>
