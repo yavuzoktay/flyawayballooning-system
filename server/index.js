@@ -18991,10 +18991,13 @@ app.get('/api/analytics', async (req, res) => {
                             `;
                                                     con.query(liabilityLocSql, [], (err7, liabLocRows) => {
                                                         if (err7) return res.status(500).json({ error: 'Failed to fetch liability by location' });
-                                                        const liabilityByLocation = liabLocRows.map(r => ({
-                                                            location: r.location || 'Other',
-                                                            value: Math.round(r.value || 0)
-                                                        }));
+                                                        const liabilityByLocation = liabLocRows.map(r => {
+                                                            const finalValue = Number(r.value || 0).toFixed(2);
+                                                            return {
+                                                                location: r.location || 'Other',
+                                                                value: parseFloat(finalValue)
+                                                            };
+                                                        });
                                                         // 8. Liability by Flight Type (voucher type driven)
                                                         const liabilityTypeSql = `
                                     SELECT 
