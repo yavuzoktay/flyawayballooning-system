@@ -3951,7 +3951,7 @@ const Manifest = () => {
                                                     display: 'flex',
                                                     flexDirection: isMobile ? 'row' : 'row',
                                                     alignItems: isMobile ? 'flex-start' : 'center',
-                                                    gap: isMobile ? 0.5 : 3,
+                                                    gap: isMobile ? 0.5 : 0,
                                                     flexWrap: 'wrap',
                                                     mt: isMobile ? 0.25 : 1,
                                                     mb: isMobile ? 0.25 : 0
@@ -4026,19 +4026,19 @@ const Manifest = () => {
                                                     ) : (
                                                         // Desktop: Original layout
                                                         <>
-                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                            <Box display="flex" alignItems="center">
                                                                 <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
                                                             </Box>
-                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                            <Box display="flex" alignItems="center">
                                                                 <Typography>Balloon Resource: {balloonResource}</Typography>
                                                             </Box>
-                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                            <Box display="flex" alignItems="center">
                                                     <Typography>Status: <span
    style={{ color: status === 'Closed' ? 'red' : 'green', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
    onClick={() => handleToggleGroupStatus(groupFlights)}
  >{status}{statusLoadingGroup === first.id ? '...' : ''}</span></Typography>
                                                     </Box>
-                                                            <Box display="flex" alignItems="center" gap={1}>
+                                                            <Box display="flex" alignItems="center">
                                                     <Typography>Type: {first.flight_type}</Typography>
                                                             </Box>
                                                         </>
