@@ -419,7 +419,6 @@ const PaginatedTable = ({
                                        id === 'expires' ? '140px' :
                                        id === 'location' ? '140px' :
                                        id === 'redeemed' ? '120px' :
-                                       id === 'phone' ? '140px' :
                                        'auto', 
                                     minWidth:
                                         id === 'email' ? '240px' :
@@ -439,7 +438,6 @@ const PaginatedTable = ({
                                          id === 'expires' ? '140px' :
                                          id === 'location' ? '140px' :
                                          id === 'redeemed' ? '120px' :
-                                         id === 'phone' ? '140px' :
                                          '80px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                                 }}
