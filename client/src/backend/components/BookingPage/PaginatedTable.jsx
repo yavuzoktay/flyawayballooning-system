@@ -516,19 +516,64 @@ const PaginatedTable = ({
                                                                 ) : (
                                                                     <span>{item[id]}</span>
                                                                 )
-                                                            ) : id === 'created_at' ? (
+                                                            ) : (id === 'created_at' || id === 'created' || id === 'created_at_display') ? (
                                                                 (() => {
+                                                                    // If the column itself is created_at_display, use it directly
+                                                                    if (id === 'created_at_display') {
+                                                                        const displayValue = item[id];
+                                                                        if (!displayValue) return '';
+                                                                        // Backend returns DD/MM/YYYY format, but check if it needs conversion
+                                                                        if (typeof displayValue === 'string') {
+                                                                            // Check if it's in YYYY-MM-DD format and convert to DD/MM/YYYY
+                                                                            const yyyyMMddPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+                                                                            const match = displayValue.match(yyyyMMddPattern);
+                                                                            if (match) {
+                                                                                // Convert YYYY-MM-DD to DD/MM/YYYY
+                                                                                const [, year, month, day] = match;
+                                                                                return `${day}/${month}/${year}`;
+                                                                            }
+                                                                            // If already in DD/MM/YYYY format, return as is (extract date part if time exists)
+                                                                            if (displayValue.includes('/')) {
+                                                                                const datePart = displayValue.split(' ')[0];
+                                                                                return datePart;
+                                                                            }
+                                                                        }
+                                                                        return displayValue;
+                                                                    }
                                                                     // Use created_at_display if available, otherwise format created_at
                                                                     if (item.created_at_display) {
-                                                                        return item.created_at_display;
+                                                                        // Check if created_at_display is in YYYY-MM-DD format and convert to DD/MM/YYYY
+                                                                        const displayValue = item.created_at_display;
+                                                                        if (typeof displayValue === 'string') {
+                                                                            // Check if it's in YYYY-MM-DD format (e.g., "2026-01-04")
+                                                                            const yyyyMMddPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+                                                                            const match = displayValue.match(yyyyMMddPattern);
+                                                                            if (match) {
+                                                                                // Convert YYYY-MM-DD to DD/MM/YYYY
+                                                                                const [, year, month, day] = match;
+                                                                                return `${day}/${month}/${year}`;
+                                                                            }
+                                                                            // If already in DD/MM/YYYY format, return as is (extract date part if time exists)
+                                                                            if (displayValue.includes('/')) {
+                                                                                const datePart = displayValue.split(' ')[0];
+                                                                                return datePart;
+                                                                            }
+                                                                        }
+                                                                        return displayValue;
                                                                     }
                                                                     if (!item[id]) return '';
+                                                                    // Try dayjs parsing for better date handling
                                                                     try {
-                                                                        const date = new Date(item[id]);
-                                                                        if (isNaN(date.getTime())) return String(item[id]);
-                                                                        const day = String(date.getDate()).padStart(2, '0');
-                                                                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                                        const year = date.getFullYear();
+                                                                        const date = dayjs(item[id]);
+                                                                        if (date.isValid()) {
+                                                                            return date.format('DD/MM/YYYY');
+                                                                        }
+                                                                        // Fallback to native Date parsing
+                                                                        const nativeDate = new Date(item[id]);
+                                                                        if (isNaN(nativeDate.getTime())) return String(item[id]);
+                                                                        const day = String(nativeDate.getDate()).padStart(2, '0');
+                                                                        const month = String(nativeDate.getMonth() + 1).padStart(2, '0');
+                                                                        const year = nativeDate.getFullYear();
                                                                         return `${day}/${month}/${year}`;
                                                                     } catch (e) {
                                                                         return String(item[id]);

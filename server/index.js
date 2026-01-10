@@ -6798,7 +6798,7 @@ app.get('/api/getAllBookingData', (req, res) => {
                 ELSE NULL
             END as voucher_type_filtered,
             COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
-            DATE_FORMAT(ab.created_at, '%Y-%m-%d') as created_at_display,
+            DATE_FORMAT(ab.created_at, '%d/%m/%Y') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display,
             v.expires as voucher_expires,
             DATE_FORMAT(v.expires, '%d/%m/%Y') as voucher_expires_display,
@@ -9738,6 +9738,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
     // For multiple vouchers (Buy Gift), we need to group by purchaser and show all voucher codes
     const voucher = `
         SELECT v.*, v.experience_type,
+               DATE_FORMAT(v.created_at, '%d/%m/%Y') as created_at_display,
                -- Calculate actual paid amount from payment_history (includes promo codes and refunds)
                -- Try linked booking first, then fall back to stored paid value
                COALESCE(
@@ -10306,7 +10307,11 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     // Expose voucher_code with the same combined value for client compatibility
                     voucher_code: (row.all_voucher_codes || voucher_ref || ''),
                     all_voucher_codes: (row.all_voucher_codes || voucher_ref || ''),
-                    created_at: row.created_at ? (() => {
+                    created_at: row.created_at_display || (row.created_at ? (() => {
+                        // Use created_at_display if available (already in DD/MM/YYYY format from SQL)
+                        if (row.created_at_display) {
+                            return row.created_at_display;
+                        }
                         // Parse created_at date correctly - handle both Date objects and string formats
                         if (typeof row.created_at === 'string' && row.created_at.includes('/')) {
                             const dateTimeParts = row.created_at.split(' ');
@@ -10329,8 +10334,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                         }
                         // Try moment parsing for Date objects or other formats
                         const createdMoment = moment(row.created_at);
-                        return createdMoment.isValid() ? createdMoment.format('DD/MM/YYYY HH:mm') : '';
-                    })() : '',
+                        return createdMoment.isValid() ? createdMoment.format('DD/MM/YYYY') : '';
+                    })() : ''),
                     booking_email: row.booking_email ?? '',
                     booking_phone: bookingPhoneWithCode ?? '',
                     booking_id: row.booking_id ?? '',

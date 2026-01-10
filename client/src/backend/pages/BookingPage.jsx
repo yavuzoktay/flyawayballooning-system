@@ -1267,21 +1267,40 @@ const BookingPage = () => {
             // Her zaman filteredVoucherData'yı güncelle
             const formattedVouchers = voucherData.map(item => {
                 let formattedDate = '';
-                if (item.created_at) {
+                // Prefer created_at_display from backend (already in DD/MM/YYYY format)
+                if (item.created_at_display) {
+                    formattedDate = item.created_at_display;
+                } else if (item.created_at) {
                     try {
                         let dateString = item.created_at;
                         
-                        if (dateString.includes(' ') && dateString.includes('/')) {
+                        // Check if already in DD/MM/YYYY format
+                        if (dateString.includes('/')) {
                             const datePart = dateString.split(' ')[0];
-                            const [day, month, year] = datePart.split('/');
-                            dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                        }
-                        
-                        const date = dayjs(dateString);
-                        if (date.isValid()) {
-                            formattedDate = date.format('DD/MM/YYYY');
+                            // Check if it's YYYY-MM-DD format and convert to DD/MM/YYYY
+                            if (dateString.match(/^\d{4}-\d{2}-\d{2}/)) {
+                                const [year, month, day] = datePart.split('-');
+                                formattedDate = `${day}/${month}/${year}`;
+                            } else if (datePart.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                                // Already in DD/MM/YYYY format
+                                formattedDate = datePart;
+                            } else {
+                                // Try to parse and format
+                                const date = dayjs(dateString);
+                                if (date.isValid()) {
+                                    formattedDate = date.format('DD/MM/YYYY');
+                                } else {
+                                    formattedDate = 'N/A';
+                                }
+                            }
                         } else {
-                            formattedDate = 'N/A';
+                            // Try to parse and format
+                            const date = dayjs(dateString);
+                            if (date.isValid()) {
+                                formattedDate = date.format('DD/MM/YYYY');
+                            } else {
+                                formattedDate = 'N/A';
+                            }
                         }
                     } catch (error) {
                         formattedDate = 'N/A';
@@ -1422,7 +1441,9 @@ const BookingPage = () => {
                 typeFromVoucher = voucherTypeByCode.get(bookingCode);
             }
 
-            if (!typeFromVoucher) return b;
+            if (!typeFromVoucher) {
+                return b;
+            }
 
             return {
                 ...b,
@@ -5491,6 +5512,7 @@ setBookingDetail(finalVoucherDetail);
                                         }).map(item => ({
                                             id: item.id || '', // Ensure id is always present
                                             created_at: item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : '',
+                                            created_at_display: item.created_at_display || (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ''),
                                             name: (Array.isArray(item.passengers) && item.passengers.length > 0
                                                 ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                                 : item.name || ''),
@@ -5511,7 +5533,7 @@ setBookingDetail(finalVoucherDetail);
                                         selectable={true}
                                         onSelectionChange={handleBookingSelectionChange}
                                         columns={[
-                                            "created_at",
+                                            "created_at_display",
                                             "name",
                                             "voucher_type",
                                             "location",
