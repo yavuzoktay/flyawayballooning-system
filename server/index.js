@@ -18982,11 +18982,11 @@ app.get('/api/analytics', async (req, res) => {
                                                             count
                                                         })).sort((a, b) => b.count - a.count);
 
-                                                        // 7. Liability by Location
+                                                        // 7. Liability by Location (excluding Flown status)
                                                     const liabilityLocSql = `
                                 SELECT location, SUM(paid) as value
                                 FROM all_booking
-                                WHERE paid IS NOT NULL AND paid > 0 ${dateFilter()}
+                                WHERE paid IS NOT NULL AND paid > 0 AND status != 'Flown' ${dateFilter()}
                                 GROUP BY location
                             `;
                                                     con.query(liabilityLocSql, [], (err7, liabLocRows) => {
