@@ -28,6 +28,13 @@ jobs:
           # Navigate to the project directory
           cd /home/ec2-user/flyawayballooning-system-backend
           
+          # Clean up old files
+          echo "Cleaning up old files..."
+          rm -f ~/flyawayballooning-system-backend/backend-deploy.zip
+          rm -f ~/flyawayballooning-system-backend/*.zip
+          > ~/flyawayballooning-system-backend/server/server.log
+          echo "✅ Cleanup completed"
+          
           # Pull latest changes
           git pull origin main
           

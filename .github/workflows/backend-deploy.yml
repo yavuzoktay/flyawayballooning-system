@@ -112,6 +112,12 @@ jobs:
               echo "Starting deployment process on $(hostname)..."
               cd ~/flyawayballooning-system-backend
               
+              echo "Cleaning up old files..."
+              rm -f ~/flyawayballooning-system-backend/backend-deploy.zip
+              rm -f ~/flyawayballooning-system-backend/*.zip
+              > ~/flyawayballooning-system-backend/server/server.log
+              echo "✅ Cleanup completed"
+              
               echo "Downloading deployment package from S3..."
               aws s3 cp s3://flyawayballooning-backend/backend-deploy.zip .
               
