@@ -4226,7 +4226,7 @@ const Manifest = () => {
                                         flexDirection: 'column',
                                         alignItems: 'flex-start',
                                         ml: 1,
-                                        minWidth: 150
+                                        mr: 2
                                     }}>
                                         <Box sx={{ 
                                             fontSize: '12px', 
@@ -4293,7 +4293,7 @@ const Manifest = () => {
                                         flexDirection: 'column',
                                         alignItems: 'flex-start',
                                         ml: 1,
-                                        minWidth: 150
+                                        mr: 2
                                     }}>
                                         <Box sx={{ 
                                             fontSize: '12px', 
