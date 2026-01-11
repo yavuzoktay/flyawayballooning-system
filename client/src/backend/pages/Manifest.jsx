@@ -3951,7 +3951,7 @@ const Manifest = () => {
                                                     display: 'flex',
                                                     flexDirection: isMobile ? 'row' : 'row',
                                                     alignItems: isMobile ? 'flex-start' : 'center',
-                                                    gap: isMobile ? 0.5 : 0,
+                                                    gap: isMobile ? 0.5 : 1,
                                                     flexWrap: 'wrap',
                                                     mt: isMobile ? 0.25 : 1,
                                                     mb: isMobile ? 0.25 : 0
