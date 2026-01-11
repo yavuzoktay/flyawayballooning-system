@@ -1266,11 +1266,13 @@ const BookingPage = () => {
             
             // Her zaman filteredVoucherData'yı güncelle
             const formattedVouchers = voucherData.map(item => {
-                let formattedDate = '';
-                // Prefer created_at_display from backend (already in DD/MM/YYYY format)
-                if (item.created_at_display) {
-                    formattedDate = item.created_at_display;
-                } else if (item.created_at) {
+                // ALWAYS use created_at_display from getAllVoucherData (already in DD/MM/YYYY format)
+                // This ensures it matches Flight Voucher Details popup exactly
+                // Backend now returns empty string instead of NULL when created_at is missing
+                let formattedDate = item.created_at_display || '';
+                
+                // Only fallback to formatting created_at if created_at_display is empty
+                if (!formattedDate && item.created_at) {
                     try {
                         let dateString = item.created_at;
                         
@@ -1289,8 +1291,6 @@ const BookingPage = () => {
                                 const date = dayjs(dateString);
                                 if (date.isValid()) {
                                     formattedDate = date.format('DD/MM/YYYY');
-                                } else {
-                                    formattedDate = 'N/A';
                                 }
                             }
                         } else {
@@ -1298,19 +1298,23 @@ const BookingPage = () => {
                             const date = dayjs(dateString);
                             if (date.isValid()) {
                                 formattedDate = date.format('DD/MM/YYYY');
-                            } else {
-                                formattedDate = 'N/A';
                             }
                         }
                     } catch (error) {
-                        formattedDate = 'N/A';
+                        // If all parsing fails, leave as empty string (will be handled by table display logic)
+                        formattedDate = '';
                     }
                 }
                 
                 return {
                     ...item,
                     id: item.id || item._original?.id || null, // Ensure id is always at top level
-                    created: formattedDate,
+                    // ALWAYS use created_at_display from getAllVoucherData to match Flight Voucher Details popup
+                    // Priority: created_at_display > formattedDate > empty string (never 'N/A')
+                    created: item.created_at_display || formattedDate || '',
+                    created_at_display: item.created_at_display || formattedDate || '',
+                    // ALWAYS use name directly from getAllVoucherData to match Flight Voucher Details popup
+                    // This ensures the table shows the exact same name as the popup (v.name)
                     name: item.name || '',
                     flight_type: item.flight_type || '',
                     voucher_type: item.voucher_type || '',
@@ -2983,7 +2987,13 @@ setBookingDetail(finalVoucherDetail);
             if (failed > 0) {
                 const errorMessages = results
                     .filter(r => r.status === 'rejected')
-                    .map(r => r.reason?.response?.data?.message || r.reason?.message || 'Unknown error')
+                    .map(r => {
+                        const error = r.reason;
+                        if (error?.response?.status === 404) {
+                            return 'Route not found';
+                        }
+                        return error?.response?.data?.message || error?.message || 'Unknown error';
+                    })
                     .join('\n');
                 
                 alert(`Some items could not be deleted:\n${errorMessages}\n\nSuccessfully deleted: ${successful} of ${itemCount}`);

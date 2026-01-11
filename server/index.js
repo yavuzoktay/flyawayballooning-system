@@ -9738,7 +9738,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
     // For multiple vouchers (Buy Gift), we need to group by purchaser and show all voucher codes
     const voucher = `
         SELECT v.*, v.experience_type,
-               DATE_FORMAT(v.created_at, '%d/%m/%Y') as created_at_display,
+               COALESCE(DATE_FORMAT(v.created_at, '%d/%m/%Y'), '') as created_at_display,
                -- Calculate actual paid amount from payment_history (includes promo codes and refunds)
                -- Try linked booking first, then fall back to stored paid value
                COALESCE(
@@ -20722,6 +20722,33 @@ app.delete("/api/deleteVoucherRefNote", (req, res) => {
 
         console.log('Successfully deleted voucher ref note:', result);
         res.json({ success: true });
+    });
+});
+
+// Delete Voucher from all_vouchers table
+app.delete('/api/deleteVoucher/:id', (req, res) => {
+    const { id } = req.params;
+    
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Missing voucher id' });
+    }
+
+    console.log('Deleting voucher with id:', id);
+
+    // Delete from all_vouchers table
+    const sql = "DELETE FROM all_vouchers WHERE id = ?";
+    con.query(sql, [id], (err, result) => {
+        if (err) {
+            console.error("Error deleting voucher:", err);
+            return res.status(500).json({ success: false, message: "Database error", error: err.message });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: "Voucher not found" });
+        }
+
+        console.log('Successfully deleted voucher:', result);
+        res.json({ success: true, message: "Voucher deleted successfully" });
     });
 });
 
