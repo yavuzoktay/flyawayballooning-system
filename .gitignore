@@ -1,3 +1,5 @@
 server/.env
 server/.env.exampleserver/.env
 server/.env.clean
+server/server.log
+*.log

@@ -10773,8 +10773,49 @@ app.post('/api/createBooking', (req, res) => {
         // For redeem voucher bookings, flight_attempts should start from 0
         const finalFlightAttempts = activitySelect === 'Redeem Voucher' ? 0 : (flight_attempts !== undefined ? flight_attempts : 0);
 
+        // Check if this is a rebook operation
+        const isRebook = rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id));
+        
         // bookingSql ve bookingValues'da selectedDate yerine bookingDateTime kullan
-        const bookingSql = `
+        // For rebook operations, use UPDATE instead of INSERT
+        const bookingSql = isRebook ? `
+            UPDATE all_booking SET
+                name = ?,
+                flight_type = ?,
+                flight_date = ?,
+                pax = ?,
+                location = ?,
+                status = ?,
+                paid = ?,
+                due = ?,
+                voucher_code = ?,
+                expires = ?,
+                manual_status_override = ?,
+                additional_notes = ?,
+                hear_about_us = ?,
+                ballooning_reason = ?,
+                prefer = ?,
+                weight = ?,
+                email = ?,
+                phone = ?,
+                choose_add_on = ?,
+                preferred_location = ?,
+                preferred_time = ?,
+                preferred_day = ?,
+                flight_attempts = ?,
+                activity_id = ?,
+                time_slot = ?,
+                experience = ?,
+                voucher_type = ?,
+                voucher_discount = ?,
+                original_amount = ?,
+                add_to_booking_items_total_price = ?,
+                weather_refund_total_price = ?,
+                flight_type_source = ?,
+                resources = ?,
+                google_calendar_event_id = ?
+            WHERE id = ?
+        ` : `
             INSERT INTO all_booking (
                 name,
                 flight_type, 
@@ -10951,17 +10992,18 @@ app.post('/api/createBooking', (req, res) => {
         }
         
         function proceedWithBookingInsert() {
-        const bookingValues = [
+        // For rebook operations, exclude created_at from UPDATE (preserve original created_at)
+        // For INSERT operations, include created_at
+        const bookingValues = isRebook ? [
             passengerName,
             chooseFlightType.type,
-            bookingDateTime, // <-- burada güncelledik
-            actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
+            bookingDateTime,
+            actualPaxCount,
             chooseLocation,
-            bookingStatus, // Use status from request body or default to 'Confirmed'
-            finalPaidAmount, // Use original voucher price for Redeem Voucher, otherwise use paid/totalPrice
+            bookingStatus,
+            finalPaidAmount,
             0,
             voucher_code || null,
-            nowDate,
             expiresDateFinal,
             0, // manual_status_override
             (additionalInfo && additionalInfo.notes) || null,
@@ -11010,11 +11052,70 @@ app.post('/api/createBooking', (req, res) => {
             base_original_amount, // original_amount (base price excluding add-ons and weather refund)
             add_on_total_price, // add_to_booking_items_total_price
             weather_refund_total_price, // weather_refund_total_price
-            flight_type_source, // flight_type_source ('Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise flight_type/experience)
-            getAssignedResource(chooseFlightType.type || experience, actualPaxCount), // resources (calculated based on flight type and passenger count)
-            null // google_calendar_event_id (will be set after event creation)
+            flight_type_source,
+            getAssignedResource(chooseFlightType.type || experience, actualPaxCount),
+            null, // google_calendar_event_id (will be set after event creation)
+            parseInt(rebook_from_booking_id) // WHERE id = ? for UPDATE
+        ] : [
+            passengerName,
+            chooseFlightType.type,
+            bookingDateTime,
+            actualPaxCount,
+            chooseLocation,
+            bookingStatus,
+            finalPaidAmount,
+            0,
+            voucher_code || null,
+            nowDate,
+            expiresDateFinal,
+            0, // manual_status_override
+            (additionalInfo && additionalInfo.notes) || null,
+            (additionalInfo && additionalInfo.hearAboutUs) || null,
+            (additionalInfo && additionalInfo.reason) || null,
+            (additionalInfo && additionalInfo.prefer && typeof additionalInfo.prefer === 'object' && Object.keys(additionalInfo.prefer).length > 0
+                ? Object.keys(additionalInfo.prefer).filter(k => additionalInfo.prefer[k]).join(', ')
+                : (typeof additionalInfo?.prefer === 'string' && additionalInfo.prefer ? additionalInfo.prefer : null)),
+            mainPassenger.weight || null,
+            bookingEmail || mainPassenger.email || null,
+            mainPassengerPhone || null,
+            choose_add_on_str,
+            preferred_location || null,
+            preferred_time || null,
+            preferred_day || null,
+            finalFlightAttempts,
+            req.body.activity_id || null,
+            selectedTime || null,
+            experience || chooseFlightType.type,
+            (voucher_type && voucher_type.trim() !== '' && !isGenericExperienceValue(voucher_type)) 
+                ? voucher_type 
+                : (() => {
+                    if (voucher_code && typeof voucher_code === 'string' && voucher_code.length >= 3) {
+                        const upperCode = voucher_code.toUpperCase();
+                        const categoryMap = {
+                            'AT': 'Any Day Flight',
+                            'WM': 'Weekday Morning',
+                            'WF': 'Flexible Weekday',
+                            'WX': 'Weekday Flex'
+                        };
+                        if (upperCode.startsWith('B') && upperCode.length >= 3) {
+                            const category = upperCode.substring(1, 3);
+                            if (categoryMap[category]) {
+                                return categoryMap[category];
+                            }
+                        }
+                    }
+                    return null;
+                })(),
+            0, // voucher_discount
+            base_original_amount,
+            add_on_total_price,
+            weather_refund_total_price,
+            flight_type_source,
+            getAssignedResource(chooseFlightType.type || experience, actualPaxCount),
+            null // google_calendar_event_id
         ];
         console.log('bookingValues:', bookingValues);
+        console.log('isRebook:', isRebook, 'rebook_from_booking_id:', rebook_from_booking_id);
 
         console.log('=== EXECUTING BOOKING SQL ===');
         console.log('SQL:', bookingSql);
@@ -11073,200 +11174,34 @@ app.post('/api/createBooking', (req, res) => {
         });
         
         function handleBookingInsertSuccess(result) {
-            const bookingId = result.insertId;
-            const createdAt = nowDate;
+            // For rebook operations, use rebook_from_booking_id as bookingId (UPDATE returns affectedRows, not insertId)
+            // For new bookings, use result.insertId
+            const bookingId = isRebook ? parseInt(rebook_from_booking_id) : result.insertId;
+            const createdAt = isRebook ? null : nowDate; // Don't update created_at for rebook operations
 
             // If this booking was created via a rebook operation, handle Google Calendar update
-            // Get old booking's Google Calendar event ID for rebook operations
+            // For rebook operations, we UPDATE the same booking, so we need to update the Google Calendar event
+            // instead of deleting the old one and creating a new one
             let oldBookingCalendarEventId = null;
             let oldBookingFlightDate = null;
             let oldBookingLocation = null;
             let oldBookingFlightType = null;
             let rebookCleanupPromise = Promise.resolve(); // Default to resolved promise if not a rebook
             
-            if (rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
-                console.log('🔄 Rebook detected - Getting old booking details for Google Calendar update:', rebook_from_booking_id);
+            if (isRebook) {
+                console.log('🔄 Rebook detected - Updating existing booking (no status change to Cancelled):', bookingId);
                 
-                // Create a Promise to handle old booking cleanup (delete calendar event, update status)
-                rebookCleanupPromise = new Promise((resolve) => {
-                    // Get old booking's Google Calendar event ID and details
-                    con.query(
-                        'SELECT google_calendar_event_id, flight_date, location, flight_type, pax, status FROM all_booking WHERE id = ?',
-                        [parseInt(rebook_from_booking_id)],
-                        (oldBookingErr, oldBookingResult) => {
-                            if (!oldBookingErr && oldBookingResult.length > 0) {
-                                oldBookingCalendarEventId = oldBookingResult[0].google_calendar_event_id;
-                                oldBookingFlightDate = oldBookingResult[0].flight_date;
-                                oldBookingLocation = oldBookingResult[0].location;
-                                oldBookingFlightType = oldBookingResult[0].flight_type;
-                                const oldBookingStatus = oldBookingResult[0].status;
-                                
-                                console.log('📅 [Rebook] Old booking Google Calendar event ID:', oldBookingCalendarEventId);
-                                console.log('📅 [Rebook] Old booking details:', {
-                                    flightDate: oldBookingFlightDate,
-                                    location: oldBookingLocation,
-                                    flightType: oldBookingFlightType,
-                                    status: oldBookingStatus,
-                                    google_calendar_event_id: oldBookingCalendarEventId
-                                });
-                                console.log('📅 [Rebook] New booking details:', {
-                                    flightDate: bookingDateTime,
-                                    location: chooseLocation,
-                                    flightType: chooseFlightType.type,
-                                    bookingId: bookingId
-                                });
-                                
-                                // Delete old booking's Google Calendar event if it exists
-                                // For rebook: always delete old event and create new one with new booking details
-                                if (oldBookingCalendarEventId) {
-                                    console.log('🗑️ [Rebook] Deleting old booking Google Calendar event:', {
-                                        oldBookingId: rebook_from_booking_id,
-                                        eventId: oldBookingCalendarEventId
-                                    });
-                                    
-                                    // Delete the old Google Calendar event
-                                    deleteCalendarEvent(oldBookingCalendarEventId)
-                                        .then((deleteResult) => {
-                                            if (deleteResult && deleteResult.success) {
-                                                if (deleteResult.alreadyDeleted) {
-                                                    console.log('✅ [Rebook] Old Google Calendar event was already deleted:', oldBookingCalendarEventId);
-                                                } else {
-                                                    console.log('✅ [Rebook] Old Google Calendar event deleted successfully:', oldBookingCalendarEventId);
-                                                }
-                                            } else {
-                                                console.log('⚠️ [Rebook] Old Google Calendar event deletion returned unexpected result:', deleteResult);
-                                            }
-                                            
-                                            // Clear old booking's Google Calendar event ID from database
-                                            // For private flights: only clear from old booking
-                                            // For shared flights: clear from all bookings that share this event
-                                            const isPrivateFlight = oldBookingFlightType === 'Private Charter' || oldBookingFlightType === 'Private';
-                                            
-                                            if (isPrivateFlight) {
-                                                // Private flight: only clear from old booking and update status to Cancelled
-                                                con.query(
-                                                    'UPDATE all_booking SET google_calendar_event_id = NULL, status = ? WHERE id = ?',
-                                                    ['Cancelled', parseInt(rebook_from_booking_id)],
-                                                    (clearErr) => {
-                                                        if (clearErr) {
-                                                            console.error('❌ [Rebook] Error clearing old booking Google Calendar event ID and updating status:', clearErr);
-                                                        } else {
-                                                            console.log('✅ [Rebook] Old booking Google Calendar event ID cleared and status updated to Cancelled (private flight)');
-                                                        }
-                                                        resolve(); // Resolve promise after cleanup
-                                                    }
-                                                );
-                                            } else {
-                                                // Shared flight: clear from all bookings that share this event
-                                                // But only update status for the specific old booking
-                                                con.query(
-                                                    'UPDATE all_booking SET google_calendar_event_id = NULL WHERE google_calendar_event_id = ?',
-                                                    [oldBookingCalendarEventId],
-                                                    (clearErr, clearResult) => {
-                                                        if (clearErr) {
-                                                            console.error('❌ [Rebook] Error clearing Google Calendar event ID from shared flight bookings:', clearErr);
-                                                            resolve(); // Resolve even on error
-                                                        } else {
-                                                            console.log('✅ [Rebook] Google Calendar event ID cleared from', clearResult.affectedRows, 'shared flight booking(s)');
-                                                            
-                                                            // Update old booking status to Cancelled
-                                                            con.query(
-                                                                'UPDATE all_booking SET status = ? WHERE id = ?',
-                                                                ['Cancelled', parseInt(rebook_from_booking_id)],
-                                                                (statusErr) => {
-                                                                    if (statusErr) {
-                                                                        console.error('❌ [Rebook] Error updating old booking status to Cancelled:', statusErr);
-                                                                    } else {
-                                                                        console.log('✅ [Rebook] Old booking status updated to Cancelled');
-                                                                    }
-                                                                    resolve(); // Resolve promise after cleanup
-                                                                }
-                                                            );
-                                                        }
-                                                    }
-                                                );
-                                            }
-                                        })
-                                        .catch((deleteErr) => {
-                                            // This catch block only handles real errors (network, permission, etc.)
-                                            // 404/410 errors are now handled in deleteCalendarEvent and return success
-                                            console.error('❌ [Rebook] Error deleting old Google Calendar event:', deleteErr);
-                                            
-                                            // Even if deletion fails, try to update status and clear event ID from database
-                                            // This ensures the database is cleaned up even if Google Calendar deletion fails
-                                            const isPrivateFlight = oldBookingFlightType === 'Private Charter' || oldBookingFlightType === 'Private';
-                                            if (isPrivateFlight) {
-                                                con.query(
-                                                    'UPDATE all_booking SET google_calendar_event_id = NULL, status = ? WHERE id = ?',
-                                                    ['Cancelled', parseInt(rebook_from_booking_id)],
-                                                    (clearErr) => {
-                                                        if (clearErr) {
-                                                            console.error('❌ [Rebook] Error clearing old booking Google Calendar event ID and updating status:', clearErr);
-                                                        } else {
-                                                            console.log('✅ [Rebook] Old booking Google Calendar event ID cleared and status updated to Cancelled (despite deletion error)');
-                                                        }
-                                                        resolve(); // Resolve promise after cleanup
-                                                    }
-                                                );
-                                            } else {
-                                                con.query(
-                                                    'UPDATE all_booking SET google_calendar_event_id = NULL WHERE google_calendar_event_id = ?',
-                                                    [oldBookingCalendarEventId],
-                                                    (clearErr, clearResult) => {
-                                                        if (clearErr) {
-                                                            console.error('❌ [Rebook] Error clearing Google Calendar event ID from shared flight bookings:', clearErr);
-                                                            resolve(); // Resolve even on error
-                                                        } else {
-                                                            console.log('✅ [Rebook] Google Calendar event ID cleared from', clearResult.affectedRows, 'shared flight booking(s)');
-                                                            
-                                                            // Update old booking status to Cancelled
-                                                            con.query(
-                                                                'UPDATE all_booking SET status = ? WHERE id = ?',
-                                                                ['Cancelled', parseInt(rebook_from_booking_id)],
-                                                                (statusErr) => {
-                                                                    if (statusErr) {
-                                                                        console.error('❌ [Rebook] Error updating old booking status to Cancelled:', statusErr);
-                                                                    } else {
-                                                                        console.log('✅ [Rebook] Old booking status updated to Cancelled');
-                                                                    }
-                                                                    resolve(); // Resolve promise after cleanup
-                                                                }
-                                                            );
-                                                        }
-                                                    }
-                                                );
-                                            }
-                                        });
-                                } else {
-                                    console.log('⚠️ [Rebook] Old booking has no Google Calendar event ID - updating status to Cancelled');
-                                    
-                                    // Even if no calendar event, update old booking status to Cancelled
-                                    con.query(
-                                        'UPDATE all_booking SET status = ? WHERE id = ?',
-                                        ['Cancelled', parseInt(rebook_from_booking_id)],
-                                        (statusErr) => {
-                                            if (statusErr) {
-                                                console.error('❌ [Rebook] Error updating old booking status to Cancelled:', statusErr);
-                                            } else {
-                                                console.log('✅ [Rebook] Old booking status updated to Cancelled (no calendar event to delete)');
-                                            }
-                                            resolve(); // Resolve promise after cleanup
-                                        }
-                                    );
-                                }
-                            } else if (oldBookingErr) {
-                                console.error('❌ [Rebook] Error getting old booking details:', oldBookingErr);
-                                resolve(); // Resolve even on error to continue with new booking creation
-                            } else {
-                                resolve(); // Resolve if no old booking found
-                            }
-                        }
-                    );
-                });
+                // For rebook operations, we UPDATE the same booking, so we don't need to mark it as Cancelled
+                // We just need to handle Google Calendar event update if needed
+                // The Google Calendar event will be updated/created in the normal flow below
+                // NO cleanup needed - same booking is being updated, not replaced
+                rebookCleanupPromise = Promise.resolve(); // No cleanup needed for rebook (same booking is updated)
             }
 
             // If this booking was created via a rebook operation, transfer payment history from old booking
-            if (rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
+            // NOTE: For rebook operations (UPDATE), we don't need to transfer payment history
+            // because we're updating the same booking, not creating a new one
+            if (rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id)) && !isRebook) {
                 console.log('🔄 Rebook detected - Transferring payment history from old booking:', rebook_from_booking_id, 'to new booking:', bookingId);
                 
                 // Transfer payment history from old booking to new booking
@@ -11316,6 +11251,8 @@ app.post('/api/createBooking', (req, res) => {
                         }
                     });
                 }
+            } else if (isRebook) {
+                console.log('🔄 Rebook detected - Same booking updated, no payment history transfer needed');
             }
 
             // If this booking was created via a rebook operation, previous history entries
@@ -11500,6 +11437,28 @@ app.post('/api/createBooking', (req, res) => {
             // --- Availability güncelleme sonu ---
 
             function insertPassengers() {
+                // For rebook operations, delete existing passengers first, then insert new ones
+                if (isRebook) {
+                    console.log('🔄 Rebook - Deleting existing passengers for booking:', bookingId);
+                    const deletePassengersSql = 'DELETE FROM passenger WHERE booking_id = ?';
+                    con.query(deletePassengersSql, [bookingId], (deleteErr) => {
+                        if (deleteErr) {
+                            console.error('❌ Error deleting existing passengers during rebook:', deleteErr);
+                            // Continue anyway - will try to insert passengers
+                        } else {
+                            console.log('✅ Existing passengers deleted for rebook');
+                        }
+                        // Continue with passenger insertion
+                        insertNewPassengers();
+                    });
+                    return; // Exit early, will continue in callback
+                }
+                
+                // For new bookings, insert passengers directly
+                insertNewPassengers();
+            }
+            
+            function insertNewPassengers() {
                 const passengerSql = 'INSERT INTO passenger (booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund) VALUES ?';
                 const passengerValues = passengerData.map(p => {
                     // Combine countryCode and phone for each passenger

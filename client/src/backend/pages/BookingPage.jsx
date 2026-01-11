@@ -3770,8 +3770,17 @@ setBookingDetail(finalVoucherDetail);
                         }
                     }
                     
-                    // Check if voucher already has a booking_id (rebook scenario)
-                    const existingBookingId = voucher.booking_id || voucher.bookingId || null;
+                    // Check if this is a rebook scenario - use bookingDetail.booking.id if available
+                    // This ensures we UPDATE the existing booking instead of creating a new one
+                    const existingBookingId = bookingDetail?.booking?.id || voucher.booking_id || voucher.bookingId || null;
+                    
+                    console.log('🔄 Flight Voucher Rebook Check:', {
+                        bookingDetailBookingId: bookingDetail?.booking?.id,
+                        voucherBookingId: voucher.booking_id,
+                        voucherBookingIdAlt: voucher.bookingId,
+                        existingBookingId: existingBookingId,
+                        isRebook: !!existingBookingId
+                    });
                     
                     // Prepare booking payload
                     const bookingPayloadBase = {
