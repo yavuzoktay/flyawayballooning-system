@@ -1639,77 +1639,16 @@ const BookingPage = () => {
         };
     }, [filters, activeTab, voucher]);
 
-    // filteredData'yı voucher tablosu için backend key'lerine göre map'le
+    // filteredData'yı voucher tablosu için filteredVoucherData'dan kullan
+    // voucherData() fonksiyonu zaten doğru formatlamayı yapıyor (name ve created_at_display kullanıyor)
+    // Bu useEffect sadece activeTab değiştiğinde filteredData'yı günceller
     useEffect(() => {
         if (activeTab === "vouchers") {
-            setFilteredData(voucher.map(item => {
-                let formattedDate = '';
-                if (item.created_at) {
-                    try {
-                        // Backend'den gelen format: "16/08/2025 18:32" (DD/MM/YYYY HH:mm)
-                        // Bu formatı dayjs ile parse etmek için önce standart formata çevirelim
-                        let dateString = item.created_at;
-                        
-                        // Eğer "DD/MM/YYYY HH:mm" formatındaysa, "DD/MM/YYYY" kısmını alalım
-                        if (dateString.includes(' ') && dateString.includes('/')) {
-                            const datePart = dateString.split(' ')[0]; // "16/08/2025" kısmını al
-                            const [day, month, year] = datePart.split('/');
-                            // YYYY-MM-DD formatına çevir
-                            dateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                        }
-                        
-                        const date = dayjs(dateString);
-                        if (date.isValid()) {
-                            formattedDate = date.format('DD/MM/YYYY');
-                        } else {
-                            formattedDate = 'N/A';
-                        }
-                    } catch (error) {
-                        formattedDate = 'N/A';
-                    }
-                }
-                
-                        // For Flight Voucher, use purchaser_name and purchaser_email
-                        // For Gift Voucher, use purchaser_name and purchaser_email (purchaser is who bought the voucher)
-                        // For other types, use name and email
-                        const isFlightVoucher = item.book_flight === 'Flight Voucher';
-                        const isGiftVoucher = item.book_flight === 'Gift Voucher';
-                        const displayName = isFlightVoucher 
-                            ? (item.purchaser_name || item.name || '')
-                            : (isGiftVoucher 
-                                ? (item.purchaser_name || item.name || '')
-                                : (item.name || ''));
-                        const displayEmail = isFlightVoucher 
-                            ? (item.purchaser_email || item.email || '')
-                            : (isGiftVoucher 
-                                ? (item.purchaser_email || item.email || '')
-                                : (item.email || ''));
-                        const displayPhone = isFlightVoucher 
-                            ? (item.purchaser_phone || item.purchaser_mobile || item.phone || item.mobile || '')
-                            : (isGiftVoucher 
-                                ? (item.purchaser_phone || item.purchaser_mobile || item.phone || item.mobile || '')
-                                : (item.phone || item.mobile || ''));
-                        
-                        return {
-                    id: item.id || null, // Ensure id is always at top level
-                    created: formattedDate,
-                    name: displayName,
-                    flight_type: item.experience_type || '', // Updated field name
-                    voucher_type: item.book_flight || '', // Updated field name
-                    actual_voucher_type: item.voucher_type || '', // New field for actual voucher type
-                    email: displayEmail,
-                    phone: displayPhone,
-                    expires: item.expires || '',
-                    redeemed: item.redeemed || '',
-                    paid: item.paid || '',
-                    voucher_ref: item.voucher_ref || '',
-                    flight_attempts: item.flight_attempts ?? 0,
-                    booking_id: item.booking_id || null,
-                    _original: item // _original her zaman eklensin
-                };
-            }));
+            // filteredVoucherData zaten voucherData() tarafından doğru formatta oluşturuluyor
+            // Sadece filteredData'yı güncelle
+            setFilteredData(filteredVoucherData);
         }
-    }, [voucher, activeTab]);
+    }, [filteredVoucherData, activeTab]);
 
     // Client-side filtering kaldırıldı çünkü artık backend'de yapılıyor
 
