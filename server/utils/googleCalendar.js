@@ -100,7 +100,7 @@ const createCalendarEvent = async (flightData) => {
         });
 
         // Format title: [Location] – [Private/Shared] – x [Count]
-        const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' 
+        const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' || flightData.flightType === 'Private Flight'
             ? 'Private' 
             : 'Shared';
         const title = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
@@ -201,7 +201,7 @@ const updateCalendarEvent = async (eventId, flightData) => {
         endDateTime.setHours(endDateTime.getHours() + 2); // 2 hour flight duration
 
         // Format title: [Location] – [Private/Shared] – x [Count]
-        const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' 
+        const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' || flightData.flightType === 'Private Flight'
             ? 'Private' 
             : 'Shared';
         const title = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
@@ -325,7 +325,7 @@ const findAndDeleteCalendarEventByDetails = async (flightData) => {
         endDateTime.setHours(endDateTime.getHours() + 2); // 2 hour flight duration
 
         // Format expected title: [Location] – [Private/Shared] – x [Count]
-        const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' 
+        const flightTypeLabel = flightData.flightType === 'Private Charter' || flightData.flightType === 'Private' || flightData.flightType === 'Private Flight'
             ? 'Private' 
             : 'Shared';
         const expectedTitle = `${flightData.location} – ${flightTypeLabel} – x ${flightData.passengerCount}`;
@@ -359,17 +359,21 @@ const findAndDeleteCalendarEventByDetails = async (flightData) => {
         }
 
         console.log(`📋 [findAndDeleteCalendarEventByDetails] Found ${response.data.items.length} events for date, searching for matching event...`);
+        
 
         // Find event matching the expected title
         const matchingEvent = response.data.items.find(event => {
             const eventTitle = event.summary || '';
             const matchesTitle = eventTitle === expectedTitle;
             
+            
             // Also check if the event time matches (within 1 hour tolerance)
             if (matchesTitle && event.start && event.start.dateTime) {
                 const eventStart = new Date(event.start.dateTime);
                 const timeDiff = Math.abs(eventStart.getTime() - flightDateTime.getTime());
                 const matchesTime = timeDiff < 60 * 60 * 1000; // 1 hour tolerance
+                
+                
                 return matchesTime;
             }
             
@@ -383,6 +387,8 @@ const findAndDeleteCalendarEventByDetails = async (flightData) => {
                 start: e.start?.dateTime,
                 id: e.id
             })));
+            
+            
             return null;
         }
 
