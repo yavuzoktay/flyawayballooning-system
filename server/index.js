@@ -6920,7 +6920,10 @@ app.get('/api/getAllBookingData', (req, res) => {
                 ? rest.flight_attempts
                 : (rest.voucher_flight_attempts || 0);
 
-            if (isRedeemVoucher && rest.voucher_code) {
+            // Only normalize flight_attempts for redeem vouchers if status is 'Open', null, or empty
+            // This prevents resetting flight_attempts after cancellation (which increments it) or after rebook (which preserves it)
+            const isNewBooking = !rest.status || rest.status === 'Open' || rest.status === '' || rest.status === null;
+            if (isRedeemVoucher && rest.voucher_code && isNewBooking) {
                 // If this booking was created from redeem voucher, flight_attempts should be 0
                 // Override if it's 1 (the default value for new bookings) or null/undefined
                 // Note: If it fell back to voucher_flight_attempts (e.g. 2), it won't be 1, so it stays 2.
@@ -13630,8 +13633,13 @@ app.get('/api/getBookingDetail', async (req, res) => {
             voucherInfo &&
             (voucherInfo.book_flight === 'Gift Voucher' || voucherInfo.id)
         );
+        
         let finalFlightAttempts = booking.flight_attempts;
-        if (isRedeemVoucher) {
+        // Only normalize flight_attempts for redeem vouchers if status is 'Open', null, or empty
+        // This prevents resetting flight_attempts after cancellation (which increments it) or after rebook (which preserves it)
+        // Normalization should only apply to newly created bookings, not to cancelled or rebooked bookings
+        const isNewBooking = !booking.status || booking.status === 'Open' || booking.status === '' || booking.status === null;
+        if (isRedeemVoucher && isNewBooking) {
             if (finalFlightAttempts === 1 || finalFlightAttempts === null || finalFlightAttempts === undefined) {
                 finalFlightAttempts = 0;
             }
@@ -15379,7 +15387,8 @@ const handleFlightAttemptsIncrement = async (booking_id) => {
             await new Promise((resolve, reject) => {
                 con.query("UPDATE all_booking SET flight_attempts = ? WHERE id = ?",
                     [newAttempts, booking_id], (err, result) => {
-                        if (err) reject(err); else resolve(result);
+                        if (err) reject(err);
+                        else resolve(result);
                     });
             });
 
@@ -16840,7 +16849,10 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
         // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
         // This matches getAllBookingData logic
-        if (isRedeemVoucher && booking.voucher_code) {
+        // Only normalize if status is 'Open', null, or empty (new bookings)
+        // This prevents resetting flight_attempts after cancellation (which increments it) or after rebook (which preserves it)
+        const isNewBooking = !booking.status || booking.status === 'Open' || booking.status === '' || booking.status === null;
+        if (isRedeemVoucher && booking.voucher_code && isNewBooking) {
             // If this booking was created from redeem voucher, flight_attempts should be 0
             // Override if it's 1 (the default value for new bookings) or null/undefined
             if (finalFlightAttempts === 1 || finalFlightAttempts === null || finalFlightAttempts === undefined) {
@@ -18650,6 +18662,7 @@ app.get('/api/analytics', async (req, res) => {
             let salesBySource = [];
             let nonRedemption = { value: 0, percent: 0 };
             let addOns = [];
+            let addOnsTotalValue = 0;
 
             // 1. Get from legacy hear_about_us column in all_booking
             const legacySourceSql = `
@@ -18773,17 +18786,26 @@ app.get('/api/analytics', async (req, res) => {
                                     percent: total ? Math.round((expired / total) * 100) : 0
                                 };
                                 // 4. Add Ons (sum revenue by add on name)
+                                // Only include add-ons that were actually paid for (paid > 0)
                                 const addOnSql = `
-                    SELECT choose_add_on
+                    SELECT choose_add_on, paid
                     FROM all_booking
-                    WHERE choose_add_on IS NOT NULL AND choose_add_on != '' ${dateFilter()}
+                    WHERE choose_add_on IS NOT NULL 
+                      AND choose_add_on != '' 
+                      AND paid IS NOT NULL 
+                      AND paid > 0
+                      ${dateFilter()}
                 `;
                                 con.query(addOnSql, [], (err4, addOnRows) => {
                                     if (err4) return res.status(500).json({ error: 'Failed to fetch add ons' });
                                     const addOnMap = {};
+                                    let addOnsTotal = 0;
                                     addOnRows.forEach(row => {
                                         try {
                                             if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
+                                            // Only process if booking was actually paid for
+                                            if (!row.paid || parseFloat(row.paid) <= 0) return;
+                                            
                                             let arr = [];
                                             try {
                                                 if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
@@ -18796,13 +18818,17 @@ app.get('/api/analytics', async (req, res) => {
                                             if (Array.isArray(arr)) {
                                                 arr.forEach(a => {
                                                     if (!a.name || !a.price) return;
+                                                    const price = Number(a.price) || 0;
                                                     if (!addOnMap[a.name]) addOnMap[a.name] = 0;
-                                                    addOnMap[a.name] += Number(a.price);
+                                                    addOnMap[a.name] += price;
+                                                    addOnsTotal += price;
                                                 });
                                             }
                                         } catch (e) { console.error('AddOn JSON parse error:', e); }
                                     });
                                     addOns = Object.entries(addOnMap).map(([name, value]) => ({ name, value: Math.round(value) }));
+                                    // Store total separately for response
+                                    addOnsTotalValue = Math.round(addOnsTotal);
                                     // 5. Sales by Location
                                     // Get location data from multiple sources:
                                     // 1. all_booking table (for Book Flight Date and Redeem Voucher bookings)
@@ -18979,11 +19005,20 @@ app.get('/api/analytics', async (req, res) => {
                                                                 type: label || 'Other',
                                                                 value
                                                             })).sort((a, b) => b.value - a.value);
-                                                            // 9. Refundable Liability (paid for WX Refundable, not expired)
+                                                            // 9. Refundable Liability
+                                                            // Rules:
+                                                            // - Booking has NOT been marked as Flown
+                                                            // - Booking has NOT expired (expires is null or in the future)
+                                                            // - Booking was purchased with the Refundable add-on (WX)
+                                                            // We also continue to respect the analytics date filter, applied on the expires column
                                                             const refundableSql = `
-                                        SELECT choose_add_on, paid, status
+                                        SELECT choose_add_on, paid, status, expires
                                         FROM all_booking
-                                        WHERE paid IS NOT NULL AND paid > 0 AND status != 'Expired' ${dateFilter()}
+                                        WHERE paid IS NOT NULL
+                                          AND paid > 0
+                                          AND status NOT IN ('Expired', 'Flown')
+                                          AND (expires IS NULL OR expires > CURDATE())
+                                          ${dateFilter('expires')}
                                     `;
                                                             con.query(refundableSql, [], (err9, refRows) => {
                                                                 if (err9) return res.status(500).json({ error: 'Failed to fetch refundable liability' });
@@ -19050,6 +19085,7 @@ app.get('/api/analytics', async (req, res) => {
                                                                         salesBySource,
                                                                         nonRedemption,
                                                                         addOns,
+                                                                        addOnsTotal: addOnsTotalValue,
                                                                         salesByLocation,
                                                                         salesByBookingType,
                                                                         liabilityByLocation,

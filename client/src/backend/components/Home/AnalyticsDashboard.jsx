@@ -57,9 +57,18 @@ const AnalyticsDashboard = ({ dateRange }) => {
                             <Typography variant="h6">Non Redemption</Typography>
                             <Typography>{analytics?.nonRedemption?.value || 0} ({analytics?.nonRedemption?.percent || 0}%)</Typography>
                             <Typography variant="h6" sx={{ mt: 2 }}>Add On's</Typography>
-                            {analytics?.addOns?.map((a, i) => (
-                                <Typography key={i}>{a.name}: <span style={{color:'#16a085'}}>£{a.value}</span></Typography>
-                            )) || <Typography>No data available</Typography>}
+                            {analytics?.addOns?.length > 0 ? (
+                                <>
+                                    {analytics.addOns.map((a, i) => (
+                                        <Typography key={i}>{a.name}: <span style={{color:'#16a085'}}>£{a.value}</span></Typography>
+                                    ))}
+                                    <Typography sx={{ mt: 1, fontWeight: 'bold' }}>
+                                        Total: <span style={{color:'#16a085'}}>£{analytics?.addOnsTotal || 0}</span>
+                                    </Typography>
+                                </>
+                            ) : (
+                                <Typography>No data available</Typography>
+                            )}
                         </CardContent>
                     </Card>
                 </Grid>
