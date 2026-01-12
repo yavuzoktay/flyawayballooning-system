@@ -614,9 +614,24 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             normalizedAvailabilityTypes.some(type => voucherWildcardTerms.includes(type));
 
         if (normalizedSelectedVoucher && !isWildcardVoucher) {
+            // Map "Any Day Voucher" to "Any Day Flight" for matching (they are equivalent)
+            const normalizedForMatching = normalizedSelectedVoucher.replace('voucher', 'flight').trim();
+            
             matchesVoucher = normalizedAvailabilityTypes.some(type => {
                 const t = String(type || '').trim();
-                return t === normalizedSelectedVoucher || t === normalizedSelectedVoucher.trim() || t.includes(normalizedSelectedVoucher);
+                // Direct match
+                if (t === normalizedSelectedVoucher || t === normalizedSelectedVoucher.trim() || t.includes(normalizedSelectedVoucher)) {
+                    return true;
+                }
+                // Match "Any Day Voucher" with "Any Day Flight" (equivalent)
+                if (normalizedSelectedVoucher.includes('any day') && t.includes('any day')) {
+                    return true;
+                }
+                // Reverse: match "Any Day Flight" with "Any Day Voucher"
+                if (normalizedForMatching && (t === normalizedForMatching || t.includes(normalizedForMatching))) {
+                    return true;
+                }
+                return false;
             });
         }
 
