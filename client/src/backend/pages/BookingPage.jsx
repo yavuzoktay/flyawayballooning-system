@@ -10475,7 +10475,12 @@ setBookingDetail(finalVoucherDetail);
                     <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                         <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: isMobile ? 0 : 1 }}>
                             <Grid item xs={12}>
-                                <FormGroup sx={{ mb: 2, flexDirection: 'row', gap: 2 }}>
+                                <FormGroup sx={{ 
+                                    mb: 1, 
+                                    flexDirection: 'row', 
+                                    gap: isMobile ? 1.5 : 2,
+                                    alignItems: 'center'
+                                }}>
                                     <FormControlLabel
                                         control={
                                             <Checkbox
@@ -10488,19 +10493,33 @@ setBookingDetail(finalVoucherDetail);
                                                     }
                                                 }}
                                                 sx={{
-                                                    color: '#1976d2',
-                                                    '&.Mui-checked': {
-                                                        color: '#1976d2',
+                                                    color: '#6b7280',
+                                                    padding: '4px',
+                                                    '&:hover': {
+                                                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                                                        borderRadius: '4px',
                                                     },
+                                                    '&.Mui-checked': {
+                                                        color: '#3b82f6',
+                                                    },
+                                                    '& .MuiSvgIcon-root': {
+                                                        fontSize: isMobile ? 20 : 22,
+                                                        transition: 'all 0.2s ease-in-out',
+                                                    },
+                                                    transition: 'all 0.2s ease-in-out',
                                                 }}
                                             />
                                         }
                                         label="Email"
                                         sx={{
+                                            margin: 0,
+                                            marginRight: isMobile ? 0 : 1,
                                             '& .MuiFormControlLabel-label': {
-                                                fontSize: isMobile ? '14px' : '14px',
-                                                fontWeight: 500,
-                                                color: isMobile ? 'inherit' : '#374151'
+                                                fontSize: isMobile ? '13px' : '14px',
+                                                fontWeight: sendMessageEmailChecked ? 600 : 500,
+                                                color: sendMessageEmailChecked ? '#3b82f6' : (isMobile ? 'inherit' : '#6b7280'),
+                                                transition: 'all 0.2s ease-in-out',
+                                                marginLeft: '6px',
                                             }
                                         }}
                                     />
@@ -10556,286 +10575,142 @@ setBookingDetail(finalVoucherDetail);
                                                     }
                                                 }}
                                                 sx={{
-                                                    color: '#1976d2',
-                                                    '&.Mui-checked': {
-                                                        color: '#1976d2',
+                                                    color: '#6b7280',
+                                                    padding: '4px',
+                                                    '&:hover': {
+                                                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                                        borderRadius: '4px',
                                                     },
+                                                    '&.Mui-checked': {
+                                                        color: '#10b981',
+                                                    },
+                                                    '& .MuiSvgIcon-root': {
+                                                        fontSize: isMobile ? 20 : 22,
+                                                        transition: 'all 0.2s ease-in-out',
+                                                    },
+                                                    transition: 'all 0.2s ease-in-out',
                                                 }}
                                             />
                                         }
                                         label="SMS"
                                         sx={{
+                                            margin: 0,
                                             '& .MuiFormControlLabel-label': {
-                                                fontSize: isMobile ? '14px' : '14px',
-                                                fontWeight: 500,
-                                                color: isMobile ? 'inherit' : '#374151'
+                                                fontSize: isMobile ? '13px' : '14px',
+                                                fontWeight: sendMessageSmsChecked ? 600 : 500,
+                                                color: sendMessageSmsChecked ? '#10b981' : (isMobile ? 'inherit' : '#6b7280'),
+                                                transition: 'all 0.2s ease-in-out',
+                                                marginLeft: '6px',
                                             }
                                         }}
                                     />
                                 </FormGroup>
                             </Grid>
-                            {/* Email Template Selection */}
+                            {/* Email and SMS Template Selection - Side by Side */}
+                            {(sendMessageEmailChecked || sendMessageSmsChecked) && (
+                                <Grid item xs={12}>
+                                    <Grid container spacing={2}>
+                                        {/* Email Template Selection */}
+                                        {sendMessageEmailChecked && (
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="subtitle2" sx={{ 
+                                                    mb: 1, 
+                                                    fontWeight: 500,
+                                                    fontSize: isMobile ? 'inherit' : '14px',
+                                                    color: isMobile ? 'inherit' : '#374151'
+                                                }}>
+                                                    Choose a template Email:
+                                                </Typography>
+                                                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                                    <Select
+                                                        value={emailForm.template || 'custom'}
+                                                        onChange={(e) => handleEmailTemplateChange(e.target.value)}
+                                                        displayEmpty
+                                                        sx={{
+                                                            fontSize: isMobile ? 'inherit' : '14px',
+                                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                            },
+                                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                            },
+                                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                            }
+                                                        }}
+                                                    >
+                                                        {emailTemplates.map((template) => (
+                                                            <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                                {template.name}
+                                                            </MenuItem>
+                                                        ))}
+                                                        {emailTemplates.length === 0 && (
+                                                            <>
+                                                                <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
+                                                                <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                                                <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
+                                                                <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
+                                                                <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
+                                                            </>
+                                                        )}
+                                                    </Select>
+                                                </FormControl>
+                                            </Grid>
+                                        )}
+                                        {/* SMS Template Selection */}
+                                        {sendMessageSmsChecked && (
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="subtitle2" sx={{ 
+                                                    mb: 1, 
+                                                    fontWeight: 500,
+                                                    fontSize: isMobile ? 'inherit' : '14px',
+                                                    color: isMobile ? 'inherit' : '#374151'
+                                                }}>
+                                                    Choose a template SMS:
+                                                </Typography>
+                                                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                                    <Select
+                                                        value={smsForm.template || 'custom'}
+                                                        onChange={(e) => handleSmsTemplateChange(e.target.value)}
+                                                        displayEmpty
+                                                        sx={{
+                                                            fontSize: isMobile ? 'inherit' : '14px',
+                                                            '& .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                            },
+                                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                            },
+                                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                            }
+                                                        }}
+                                                    >
+                                                        {smsTemplates.map((template) => (
+                                                            <MenuItem key={template.id} value={String(template.id)} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                                {template.name}
+                                                            </MenuItem>
+                                                        ))}
+                                                        <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                                    </Select>
+                                                </FormControl>
+                                            </Grid>
+                                        )}
+                                    </Grid>
+                                </Grid>
+                            )}
+                            {/* Email Template Preview */}
                             {sendMessageEmailChecked && (
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle2" sx={{ 
-                                        mb: 1, 
-                                        fontWeight: 500,
-                                        fontSize: isMobile ? 'inherit' : '14px',
-                                        color: isMobile ? 'inherit' : '#374151'
-                                    }}>
-                                        Choose a template Email:
-                                    </Typography>
-                                    <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-                                        <Select
-                                            value={emailForm.template || 'custom'}
-                                            onChange={(e) => handleEmailTemplateChange(e.target.value)}
-                                            displayEmpty
-                                            sx={{
-                                                fontSize: isMobile ? 'inherit' : '14px',
-                                                '& .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                                },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                                },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                                }
-                                            }}
-                                        >
-                                            {emailTemplates.map((template) => (
-                                                <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
-                                                    {template.name}
-                                                </MenuItem>
-                                            ))}
-                                            {emailTemplates.length === 0 && (
-                                                <>
-                                                    <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
-                                                    <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
-                                                    <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
-                                                    <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
-                                                    <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
-                                                </>
-                                            )}
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                            )}
-                            {/* SMS Template Selection */}
-                            {sendMessageSmsChecked && (
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle2" sx={{ 
-                                        mb: 1, 
-                                        fontWeight: 500,
-                                        fontSize: isMobile ? 'inherit' : '14px',
-                                        color: isMobile ? 'inherit' : '#374151'
-                                    }}>
-                                        Choose a template SMS:
-                                    </Typography>
-                                    <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-                                    <Select
-                                        value={smsForm.template || 'custom'}
-                                        onChange={(e) => handleSmsTemplateChange(e.target.value)}
-                                        displayEmpty
-                                            sx={{
-                                                fontSize: isMobile ? 'inherit' : '14px',
-                                                '& .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                                },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                                },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                    borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                                }
-                                            }}
-                                        >
-                                            {smsTemplates.map((template) => (
-                                                <MenuItem key={template.id} value={String(template.id)} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
-                                                    {template.name}
-                                                </MenuItem>
-                                            ))}
-                                            <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                            )}
-                            {/* SMS Message Field - Show only if SMS is checked */}
-                            {sendMessageSmsChecked && (
-                                <Grid item xs={12}>
-                                    <Typography variant="subtitle2" sx={{ 
-                                        mb: isMobile ? 0.5 : 1, 
-                                        fontWeight: 500, 
-                                        fontSize: isMobile ? 13 : '14px',
-                                        color: isMobile ? 'inherit' : '#374151'
-                                    }}>
-                                        Message
-                                    </Typography>
-                                    <TextField
-                                        fullWidth
-                                        placeholder="Enter your SMS message here..."
-                                        value={smsForm.message || ''}
-                                        onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
-                                        multiline
-                                        rows={isMobile ? 4 : 6}
-                                        variant="outlined"
-                                        size={isMobile ? "small" : "medium"}
-                                        sx={{ 
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: isMobile ? 2 : '6px',
-                                                fontSize: isMobile ? '14px' : '14px',
-                                                '& fieldset': {
-                                                    borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                                },
-                                                '&:hover fieldset': {
-                                                    borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                                },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                                }
-                                            },
-                                            '& .MuiInputLabel-root': {
-                                                fontSize: isMobile ? '14px' : '14px'
-                                            }
-                                        }}
-                                    />
-                                </Grid>
-                            )}
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ 
-                                    mb: isMobile ? 0.5 : 1, 
-                                    fontWeight: 500, 
-                                    fontSize: isMobile ? 13 : '14px',
-                                    color: isMobile ? 'inherit' : '#374151'
-                                }}>
-                                    Add an optional, personalized note
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    placeholder="Nice to speak with you today!"
-                                    value={personalNote}
-                                    onChange={(e) => setPersonalNote(e.target.value)}
-                                    multiline
-                                    rows={isMobile ? 4 : 6}
-                                    variant="outlined"
-                                    size={isMobile ? "small" : "medium"}
-                                    sx={{ 
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: isMobile ? 2 : '6px',
-                                            fontSize: isMobile ? '14px' : '14px',
-                                            '& fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                            },
-                                            '&:hover fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                            },
-                                            '&.Mui-focused fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                            }
-                                        },
-                                        '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : '14px'
-                                        }
-                                    }}
-                                />
-                            </Grid>
-                            {/* SMS Preview - Mobile Device - Show only if SMS is checked */}
-                            {sendMessageSmsChecked && (
                                 <Grid item xs={12}>
                                     <Box sx={{ 
                                         border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
                                         borderRadius: isMobile ? 2 : '8px', 
                                         p: isMobile ? 1 : 2,
                                         backgroundColor: '#f9f9f9',
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        alignItems: 'flex-start'
+                                        position: 'relative',
+                                        overflow: 'auto',
+                                        maxHeight: isMobile ? '300px' : '600px'
                                     }}>
-                                        {/* Mobile Device Preview */}
-                                        <Box sx={{ 
-                                            width: isMobile ? '240px' : '320px',
-                                            maxWidth: '100%',
-                                            background: '#000',
-                                            borderRadius: isMobile ? '18px' : '24px',
-                                            padding: isMobile ? '8px' : '12px',
-                                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
-                                        }}>
-                                            {/* Phone Screen */}
-                                            <Box sx={{
-                                                background: '#f5f5f5',
-                                                borderRadius: isMobile ? '14px' : '20px',
-                                                padding: isMobile ? '6px' : '8px',
-                                                minHeight: isMobile ? '280px' : '400px'
-                                            }}>
-                                                {/* Status Bar */}
-                                                <Box sx={{
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    padding: isMobile ? '6px 8px' : '8px 12px',
-                                                    fontSize: isMobile ? '8px' : '10px',
-                                                    color: '#000',
-                                                    background: '#fff',
-                                                    borderRadius: isMobile ? '8px 8px 0 0' : '12px 12px 0 0'
-                                                }}>
-                                                    <span>9:41</span>
-                                                    <Box sx={{ display: 'flex', gap: isMobile ? '2px' : '4px', alignItems: 'center' }}>
-                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
-                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
-                                                    </Box>
-                                                </Box>
-
-                                                {/* Message Preview */}
-                                                <Box sx={{
-                                                    padding: isMobile ? '12px' : '16px',
-                                                    background: '#fff',
-                                                    borderRadius: isMobile ? '0 0 8px 8px' : '0 0 12px 12px',
-                                                    minHeight: isMobile ? '200px' : '300px',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    justifyContent: 'flex-start'
-                                                }}>
-                                                    {/* Message Bubble */}
-                                                    <Box sx={{
-                                                        background: '#e5e7eb',
-                                                        borderRadius: isMobile ? '12px' : '16px',
-                                                        padding: isMobile ? '8px 12px' : '12px 16px',
-                                                        marginBottom: isMobile ? '6px' : '8px',
-                                                        maxWidth: '85%',
-                                                        alignSelf: 'flex-start',
-                                                        wordWrap: 'break-word',
-                                                        fontSize: isMobile ? '12px' : '14px',
-                                                        lineHeight: '1.5',
-                                                        color: '#111827',
-                                                        whiteSpace: 'pre-wrap'
-                                                    }}>
-                                                        {(() => {
-                                                            const booking = bookingDetail?.booking || selectedBookingForEmail || {};
-                                                            const messageText = smsForm.message || '';
-                                                            const messageWithPrompts = replaceSmsPrompts(messageText, booking);
-                                                            const finalMessage = personalNote 
-                                                                ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
-                                                                : messageWithPrompts;
-                                                            return finalMessage || 'Your message will appear here...';
-                                                        })()}
-                                                    </Box>
-                                                </Box>
-                                            </Box>
-                                        </Box>
-                                    </Box>
-                                </Grid>
-                            )}
-                            {/* Email Template Preview */}
-                            <Grid item xs={12}>
-                                <Box sx={{ 
-                                    border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
-                                    borderRadius: isMobile ? 2 : '8px', 
-                                    p: isMobile ? 1 : 2,
-                                    backgroundColor: '#f9f9f9',
-                                    position: 'relative',
-                                    overflow: 'auto',
-                                    maxHeight: isMobile ? '300px' : '600px'
-                                }}>
                                     {/* Email Header */}
                                     <Box sx={{ 
                                         display: 'flex', 
@@ -10876,7 +10751,7 @@ setBookingDetail(finalVoucherDetail);
                                     }}>
                                         From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
                                     </Typography>
-                                    {(selectedBookingIds && selectedBookingIds.length > 1) || (selectedVoucherIds && selectedVoucherIds.length > 1) && (
+                                    {((selectedBookingIds && selectedBookingIds.length > 1) || (selectedVoucherIds && selectedVoucherIds.length > 1)) && (
                                         <Typography variant="caption" sx={{ 
                                             color: '#666', 
                                             display: 'block', 
@@ -10986,6 +10861,93 @@ setBookingDetail(finalVoucherDetail);
                                         </Box>
                                 </Box>
                             </Grid>
+                            )}
+                            {/* SMS Template Preview */}
+                            {sendMessageSmsChecked && (
+                                <Grid item xs={12}>
+                                    <Box sx={{ 
+                                        border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                        borderRadius: isMobile ? 2 : '8px', 
+                                        p: isMobile ? 1 : 2,
+                                        backgroundColor: '#f9f9f9',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'flex-start'
+                                    }}>
+                                        {/* Mobile Device Preview */}
+                                        <Box sx={{ 
+                                            width: isMobile ? '240px' : '320px',
+                                            maxWidth: '100%',
+                                            background: '#000',
+                                            borderRadius: isMobile ? '18px' : '24px',
+                                            padding: isMobile ? '8px' : '12px',
+                                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                        }}>
+                                            {/* Phone Screen */}
+                                            <Box sx={{
+                                                background: '#f5f5f5',
+                                                borderRadius: isMobile ? '14px' : '20px',
+                                                padding: isMobile ? '6px' : '8px',
+                                                minHeight: isMobile ? '280px' : '400px'
+                                            }}>
+                                                {/* Status Bar */}
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    padding: isMobile ? '6px 8px' : '8px 12px',
+                                                    fontSize: isMobile ? '8px' : '10px',
+                                                    color: '#000',
+                                                    background: '#fff',
+                                                    borderRadius: isMobile ? '8px 8px 0 0' : '12px 12px 0 0'
+                                                }}>
+                                                    <span>9:41</span>
+                                                    <Box sx={{ display: 'flex', gap: isMobile ? '2px' : '4px', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
+                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
+                                                    </Box>
+                                                </Box>
+
+                                                {/* Message Preview */}
+                                                <Box sx={{
+                                                    padding: isMobile ? '12px' : '16px',
+                                                    background: '#fff',
+                                                    borderRadius: isMobile ? '0 0 8px 8px' : '0 0 12px 12px',
+                                                    minHeight: isMobile ? '200px' : '300px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    justifyContent: 'flex-start'
+                                                }}>
+                                                    {/* Message Bubble */}
+                                                    <Box sx={{
+                                                        background: '#e5e7eb',
+                                                        borderRadius: isMobile ? '12px' : '16px',
+                                                        padding: isMobile ? '8px 12px' : '12px 16px',
+                                                        marginBottom: isMobile ? '6px' : '8px',
+                                                        maxWidth: '85%',
+                                                        alignSelf: 'flex-start',
+                                                        wordWrap: 'break-word',
+                                                        fontSize: isMobile ? '12px' : '14px',
+                                                        lineHeight: '1.5',
+                                                        color: '#111827',
+                                                        whiteSpace: 'pre-wrap'
+                                                    }}>
+                                                        {(() => {
+                                                            const booking = selectedBookingForEmail || {};
+                                                            const messageText = smsForm.message || '';
+                                                            const messageWithPrompts = replaceSmsPrompts(messageText, booking);
+                                                            const finalMessage = personalNote 
+                                                                ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
+                                                                : messageWithPrompts;
+                                                            return finalMessage || 'Your message will appear here...';
+                                                        })()}
+                                                    </Box>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                </Grid>
+                            )}
                             {/* Hidden fields for backend / debugging */}
                             <input type="hidden" value={emailForm.to} />
                             <input type="hidden" value={emailForm.subject} />
@@ -11250,44 +11212,6 @@ setBookingDetail(finalVoucherDetail);
                                         )}
                                     </Select>
                                 </FormControl>
-                            </Grid>
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ 
-                                    mb: isMobile ? 0.5 : 1, 
-                                    fontWeight: 500, 
-                                    fontSize: isMobile ? 13 : '14px',
-                                    color: isMobile ? 'inherit' : '#374151'
-                                }}>
-                                    Message
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    placeholder="Enter your SMS message here..."
-                                    value={smsForm.message || ''}
-                                    onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
-                                    multiline
-                                    rows={isMobile ? 4 : 6}
-                                    variant="outlined"
-                                    size={isMobile ? "small" : "medium"}
-                                    sx={{ 
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: isMobile ? 2 : '6px',
-                                            fontSize: isMobile ? '14px' : '14px',
-                                            '& fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                            },
-                                            '&:hover fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                            },
-                                            '&.Mui-focused fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                            }
-                                        },
-                                        '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : '14px'
-                                        }
-                                    }}
-                                />
                             </Grid>
                             <Grid item xs={12}>
                                 <Typography variant="subtitle2" sx={{ 

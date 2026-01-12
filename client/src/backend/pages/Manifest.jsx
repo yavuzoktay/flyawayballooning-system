@@ -7045,7 +7045,12 @@ const Manifest = () => {
                 }}>
                     <Grid container spacing={isMobile ? 1.5 : 2} sx={{ mt: 1 }}>
                         <Grid item xs={12}>
-                            <FormGroup sx={{ mb: 2, flexDirection: 'row', gap: 2 }}>
+                            <FormGroup sx={{ 
+                                mb: 1, 
+                                flexDirection: 'row', 
+                                gap: isMobile ? 1.5 : 2,
+                                alignItems: 'center'
+                            }}>
                                 <FormControlLabel
                                     control={
                                         <Checkbox
@@ -7058,19 +7063,33 @@ const Manifest = () => {
                                                 }
                                             }}
                                             sx={{
-                                                color: '#1976d2',
-                                                '&.Mui-checked': {
-                                                    color: '#1976d2',
+                                                color: '#6b7280',
+                                                padding: '4px',
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                                                    borderRadius: '4px',
                                                 },
+                                                '&.Mui-checked': {
+                                                    color: '#3b82f6',
+                                                },
+                                                '& .MuiSvgIcon-root': {
+                                                    fontSize: isMobile ? 20 : 22,
+                                                    transition: 'all 0.2s ease-in-out',
+                                                },
+                                                transition: 'all 0.2s ease-in-out',
                                             }}
                                         />
                                     }
                                     label="Email"
                                     sx={{
+                                        margin: 0,
+                                        marginRight: isMobile ? 0 : 1,
                                         '& .MuiFormControlLabel-label': {
-                                            fontSize: isMobile ? '14px' : '14px',
-                                            fontWeight: 500,
-                                            color: isMobile ? 'inherit' : '#374151'
+                                            fontSize: isMobile ? '13px' : '14px',
+                                            fontWeight: sendMessageEmailChecked ? 600 : 500,
+                                            color: sendMessageEmailChecked ? '#3b82f6' : (isMobile ? 'inherit' : '#6b7280'),
+                                            transition: 'all 0.2s ease-in-out',
+                                            marginLeft: '6px',
                                         }
                                     }}
                                 />
@@ -7084,6 +7103,38 @@ const Manifest = () => {
                                                 if (!e.target.checked && !sendMessageEmailChecked) {
                                                     setSendMessageEmailChecked(true);
                                                 }
+                                                // When SMS checkbox is checked, auto-select corresponding SMS template if email template is already selected
+                                                if (e.target.checked && sendMessageEmailChecked && emailForm.template && emailForm.template !== 'custom' && smsTemplates.length > 0) {
+                                                    // Find the email template
+                                                    const dbTemplate = emailTemplates.find(
+                                                        (t) => t.id.toString() === emailForm.template.toString()
+                                                    );
+                                                    const templateName = resolveTemplateName(emailForm.template, dbTemplate);
+                                                    const emailTemplateName = (dbTemplate?.name || templateName).trim();
+                                                    
+                                                    // Email to SMS template name mapping
+                                                    const emailToSmsMapping = {
+                                                        'Flight Voucher Confirmation': 'Flight Voucher Confirmation SMS',
+                                                        'Booking Confirmation': 'Booking Confirmation SMS',
+                                                        'Booking Rescheduled': 'Booking Rescheduled SMS',
+                                                        'Follow up': 'Follow up SMS',
+                                                        'Passenger Rescheduling Information': 'Passenger Rescheduling Information SMS',
+                                                        'Upcoming Flight Reminder': 'Upcoming Flight Reminder SMS'
+                                                    };
+                                                    
+                                                    const correspondingSmsTemplateName = emailToSmsMapping[emailTemplateName];
+                                                    
+                                                    if (correspondingSmsTemplateName) {
+                                                        const matchingSmsTemplate = smsTemplates.find(
+                                                            t => t.name === correspondingSmsTemplateName
+                                                        );
+                                                        
+                                                        if (matchingSmsTemplate) {
+                                                            handleSmsTemplateChange(String(matchingSmsTemplate.id));
+                                                            return; // Exit early to skip the initialization below
+                                                        }
+                                                    }
+                                                }
                                                 // Initialize SMS form if needed when SMS checkbox is checked
                                                 if (e.target.checked && !sendMessageEmailChecked) {
                                                     // Initialize SMS form if needed
@@ -7094,149 +7145,128 @@ const Manifest = () => {
                                                 }
                                             }}
                                             sx={{
-                                                color: '#1976d2',
-                                                '&.Mui-checked': {
-                                                    color: '#1976d2',
+                                                color: '#6b7280',
+                                                padding: '4px',
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                                    borderRadius: '4px',
                                                 },
+                                                '&.Mui-checked': {
+                                                    color: '#10b981',
+                                                },
+                                                '& .MuiSvgIcon-root': {
+                                                    fontSize: isMobile ? 20 : 22,
+                                                    transition: 'all 0.2s ease-in-out',
+                                                },
+                                                transition: 'all 0.2s ease-in-out',
                                             }}
                                         />
                                     }
                                     label="SMS"
                                     sx={{
+                                        margin: 0,
                                         '& .MuiFormControlLabel-label': {
-                                            fontSize: isMobile ? '14px' : '14px',
-                                            fontWeight: 500,
-                                            color: isMobile ? 'inherit' : '#374151'
+                                            fontSize: isMobile ? '13px' : '14px',
+                                            fontWeight: sendMessageSmsChecked ? 600 : 500,
+                                            color: sendMessageSmsChecked ? '#10b981' : (isMobile ? 'inherit' : '#6b7280'),
+                                            transition: 'all 0.2s ease-in-out',
+                                            marginLeft: '6px',
                                         }
                                     }}
                                 />
                             </FormGroup>
                         </Grid>
-                        {/* Email Template Selection */}
-                        {sendMessageEmailChecked && (
+                        {/* Email and SMS Template Selection - Side by Side */}
+                        {(sendMessageEmailChecked || sendMessageSmsChecked) && (
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ 
-                                    mb: 1, 
-                                    fontWeight: 500,
-                                    fontSize: isMobile ? 'inherit' : '14px',
-                                    color: isMobile ? 'inherit' : '#374151'
-                                }}>
-                                    Choose a template Email:
-                                </Typography>
-                                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-                                    <Select
-                                        value={emailForm.template || 'custom'}
-                                        onChange={(e) => handleEmailTemplateChange(e.target.value)}
-                                        displayEmpty
-                                        sx={{
-                                            fontSize: isMobile ? 'inherit' : '14px',
-                                            '& .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                            },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                            },
-                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                            }
-                                        }}
-                                    >
-                                        {emailTemplates.map((template) => (
-                                            <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
-                                                {template.name}
-                                            </MenuItem>
-                                        ))}
-                                        {emailTemplates.length === 0 && (
-                                            <>
-                                                <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
-                                                <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
-                                                <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
-                                                <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
-                                                <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
-                                            </>
-                                        )}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        )}
-                        {/* SMS Template Selection */}
-                        {sendMessageSmsChecked && (
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ 
-                                    mb: 1, 
-                                    fontWeight: 500,
-                                    fontSize: isMobile ? 'inherit' : '14px',
-                                    color: isMobile ? 'inherit' : '#374151'
-                                }}>
-                                    Choose a template SMS:
-                                </Typography>
-                                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-                                    <Select
-                                        value={smsForm.template || 'custom'}
-                                        onChange={(e) => handleSmsTemplateChange(e.target.value)}
-                                        displayEmpty
-                                        sx={{
-                                            fontSize: isMobile ? 'inherit' : '14px',
-                                            '& .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                            },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                            },
-                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                            }
-                                        }}
-                                    >
-                                        {smsTemplates.map((template) => (
-                                            <MenuItem key={template.id} value={String(template.id)} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
-                                                {template.name}
-                                            </MenuItem>
-                                        ))}
-                                        <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        )}
-                        {/* SMS Message Field - Show only if SMS is checked */}
-                        {sendMessageSmsChecked && (
-                            <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ 
-                                    mb: isMobile ? 0.5 : 1, 
-                                    fontWeight: 500, 
-                                    fontSize: isMobile ? 13 : '14px',
-                                    color: isMobile ? 'inherit' : '#374151'
-                                }}>
-                                    Message
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    placeholder="Enter your SMS message here..."
-                                    value={smsForm.message || ''}
-                                    onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
-                                    multiline
-                                    rows={isMobile ? 4 : 6}
-                                    variant="outlined"
-                                    size={isMobile ? "small" : "medium"}
-                                    sx={{ 
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: isMobile ? 2 : '6px',
-                                            fontSize: isMobile ? '14px' : '14px',
-                                            '& fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                            },
-                                            '&:hover fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                            },
-                                            '&.Mui-focused fieldset': {
-                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
-                                            }
-                                        },
-                                        '& .MuiInputLabel-root': {
-                                            fontSize: isMobile ? '14px' : '14px'
-                                        }
-                                    }}
-                                />
+                                <Grid container spacing={2}>
+                                    {/* Email Template Selection */}
+                                    {sendMessageEmailChecked && (
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="subtitle2" sx={{ 
+                                                mb: 1, 
+                                                fontWeight: 500,
+                                                fontSize: isMobile ? 'inherit' : '14px',
+                                                color: isMobile ? 'inherit' : '#374151'
+                                            }}>
+                                                Choose a template Email:
+                                            </Typography>
+                                            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                                <Select
+                                                    value={emailForm.template || 'custom'}
+                                                    onChange={(e) => handleEmailTemplateChange(e.target.value)}
+                                                    displayEmpty
+                                                    sx={{
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        '& .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                        },
+                                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                        },
+                                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                        }
+                                                    }}
+                                                >
+                                                    {emailTemplates.map((template) => (
+                                                        <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                            {template.name}
+                                                        </MenuItem>
+                                                    ))}
+                                                    {emailTemplates.length === 0 && (
+                                                        <>
+                                                            <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
+                                                            <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                                            <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
+                                                            <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
+                                                            <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
+                                                        </>
+                                                    )}
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                    )}
+                                    {/* SMS Template Selection */}
+                                    {sendMessageSmsChecked && (
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="subtitle2" sx={{ 
+                                                mb: 1, 
+                                                fontWeight: 500,
+                                                fontSize: isMobile ? 'inherit' : '14px',
+                                                color: isMobile ? 'inherit' : '#374151'
+                                            }}>
+                                                Choose a template SMS:
+                                            </Typography>
+                                            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                                <Select
+                                                    value={smsForm.template || 'custom'}
+                                                    onChange={(e) => handleSmsTemplateChange(e.target.value)}
+                                                    displayEmpty
+                                                    sx={{
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        '& .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                        },
+                                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                        },
+                                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                        }
+                                                    }}
+                                                >
+                                                    {smsTemplates.map((template) => (
+                                                        <MenuItem key={template.id} value={String(template.id)} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                            {template.name}
+                                                        </MenuItem>
+                                                    ))}
+                                                    <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                    )}
+                                </Grid>
                             </Grid>
                         )}
                         <Grid item xs={12}>
@@ -7544,25 +7574,6 @@ const Manifest = () => {
                                     )}
                                 </Select>
                             </FormControl>
-                        </Grid>
-                        <Grid item xs={12}>
-                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
-                                Message
-                            </Typography>
-                            <TextField
-                                fullWidth
-                                placeholder="Enter your SMS message here..."
-                                value={smsForm.message || ''}
-                                onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
-                                multiline
-                                rows={6}
-                                variant="outlined"
-                                sx={{ 
-                                    '& .MuiOutlinedInput-root': {
-                                        borderRadius: 2
-                                    }
-                                }}
-                            />
                         </Grid>
                         <Grid item xs={12}>
                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
