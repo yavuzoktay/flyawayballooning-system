@@ -1530,6 +1530,44 @@ const BookingPage = () => {
             message,
             template: templateValue
         }));
+
+        // Auto-select corresponding SMS template if SMS checkbox is checked
+        if (sendMessageSmsChecked && smsTemplates.length > 0) {
+            // Email to SMS template name mapping
+            const emailToSmsMapping = {
+                'Flight Voucher Confirmation': 'Flight Voucher Confirmation SMS',
+                'Booking Confirmation': 'Booking Confirmation SMS',
+                'Booking Rescheduled': 'Booking Rescheduled SMS',
+                'Follow up': 'Follow up SMS',
+                'Passenger Rescheduling Information': 'Passenger Rescheduling Information SMS',
+                'Upcoming Flight Reminder': 'Upcoming Flight Reminder SMS'
+            };
+
+            // Get email template name (trim whitespace to handle trailing spaces)
+            const emailTemplateName = (dbTemplate?.name || templateName).trim();
+            
+            // Find corresponding SMS template
+            const correspondingSmsTemplateName = emailToSmsMapping[emailTemplateName];
+            
+            if (correspondingSmsTemplateName) {
+                const matchingSmsTemplate = smsTemplates.find(
+                    t => t.name === correspondingSmsTemplateName
+                );
+                
+                if (matchingSmsTemplate) {
+                    console.log('✅ Auto-selecting SMS template:', matchingSmsTemplate.name);
+                    handleSmsTemplateChange(String(matchingSmsTemplate.id));
+                } else {
+                    console.log('⚠️ SMS template not found for:', correspondingSmsTemplateName);
+                    // Set to custom if no matching SMS template found
+                    setSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+                }
+            } else {
+                console.log('⚠️ No SMS mapping for email template:', emailTemplateName);
+                // Set to custom if no mapping exists
+                setSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+            }
+        }
     };
 
     // Fetch data
@@ -7489,7 +7527,7 @@ setBookingDetail(finalVoucherDetail);
                                                                     (isGiftVoucher && !hasGiftEmail)
                                                                 }
                                                             >
-                                                                Email&SMS
+                                                                Email | SMS
                                                             </Button>
                                                         );
                                                     })()}
@@ -10476,6 +10514,38 @@ setBookingDetail(finalVoucherDetail);
                                                     if (!e.target.checked && !sendMessageEmailChecked) {
                                                         setSendMessageEmailChecked(true);
                                                     }
+                                                    // When SMS checkbox is checked, auto-select corresponding SMS template if email template is already selected
+                                                    if (e.target.checked && sendMessageEmailChecked && emailForm.template && emailForm.template !== 'custom' && smsTemplates.length > 0) {
+                                                        // Find the email template
+                                                        const dbTemplate = emailTemplates.find(
+                                                            (t) => t.id.toString() === emailForm.template.toString()
+                                                        );
+                                                        const templateName = resolveTemplateName(emailForm.template, dbTemplate);
+                                                        const emailTemplateName = (dbTemplate?.name || templateName).trim();
+                                                        
+                                                        // Email to SMS template name mapping
+                                                        const emailToSmsMapping = {
+                                                            'Flight Voucher Confirmation': 'Flight Voucher Confirmation SMS',
+                                                            'Booking Confirmation': 'Booking Confirmation SMS',
+                                                            'Booking Rescheduled': 'Booking Rescheduled SMS',
+                                                            'Follow up': 'Follow up SMS',
+                                                            'Passenger Rescheduling Information': 'Passenger Rescheduling Information SMS',
+                                                            'Upcoming Flight Reminder': 'Upcoming Flight Reminder SMS'
+                                                        };
+                                                        
+                                                        const correspondingSmsTemplateName = emailToSmsMapping[emailTemplateName];
+                                                        
+                                                        if (correspondingSmsTemplateName) {
+                                                            const matchingSmsTemplate = smsTemplates.find(
+                                                                t => t.name === correspondingSmsTemplateName
+                                                            );
+                                                            
+                                                            if (matchingSmsTemplate) {
+                                                                handleSmsTemplateChange(String(matchingSmsTemplate.id));
+                                                                return; // Exit early to skip the initialization below
+                                                            }
+                                                        }
+                                                    }
                                                     // Initialize SMS form if needed when SMS checkbox is checked
                                                     if (e.target.checked && !sendMessageEmailChecked) {
                                                         // Initialize SMS form if needed
@@ -10563,10 +10633,10 @@ setBookingDetail(finalVoucherDetail);
                                         Choose a template SMS:
                                     </Typography>
                                     <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-                                        <Select
-                                            value={smsForm.template || 'custom'}
-                                            onChange={(e) => handleSmsTemplateChange(e.target.value)}
-                                            displayEmpty
+                                    <Select
+                                        value={smsForm.template || 'custom'}
+                                        onChange={(e) => handleSmsTemplateChange(e.target.value)}
+                                        displayEmpty
                                             sx={{
                                                 fontSize: isMobile ? 'inherit' : '14px',
                                                 '& .MuiOutlinedInput-notchedOutline': {
