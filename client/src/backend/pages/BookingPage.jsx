@@ -435,6 +435,9 @@ const BookingPage = () => {
     });
     const [personalNote, setPersonalNote] = useState('');
     const [sendingEmail, setSendingEmail] = useState(false);
+    // Email and SMS checkboxes for Send a Message popup
+    const [sendMessageEmailChecked, setSendMessageEmailChecked] = useState(true);
+    const [sendMessageSmsChecked, setSendMessageSmsChecked] = useState(false);
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsLoading, setEmailLogsLoading] = useState(false);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
@@ -951,174 +954,446 @@ const BookingPage = () => {
     const handleSendEmail = async () => {
         console.log('🔍 Current emailForm state:', emailForm);
         console.log('🔍 Personal note:', personalNote);
+        console.log('🔍 Email checked:', sendMessageEmailChecked);
+        console.log('🔍 SMS checked:', sendMessageSmsChecked);
         
         const isBulkBooking = selectedBookingIds && selectedBookingIds.length > 1;
         const isBulkVoucher = selectedVoucherIds && selectedVoucherIds.length > 1;
         const isBulk = isBulkBooking || isBulkVoucher;
         const isVoucher = selectedBookingForEmail?.contextType === 'voucher' || isBulkVoucher;
 
-        if (!isBulk && !emailForm.to) {
-            alert('Recipient email is required');
+        // Check if at least one checkbox is selected
+        if (!sendMessageEmailChecked && !sendMessageSmsChecked) {
+            alert('Please select at least one option (Email or SMS)');
             return;
         }
 
-        if (!emailForm.subject) {
-            alert('Subject is required. Please select a template.');
-            return;
+        // Validate email requirements if email is checked
+        if (sendMessageEmailChecked) {
+            if (!isBulk && !emailForm.to) {
+                alert('Recipient email is required');
+                return;
+            }
+
+            if (!emailForm.subject) {
+                alert('Subject is required. Please select a template.');
+                return;
+            }
         }
 
-        const dbTemplate = emailTemplates.find(
-            (t) => t.id?.toString() === emailForm.template?.toString()
-        );
-        const templateName = resolveTemplateName(emailForm.template, dbTemplate);
-        const finalHtml = buildEmailHtml({
-            templateName,
-            messageHtml: emailForm.message,
-            booking: selectedBookingForEmail,
-            personalNote
-        });
-        const finalText = stripHtml(finalHtml);
+        // Validate SMS requirements if SMS is checked
+        if (sendMessageSmsChecked) {
+            if (!isBulk) {
+                // Get phone number from selectedBookingForEmail or bookingDetail
+                // Priority: bookingDetail.booking > selectedBookingForEmail
+                const bookingData = bookingDetail?.booking || selectedBookingForEmail || {};
+                const phone = isVoucher 
+                    ? (bookingData.purchaser_phone || bookingData.phone || bookingData.mobile || selectedBookingForEmail?.purchaser_phone || selectedBookingForEmail?.phone || selectedBookingForEmail?.mobile || '')
+                    : (bookingData.phone || bookingData.mobile || selectedBookingForEmail?.phone || selectedBookingForEmail?.mobile || '');
+                const cleanedPhone = cleanPhoneNumber(phone);
+                
+                if (!cleanedPhone || !cleanedPhone.startsWith('+')) {
+                    alert('Recipient phone number is required for SMS. Please ensure the booking has a valid international phone number.');
+                    return;
+                }
+            }
 
-        console.log('📧 Sending email with data:', {
-            to: emailForm.to,
-            subject: emailForm.subject,
-            messageLength: finalHtml?.length || 0,
-            template: emailForm.template,
-            mode: isBulk ? 'bulk' : 'single',
-            isVoucher,
-            selectedBookingIdsCount: selectedBookingIds?.length || 0,
-            selectedVoucherIdsCount: selectedVoucherIds?.length || 0
-        });
-
-        console.log('📄 Final HTML contains receipt:', /Receipt/i.test(finalHtml));
+            // Validate SMS template selection
+            if (!smsForm.template || smsForm.template === 'custom') {
+                if (!smsForm.message || smsForm.message.trim().length === 0) {
+                    alert('SMS message is required. Please select an SMS template or enter a custom message.');
+                    return;
+                }
+            }
+        }
 
         setSendingEmail(true);
         try {
+            const emailPromises = [];
+            const smsPromises = [];
 
-            if (isBulk) {
-                if (isBulkVoucher) {
-                    // Bulk email to selected vouchers
-                    const recipients = filteredData
-                        .filter(v => selectedVoucherIds.includes(v.id))
-                        .map(v => {
-                            const originalVoucher = v._original || v;
-                            const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                            const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                            const email = isFlightVoucher 
-                                ? (originalVoucher.purchaser_email || v.email || '')
-                                : (isGiftVoucher 
-                                    ? (originalVoucher.recipient_email || v.email || '')
-                                    : (v.email || ''));
-                            return email.trim();
-                        })
-                        .filter(e => !!e);
+            // Prepare email data if email is checked
+            if (sendMessageEmailChecked) {
+                const dbTemplate = emailTemplates.find(
+                    (t) => t.id?.toString() === emailForm.template?.toString()
+                );
+                const templateName = resolveTemplateName(emailForm.template, dbTemplate);
+                const finalHtml = buildEmailHtml({
+                    templateName,
+                    messageHtml: emailForm.message,
+                    booking: selectedBookingForEmail,
+                    personalNote
+                });
+                const finalText = stripHtml(finalHtml);
 
-                    if (recipients.length === 0) {
-                        alert('No valid email addresses found for selected vouchers.');
-                        setSendingEmail(false);
-                        return;
-                    }
+                console.log('📧 Sending email with data:', {
+                    to: emailForm.to,
+                    subject: emailForm.subject,
+                    messageLength: finalHtml?.length || 0,
+                    template: emailForm.template,
+                    mode: isBulk ? 'bulk' : 'single',
+                    isVoucher,
+                    selectedBookingIdsCount: selectedBookingIds?.length || 0,
+                    selectedVoucherIdsCount: selectedVoucherIds?.length || 0
+                });
 
-                    const response = await axios.post('/api/sendBulkVoucherEmail', {
-                        voucherIds: selectedVoucherIds,
-                        to: recipients,
-                        subject: emailForm.subject,
-                        message: finalHtml,
-                        messageText: finalText,
-                        template: emailForm.template,
-                    });
+                if (isBulk) {
+                    if (isBulkVoucher) {
+                        // Bulk email to selected vouchers
+                        const recipients = filteredData
+                            .filter(v => selectedVoucherIds.includes(v.id))
+                            .map(v => {
+                                const originalVoucher = v._original || v;
+                                const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
+                                const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
+                                const email = isFlightVoucher 
+                                    ? (originalVoucher.purchaser_email || v.email || '')
+                                    : (isGiftVoucher 
+                                        ? (originalVoucher.recipient_email || v.email || '')
+                                        : (v.email || ''));
+                                return email.trim();
+                            })
+                            .filter(e => !!e);
 
-                    if (response.data.success) {
-                        alert(`Email sent to ${recipients.length} vouchers successfully!`);
-                        setEmailModalOpen(false);
-                        setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
-                        setPersonalNote('');
-                    } else {
-                        alert('Failed to send email: ' + response.data.message);
-                    }
-                } else {
-                    // Bulk email to selected bookings
-                    const recipients = booking
-                        .filter(b => selectedBookingIds.includes(b.id))
-                        .map(b => (b.email || '').trim())
-                        .filter(e => !!e);
-
-                    if (recipients.length === 0) {
-                        alert('No valid email addresses found for selected bookings.');
-                        setSendingEmail(false);
-                        return;
-                    }
-
-                    const response = await axios.post('/api/sendBulkBookingEmail', {
-                        bookingIds: selectedBookingIds,
-                        to: recipients,
-                        subject: emailForm.subject,
-                        message: finalHtml,
-                        messageText: finalText,
-                        template: emailForm.template,
-                    });
-
-                    if (response.data.success) {
-                        alert(`Email sent to ${recipients.length} bookings successfully!`);
-                        setEmailModalOpen(false);
-                        setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
-                        setPersonalNote('');
-                    } else {
-                        alert('Failed to send email: ' + response.data.message);
-                    }
-                }
-            } else {
-                // Single email (booking or voucher)
-                if (isVoucher) {
-                    const response = await axios.post('/api/sendVoucherEmail', {
-                        voucherId: selectedBookingForEmail.id,
-                        to: emailForm.to,
-                        subject: emailForm.subject,
-                        message: finalHtml,
-                        messageText: finalText,
-                        template: emailForm.template,
-                        voucherData: selectedBookingForEmail
-                    });
-
-                    if (response.data.success) {
-                        alert('Email sent successfully!');
-                        setEmailModalOpen(false);
-                        setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
-                        setPersonalNote('');
-                        if (emailLogsContext) {
-                            fetchEmailLogsForParams(emailLogsContext);
+                        if (recipients.length === 0) {
+                            if (!sendMessageSmsChecked) {
+                                alert('No valid email addresses found for selected vouchers.');
+                                setSendingEmail(false);
+                                return;
+                            }
+                        } else {
+                            emailPromises.push(
+                                axios.post('/api/sendBulkVoucherEmail', {
+                                    voucherIds: selectedVoucherIds,
+                                    to: recipients,
+                                    subject: emailForm.subject,
+                                    message: finalHtml,
+                                    messageText: finalText,
+                                    template: emailForm.template,
+                                })
+                            );
                         }
                     } else {
-                        alert('Failed to send email: ' + response.data.message);
+                        // Bulk email to selected bookings
+                        const recipients = booking
+                            .filter(b => selectedBookingIds.includes(b.id))
+                            .map(b => (b.email || '').trim())
+                            .filter(e => !!e);
+
+                        if (recipients.length === 0) {
+                            if (!sendMessageSmsChecked) {
+                                alert('No valid email addresses found for selected bookings.');
+                                setSendingEmail(false);
+                                return;
+                            }
+                        } else {
+                            emailPromises.push(
+                                axios.post('/api/sendBulkBookingEmail', {
+                                    bookingIds: selectedBookingIds,
+                                    to: recipients,
+                                    subject: emailForm.subject,
+                                    message: finalHtml,
+                                    messageText: finalText,
+                                    template: emailForm.template,
+                                })
+                            );
+                        }
                     }
                 } else {
-                    // Single booking email (existing behaviour)
-                    const response = await axios.post('/api/sendBookingEmail', {
-                        bookingId: selectedBookingForEmail.id,
-                        to: emailForm.to,
-                        subject: emailForm.subject,
-                        message: finalHtml,
-                        messageText: finalText,
-                        template: emailForm.template,
-                        bookingData: selectedBookingForEmail
-                    });
-
-                    if (response.data.success) {
-                        alert('Email sent successfully!');
-                        setEmailModalOpen(false);
-                        setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
-                        setPersonalNote('');
-                        if (emailLogsContext) {
-                            fetchEmailLogsForParams(emailLogsContext);
-                        }
+                    // Single email (booking or voucher)
+                    if (isVoucher) {
+                        emailPromises.push(
+                            axios.post('/api/sendVoucherEmail', {
+                                voucherId: selectedBookingForEmail.id,
+                                to: emailForm.to,
+                                subject: emailForm.subject,
+                                message: finalHtml,
+                                messageText: finalText,
+                                template: emailForm.template,
+                                voucherData: selectedBookingForEmail
+                            })
+                        );
                     } else {
-                        alert('Failed to send email: ' + response.data.message);
+                        // Single booking email (existing behaviour)
+                        emailPromises.push(
+                            axios.post('/api/sendBookingEmail', {
+                                bookingId: selectedBookingForEmail.id,
+                                to: emailForm.to,
+                                subject: emailForm.subject,
+                                message: finalHtml,
+                                messageText: finalText,
+                                template: emailForm.template,
+                                bookingData: selectedBookingForEmail
+                            })
+                        );
                     }
                 }
             }
+
+            // Prepare SMS data if SMS is checked
+            if (sendMessageSmsChecked) {
+                // Use SMS template if available, otherwise convert email template to SMS format
+                let smsMessage = '';
+                let smsTemplateId = null;
+                
+                // Check if we have an SMS template selected
+                if (smsForm.template && smsForm.template !== 'custom' && smsForm.message) {
+                    // Use SMS template message directly
+                    smsMessage = smsForm.message;
+                    smsTemplateId = smsForm.template;
+                    
+                    // Replace SMS prompts with booking data
+                    const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
+                    smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
+                } else if (smsForm.message && smsForm.message.trim().length > 0) {
+                    // Custom SMS message
+                    smsMessage = smsForm.message;
+                    const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
+                    smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
+                } else {
+                    // Fallback: Convert email template to SMS format (only if email template exists)
+                    if (emailForm.message && emailForm.message.trim().length > 0) {
+                        const dbTemplate = emailTemplates.find(
+                            (t) => t.id?.toString() === emailForm.template?.toString()
+                        );
+                        const templateName = resolveTemplateName(emailForm.template, dbTemplate);
+                        
+                        // Get SMS message from email template (strip HTML and convert to plain text)
+                        smsMessage = stripHtml(emailForm.message);
+                        
+                        // Remove common email-only content that's not suitable for SMS
+                        // Remove long URLs, receipt details, footer text, etc.
+                        smsMessage = smsMessage
+                            .replace(/https?:\/\/[^\s]+/gi, '') // Remove URLs
+                            .replace(/Customer Portal Link:.*/gi, '') // Remove portal links
+                            .replace(/Receipt.*?All prices in GBP.*/gis, '') // Remove receipt sections
+                            .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '') // Remove footer
+                            .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
+                            .trim();
+                        
+                        // Replace SMS prompts with booking data - use bookingDetail if available, otherwise selectedBookingForEmail
+                        const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
+                        smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
+                    } else {
+                        // No SMS message available
+                        console.warn('⚠️ No SMS message available - template not selected and no email template to convert');
+                        smsMessage = '';
+                    }
+                }
+                
+                // Calculate available space for personal note (SMS limit is 1600 characters)
+                const SMS_MAX_LENGTH = 1600;
+                const personalNoteText = personalNote ? `\n\n${personalNote}` : '';
+                
+                // If message is too long, truncate it
+                if (smsMessage.length + personalNoteText.length > SMS_MAX_LENGTH) {
+                    const maxMessageLength = Math.max(100, SMS_MAX_LENGTH - personalNoteText.length - 50); // Leave some buffer
+                    smsMessage = smsMessage.substring(0, maxMessageLength).trim();
+                    // Try to cut at a sentence or word boundary
+                    const lastPeriod = smsMessage.lastIndexOf('.');
+                    const lastSpace = smsMessage.lastIndexOf(' ');
+                    const cutPoint = lastPeriod > maxMessageLength * 0.8 ? lastPeriod + 1 : 
+                                    (lastSpace > maxMessageLength * 0.8 ? lastSpace : maxMessageLength);
+                    smsMessage = smsMessage.substring(0, cutPoint).trim();
+                    if (!smsMessage.endsWith('.') && !smsMessage.endsWith('!') && !smsMessage.endsWith('?')) {
+                        smsMessage += '...';
+                    }
+                }
+                
+                // Combine template message with personal note for SMS (if there's space)
+                let finalSmsMessage = smsMessage;
+                if (personalNote) {
+                    const combinedLength = smsMessage.length + personalNote.length + 2; // +2 for \n\n
+                    if (combinedLength <= SMS_MAX_LENGTH) {
+                        finalSmsMessage = `${smsMessage}\n\n${personalNote}`;
+                    } else {
+                        // Personal note doesn't fit, truncate main message more to make room
+                        const spaceForNote = personalNote.length + 10; // +10 for \n\n and buffer
+                        const maxMainLength = SMS_MAX_LENGTH - spaceForNote;
+                        if (maxMainLength > 100) {
+                            smsMessage = smsMessage.substring(0, maxMainLength).trim();
+                            // Try to cut at a sentence boundary
+                            const lastPeriod = smsMessage.lastIndexOf('.');
+                            if (lastPeriod > maxMainLength * 0.7) {
+                                smsMessage = smsMessage.substring(0, lastPeriod + 1);
+                            }
+                            finalSmsMessage = `${smsMessage}\n\n${personalNote}`;
+                        } else {
+                            // Not enough space, skip personal note
+                            console.warn('⚠️ Personal note too long, skipping to fit SMS limit');
+                            finalSmsMessage = smsMessage;
+                        }
+                    }
+                }
+                
+                // Final check - ensure total length doesn't exceed limit
+                if (finalSmsMessage.length > SMS_MAX_LENGTH) {
+                    const truncated = finalSmsMessage.substring(0, SMS_MAX_LENGTH - 3).trim();
+                    const finalTruncated = truncated.endsWith('.') || truncated.endsWith('!') || truncated.endsWith('?') 
+                        ? truncated + '..' 
+                        : truncated + '...';
+                    console.warn('⚠️ SMS message truncated to fit 1600 character limit');
+                    finalSmsMessage = finalTruncated;
+                }
+                
+                // Use finalSmsMessage for sending
+                const smsMessageToSend = finalSmsMessage;
+                
+                // Validate SMS message before sending
+                if (!smsMessageToSend || smsMessageToSend.trim().length === 0) {
+                    console.error('⚠️ SMS message is empty, skipping SMS send');
+                    // Don't add to smsPromises if message is empty
+                } else {
+                    if (isBulk) {
+                    if (isBulkVoucher) {
+                        // Bulk SMS to selected vouchers
+                        const recipients = filteredData
+                            .filter(v => selectedVoucherIds.includes(v.id))
+                            .map(v => {
+                                const originalVoucher = v._original || v;
+                                const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
+                                const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
+                                const phone = isFlightVoucher 
+                                    ? (originalVoucher.purchaser_phone || v.phone || '')
+                                    : (isGiftVoucher 
+                                        ? (originalVoucher.recipient_phone || v.phone || '')
+                                        : (v.phone || ''));
+                                const cleanedPhone = cleanPhoneNumber(phone);
+                                return cleanedPhone && cleanedPhone.startsWith('+') ? cleanedPhone : null;
+                            })
+                            .filter(p => p !== null);
+
+                        if (recipients.length > 0) {
+                            smsPromises.push(
+                                axios.post('/api/sendBulkVoucherSms', {
+                                    voucherIds: selectedVoucherIds,
+                                    to: recipients,
+                                    body: smsMessageToSend,
+                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null)
+                                })
+                            );
+                        }
+                    } else {
+                        // Bulk SMS to selected bookings
+                        const recipients = booking
+                            .filter(b => selectedBookingIds.includes(b.id))
+                            .map(b => {
+                                const phone = cleanPhoneNumber(b.phone || b.mobile || '');
+                                return phone && phone.startsWith('+') ? phone : null;
+                            })
+                            .filter(p => p !== null);
+
+                        if (recipients.length > 0) {
+                            smsPromises.push(
+                                axios.post('/api/sendBulkBookingSms', {
+                                    bookingIds: selectedBookingIds,
+                                    to: recipients,
+                                    body: smsMessageToSend,
+                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null)
+                                })
+                            );
+                        }
+                    }
+                } else {
+                    // Single SMS (booking or voucher)
+                    // Get phone number from bookingDetail or selectedBookingForEmail
+                    // Priority: bookingDetail.booking > selectedBookingForEmail
+                    const bookingData = bookingDetail?.booking || selectedBookingForEmail || {};
+                    const phone = isVoucher 
+                        ? (bookingData.purchaser_phone || bookingData.phone || bookingData.mobile || selectedBookingForEmail?.purchaser_phone || selectedBookingForEmail?.phone || selectedBookingForEmail?.mobile || '')
+                        : (bookingData.phone || bookingData.mobile || selectedBookingForEmail?.phone || selectedBookingForEmail?.mobile || '');
+                    const cleanedPhone = cleanPhoneNumber(phone);
+                    
+                    if (cleanedPhone && cleanedPhone.startsWith('+') && smsMessageToSend && smsMessageToSend.trim().length > 0) {
+                        // Use bookingDetail.booking if available, otherwise selectedBookingForEmail
+                        const dataForApi = bookingDetail?.booking || selectedBookingForEmail || {};
+                        
+                        if (isVoucher) {
+                            smsPromises.push(
+                                axios.post('/api/sendVoucherSms', {
+                                    voucherId: selectedBookingForEmail?.id || bookingDetail?.booking?.id,
+                                    to: cleanedPhone,
+                                    body: smsMessageToSend,
+                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null),
+                                    voucherData: dataForApi
+                                })
+                            );
+                        } else {
+                            smsPromises.push(
+                                axios.post('/api/sendBookingSms', {
+                                    bookingId: selectedBookingForEmail?.id || bookingDetail?.booking?.id,
+                                    to: cleanedPhone,
+                                    body: smsMessageToSend,
+                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null),
+                                    bookingData: dataForApi
+                                })
+                            );
+                        }
+                    } else {
+                        if (!cleanedPhone || !cleanedPhone.startsWith('+')) {
+                            console.warn('⚠️ No valid phone number found for SMS');
+                        }
+                        if (!smsMessageToSend || smsMessageToSend.trim().length === 0) {
+                            console.warn('⚠️ SMS message is empty');
+                        }
+                    }
+                    }
+                }
+            }
+
+            // Execute all promises
+            const results = await Promise.allSettled([...emailPromises, ...smsPromises]);
+            
+            const emailResults = results.slice(0, emailPromises.length);
+            const smsResults = results.slice(emailPromises.length);
+            
+            let successMessages = [];
+            let errorMessages = [];
+
+            emailResults.forEach((result, index) => {
+                if (result.status === 'fulfilled' && result.value.data.success) {
+                    successMessages.push('Email sent successfully!');
+                } else {
+                    errorMessages.push('Failed to send email: ' + (result.reason?.response?.data?.message || result.reason?.message || 'Unknown error'));
+                }
+            });
+
+            smsResults.forEach((result, index) => {
+                if (result.status === 'fulfilled' && result.value.data.success) {
+                    successMessages.push('SMS sent successfully!');
+                } else {
+                    errorMessages.push('Failed to send SMS: ' + (result.reason?.response?.data?.message || result.reason?.message || 'Unknown error'));
+                }
+            });
+
+            if (successMessages.length > 0 || errorMessages.length > 0) {
+                if (successMessages.length > 0) {
+                    alert(successMessages.join('\n'));
+                }
+                if (errorMessages.length > 0) {
+                    alert(errorMessages.join('\n'));
+                }
+                
+                if (successMessages.length > 0 && errorMessages.length === 0) {
+                    setEmailModalOpen(false);
+                    setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
+                    setPersonalNote('');
+                    setSmsForm({ to: '', message: '', template: 'custom' });
+                    setSmsPersonalNote('');
+                    setSendMessageEmailChecked(true);
+                    setSendMessageSmsChecked(false);
+                    if (emailLogsContext) {
+                        fetchEmailLogsForParams(emailLogsContext);
+                    }
+                }
+            } else {
+                if (!sendMessageEmailChecked && !sendMessageSmsChecked) {
+                    alert('No valid recipients found. Please check email addresses and phone numbers.');
+                }
+            }
         } catch (error) {
-            console.error('Error sending email:', error);
-            alert('Error sending email: ' + (error.response?.data?.message || error.message));
+            console.error('Error sending message:', error);
+            alert('Error sending message: ' + (error.response?.data?.message || error.message));
         }
         setSendingEmail(false);
     };
@@ -3112,6 +3387,23 @@ setBookingDetail(finalVoucherDetail);
         });
         
         setPersonalNote('');
+        
+        // Initialize SMS form if SMS templates are available
+        if (smsTemplates.length > 0 && sendMessageSmsChecked) {
+            const firstSmsTemplate = smsTemplates[0];
+            setSmsForm({
+                to: cleanPhoneNumber(bookingWithContext.phone || bookingWithContext.mobile || ''),
+                message: firstSmsTemplate.message || '',
+                template: String(firstSmsTemplate.id)
+            });
+        } else {
+            setSmsForm({
+                to: cleanPhoneNumber(bookingWithContext.phone || bookingWithContext.mobile || ''),
+                message: '',
+                template: 'custom'
+            });
+        }
+        
         setEmailModalOpen(true);
 
         const params = getEmailLogParamsForEntity(bookingWithContext);
@@ -7197,7 +7489,7 @@ setBookingDetail(finalVoucherDetail);
                                                                     (isGiftVoucher && !hasGiftEmail)
                                                                 }
                                                             >
-                                                                Email
+                                                                Email&SMS
                                                             </Button>
                                                         );
                                                     })()}
@@ -10092,7 +10384,12 @@ setBookingDetail(finalVoucherDetail);
                 {/* Email Modal */}
                 <Dialog 
                     open={emailModalOpen} 
-                    onClose={() => setEmailModalOpen(false)}
+                    onClose={() => {
+                        setEmailModalOpen(false);
+                        setSendMessageEmailChecked(true);
+                        setSendMessageSmsChecked(false);
+                        setSmsForm({ to: '', message: '', template: 'custom' });
+                    }}
                     maxWidth={isMobile ? "md" : "lg"}
                     fullWidth
                     PaperProps={{
@@ -10140,52 +10437,200 @@ setBookingDetail(finalVoucherDetail);
                     <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                         <Grid container spacing={isMobile ? 1 : 2} sx={{ mt: isMobile ? 0 : 1 }}>
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ 
-                                    mb: 1, 
-                                    fontWeight: 500,
-                                    fontSize: isMobile ? 'inherit' : '14px',
-                                    color: isMobile ? 'inherit' : '#374151'
-                                }}>
-                                    Choose a template:
-                                </Typography>
-                                <FormControl fullWidth size={isMobile ? "small" : "medium"}>
-                                    <Select
-                                        value={emailForm.template}
-                                        onChange={(e) => handleEmailTemplateChange(e.target.value)}
-                                        displayEmpty
+                                <FormGroup sx={{ mb: 2, flexDirection: 'row', gap: 2 }}>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={sendMessageEmailChecked}
+                                                onChange={(e) => {
+                                                    setSendMessageEmailChecked(e.target.checked);
+                                                    // If unchecking email and SMS is also unchecked, keep at least one checked
+                                                    if (!e.target.checked && !sendMessageSmsChecked) {
+                                                        setSendMessageSmsChecked(true);
+                                                    }
+                                                }}
+                                                sx={{
+                                                    color: '#1976d2',
+                                                    '&.Mui-checked': {
+                                                        color: '#1976d2',
+                                                    },
+                                                }}
+                                            />
+                                        }
+                                        label="Email"
                                         sx={{
-                                            fontSize: isMobile ? 'inherit' : '14px',
-                                            '& .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
-                                            },
-                                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                            },
-                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            '& .MuiFormControlLabel-label': {
+                                                fontSize: isMobile ? '14px' : '14px',
+                                                fontWeight: 500,
+                                                color: isMobile ? 'inherit' : '#374151'
                                             }
                                         }}
-                                    >
-                                        {/* Database templates */}
-                                        {emailTemplates.map((template) => (
-                                            <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
-                                                {template.name}
-                                            </MenuItem>
-                                        ))}
-                                        
-                                        {/* Legacy hardcoded templates (fallback) */}
-                                        {emailTemplates.length === 0 && (
-                                            <>
-                                                <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
-                                        <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
-                                        <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
-                                        <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
-                                        <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
-                                            </>
-                                        )}
-                                    </Select>
-                                </FormControl>
+                                    />
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={sendMessageSmsChecked}
+                                                onChange={(e) => {
+                                                    setSendMessageSmsChecked(e.target.checked);
+                                                    // If unchecking SMS and Email is also unchecked, keep at least one checked
+                                                    if (!e.target.checked && !sendMessageEmailChecked) {
+                                                        setSendMessageEmailChecked(true);
+                                                    }
+                                                    // Initialize SMS form if needed when SMS checkbox is checked
+                                                    if (e.target.checked && !sendMessageEmailChecked) {
+                                                        // Initialize SMS form if needed
+                                                        if (!smsForm.message && smsTemplates.length > 0) {
+                                                            const firstTemplate = smsTemplates[0];
+                                                            handleSmsTemplateChange(String(firstTemplate.id));
+                                                        }
+                                                    }
+                                                }}
+                                                sx={{
+                                                    color: '#1976d2',
+                                                    '&.Mui-checked': {
+                                                        color: '#1976d2',
+                                                    },
+                                                }}
+                                            />
+                                        }
+                                        label="SMS"
+                                        sx={{
+                                            '& .MuiFormControlLabel-label': {
+                                                fontSize: isMobile ? '14px' : '14px',
+                                                fontWeight: 500,
+                                                color: isMobile ? 'inherit' : '#374151'
+                                            }
+                                        }}
+                                    />
+                                </FormGroup>
                             </Grid>
+                            {/* Email Template Selection */}
+                            {sendMessageEmailChecked && (
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ 
+                                        mb: 1, 
+                                        fontWeight: 500,
+                                        fontSize: isMobile ? 'inherit' : '14px',
+                                        color: isMobile ? 'inherit' : '#374151'
+                                    }}>
+                                        Choose a template Email:
+                                    </Typography>
+                                    <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                        <Select
+                                            value={emailForm.template || 'custom'}
+                                            onChange={(e) => handleEmailTemplateChange(e.target.value)}
+                                            displayEmpty
+                                            sx={{
+                                                fontSize: isMobile ? 'inherit' : '14px',
+                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                },
+                                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                },
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                }
+                                            }}
+                                        >
+                                            {emailTemplates.map((template) => (
+                                                <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                    {template.name}
+                                                </MenuItem>
+                                            ))}
+                                            {emailTemplates.length === 0 && (
+                                                <>
+                                                    <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
+                                                    <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                                    <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
+                                                    <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
+                                                    <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
+                                                </>
+                                            )}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            )}
+                            {/* SMS Template Selection */}
+                            {sendMessageSmsChecked && (
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ 
+                                        mb: 1, 
+                                        fontWeight: 500,
+                                        fontSize: isMobile ? 'inherit' : '14px',
+                                        color: isMobile ? 'inherit' : '#374151'
+                                    }}>
+                                        Choose a template SMS:
+                                    </Typography>
+                                    <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                        <Select
+                                            value={smsForm.template || 'custom'}
+                                            onChange={(e) => handleSmsTemplateChange(e.target.value)}
+                                            displayEmpty
+                                            sx={{
+                                                fontSize: isMobile ? 'inherit' : '14px',
+                                                '& .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                },
+                                                '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                },
+                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                    borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                }
+                                            }}
+                                        >
+                                            {smsTemplates.map((template) => (
+                                                <MenuItem key={template.id} value={String(template.id)} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                    {template.name}
+                                                </MenuItem>
+                                            ))}
+                                            <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                            )}
+                            {/* SMS Message Field - Show only if SMS is checked */}
+                            {sendMessageSmsChecked && (
+                                <Grid item xs={12}>
+                                    <Typography variant="subtitle2" sx={{ 
+                                        mb: isMobile ? 0.5 : 1, 
+                                        fontWeight: 500, 
+                                        fontSize: isMobile ? 13 : '14px',
+                                        color: isMobile ? 'inherit' : '#374151'
+                                    }}>
+                                        Message
+                                    </Typography>
+                                    <TextField
+                                        fullWidth
+                                        placeholder="Enter your SMS message here..."
+                                        value={smsForm.message || ''}
+                                        onChange={(e) => setSmsForm(prev => ({ ...prev, message: e.target.value }))}
+                                        multiline
+                                        rows={isMobile ? 4 : 6}
+                                        variant="outlined"
+                                        size={isMobile ? "small" : "medium"}
+                                        sx={{ 
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: isMobile ? 2 : '6px',
+                                                fontSize: isMobile ? '14px' : '14px',
+                                                '& fieldset': {
+                                                    borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                },
+                                                '&:hover fieldset': {
+                                                    borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                },
+                                                '&.Mui-focused fieldset': {
+                                                    borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                }
+                                            },
+                                            '& .MuiInputLabel-root': {
+                                                fontSize: isMobile ? '14px' : '14px'
+                                            }
+                                        }}
+                                    />
+                                </Grid>
+                            )}
                             <Grid item xs={12}>
                                 <Typography variant="subtitle2" sx={{ 
                                     mb: isMobile ? 0.5 : 1, 
@@ -10224,6 +10669,92 @@ setBookingDetail(finalVoucherDetail);
                                     }}
                                 />
                             </Grid>
+                            {/* SMS Preview - Mobile Device - Show only if SMS is checked */}
+                            {sendMessageSmsChecked && (
+                                <Grid item xs={12}>
+                                    <Box sx={{ 
+                                        border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                        borderRadius: isMobile ? 2 : '8px', 
+                                        p: isMobile ? 1 : 2,
+                                        backgroundColor: '#f9f9f9',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'flex-start'
+                                    }}>
+                                        {/* Mobile Device Preview */}
+                                        <Box sx={{ 
+                                            width: isMobile ? '240px' : '320px',
+                                            maxWidth: '100%',
+                                            background: '#000',
+                                            borderRadius: isMobile ? '18px' : '24px',
+                                            padding: isMobile ? '8px' : '12px',
+                                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                        }}>
+                                            {/* Phone Screen */}
+                                            <Box sx={{
+                                                background: '#f5f5f5',
+                                                borderRadius: isMobile ? '14px' : '20px',
+                                                padding: isMobile ? '6px' : '8px',
+                                                minHeight: isMobile ? '280px' : '400px'
+                                            }}>
+                                                {/* Status Bar */}
+                                                <Box sx={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    padding: isMobile ? '6px 8px' : '8px 12px',
+                                                    fontSize: isMobile ? '8px' : '10px',
+                                                    color: '#000',
+                                                    background: '#fff',
+                                                    borderRadius: isMobile ? '8px 8px 0 0' : '12px 12px 0 0'
+                                                }}>
+                                                    <span>9:41</span>
+                                                    <Box sx={{ display: 'flex', gap: isMobile ? '2px' : '4px', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
+                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
+                                                    </Box>
+                                                </Box>
+
+                                                {/* Message Preview */}
+                                                <Box sx={{
+                                                    padding: isMobile ? '12px' : '16px',
+                                                    background: '#fff',
+                                                    borderRadius: isMobile ? '0 0 8px 8px' : '0 0 12px 12px',
+                                                    minHeight: isMobile ? '200px' : '300px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    justifyContent: 'flex-start'
+                                                }}>
+                                                    {/* Message Bubble */}
+                                                    <Box sx={{
+                                                        background: '#e5e7eb',
+                                                        borderRadius: isMobile ? '12px' : '16px',
+                                                        padding: isMobile ? '8px 12px' : '12px 16px',
+                                                        marginBottom: isMobile ? '6px' : '8px',
+                                                        maxWidth: '85%',
+                                                        alignSelf: 'flex-start',
+                                                        wordWrap: 'break-word',
+                                                        fontSize: isMobile ? '12px' : '14px',
+                                                        lineHeight: '1.5',
+                                                        color: '#111827',
+                                                        whiteSpace: 'pre-wrap'
+                                                    }}>
+                                                        {(() => {
+                                                            const booking = bookingDetail?.booking || selectedBookingForEmail || {};
+                                                            const messageText = smsForm.message || '';
+                                                            const messageWithPrompts = replaceSmsPrompts(messageText, booking);
+                                                            const finalMessage = personalNote 
+                                                                ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
+                                                                : messageWithPrompts;
+                                                            return finalMessage || 'Your message will appear here...';
+                                                        })()}
+                                                    </Box>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                </Grid>
+                            )}
                             {/* Email Template Preview */}
                             <Grid item xs={12}>
                                 <Box sx={{ 
