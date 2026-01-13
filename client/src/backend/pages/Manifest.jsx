@@ -3468,17 +3468,9 @@ const Manifest = () => {
         }
         try {
             lastCrewFetchRef.current = { date, inFlight: true };
-            const res = await axios.get('/api/crew-assignments', { params: { date } });
-            if (res.data?.success && Array.isArray(res.data.data)) {
-                const map = {};
-                for (const row of res.data.data) {
-                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                    map[key] = row.crew_id;
-                }
-                setCrewAssignmentsBySlot(map);
-            } else {
-                setCrewAssignmentsBySlot({});
-            }
+            await axios.get('/api/crew-assignments', { params: { date } });
+            // Don't auto-populate assignments from API - only show user selections
+            setCrewAssignmentsBySlot({});
         } catch (err) {
             console.error('Error refreshing crew assignments:', err);
             setCrewAssignmentsBySlot({});
@@ -3499,17 +3491,9 @@ const Manifest = () => {
         }
         try {
             lastPilotFetchRef.current = { date, inFlight: true };
-            const res = await axios.get('/api/pilot-assignments', { params: { date } });
-            if (res.data?.success && Array.isArray(res.data.data)) {
-                const map = {};
-                for (const row of res.data.data) {
-                    const key = slotKey(row.activity_id, dayjs(row.date).format('YYYY-MM-DD'), row.time.substring(0,5));
-                    map[key] = row.pilot_id;
-                }
-                setPilotAssignmentsBySlot(map);
-            } else {
-                setPilotAssignmentsBySlot({});
-            }
+            await axios.get('/api/pilot-assignments', { params: { date } });
+            // Don't auto-populate assignments from API - only show user selections
+            setPilotAssignmentsBySlot({});
         } catch (err) {
             console.error('Error refreshing pilot assignments:', err);
             setPilotAssignmentsBySlot({});
@@ -4671,19 +4655,19 @@ const Manifest = () => {
                                     activity_id: activityIdForSlot, 
                                     flight_date: first.flight_date,
                                     date_part: (first.flight_date||'').substring(0,10),
-                                                            time_part: (first.flight_date||'').substring(11,16),
-                                                            fullFlight: first
-                                                        });
-                                                    }
-                                                    
-                                                    // Check if activityId is valid
-                                                    const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
-                                                    
-                                                    if (!isActivityIdValid) {
-                                                        console.error('Invalid activityId for flight:', { 
-                                                            flightId: first.id, 
-                                                            activityId: activityIdForSlot,
-                                                            flight: first 
+                                    time_part: (first.flight_date||'').substring(11,16),
+                                    fullFlight: first
+                                });
+                            }
+                            
+                            // Check if activityId is valid
+                            const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                            
+                            if (!isActivityIdValid) {
+                                console.error('Invalid activityId for flight:', { 
+                                    flightId: first.id, 
+                                    activityId: activityIdForSlot,
+                                    flight: first 
                                 });
                             }
                             
@@ -4742,17 +4726,17 @@ const Manifest = () => {
                             const activityIdForSlot = getFlightActivityId(first);
                             const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
                             const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
-                                                    
-                                                    // Check if activityId is valid
-                                                    const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
-                                                    
-                                                    if (!isActivityIdValid) {
-                                                        console.error('Invalid activityId for pilot flight:', { 
-                                                            flightId: first.id, 
-                                                            activityId: activityIdForSlot,
-                                                            flight: first 
-                                                        });
-                                                    }
+                            
+                            // Check if activityId is valid
+                            const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
+                            
+                            if (!isActivityIdValid) {
+                                console.error('Invalid activityId for pilot flight:', { 
+                                    flightId: first.id, 
+                                    activityId: activityIdForSlot,
+                                    flight: first 
+                                });
+                            }
                             
                             return (
                                 <>
