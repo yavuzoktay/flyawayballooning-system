@@ -7301,11 +7301,11 @@ setBookingDetail(finalVoucherDetail);
                                                         const originalVoucher = bookingDetail.originalVoucher || null;
                                                         const redeemed = (b.redeemed === true) || (b.voucher_redeemed === 1) || (typeof b.redeemed_at === 'string' && b.redeemed_at) || (v.redeemed === 'Yes' || v.redeemed === true) || (b.redeemed_voucher === 'Yes');
                                                         
-                                                        // For redeemed vouchers, show the original voucher_ref instead of the new booking voucher_code
-                                                        // This fixes the issue where rebooked vouchers show the new code (e.g., BAT26JGS) instead of original (e.g., GATESMEOR)
-                                                        const voucherCodeToDisplay = (b.redeemed_voucher === 'Yes' || b.redeemed_voucher === 1) && originalVoucher && originalVoucher.voucher_ref
-                                                            ? originalVoucher.voucher_ref
-                                                            : (b.voucher_code || '');
+                                                        // For redeemed vouchers created via createRedeemBooking, show the REDEEMED voucher code
+                                                        // This is the voucher code that was used to redeem (e.g., GATVZ2HW55)
+                                                        // The booking.voucher_code field now contains the newly generated voucher code (for All Bookings table)
+                                                        // The originalRedeemedVoucherCode field contains the redeemed voucher code (for popup display)
+                                                        const voucherCodeToDisplay = b.originalRedeemedVoucherCode || b.voucher_code || '';
                                                         
                                                         return (
                                                             <Typography>

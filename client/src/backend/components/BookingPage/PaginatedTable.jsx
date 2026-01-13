@@ -589,9 +589,6 @@ const PaginatedTable = ({
                                                                 })()
                                                             ) : id === 'flight_date' ? (
                                                 (() => {
-                                                    // #region agent log
-                                                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaginatedTable.jsx:592',message:'formatting flight_date for table',data:{flightDate:item[id],flightDateDisplay:item.flight_date_display,bookingId:item.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-                                                    // #endregion
                                                     if (item.flight_date_display !== undefined) {
                                                         if (item.flight_date_display === '-') return '-';
                                                         return item.flight_date_display;
@@ -626,9 +623,6 @@ const PaginatedTable = ({
                                                             const urlDate = `${yearStr}-${monthStr}-${dayStr}`;
                                                             const displayDateTime = `${dayStr}/${monthStr}/${yearStr} ${timeString}`;
                                                             
-                                                            // #region agent log
-                                                            fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaginatedTable.jsx:620',message:'flight_date formatted',data:{originalDateString:dateString,formattedDate:displayDateTime,urlDate,year,month,day,hour,minute},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-                                                            // #endregion
                                                             
                                                             return (
                                                                 <a

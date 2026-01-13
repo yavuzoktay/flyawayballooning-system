@@ -1627,9 +1627,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
         chooseFlightType,
         passengerData,
         additionalInfo,
-        selectedDate,
+        selectedDate: reqSelectedDate,
         selectedTime,
-        voucher_code,
+        voucher_code: reqVoucherCode,
         totalPrice = 0,
         activity_id,
         userSessionData
@@ -1641,10 +1641,48 @@ app.post('/api/createRedeemBooking', (req, res) => {
     }
 
     // Trim voucher code to remove whitespace and tab characters
-    const cleanVoucherCode = voucher_code ? voucher_code.trim() : null;
+    const cleanVoucherCode = reqVoucherCode ? String(reqVoucherCode).trim() : 'no-voucher';
+    const selectedDate = reqSelectedDate || 'no-date';
+    const passengerEmail = passengerData?.[0]?.email || 'no-email';
+    
+    // Prevent duplicate requests: use a request ID or combination of key fields
+    // Store in-memory to prevent same request from being processed multiple times
+    // Create a simpler key for duplicate detection (without timestamp)
+    const duplicateKey = `${cleanVoucherCode}-${selectedDate}-${passengerEmail}`;
+    
+    // Check if this exact request is already being processed (simple in-memory cache)
+    // Note: This is a basic protection. For production, consider using Redis or a more robust solution
+    if (!global.redeemBookingRequests) {
+        global.redeemBookingRequests = new Map(); // Use Map to store timestamp with key
+    }
+    
+    // Check if request is already in progress (within last 10 seconds)
+    const existingRequest = global.redeemBookingRequests.get(duplicateKey);
+    if (existingRequest && (Date.now() - existingRequest < 10000)) {
+        console.warn('⚠️ Duplicate createRedeemBooking request detected, ignoring:', duplicateKey);
+        return res.status(400).json({ success: false, error: 'Duplicate request detected. Please wait a moment and try again.' });
+    }
+    
+    // Add request to processing map with current timestamp
+    global.redeemBookingRequests.set(duplicateKey, Date.now());
+    
+    // Clean up old requests (older than 30 seconds) periodically
+    setTimeout(() => {
+        if (global.redeemBookingRequests) {
+            const now = Date.now();
+            for (const [key, timestamp] of global.redeemBookingRequests.entries()) {
+                if (now - timestamp > 30000) {
+                    global.redeemBookingRequests.delete(key);
+                }
+            }
+        }
+    }, 30000);
+    
+    // Use cleanVoucherCode for further processing (convert 'no-voucher' to null)
+    const cleanVoucherCodeForValidation = cleanVoucherCode === 'no-voucher' ? null : cleanVoucherCode;
 
     // Validate voucher code is not already used (check both voucher_codes and all_vouchers tables)
-    if (cleanVoucherCode) {
+    if (cleanVoucherCodeForValidation) {
         // First check voucher_codes table
         const checkVoucherCodesSql = `
             SELECT code, is_active, current_uses, max_uses 
@@ -1653,7 +1691,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             LIMIT 1
         `;
 
-        con.query(checkVoucherCodesSql, [cleanVoucherCode], (checkErr, checkResult) => {
+        con.query(checkVoucherCodesSql, [cleanVoucherCodeForValidation], (checkErr, checkResult) => {
             if (checkErr) {
                 // If voucher_codes table doesn't exist or query fails, check all_vouchers instead
                 console.warn('Warning: Could not check voucher_codes table:', checkErr.message);
@@ -1703,7 +1741,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 LIMIT 1
             `;
 
-            con.query(checkAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
+            con.query(checkAllVouchersSql, [cleanVoucherCodeForValidation], (voucherErr, voucherResult) => {
                 if (voucherErr) {
                     console.warn('Warning: Could not check all_vouchers table:', voucherErr.message);
                     // Can't validate, proceed with booking (risky but allows operation)
@@ -1719,35 +1757,67 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     console.log('Status:', voucher.status);
                     console.log('Name:', voucher.name);
 
-                    // Check if already redeemed by checking all_booking table
-                    // Don't rely solely on all_vouchers.redeemed field as it might be incorrectly set
-                    // Instead, check if there's a booking with redeemed_voucher = 'Yes' for this voucher
+                    // Check if already redeemed by checking voucher_code_usage table
+                    // This is more reliable as it tracks which voucher codes were used for which bookings
                     const checkRedeemedBookingSql = `
-                        SELECT id, redeemed_voucher
-                        FROM all_booking 
-                        WHERE UPPER(voucher_code) = UPPER(?)
-                        AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                        SELECT vcu.id, vcu.booking_id, vc.code
+                        FROM voucher_code_usage vcu
+                        INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
+                        WHERE UPPER(vc.code) = UPPER(?)
+                        AND EXISTS (
+                            SELECT 1 FROM all_booking ab 
+                            WHERE ab.id = vcu.booking_id 
+                            AND (ab.redeemed_voucher = 'Yes' OR ab.redeemed_voucher = 1 OR ab.flight_type_source = 'Redeem Voucher')
+                        )
                         LIMIT 1
                     `;
                     
-                    con.query(checkRedeemedBookingSql, [cleanVoucherCode], (redeemedCheckErr, redeemedCheckResult) => {
+                    con.query(checkRedeemedBookingSql, [cleanVoucherCodeForValidation], (redeemedCheckErr, redeemedCheckResult) => {
                         if (redeemedCheckErr) {
-                            console.warn('Warning: Could not check all_booking for redeemed status:', redeemedCheckErr.message);
-                            // If we can't check, only block if status is explicitly 'Used'
-                            if (voucher.status === 'Used') {
-                                return res.status(400).json({
-                                    success: false,
-                                    error: 'This voucher has already been redeemed and cannot be used again'
-                                });
-                            }
-                            // Otherwise, proceed with booking
-                            createRedeemBookingLogic();
+                            console.warn('Warning: Could not check voucher_code_usage for redeemed status:', redeemedCheckErr.message);
+                            // Fallback: check all_booking table
+                            const fallbackCheckSql = `
+                                SELECT id, redeemed_voucher
+                                FROM all_booking 
+                                WHERE UPPER(voucher_code) = UPPER(?)
+                                AND (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+                                LIMIT 1
+                            `;
+                            con.query(fallbackCheckSql, [cleanVoucherCodeForValidation], (fallbackErr, fallbackResult) => {
+                                if (fallbackErr || (fallbackResult && fallbackResult.length > 0)) {
+                                    // Remove request from processing map
+                                    if (global.redeemBookingRequests) {
+                                        global.redeemBookingRequests.delete(duplicateKey);
+                                    }
+                                    return res.status(400).json({
+                                        success: false,
+                                        error: 'This voucher has already been redeemed and cannot be used again'
+                                    });
+                                }
+                                // If we can't check, only block if status is explicitly 'Used'
+                                if (voucher.status === 'Used') {
+                                    // Remove request from processing map
+                                    if (global.redeemBookingRequests) {
+                                        global.redeemBookingRequests.delete(duplicateKey);
+                                    }
+                                    return res.status(400).json({
+                                        success: false,
+                                        error: 'This voucher has already been redeemed and cannot be used again'
+                                    });
+                                }
+                                // Otherwise, proceed with booking
+                                createRedeemBookingLogic();
+                            });
                             return;
                         }
 
                         // If there's a booking with redeemed_voucher = 'Yes', block it
                         if (redeemedCheckResult.length > 0) {
-                            console.log('Voucher already redeemed - found booking with redeemed_voucher = Yes');
+                            console.log('Voucher already redeemed - found booking via voucher_code_usage');
+                            // Remove request from processing map
+                            if (global.redeemBookingRequests) {
+                                global.redeemBookingRequests.delete(duplicateKey);
+                            }
                             return res.status(400).json({
                                 success: false,
                                 error: 'This voucher has already been redeemed and cannot be used again'
@@ -1916,7 +1986,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
         console.log('Final bookingDateTime:', bookingDateTime);
 
         // Get voucher information (created_at, voucher_type, experience_type) and price
-        if (cleanVoucherCode) {
+        if (cleanVoucherCodeForValidation) {
             // First, get voucher info from all_vouchers table (including paid amount)
             const getVoucherInfoSql = `
             SELECT created_at, voucher_type, experience_type, book_flight, paid
@@ -1925,7 +1995,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
             LIMIT 1
         `;
 
-            con.query(getVoucherInfoSql, [cleanVoucherCode], (voucherInfoErr, voucherInfoResult) => {
+            con.query(getVoucherInfoSql, [cleanVoucherCodeForValidation], (voucherInfoErr, voucherInfoResult) => {
                 if (voucherInfoErr) {
                     console.warn('Warning: Could not fetch voucher info:', voucherInfoErr.message);
                     // Voucher bilgisi alınamazsa, sadece fiyat bilgisini al
@@ -2025,7 +2095,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     LIMIT 1
                 `;
 
-                con.query(getVoucherPaidSql, [cleanVoucherCode], (voucherPaidErr, voucherPaidResult) => {
+                con.query(getVoucherPaidSql, [cleanVoucherCodeForValidation], (voucherPaidErr, voucherPaidResult) => {
                     let voucherOriginalPrice = totalPrice || 0;
 
                     // Priority: 1. all_vouchers.paid, 2. voucher_codes.paid_amount, 3. totalPrice
@@ -2181,25 +2251,30 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 if (!newVoucherCode) {
                     console.warn('⚠️ Failed to generate new voucher code, using redeemed voucher code as fallback');
                     // Fallback to using redeemed voucher code if generation fails
-                    createBookingWithGeneratedCode(cleanVoucherCode);
+                    createBookingWithGeneratedCode(cleanVoucherCodeForValidation);
                     return;
                 }
 
-                // Create voucher_codes entry for the new voucher code
-                const title = `${passengerName} - Book Flight - ${chooseLocation}`;
-                const voucherCodeSql = `
+                // First, ensure the REDEEMED voucher code exists in voucher_codes table (for foreign key constraint)
+                // This is the voucher code that will be stored in booking.voucher_code
+                const redeemedVoucherCodeTitle = `${passengerName} - Redeemed Flight Voucher - ${chooseLocation}`;
+                const redeemedVoucherCodeSql = `
                     INSERT INTO voucher_codes (
                         code, title, valid_from, valid_until, max_uses, current_uses,
                         applicable_locations, applicable_experiences, applicable_voucher_types,
                         is_active, created_at, updated_at, source_type, customer_email, paid_amount
-                    ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'redeem_booking', ?, ?)
+                    ) VALUES (?, ?, NOW(), ?, 1, 1, ?, ?, ?, 0, NOW(), NOW(), 'redeemed_voucher', ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                        current_uses = current_uses + 1,
+                        is_active = 0,
+                        updated_at = NOW()
                 `;
                 
                 const validUntil = expiresDateFinal ? moment(expiresDateFinal).format('YYYY-MM-DD') : moment().add(24, 'months').format('YYYY-MM-DD');
                 
-                const voucherCodeValues = [
-                    newVoucherCode,
-                    title,
+                const redeemedVoucherCodeValues = [
+                    cleanVoucherCode,
+                    redeemedVoucherCodeTitle,
                     validUntil,
                     chooseLocation || null,
                     resolvedVoucherType || null,
@@ -2208,16 +2283,48 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     paidAmount || 0
                 ];
                 
-                con.query(voucherCodeSql, voucherCodeValues, (voucherCodeErr) => {
-                    if (voucherCodeErr) {
-                        console.warn('⚠️ Warning: Could not create voucher_codes entry:', voucherCodeErr.message);
-                        // Continue with booking creation even if voucher_codes entry fails
+                // Create voucher_codes entry for the redeemed voucher code first
+                con.query(redeemedVoucherCodeSql, redeemedVoucherCodeValues, (redeemedVoucherCodeErr) => {
+                    if (redeemedVoucherCodeErr) {
+                        console.warn('⚠️ Warning: Could not create voucher_codes entry for redeemed voucher code:', redeemedVoucherCodeErr.message);
+                        // Continue anyway - will handle foreign key error in fallback
                     } else {
-                        console.log('✅ Created voucher_codes entry for new voucher code:', newVoucherCode);
+                        console.log('✅ Created/updated voucher_codes entry for redeemed voucher code:', cleanVoucherCode);
                     }
                     
-                    // Proceed with booking creation using the new voucher code
-                    createBookingWithGeneratedCode(newVoucherCode);
+                    // Now create voucher_codes entry for the new voucher code
+                    const title = `${passengerName} - Book Flight - ${chooseLocation}`;
+                    const voucherCodeSql = `
+                        INSERT INTO voucher_codes (
+                            code, title, valid_from, valid_until, max_uses, current_uses,
+                            applicable_locations, applicable_experiences, applicable_voucher_types,
+                            is_active, created_at, updated_at, source_type, customer_email, paid_amount
+                        ) VALUES (?, ?, NOW(), ?, 1, 0, ?, ?, ?, 1, NOW(), NOW(), 'redeem_booking', ?, ?)
+                    `;
+                    
+                    const voucherCodeValues = [
+                        newVoucherCode,
+                        title,
+                        validUntil,
+                        chooseLocation || null,
+                        resolvedVoucherType || null,
+                        resolvedVoucherType || null,
+                        passengerData[0].email || null,
+                        paidAmount || 0
+                    ];
+                    
+                    con.query(voucherCodeSql, voucherCodeValues, (voucherCodeErr) => {
+                        if (voucherCodeErr) {
+                            console.warn('⚠️ Warning: Could not create voucher_codes entry for new voucher code:', voucherCodeErr.message);
+                            // Continue with booking creation even if voucher_codes entry fails
+                        } else {
+                            console.log('✅ Created voucher_codes entry for new voucher code:', newVoucherCode);
+                        }
+                        
+                        // Proceed with booking creation using the REDEEMED voucher code (cleanVoucherCode)
+                        // newVoucherCode is passed to createBookingWithGeneratedCode but booking.voucher_code will use cleanVoucherCode
+                        createBookingWithGeneratedCode(newVoucherCode);
+                    });
                 });
             });
 
@@ -2265,6 +2372,10 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     ? 'Scheduled' 
                     : 'Open';
 
+                // For redeem voucher bookings, use the NEWLY GENERATED voucher code (generatedVoucherCode) in booking.voucher_code
+                // This is the voucher code that will be displayed in the All Bookings table (e.g., BAT26RMJ)
+                // The redeemed voucher code (cleanVoucherCode) will be shown in the booking details popup via all_vouchers lookup
+                const voucherCodeForBooking = generatedVoucherCode || cleanVoucherCode;
                 const bookingValues = [
                     passengerName,
                     chooseFlightType.type || 'Shared Flight',
@@ -2274,7 +2385,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     initialStatus, // Set to 'Scheduled' if flight_date exists, otherwise 'Open'
                     paidAmount, // Use original voucher price instead of totalPrice
                     0,
-                    generatedVoucherCode, // Use the newly generated voucher code
+                    voucherCodeForBooking, // Use the NEWLY GENERATED voucher code (generatedVoucherCode) for All Bookings table display
                     now, // created_at
                     expiresDateFinal || null, // expires - calculated from voucher created_at
                     passengerData[0].email || null,
@@ -2313,9 +2424,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
                 function handleRedeemBookingSuccess(bookingId) {
                     console.log('=== REDEEM BOOKING SUCCESS ===');
-                    console.log('✅ Booking created with generated voucher code:', generatedVoucherCode);
+                    console.log('✅ Booking created with newly generated voucher code:', generatedVoucherCode);
+                    console.log('✅ Redeemed voucher code (for popup display):', cleanVoucherCode);
 
                     // Ensure voucher_code is set in all_booking (fallback update for safety)
+                    // Use newly generated voucher code (generatedVoucherCode) for All Bookings table display
                     if (generatedVoucherCode && generatedVoucherCode.trim()) {
                         con.query(
                             'UPDATE all_booking SET voucher_code = ? WHERE id = ? AND (voucher_code IS NULL OR voucher_code = "")',
@@ -2330,6 +2443,111 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         );
                     } else {
                         console.warn('⚠️ Warning: Redeem Voucher booking created without voucher_code. Booking ID:', bookingId);
+                    }
+                    
+                    // Link the newly generated voucher code to the booking via voucher_code_usage table
+                    // This allows the system to track that a new voucher code was generated for this booking
+                    if (generatedVoucherCode && generatedVoucherCode.trim() && bookingId) {
+                        // First, get the voucher_code_id from voucher_codes table
+                        con.query(
+                            'SELECT id FROM voucher_codes WHERE code = ?',
+                            [generatedVoucherCode.trim()],
+                            (voucherCodeErr, voucherCodeRows) => {
+                                if (voucherCodeErr) {
+                                    console.error('Error finding voucher_code_id for generated voucher code:', voucherCodeErr);
+                                    return;
+                                }
+                                
+                                if (voucherCodeRows && voucherCodeRows.length > 0) {
+                                    const voucherCodeId = voucherCodeRows[0].id;
+                                    const customerEmail = passengerData && passengerData[0] && passengerData[0].email ? passengerData[0].email : null;
+                                    
+                                    // Insert into voucher_code_usage to link the new voucher code with the booking
+                                    const usageSql = `
+                                        INSERT INTO voucher_code_usage (
+                                            voucher_code_id, booking_id, customer_email,
+                                            discount_applied, original_amount, final_amount
+                                        ) VALUES (?, ?, ?, ?, ?, ?)
+                                    `;
+                                    const usageValues = [
+                                        voucherCodeId,
+                                        bookingId,
+                                        customerEmail || 'unknown@example.com',
+                                        0, // discount_applied (no discount for redeem voucher)
+                                        paidAmount || 0, // original_amount
+                                        paidAmount || 0  // final_amount (same as original for redeem voucher)
+                                    ];
+                                    
+                                    con.query(usageSql, usageValues, (usageErr) => {
+                                        if (usageErr) {
+                                            console.error('Error linking generated voucher code to booking via voucher_code_usage:', usageErr);
+                                        } else {
+                                            console.log('✅ Generated voucher code linked to booking via voucher_code_usage:', generatedVoucherCode.trim());
+                                        }
+                                    });
+                                } else {
+                                    console.warn('⚠️ Warning: Generated voucher code not found in voucher_codes table:', generatedVoucherCode.trim());
+                                }
+                            }
+                        );
+                    }
+                    
+                    // Also link the REDEEMED voucher code to the booking via voucher_code_usage table
+                    // This allows getBookingDetail to easily find the original redeemed voucher code
+                    if (cleanVoucherCode && cleanVoucherCode.trim() && bookingId) {
+                        // First, get the voucher_code_id from voucher_codes table for the redeemed voucher code
+                        con.query(
+                            'SELECT id FROM voucher_codes WHERE code = ?',
+                            [cleanVoucherCode.trim()],
+                            (redeemedVoucherCodeErr, redeemedVoucherCodeRows) => {
+                                if (redeemedVoucherCodeErr) {
+                                    console.error('Error finding voucher_code_id for redeemed voucher code:', redeemedVoucherCodeErr);
+                                    return;
+                                }
+                                
+                                if (redeemedVoucherCodeRows && redeemedVoucherCodeRows.length > 0) {
+                                    const redeemedVoucherCodeId = redeemedVoucherCodeRows[0].id;
+                                    const customerEmail = passengerData && passengerData[0] && passengerData[0].email ? passengerData[0].email : null;
+                                    
+                                    // Insert into voucher_code_usage to link the redeemed voucher code with the booking
+                                    // Use a different approach: check if already exists to avoid duplicates
+                                    const checkUsageSql = 'SELECT id FROM voucher_code_usage WHERE booking_id = ? AND voucher_code_id = ?';
+                                    con.query(checkUsageSql, [bookingId, redeemedVoucherCodeId], (checkErr, checkRows) => {
+                                        if (checkErr) {
+                                            console.error('Error checking existing voucher_code_usage for redeemed voucher:', checkErr);
+                                            return;
+                                        }
+                                        
+                                        if (!checkRows || checkRows.length === 0) {
+                                            const redeemedUsageSql = `
+                                                INSERT INTO voucher_code_usage (
+                                                    voucher_code_id, booking_id, customer_email,
+                                                    discount_applied, original_amount, final_amount
+                                                ) VALUES (?, ?, ?, ?, ?, ?)
+                                            `;
+                                            const redeemedUsageValues = [
+                                                redeemedVoucherCodeId,
+                                                bookingId,
+                                                customerEmail || 'unknown@example.com',
+                                                0, // discount_applied (no discount for redeem voucher)
+                                                paidAmount || 0, // original_amount
+                                                paidAmount || 0  // final_amount (same as original for redeem voucher)
+                                            ];
+                                            
+                                            con.query(redeemedUsageSql, redeemedUsageValues, (redeemedUsageErr) => {
+                                                if (redeemedUsageErr) {
+                                                    console.error('Error linking redeemed voucher code to booking via voucher_code_usage:', redeemedUsageErr);
+                                                } else {
+                                                    console.log('✅ Redeemed voucher code linked to booking via voucher_code_usage:', cleanVoucherCode.trim());
+                                                }
+                                            });
+                                        }
+                                    });
+                                } else {
+                                    console.warn('⚠️ Warning: Redeemed voucher code not found in voucher_codes table:', cleanVoucherCode.trim());
+                                }
+                            }
+                        );
                     }
 
                 // Save user session data if provided
@@ -2580,6 +2798,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     });
                 }
 
+                    // Remove request from processing map before sending response
+                    if (global.redeemBookingRequests) {
+                        global.redeemBookingRequests.delete(duplicateKey);
+                    }
+                    
                     res.json({
                         success: true,
                         message: 'Booking created successfully',
@@ -2610,6 +2833,10 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
                             return con.query(bookingSql, fallbackValues, (fallbackErr, fallbackResult) => {
                                 if (fallbackErr) {
+                                    // Remove request from processing map on error
+                                    if (global.redeemBookingRequests) {
+                                        global.redeemBookingRequests.delete(duplicateKey);
+                                    }
                                     console.error('❌ Redeem booking fallback insert also failed:', fallbackErr);
                                     return res.status(500).json({
                                         success: false,
@@ -2624,6 +2851,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
                             });
                         }
 
+                        // Remove request from processing map on error
+                        if (global.redeemBookingRequests) {
+                            global.redeemBookingRequests.delete(duplicateKey);
+                        }
+                        
                         return res.status(500).json({
                             success: false,
                             error: 'Database query failed to create booking',
@@ -2632,6 +2864,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     }
 
                     const bookingId = result.insertId;
+                    
+                    
                     return handleRedeemBookingSuccess(bookingId);
                 });
             } // end of createBookingWithGeneratedCode
@@ -6827,7 +7061,7 @@ app.get('/api/getAllBookingData', (req, res) => {
                     THEN ab.voucher_type
                 ELSE NULL
             END as voucher_type_filtered,
-            COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) as voucher_code,
+            COALESCE(ab.voucher_code, vc.code, v.voucher_ref) as voucher_code,
             DATE_FORMAT(ab.created_at, '%d/%m/%Y') as created_at_display,
             DATE_FORMAT(ab.expires, '%d/%m/%Y') as expires_display,
             v.expires as voucher_expires,
@@ -6844,18 +7078,8 @@ app.get('/api/getAllBookingData', (req, res) => {
         FROM all_booking ab
         LEFT JOIN voucher_codes vc 
             ON vc.code = ab.voucher_code
-        LEFT JOIN voucher_code_usage vcu
-            ON vcu.booking_id = ab.id OR (vcu.customer_email IS NOT NULL AND vcu.customer_email = ab.email)
-        LEFT JOIN voucher_codes vcu_map
-            ON vcu_map.id = vcu.voucher_code_id
-        LEFT JOIN voucher_code_usage vcu2
-            ON vcu2.booking_id = ab.id
-        LEFT JOIN voucher_codes vc2
-            ON vc2.id = vcu2.voucher_code_id
         LEFT JOIN all_vouchers v
-            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code)
-            OR (vcu_map.code IS NOT NULL AND v.voucher_ref = vcu_map.code)
-            OR (vc2.code IS NOT NULL AND v.voucher_ref = vc2.code)
+            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code)
         ${whereClause}
         ORDER BY ab.created_at DESC
         LIMIT 1000
@@ -6869,13 +7093,6 @@ app.get('/api/getAllBookingData', (req, res) => {
             console.error('Error fetching all booking data:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
-        // #region agent log
-        if (result && result.length > 0) {
-            result.slice(0, 5).forEach((r, idx) => {
-                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:6841',message:'getAllBookingData flight_date from DB',data:{bookingId:r.id,flightDate:r.flight_date,flightDateType:typeof r.flight_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-            });
-        }
-        // #endregion
 
         // If voucher_code is still null, fallback to joined usage mapping
 
@@ -10821,9 +11038,6 @@ app.post('/api/createBooking', (req, res) => {
             }
             bookingDateTime = `${datePart} ${selectedTime}`;
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:10790',message:'createBooking bookingDateTime',data:{selectedDate,selectedTime,bookingDateTime,isRebook},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-        // #endregion
         // Determine flight_type_source: 'Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise use flight_type/experience
         const flight_type_source = activitySelect === 'Redeem Voucher' ? 'Redeem Voucher' : (chooseFlightType?.type || experience || null);
 
@@ -13913,6 +14127,7 @@ app.get('/api/getBookingDetail', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         const booking = bookingRows[0];
+        
 
         // Fetch voucher info (type, flight attempts) when booking has voucher_code
         let voucherInfo = null;
@@ -13993,43 +14208,102 @@ app.get('/api/getBookingDetail', async (req, res) => {
         // If this booking was created from a Flight Voucher (redeemed_voucher = 'Yes' or flight_type_source = 'Redeem Voucher'),
         // try to get the original voucher's passenger_details order and sort passengers to match that order
         // This ensures Booking Details matches Flight Voucher Details passenger order
+        // Also find the original redeemed voucher code to display in booking details
+        let originalRedeemedVoucherCode = null;
+        let voucherRows = null;
+        
         if (passengers.length > 0 && 
             (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1 || booking.flight_type_source === 'Redeem Voucher')) {
             try {
-                // Try to find the original voucher by voucher_code first
-                // If not found, try to find by email and created_at (voucher created before booking)
-                let voucherRows = null;
+                // First, try to find the original redeemed voucher code via voucher_code_usage table
+                // This is the most reliable method since we explicitly link the redeemed voucher code during booking creation
+                const [redeemedVoucherUsageRows] = await new Promise((resolve, reject) => {
+                    con.query(`
+                        SELECT vc.code as redeemed_voucher_code
+                        FROM voucher_code_usage vcu
+                        INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
+                        WHERE vcu.booking_id = ?
+                        AND vc.code != ?
+                        AND vc.code IN (SELECT voucher_ref FROM all_vouchers WHERE book_flight = 'Flight Voucher')
+                        ORDER BY vcu.used_at DESC
+                        LIMIT 1
+                    `, [booking_id, booking.voucher_code || ''], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
                 
-                if (booking.voucher_code) {
-                    const [voucherRowsByCode] = await new Promise((resolve, reject) => {
-                        con.query('SELECT voucher_passenger_details FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                if (redeemedVoucherUsageRows && redeemedVoucherUsageRows.length > 0) {
+                    originalRedeemedVoucherCode = redeemedVoucherUsageRows[0].redeemed_voucher_code;
+                    
+                    // Get voucher passenger details for sorting
+                    const [voucherRowsByRedeemedCode] = await new Promise((resolve, reject) => {
+                        con.query('SELECT voucher_ref, voucher_passenger_details FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [originalRedeemedVoucherCode], (err, rows) => {
                             if (err) reject(err);
                             else resolve([rows]);
                         });
                     });
-                    if (voucherRowsByCode && voucherRowsByCode.length > 0) {
-                        voucherRows = voucherRowsByCode;
+                    if (voucherRowsByRedeemedCode && voucherRowsByRedeemedCode.length > 0) {
+                        voucherRows = voucherRowsByRedeemedCode;
                     }
-                }
-                
-                // If not found by voucher_code, try to find by email and created_at
-                if (!voucherRows || voucherRows.length === 0) {
-                    const [voucherRowsByEmail] = await new Promise((resolve, reject) => {
-                        con.query(`
-                            SELECT voucher_passenger_details 
-                            FROM all_vouchers 
-                            WHERE (email = ? OR purchaser_email = ?) 
-                            AND created_at < ? 
-                            AND book_flight = 'Flight Voucher'
-                            ORDER BY created_at DESC 
-                            LIMIT 1
-                        `, [booking.email, booking.email, booking.created_at || '9999-12-31'], (err, rows) => {
-                            if (err) reject(err);
-                            else resolve([rows]);
+                } else {
+                    // Fallback: Try to find the original voucher by voucher_code first
+                    // If not found, try to find by email and created_at (voucher created before booking)
+                    if (booking.voucher_code) {
+                        const [voucherRowsByCode] = await new Promise((resolve, reject) => {
+                            con.query('SELECT voucher_ref, voucher_passenger_details FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                                if (err) reject(err);
+                                else resolve([rows]);
+                            });
                         });
-                    });
-                    if (voucherRowsByEmail && voucherRowsByEmail.length > 0) {
-                        voucherRows = voucherRowsByEmail;
+                        if (voucherRowsByCode && voucherRowsByCode.length > 0) {
+                            voucherRows = voucherRowsByCode;
+                        }
+                    }
+                    
+                    // If not found by voucher_code, try to find by email and created_at
+                    if (!voucherRows || voucherRows.length === 0) {
+                        const [voucherRowsByEmail] = await new Promise((resolve, reject) => {
+                            con.query(`
+                                SELECT voucher_ref, voucher_passenger_details 
+                                FROM all_vouchers 
+                                WHERE (email = ? OR purchaser_email = ?) 
+                                AND created_at < ? 
+                                AND book_flight = 'Flight Voucher'
+                                AND (redeemed = 'Yes' OR status = 'Used')
+                                ORDER BY created_at DESC 
+                                LIMIT 1
+                            `, [booking.email, booking.email, booking.created_at || '9999-12-31'], (err, rows) => {
+                                if (err) reject(err);
+                                else resolve([rows]);
+                            });
+                        });
+                        if (voucherRowsByEmail && voucherRowsByEmail.length > 0) {
+                            voucherRows = voucherRowsByEmail;
+                            originalRedeemedVoucherCode = voucherRowsByEmail[0]?.voucher_ref || null;
+                        }
+                    } else {
+                        // Found by voucher_code - but this is the new voucher code, not the original redeemed one
+                        // Need to find the original redeemed voucher code by looking for vouchers that were redeemed around the same time
+                        const [originalVoucherRows] = await new Promise((resolve, reject) => {
+                            con.query(`
+                                SELECT voucher_ref 
+                                FROM all_vouchers 
+                                WHERE (email = ? OR purchaser_email = ?) 
+                                AND created_at < ? 
+                                AND book_flight = 'Flight Voucher'
+                                AND (redeemed = 'Yes' OR status = 'Used')
+                                AND created_at >= DATE_SUB(?, INTERVAL 30 DAY)
+                                ORDER BY created_at DESC 
+                                LIMIT 1
+                            `, [booking.email, booking.email, booking.created_at || '9999-12-31', booking.created_at || '9999-12-31'], (err, rows) => {
+                                if (err) reject(err);
+                                else resolve([rows]);
+                            });
+                        });
+                        if (originalVoucherRows && originalVoucherRows.length > 0) {
+                            originalRedeemedVoucherCode = originalVoucherRows[0]?.voucher_ref || null;
+                        }
                     }
                 }
                 
@@ -14546,6 +14820,11 @@ app.get('/api/getBookingDetail', async (req, res) => {
                     booking.weather_refund_total_price = parseFloat(booking.weather_refund_total_price) || 0;
                 }
             }
+        }
+
+        // Add original redeemed voucher code to booking object for frontend display
+        if (originalRedeemedVoucherCode) {
+            booking.originalRedeemedVoucherCode = originalRedeemedVoucherCode;
         }
 
         res.json({
