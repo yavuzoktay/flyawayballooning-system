@@ -5526,20 +5526,6 @@ const Manifest = () => {
                                                         background: '#2980B9'
                                                     }
                                                 }} onClick={handleEmailBooking}>Email | SMS</Button>
-                                                <Button variant="contained" color="info" sx={{ 
-                                                    borderRadius: 2, 
-                                                    fontWeight: 600, 
-                                                    textTransform: 'none', 
-                                                    background: '#3498DB',
-                                                    mb: isMobile ? 0 : 1,
-                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
-                                                    minWidth: isMobile ? 'auto' : 'auto',
-                                                    fontSize: isMobile ? '12px' : '14px',
-                                                    padding: isMobile ? '6px 8px' : '8px 16px',
-                                                    '&:hover': {
-                                                        background: '#2980B9'
-                                                    }
-                                                }} onClick={handleSmsBooking}>SMS</Button>
                                                 <Button
                                                     variant="contained"
                                                     color="secondary"
