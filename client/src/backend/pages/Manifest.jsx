@@ -233,6 +233,10 @@ const Manifest = () => {
     const [groupMessageSending, setGroupMessageSending] = useState(false);
     const [groupSelectedBookings, setGroupSelectedBookings] = useState([]);
     const [groupMessagePreviewBooking, setGroupMessagePreviewBooking] = useState(null);
+    // Email and SMS checkboxes for Group Message popup
+    const [groupMessageEmailChecked, setGroupMessageEmailChecked] = useState(true);
+    const [groupMessageSmsChecked, setGroupMessageSmsChecked] = useState(false);
+    const [groupSmsForm, setGroupSmsForm] = useState({ to: '', message: '', template: 'custom' });
     const [messagesModalOpen, setMessagesModalOpen] = useState(false);
     const [messagesLoading, setMessagesLoading] = useState(false);
     const [messageLogs, setMessageLogs] = useState([]);
@@ -334,6 +338,10 @@ const Manifest = () => {
             template: selectedTemplate
         });
         setGroupPersonalNote('');
+        // Initialize checkbox states
+        setGroupMessageEmailChecked(true);
+        setGroupMessageSmsChecked(false);
+        setGroupSmsForm({ to: '', message: '', template: 'custom' });
         // Set preview date/time once when modal opens
         const now = new Date();
         setGroupMessagePreviewDateTime(
@@ -358,6 +366,32 @@ const Manifest = () => {
         }
 
         handleGlobalMenuClose();
+    };
+
+    const handleGroupSmsTemplateChange = (templateValue) => {
+        if (!templateValue || templateValue === 'custom') {
+            setGroupSmsForm(prev => ({ 
+                ...prev, 
+                template: 'custom', 
+                message: '' 
+            }));
+            return;
+        }
+        
+        const dbTemplate = smsTemplates.find(t => {
+            const templateId = String(t.id);
+            const selectedValue = String(templateValue);
+            return templateId === selectedValue;
+        });
+        
+        if (dbTemplate) {
+            const newMessage = dbTemplate.message || '';
+            setGroupSmsForm(prev => ({ 
+                ...prev, 
+                template: String(dbTemplate.id),
+                message: newMessage
+            }));
+        }
     };
 
     const handleGroupTemplateChange = (templateValue) => {
@@ -401,6 +435,40 @@ const Manifest = () => {
             message,
             template: templateValue
         }));
+
+        // Auto-select corresponding SMS template if SMS checkbox is checked
+        if (groupMessageSmsChecked && smsTemplates.length > 0) {
+            // Email to SMS template name mapping
+            const emailToSmsMapping = {
+                'Flight Voucher Confirmation': 'Flight Voucher Confirmation SMS',
+                'Booking Confirmation': 'Booking Confirmation SMS',
+                'Booking Rescheduled': 'Booking Rescheduled SMS',
+                'Follow up': 'Follow up SMS',
+                'Passenger Rescheduling Information': 'Passenger Rescheduling Information SMS',
+                'Upcoming Flight Reminder': 'Upcoming Flight Reminder SMS'
+            };
+
+            // Get email template name
+            const templateName = resolveTemplateName(templateValue, dbTemplate);
+            const emailTemplateName = dbTemplate?.name || templateName;
+            
+            // Find corresponding SMS template
+            const correspondingSmsTemplateName = emailToSmsMapping[emailTemplateName];
+            
+            if (correspondingSmsTemplateName) {
+                const matchingSmsTemplate = smsTemplates.find(
+                    t => t.name === correspondingSmsTemplateName
+                );
+                
+                if (matchingSmsTemplate) {
+                    handleGroupSmsTemplateChange(String(matchingSmsTemplate.id));
+                } else {
+                    setGroupSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+                }
+            } else {
+                setGroupSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+            }
+        }
     };
 
     const cancelGroupBookings = async (bookings) => {
@@ -441,6 +509,9 @@ const Manifest = () => {
         setGroupSelectedBookings([]);
         setGroupMessagePreviewBooking(null);
         setGroupActionMode('message');
+        setGroupMessageEmailChecked(true);
+        setGroupMessageSmsChecked(false);
+        setGroupSmsForm({ to: '', message: '', template: 'custom' });
     };
 
     // Email handlers
@@ -1015,14 +1086,33 @@ const Manifest = () => {
     };
 
     const handleSendGroupEmail = async () => {
-        if (groupMessageForm.to.length === 0) {
-            alert('No recipients selected.');
+        // Check if at least one checkbox is selected
+        if (!groupMessageEmailChecked && !groupMessageSmsChecked) {
+            alert('Please select at least one option (Email or SMS)');
             return;
         }
 
-        if (!groupMessageForm.subject) {
-            alert('Subject is required. Please select a template.');
-            return;
+        // Validate email requirements if email is checked
+        if (groupMessageEmailChecked) {
+            if (groupMessageForm.to.length === 0) {
+                alert('No recipients selected.');
+                return;
+            }
+
+            if (!groupMessageForm.subject) {
+                alert('Subject is required. Please select a template.');
+                return;
+            }
+        }
+
+        // Validate SMS requirements if SMS is checked
+        if (groupMessageSmsChecked) {
+            if (!groupSmsForm.template || groupSmsForm.template === 'custom') {
+                if (!groupSmsForm.message || groupSmsForm.message.trim().length === 0) {
+                    alert('SMS message is required. Please select an SMS template or enter a custom message.');
+                    return;
+                }
+            }
         }
 
         if (!groupSelectedBookings.length) {
@@ -1031,52 +1121,151 @@ const Manifest = () => {
         }
 
         setGroupMessageSending(true);
-        let successCount = 0;
-        const failures = [];
+        let emailSuccessCount = 0;
+        let smsSuccessCount = 0;
+        const emailFailures = [];
+        const smsFailures = [];
 
         for (const booking of groupSelectedBookings) {
-            const to = booking.email || '';
-            if (!to) {
-                failures.push({ booking, reason: 'Missing email address' });
-                continue;
+            // Send email if email checkbox is checked
+            if (groupMessageEmailChecked) {
+                const to = booking.email || '';
+                if (!to) {
+                    emailFailures.push({ booking, reason: 'Missing email address' });
+                } else {
+                    const templateName = resolveTemplateName(groupMessageForm.template, emailTemplates.find((t) => t.id?.toString() === groupMessageForm.template?.toString()));
+                    const finalHtml = buildEmailHtml({
+                        templateName,
+                        messageHtml: groupMessageForm.message,
+                        booking,
+                        personalNote: groupPersonalNote
+                    });
+                    const finalText = stripHtml(finalHtml);
+
+                    try {
+                        await axios.post('/api/sendBookingEmail', {
+                            bookingId: booking.id,
+                            to,
+                            subject: groupMessageForm.subject,
+                            message: finalHtml,
+                            messageText: finalText,
+                            template: groupMessageForm.template,
+                            bookingData: booking
+                        });
+                        emailSuccessCount += 1;
+                    } catch (err) {
+                        emailFailures.push({
+                            booking,
+                            reason: err?.response?.data?.message || err.message || 'Unknown error'
+                        });
+                    }
+                }
             }
 
-            const templateName = resolveTemplateName(groupMessageForm.template, emailTemplates.find((t) => t.id?.toString() === groupMessageForm.template?.toString()));
-            const finalHtml = buildEmailHtml({
-                templateName,
-                messageHtml: groupMessageForm.message,
-                booking,
-                personalNote: groupPersonalNote
-            });
-            const finalText = stripHtml(finalHtml);
+            // Send SMS if SMS checkbox is checked
+            if (groupMessageSmsChecked) {
+                const phone = booking.phone || booking.mobile || '';
+                const normalizedPhone = normalizeUkPhone(phone);
+                
+                if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
+                    smsFailures.push({ booking, reason: 'Missing or invalid phone number' });
+                } else {
+                    // Use SMS template if available, otherwise convert email template to SMS format
+                    let smsMessage = '';
+                    let smsTemplateId = null;
+                    
+                    // Check if we have an SMS template selected
+                    if (groupSmsForm.template && groupSmsForm.template !== 'custom' && groupSmsForm.message) {
+                        smsMessage = groupSmsForm.message;
+                        smsTemplateId = groupSmsForm.template;
+                        smsMessage = replaceSmsPrompts(smsMessage, booking);
+                    } else if (groupSmsForm.message && groupSmsForm.message.trim().length > 0) {
+                        smsMessage = groupSmsForm.message;
+                        smsMessage = replaceSmsPrompts(smsMessage, booking);
+                    } else if (groupMessageForm.message && groupMessageForm.message.trim().length > 0) {
+                        // Fallback: Convert email template to SMS format
+                        smsMessage = stripHtml(groupMessageForm.message);
+                        smsMessage = smsMessage
+                            .replace(/https?:\/\/[^\s]+/gi, '')
+                            .replace(/Customer Portal Link:.*/gi, '')
+                            .replace(/Receipt.*?All prices in GBP.*/gis, '')
+                            .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '')
+                            .replace(/\n{3,}/g, '\n\n')
+                            .trim();
+                        smsMessage = replaceSmsPrompts(smsMessage, booking);
+                    }
 
-            try {
-                await axios.post('/api/sendBookingEmail', {
-                    bookingId: booking.id,
-                    to,
-                    subject: groupMessageForm.subject,
-                    message: finalHtml,
-                    messageText: finalText,
-                    template: groupMessageForm.template,
-                    bookingData: booking
-                });
-                successCount += 1;
-            } catch (err) {
-                failures.push({
-                    booking,
-                    reason: err?.response?.data?.message || err.message || 'Unknown error'
-                });
+                    // Add personal note if there's space
+                    const SMS_MAX_LENGTH = 1600;
+                    let finalSmsMessage = smsMessage;
+                    if (groupPersonalNote) {
+                        const combinedLength = smsMessage.length + groupPersonalNote.length + 2;
+                        if (combinedLength <= SMS_MAX_LENGTH) {
+                            finalSmsMessage = `${smsMessage}\n\n${groupPersonalNote}`;
+                        } else {
+                            const spaceForNote = groupPersonalNote.length + 10;
+                            const maxMainLength = SMS_MAX_LENGTH - spaceForNote;
+                            if (maxMainLength > 100) {
+                                smsMessage = smsMessage.substring(0, maxMainLength).trim();
+                                const lastPeriod = smsMessage.lastIndexOf('.');
+                                if (lastPeriod > maxMainLength * 0.7) {
+                                    smsMessage = smsMessage.substring(0, lastPeriod + 1);
+                                }
+                                finalSmsMessage = `${smsMessage}\n\n${groupPersonalNote}`;
+                            } else {
+                                finalSmsMessage = smsMessage;
+                            }
+                        }
+                    }
+
+                    // Final check - ensure total length doesn't exceed limit
+                    if (finalSmsMessage.length > SMS_MAX_LENGTH) {
+                        const truncated = finalSmsMessage.substring(0, SMS_MAX_LENGTH - 3).trim();
+                        finalSmsMessage = truncated.endsWith('.') || truncated.endsWith('!') || truncated.endsWith('?') 
+                            ? truncated + '..' 
+                            : truncated + '...';
+                    }
+
+                    if (finalSmsMessage && finalSmsMessage.trim().length > 0) {
+                        try {
+                            await axios.post('/api/sendBookingSms', {
+                                bookingId: booking.id,
+                                to: normalizedPhone,
+                                body: finalSmsMessage,
+                                templateId: smsTemplateId || (groupSmsForm.template && groupSmsForm.template !== 'custom' ? groupSmsForm.template : null)
+                            });
+                            smsSuccessCount += 1;
+                        } catch (err) {
+                            smsFailures.push({
+                                booking,
+                                reason: err?.response?.data?.message || err.message || 'Unknown error'
+                            });
+                        }
+                    } else {
+                        smsFailures.push({ booking, reason: 'SMS message is empty' });
+                    }
+                }
             }
         }
 
         setGroupMessageSending(false);
 
-        let summary = `Emails sent: ${successCount}`;
-        if (failures.length > 0) {
-            summary += `\nFailed: ${failures.length}`;
+        let summary = '';
+        if (groupMessageEmailChecked) {
+            summary += `Emails sent: ${emailSuccessCount}`;
+            if (emailFailures.length > 0) {
+                summary += `\nEmail failures: ${emailFailures.length}`;
+            }
+        }
+        if (groupMessageSmsChecked) {
+            if (summary) summary += '\n';
+            summary += `SMS sent: ${smsSuccessCount}`;
+            if (smsFailures.length > 0) {
+                summary += `\nSMS failures: ${smsFailures.length}`;
+            }
         }
 
-        if (failures.length === 0 && groupActionMode === 'cancel') {
+        if (emailFailures.length === 0 && smsFailures.length === 0 && groupActionMode === 'cancel') {
             try {
                 await cancelGroupBookings(groupSelectedBookings);
                 summary += `\nCancelled ${groupSelectedBookings.length} booking(s).`;
@@ -1086,7 +1275,7 @@ const Manifest = () => {
         }
 
         alert(summary);
-        if (failures.length === 0) {
+        if (emailFailures.length === 0 && smsFailures.length === 0) {
             closeGroupMessageModal();
         }
     };
@@ -6858,56 +7047,258 @@ const Manifest = () => {
                     }
                 }}>
                     <Grid container spacing={isMobile ? 1.5 : 2}>
+                        {/* Email and SMS Checkboxes */}
                         <Grid item xs={12}>
-                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
-                                Recipients
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, background: '#f8fafc', borderRadius: 2, p: 2 }}>
-                                {groupMessageForm.to.map((email) => (
-                                    <Box
-                                        key={email}
-                                        sx={{
-                                            px: 1.5,
-                                            py: 0.75,
-                                            background: '#eef2ff',
-                                            color: '#4338ca',
-                                            borderRadius: 999,
-                                            fontSize: 12,
-                                            fontWeight: 600
-                                        }}
-                                    >
-                                        {email}
-                                    </Box>
-                                ))}
-                            </Box>
+                            <FormGroup sx={{ 
+                                mb: 1, 
+                                flexDirection: 'row', 
+                                gap: isMobile ? 1.5 : 2,
+                                alignItems: 'center'
+                            }}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={groupMessageEmailChecked}
+                                            onChange={(e) => {
+                                                setGroupMessageEmailChecked(e.target.checked);
+                                                // If unchecking email and SMS is also unchecked, keep at least one checked
+                                                if (!e.target.checked && !groupMessageSmsChecked) {
+                                                    setGroupMessageSmsChecked(true);
+                                                }
+                                            }}
+                                            sx={{
+                                                color: '#6b7280',
+                                                padding: '4px',
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                                                    borderRadius: '4px',
+                                                },
+                                                '&.Mui-checked': {
+                                                    color: '#3b82f6',
+                                                },
+                                                '& .MuiSvgIcon-root': {
+                                                    fontSize: isMobile ? 20 : 22,
+                                                    transition: 'all 0.2s ease-in-out',
+                                                },
+                                                transition: 'all 0.2s ease-in-out',
+                                            }}
+                                        />
+                                    }
+                                    label="Email"
+                                    sx={{
+                                        margin: 0,
+                                        marginRight: isMobile ? 0 : 1,
+                                        '& .MuiFormControlLabel-label': {
+                                            fontSize: isMobile ? '13px' : '14px',
+                                            fontWeight: groupMessageEmailChecked ? 600 : 500,
+                                            color: groupMessageEmailChecked ? '#3b82f6' : (isMobile ? 'inherit' : '#6b7280'),
+                                            transition: 'all 0.2s ease-in-out',
+                                            marginLeft: '6px',
+                                        }
+                                    }}
+                                />
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={groupMessageSmsChecked}
+                                            onChange={(e) => {
+                                                setGroupMessageSmsChecked(e.target.checked);
+                                                // If unchecking SMS and Email is also unchecked, keep at least one checked
+                                                if (!e.target.checked && !groupMessageEmailChecked) {
+                                                    setGroupMessageEmailChecked(true);
+                                                }
+                                                // When SMS checkbox is checked, auto-select corresponding SMS template if email template is already selected
+                                                if (e.target.checked && groupMessageEmailChecked && groupMessageForm.template && groupMessageForm.template !== 'custom' && smsTemplates.length > 0) {
+                                                    // Find the email template
+                                                    const dbTemplate = emailTemplates.find(
+                                                        (t) => t.id.toString() === groupMessageForm.template.toString()
+                                                    );
+                                                    const templateName = resolveTemplateName(groupMessageForm.template, dbTemplate);
+                                                    const emailTemplateName = (dbTemplate?.name || templateName).trim();
+                                                    
+                                                    // Email to SMS template name mapping
+                                                    const emailToSmsMapping = {
+                                                        'Flight Voucher Confirmation': 'Flight Voucher Confirmation SMS',
+                                                        'Booking Confirmation': 'Booking Confirmation SMS',
+                                                        'Booking Rescheduled': 'Booking Rescheduled SMS',
+                                                        'Follow up': 'Follow up SMS',
+                                                        'Passenger Rescheduling Information': 'Passenger Rescheduling Information SMS',
+                                                        'Upcoming Flight Reminder': 'Upcoming Flight Reminder SMS'
+                                                    };
+                                                    
+                                                    const correspondingSmsTemplateName = emailToSmsMapping[emailTemplateName];
+                                                    
+                                                    if (correspondingSmsTemplateName) {
+                                                        const matchingSmsTemplate = smsTemplates.find(
+                                                            t => t.name === correspondingSmsTemplateName
+                                                        );
+                                                        
+                                                        if (matchingSmsTemplate) {
+                                                            handleGroupSmsTemplateChange(String(matchingSmsTemplate.id));
+                                                            return; // Exit early to skip the initialization below
+                                                        }
+                                                    }
+                                                }
+                                                // Initialize SMS form if needed when SMS checkbox is checked
+                                                if (e.target.checked && !groupMessageEmailChecked) {
+                                                    // Initialize SMS form if needed
+                                                    if (!groupSmsForm.message && smsTemplates.length > 0) {
+                                                        const firstTemplate = smsTemplates[0];
+                                                        handleGroupSmsTemplateChange(String(firstTemplate.id));
+                                                    }
+                                                }
+                                            }}
+                                            sx={{
+                                                color: '#6b7280',
+                                                padding: '4px',
+                                                '&:hover': {
+                                                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                                    borderRadius: '4px',
+                                                },
+                                                '&.Mui-checked': {
+                                                    color: '#10b981',
+                                                },
+                                                '& .MuiSvgIcon-root': {
+                                                    fontSize: isMobile ? 20 : 22,
+                                                    transition: 'all 0.2s ease-in-out',
+                                                },
+                                                transition: 'all 0.2s ease-in-out',
+                                            }}
+                                        />
+                                    }
+                                    label="SMS"
+                                    sx={{
+                                        margin: 0,
+                                        '& .MuiFormControlLabel-label': {
+                                            fontSize: isMobile ? '13px' : '14px',
+                                            fontWeight: groupMessageSmsChecked ? 600 : 500,
+                                            color: groupMessageSmsChecked ? '#10b981' : (isMobile ? 'inherit' : '#6b7280'),
+                                            transition: 'all 0.2s ease-in-out',
+                                            marginLeft: '6px',
+                                        }
+                                    }}
+                                />
+                            </FormGroup>
                         </Grid>
-                        <Grid item xs={12}>
-                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
-                                Choose a template:
-                            </Typography>
-                            <FormControl fullWidth size="small">
-                                <Select
-                                    value={groupMessageForm.template}
-                                    onChange={(e) => handleGroupTemplateChange(e.target.value)}
-                                    displayEmpty
-                                >
-                                    {emailTemplates.map((template) => (
-                                        <MenuItem key={template.id} value={template.id}>
-                                            {template.name}
-                                        </MenuItem>
+                        {/* Recipients - Only show for email */}
+                        {groupMessageEmailChecked && (
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
+                                    Recipients
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, background: '#f8fafc', borderRadius: 2, p: 2 }}>
+                                    {groupMessageForm.to.map((email) => (
+                                        <Box
+                                            key={email}
+                                            sx={{
+                                                px: 1.5,
+                                                py: 0.75,
+                                                background: '#eef2ff',
+                                                color: '#4338ca',
+                                                borderRadius: 999,
+                                                fontSize: 12,
+                                                fontWeight: 600
+                                            }}
+                                        >
+                                            {email}
+                                        </Box>
                                     ))}
-                                    {emailTemplates.length === 0 && (
-                                        <>
-                                            <MenuItem value="to_be_updated">To Be Updated</MenuItem>
-                                            <MenuItem value="custom">Custom Message</MenuItem>
-                                            <MenuItem value="confirmation">Booking Confirmation</MenuItem>
-                                            <MenuItem value="reminder">Flight Reminder</MenuItem>
-                                            <MenuItem value="reschedule">Flight Rescheduling</MenuItem>
-                                        </>
+                                </Box>
+                            </Grid>
+                        )}
+                        {/* Email and SMS Template Selection - Side by Side */}
+                        {(groupMessageEmailChecked || groupMessageSmsChecked) && (
+                            <Grid item xs={12}>
+                                <Grid container spacing={2}>
+                                    {/* Email Template Selection */}
+                                    {groupMessageEmailChecked && (
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="subtitle2" sx={{ 
+                                                mb: 1, 
+                                                fontWeight: 500,
+                                                fontSize: isMobile ? 'inherit' : '14px',
+                                                color: isMobile ? 'inherit' : '#374151'
+                                            }}>
+                                                Choose a template Email:
+                                            </Typography>
+                                            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                                <Select
+                                                    value={groupMessageForm.template || 'custom'}
+                                                    onChange={(e) => handleGroupTemplateChange(e.target.value)}
+                                                    displayEmpty
+                                                    sx={{
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        '& .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                        },
+                                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                        },
+                                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                        }
+                                                    }}
+                                                >
+                                                    {emailTemplates.map((template) => (
+                                                        <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                            {template.name}
+                                                        </MenuItem>
+                                                    ))}
+                                                    {emailTemplates.length === 0 && (
+                                                        <>
+                                                            <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
+                                                            <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                                            <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
+                                                            <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
+                                                            <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
+                                                        </>
+                                                    )}
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
                                     )}
-                                </Select>
-                            </FormControl>
-                        </Grid>
+                                    {/* SMS Template Selection */}
+                                    {groupMessageSmsChecked && (
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="subtitle2" sx={{ 
+                                                mb: 1, 
+                                                fontWeight: 500,
+                                                fontSize: isMobile ? 'inherit' : '14px',
+                                                color: isMobile ? 'inherit' : '#374151'
+                                            }}>
+                                                Choose a template SMS:
+                                            </Typography>
+                                            <FormControl fullWidth size={isMobile ? "small" : "medium"}>
+                                                <Select
+                                                    value={groupSmsForm.template || 'custom'}
+                                                    onChange={(e) => handleGroupSmsTemplateChange(e.target.value)}
+                                                    displayEmpty
+                                                    sx={{
+                                                        fontSize: isMobile ? 'inherit' : '14px',
+                                                        '& .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                                        },
+                                                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                                        },
+                                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                            borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                                        }
+                                                    }}
+                                                >
+                                                    {smsTemplates.map((template) => (
+                                                        <MenuItem key={template.id} value={String(template.id)} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                            {template.name}
+                                                        </MenuItem>
+                                                    ))}
+                                                    <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
+                                                </Select>
+                                            </FormControl>
+                                        </Grid>
+                                    )}
+                                </Grid>
+                            </Grid>
+                        )}
                         <Grid item xs={12}>
                             <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 500 }}>
                                 Add an optional, personalized note
@@ -6927,70 +7318,135 @@ const Manifest = () => {
                                 }}
                             />
                         </Grid>
-                        <Grid item xs={12}>
-                            <Box sx={{
-                                border: '1px solid #e0e0e0',
-                                borderRadius: 2,
-                                p: 3,
-                                backgroundColor: '#f9f9f9',
-                                position: 'relative'
-                            }}>
-                                <Box sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                    mb: 2,
-                                    pb: 2,
-                                    borderBottom: '1px solid #e0e0e0'
-                                }}>
-                                    <Box sx={{
-                                        width: 12,
-                                        height: 12,
-                                        borderRadius: '50%',
-                                        backgroundColor: '#ff5f57'
-                                    }} />
-                                    <Box sx={{
-                                        width: 12,
-                                        height: 12,
-                                        borderRadius: '50%',
-                                        backgroundColor: '#ffbd2e'
-                                    }} />
-                                    <Box sx={{
-                                        width: 12,
-                                        height: 12,
-                                        borderRadius: '50%',
-                                        backgroundColor: '#28ca42'
-                                    }} />
-                                </Box>
-
-                                <Typography variant="caption" sx={{ color: '#666', display: 'block', mb: 0.5 }}>
-                                    From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#999', display: 'block', mb: 2 }}>
-                                    {groupMessagePreviewDateTime || `${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
-                                </Typography>
-
-                                <Typography sx={{
-                                    color: '#d32f2f',
-                                    fontWeight: 600,
-                                    mb: 2
-                                }}>
-                                    {groupMessageForm.subject || 'Flight update'}
-                                </Typography>
-
-                                <Box sx={{
-                                    backgroundColor: '#fff',
-                                    p: isMobile ? 0.5 : 2,
-                                    borderRadius: 2,
-                                    minHeight: 200,
+                        {/* Email Template Preview */}
+                        {groupMessageEmailChecked && (
+                            <Grid item xs={12}>
+                                <Box sx={{ 
+                                    border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                    borderRadius: isMobile ? 2 : '8px', 
+                                    p: isMobile ? 1 : 2,
+                                    backgroundColor: '#f9f9f9',
+                                    position: 'relative',
                                     overflow: 'auto',
-                                    maxHeight: '600px',
-                                    width: '100%'
+                                    maxHeight: isMobile ? '300px' : '600px'
                                 }}>
-                                    <MemoizedEmailPreview html={groupPreviewHtml} isMobile={isMobile} />
+                                    {/* Email Header */}
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: isMobile ? 0.5 : 1,
+                                        mb: isMobile ? 1 : 2,
+                                        pb: isMobile ? 1 : 2,
+                                        borderBottom: '1px solid #e0e0e0'
+                                    }}>
+                                        <Box sx={{ 
+                                            width: isMobile ? 8 : 12, 
+                                            height: isMobile ? 8 : 12, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#ff5f57' 
+                                        }} />
+                                        <Box sx={{ 
+                                            width: isMobile ? 8 : 12, 
+                                            height: isMobile ? 8 : 12, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#ffbd2e' 
+                                        }} />
+                                        <Box sx={{ 
+                                            width: isMobile ? 8 : 12, 
+                                            height: isMobile ? 8 : 12, 
+                                            borderRadius: '50%', 
+                                            backgroundColor: '#28ca42' 
+                                        }} />
+                                    </Box>
+                                    
+                                    {/* Email From */}
+                                    <Typography variant="caption" sx={{ 
+                                        color: '#666', 
+                                        display: 'block', 
+                                        mb: isMobile ? 0.25 : 0.5, 
+                                        fontSize: isMobile ? 10 : '12px', 
+                                        wordBreak: 'break-word',
+                                        lineHeight: isMobile ? 'inherit' : '1.4'
+                                    }}>
+                                        From "Fly Away Ballooning" &lt;info@flyawayballooning.com&gt;
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ 
+                                        color: '#999', 
+                                        display: 'block', 
+                                        mb: isMobile ? 1 : 2, 
+                                        fontSize: isMobile ? 10 : '12px',
+                                        lineHeight: isMobile ? 'inherit' : '1.4'
+                                    }}>
+                                        {groupMessagePreviewDateTime || `${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
+                                    </Typography>
+                                    
+                                    {/* Email Subject */}
+                                    <Typography sx={{ 
+                                        color: '#d32f2f', 
+                                        fontWeight: 600, 
+                                        mb: isMobile ? 1 : 2,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: isMobile ? 0.5 : 1,
+                                        fontSize: isMobile ? 13 : '16px',
+                                        wordBreak: 'break-word'
+                                    }}>
+                                        <span style={{ fontSize: isMobile ? 16 : 20 }}>🎈</span> {groupMessageForm.subject || 'Flight update'}
+                                    </Typography>
+                                    
+                                    {/* Email Body Preview */}
+                                    <Box
+                                        sx={{
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            width: '100%',
+                                            overflow: 'auto',
+                                            pb: 0,
+                                            mb: 0
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                transform: isMobile ? 'scale(0.5)' : 'scale(0.75)',
+                                                transformOrigin: 'top center',
+                                                width: isMobile ? '200%' : '133.33%',
+                                                width: isMobile ? '200%' : '100%',
+                                                overflow: 'visible',
+                                                marginBottom: isMobile ? '-50%' : '-25%',
+                                                '& table': {
+                                                    maxWidth: '100% !important',
+                                                    width: '100% !important',
+                                                    marginBottom: '0 !important'
+                                                },
+                                                '& img': {
+                                                    maxWidth: '100% !important',
+                                                    height: 'auto !important'
+                                                },
+                                                '& *': {
+                                                    fontSize: isMobile ? '12px !important' : 'inherit !important',
+                                                    lineHeight: 'inherit !important'
+                                                },
+                                                '& body': {
+                                                    margin: '0 !important',
+                                                    padding: '0 !important'
+                                                },
+                                                '& td': {
+                                                    padding: isMobile ? '8px !important' : '16px !important'
+                                                },
+                                                '& table[role="presentation"]': {
+                                                    margin: '0 !important',
+                                                    marginBottom: '0 !important'
+                                                },
+                                                '& tr:last-child td': {
+                                                    paddingBottom: isMobile ? '8px !important' : '16px !important'
+                                                }
+                                            }}
+                                            dangerouslySetInnerHTML={{ __html: groupPreviewHtml }}
+                                        />
+                                    </Box>
                                 </Box>
-            </Box>
-                        </Grid>
+                            </Grid>
+                        )}
     </Grid>
 </DialogContent>
                 <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>
@@ -7010,7 +7466,12 @@ const Manifest = () => {
                                 backgroundColor: '#1565c0'
                             }
                         }}
-                        disabled={groupMessageSending || groupMessageForm.to.length === 0 || !groupMessageForm.subject}
+                        disabled={
+                            groupMessageSending || 
+                            (!groupMessageEmailChecked && !groupMessageSmsChecked) ||
+                            (groupMessageEmailChecked && (groupMessageForm.to.length === 0 || !groupMessageForm.subject)) ||
+                            (groupMessageSmsChecked && (!groupSmsForm.template || groupSmsForm.template === 'custom') && (!groupSmsForm.message || groupSmsForm.message.trim().length === 0))
+                        }
                     >
                         {groupMessageSending ? 'Sending...' : 'Send'}
                     </Button>
