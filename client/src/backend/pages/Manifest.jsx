@@ -7433,6 +7433,94 @@ const Manifest = () => {
                                 </Box>
                             </Grid>
                         )}
+                        {/* SMS Template Preview */}
+                        {groupMessageSmsChecked && (
+                            <Grid item xs={12}>
+                                <Box sx={{ 
+                                    border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                    borderRadius: isMobile ? 2 : '8px', 
+                                    p: isMobile ? 1 : 2,
+                                    backgroundColor: '#f9f9f9',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'flex-start'
+                                }}>
+                                    {/* Mobile Device Preview */}
+                                    <Box sx={{ 
+                                        width: isMobile ? '240px' : '320px',
+                                        maxWidth: '100%',
+                                        background: '#000',
+                                        borderRadius: isMobile ? '18px' : '24px',
+                                        padding: isMobile ? '8px' : '12px',
+                                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                    }}>
+                                        {/* Phone Screen */}
+                                        <Box sx={{
+                                            background: '#f5f5f5',
+                                            borderRadius: isMobile ? '14px' : '20px',
+                                            padding: isMobile ? '6px' : '8px',
+                                            minHeight: isMobile ? '280px' : '400px'
+                                        }}>
+                                            {/* Status Bar */}
+                                            <Box sx={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: isMobile ? '6px 8px' : '8px 12px',
+                                                fontSize: isMobile ? '8px' : '10px',
+                                                color: '#000',
+                                                background: '#fff',
+                                                borderRadius: isMobile ? '8px 8px 0 0' : '12px 12px 0 0'
+                                            }}>
+                                                <span>9:41</span>
+                                                <Box sx={{ display: 'flex', gap: isMobile ? '2px' : '4px', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
+                                                    <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
+                                                </Box>
+                                            </Box>
+
+                                            {/* Message Preview */}
+                                            <Box sx={{
+                                                padding: isMobile ? '12px' : '16px',
+                                                background: '#fff',
+                                                borderRadius: isMobile ? '0 0 8px 8px' : '0 0 12px 12px',
+                                                minHeight: isMobile ? '200px' : '300px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                justifyContent: 'flex-start'
+                                            }}>
+                                                {/* Message Bubble */}
+                                                <Box sx={{
+                                                    background: '#e5e7eb',
+                                                    borderRadius: isMobile ? '12px' : '16px',
+                                                    padding: isMobile ? '8px 12px' : '12px 16px',
+                                                    marginBottom: isMobile ? '6px' : '8px',
+                                                    maxWidth: '85%',
+                                                    alignSelf: 'flex-start',
+                                                    wordWrap: 'break-word',
+                                                    fontSize: isMobile ? '12px' : '14px',
+                                                    lineHeight: '1.5',
+                                                    color: '#111827',
+                                                    whiteSpace: 'pre-wrap'
+                                                }}>
+                                                    {(() => {
+                                                        const previewBooking = groupMessagePreviewBooking || (groupSelectedBookings.length > 0 ? groupSelectedBookings[0] : null);
+                                                        if (!previewBooking) return 'Your message will appear here...';
+                                                        
+                                                        const messageText = groupSmsForm.message || '';
+                                                        const messageWithPrompts = replaceSmsPrompts(messageText, previewBooking);
+                                                        const finalMessage = groupPersonalNote 
+                                                            ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${groupPersonalNote}`
+                                                            : messageWithPrompts;
+                                                        return finalMessage || 'Your message will appear here...';
+                                                    })()}
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            </Grid>
+                        )}
     </Grid>
 </DialogContent>
                 <DialogActions sx={{ p: 3, justifyContent: 'flex-end' }}>

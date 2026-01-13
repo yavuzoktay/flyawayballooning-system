@@ -451,7 +451,8 @@ const PaginatedTable = ({
                             <th style={{ 
                                 padding: "8px",
                                 whiteSpace: "nowrap",
-                                overflow: "hidden"
+                                overflow: "hidden",
+                                textAlign: "left"
                             }}>
                                 <input
                                     type="checkbox"
@@ -469,7 +470,8 @@ const PaginatedTable = ({
                                 textOverflow: "ellipsis",
                                 fontSize: "16px",
                                 fontWeight: "normal",
-                                fontFamily: "'Gilroy', sans-serif"
+                                fontFamily: "'Gilroy', sans-serif",
+                                textAlign: "left"
                             }}>{col}</th>
                         ))}
                     </tr>
@@ -495,7 +497,7 @@ const PaginatedTable = ({
                                                     const id = getColId(col);
                                                     return (
                                                         <td key={id} style={{ 
-                                                            textAlign: "center", 
+                                                            textAlign: "left", 
                                                             padding: "8px", 
                                                             whiteSpace: "nowrap",
                                                             overflow: "hidden",
