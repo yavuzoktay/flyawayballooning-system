@@ -1870,15 +1870,41 @@ app.post('/api/createRedeemBooking', (req, res) => {
         // Format booking date
         let bookingDateTime = selectedDate;
         if (selectedDate && selectedTime) {
-            const datePart = typeof selectedDate === 'string' && selectedDate.includes(' ')
-                ? selectedDate.split(' ')[0]
-                : (typeof selectedDate === 'string' && selectedDate.length >= 10
-                    ? selectedDate.substring(0, 10)
-                    : selectedDate);
+            let datePart;
+            // Handle UTC ISO format (e.g., "2026-04-29T23:00:00.000Z")
+            // Parse as local time to avoid timezone conversion
+            if (typeof selectedDate === 'string' && selectedDate.includes('T') && selectedDate.endsWith('Z')) {
+                // UTC ISO format: parse as local time
+                const utcDate = new Date(selectedDate);
+                const year = utcDate.getFullYear();
+                const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+                const day = String(utcDate.getDate()).padStart(2, '0');
+                datePart = `${year}-${month}-${day}`;
+            } else if (typeof selectedDate === 'string' && selectedDate.includes(' ')) {
+                // Already has space (e.g., "2026-04-30 07:00:00")
+                datePart = selectedDate.split(' ')[0];
+            } else if (typeof selectedDate === 'string' && selectedDate.length >= 10) {
+                // Plain date string (e.g., "2026-04-30")
+                datePart = selectedDate.substring(0, 10);
+            } else {
+                datePart = selectedDate;
+            }
             bookingDateTime = `${datePart} ${selectedTime}`;
         } else if (selectedDate) {
             // If no selectedTime, use selectedDate as-is (might already include time)
-            bookingDateTime = selectedDate;
+            // Handle UTC ISO format
+            if (typeof selectedDate === 'string' && selectedDate.includes('T') && selectedDate.endsWith('Z')) {
+                const utcDate = new Date(selectedDate);
+                const year = utcDate.getFullYear();
+                const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+                const day = String(utcDate.getDate()).padStart(2, '0');
+                const hour = String(utcDate.getHours()).padStart(2, '0');
+                const minute = String(utcDate.getMinutes()).padStart(2, '0');
+                const second = String(utcDate.getSeconds()).padStart(2, '0');
+                bookingDateTime = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+            } else {
+                bookingDateTime = selectedDate;
+            }
         } else {
             // Fallback to current timestamp if no date provided
             bookingDateTime = now;
@@ -6765,11 +6791,15 @@ app.get('/api/getAllBookingData', (req, res) => {
             ) as name,
             ab.name as passenger_name,
             -- Calculate actual paid amount from payment_history (includes promo codes and refunds)
+            -- For Gift Voucher redemptions, prioritize voucher's paid amount over payment_history
             -- Only override if there are payment records; otherwise use the stored paid value
-            COALESCE(
-                (SELECT SUM(ph.amount) FROM payment_history ph WHERE ph.booking_id = ab.id),
-                ab.paid
-            ) as paid,
+            CASE 
+                WHEN v.book_flight = 'Gift Voucher' AND v.paid IS NOT NULL AND v.paid > 0 THEN v.paid
+                ELSE COALESCE(
+                    (SELECT SUM(ph.amount) FROM payment_history ph WHERE ph.booking_id = ab.id),
+                    ab.paid
+                )
+            END as paid,
             -- Check if booking has any refunds (payment_status = 'refunded' or amount < 0)
             CASE 
                 WHEN EXISTS (
@@ -6808,6 +6838,7 @@ app.get('/api/getAllBookingData', (req, res) => {
             v.experience_type as voucher_experience_type,
             v.book_flight as voucher_book_flight,
             v.flight_attempts as voucher_flight_attempts,
+            v.paid as voucher_paid,
             -- flight_type_source: use from database if exists, otherwise will be calculated
             ab.flight_type_source
         FROM all_booking ab
@@ -6817,8 +6848,14 @@ app.get('/api/getAllBookingData', (req, res) => {
             ON vcu.booking_id = ab.id OR (vcu.customer_email IS NOT NULL AND vcu.customer_email = ab.email)
         LEFT JOIN voucher_codes vcu_map
             ON vcu_map.id = vcu.voucher_code_id
+        LEFT JOIN voucher_code_usage vcu2
+            ON vcu2.booking_id = ab.id
+        LEFT JOIN voucher_codes vc2
+            ON vc2.id = vcu2.voucher_code_id
         LEFT JOIN all_vouchers v
-            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code)
+            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code)
+            OR (vcu_map.code IS NOT NULL AND v.voucher_ref = vcu_map.code)
+            OR (vc2.code IS NOT NULL AND v.voucher_ref = vc2.code)
         ${whereClause}
         ORDER BY ab.created_at DESC
         LIMIT 1000
@@ -6832,6 +6869,13 @@ app.get('/api/getAllBookingData', (req, res) => {
             console.error('Error fetching all booking data:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
+        // #region agent log
+        if (result && result.length > 0) {
+            result.slice(0, 5).forEach((r, idx) => {
+                fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:6841',message:'getAllBookingData flight_date from DB',data:{bookingId:r.id,flightDate:r.flight_date,flightDateType:typeof r.flight_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+            });
+        }
+        // #endregion
 
         // If voucher_code is still null, fallback to joined usage mapping
 
@@ -6847,6 +6891,7 @@ app.get('/api/getAllBookingData', (req, res) => {
                 original_voucher_type,
                 voucher_experience_type,
                 voucher_book_flight,
+                voucher_paid,
                 ...rest
             } = r;
 
@@ -7973,10 +8018,11 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
     console.log('🔍 findBookingByVoucherRef: Searching for voucher_ref:', rawCode);
 
     // First, try to find booking by direct voucher_code match
+    // Also check voucher_code_usage for Gift Voucher redemptions
     const sql = `
         SELECT 
             ab.*,
-            COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) AS resolved_voucher_code
+            COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code, v.voucher_ref) AS resolved_voucher_code
         FROM all_booking ab
         LEFT JOIN voucher_codes vc 
             ON vc.code = ab.voucher_code
@@ -7984,9 +8030,13 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
             ON vcu.booking_id = ab.id
         LEFT JOIN voucher_codes vcu_map
             ON vcu_map.id = vcu.voucher_code_id
+        LEFT JOIN voucher_code_usage vcu2
+            ON vcu2.booking_id = ab.id
+        LEFT JOIN voucher_codes vc2
+            ON vc2.id = vcu2.voucher_code_id
         LEFT JOIN all_vouchers v
-            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code)
-        WHERE COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = ?
+            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code)
+        WHERE COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code, v.voucher_ref) = ?
         ORDER BY ab.created_at DESC
         LIMIT 1
     `;
@@ -8018,9 +8068,8 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                 v.status AS voucher_status
             FROM all_vouchers v
             INNER JOIN all_booking ab
-                ON ab.flight_type_source = 'Redeem Voucher'
-                AND ab.redeemed_voucher = 'Yes'
-                AND ab.created_at >= v.created_at
+                ON ab.created_at >= v.created_at
+                AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY)
             WHERE v.voucher_ref = ?
                 AND (v.redeemed = 'Yes' OR v.status = 'Used')
                 AND (
@@ -8042,12 +8091,14 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                         OR UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.recipient_name, '')))
                         OR UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.purchaser_name, '')))
                     ))
-                    OR (v.paid IS NOT NULL AND v.paid != '' AND ab.paid IS NOT NULL AND ab.paid != '' AND CAST(ab.paid AS DECIMAL(10,2)) = CAST(v.paid AS DECIMAL(10,2)))
-                    -- Last resort: within a tight time window after voucher creation (redeem is usually immediate)
-                    OR (ab.created_at >= v.created_at AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 7 DAY))
+                    -- Note: We don't match on paid amount because rebook operations may change the paid value
+                    -- Last resort: within a time window after voucher creation (includes rebooked bookings)
+                    -- Rebooked bookings keep the same created_at, so they'll match here
+                    OR (ab.created_at >= v.created_at AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY))
                 )
             ORDER BY 
-                -- Prefer exact email matches, then phone, then paid match, then recency
+                -- Prefer exact email matches, then phone, then recency
+                -- Note: We don't order by paid match because rebook operations may change the paid value
                 (ab.email IS NOT NULL AND ab.email != '' AND (
                     UPPER(ab.email) = UPPER(v.email)
                     OR UPPER(ab.email) = UPPER(v.recipient_email)
@@ -8060,7 +8111,6 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                     OR ab.phone = v.mobile
                     OR ab.phone = v.purchaser_mobile
                 )) DESC,
-                (v.paid IS NOT NULL AND v.paid != '' AND ab.paid IS NOT NULL AND ab.paid != '' AND CAST(ab.paid AS DECIMAL(10,2)) = CAST(v.paid AS DECIMAL(10,2))) DESC,
                 ab.created_at DESC
             LIMIT 1
         `;
@@ -8086,9 +8136,7 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                     v.voucher_ref AS original_voucher_ref
                 FROM all_vouchers v
                 INNER JOIN all_booking ab
-                    ON ab.flight_type_source = 'Redeem Voucher'
-                    AND ab.redeemed_voucher = 'Yes'
-                    AND ab.created_at >= v.created_at
+                    ON ab.created_at >= v.created_at
                     AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY)
                 WHERE v.voucher_ref = ?
                     AND (v.redeemed = 'Yes' OR v.status = 'Used')
@@ -10721,6 +10769,9 @@ app.post('/api/createBooking', (req, res) => {
     }
 
     function insertBookingAndPassengers(expiresDateFinal) {
+        // Check if this is a rebook operation (define early to avoid TDZ issues)
+        const isRebook = rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id));
+        
         // Use provided created_at if available (for rebook operations), otherwise use current date
         const nowDate = created_at ? moment(created_at).format('YYYY-MM-DD HH:mm:ss') : moment().format('YYYY-MM-DD HH:mm:ss');
         const mainPassenger = passengerData[0] || {};
@@ -10770,14 +10821,14 @@ app.post('/api/createBooking', (req, res) => {
             }
             bookingDateTime = `${datePart} ${selectedTime}`;
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.js:10790',message:'createBooking bookingDateTime',data:{selectedDate,selectedTime,bookingDateTime,isRebook},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+        // #endregion
         // Determine flight_type_source: 'Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise use flight_type/experience
         const flight_type_source = activitySelect === 'Redeem Voucher' ? 'Redeem Voucher' : (chooseFlightType?.type || experience || null);
 
         // For redeem voucher bookings, flight_attempts should start from 0
         const finalFlightAttempts = activitySelect === 'Redeem Voucher' ? 0 : (flight_attempts !== undefined ? flight_attempts : 0);
-
-        // Check if this is a rebook operation
-        const isRebook = rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id));
         
         // bookingSql ve bookingValues'da selectedDate yerine bookingDateTime kullan
         // For rebook operations, use UPDATE instead of INSERT
@@ -10910,26 +10961,139 @@ app.post('/api/createBooking', (req, res) => {
             bookingStatus = 'Scheduled';
         }
 
-        // For Redeem Voucher, get original voucher price from all_vouchers table
+        // For Redeem Voucher or Rebook with Gift Voucher, get original voucher price from all_vouchers table
         // This ensures we use the correct original price, not a doubled amount
         let finalPaidAmount = paid || totalPrice;
-        if (activitySelect === 'Redeem Voucher' && voucher_code) {
+        // Check if this is a Redeem Voucher operation OR a rebook with a Gift Voucher
+        const isRedeemVoucherOperation = activitySelect === 'Redeem Voucher';
+        const isRebookWithGiftVoucher = isRebook && voucher_code;
+        
+        // For rebook operations, preserve the existing booking's paid amount (don't change it)
+        if (isRebook && rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
+            // Get current booking's paid value to preserve it during rebook
+            con.query(
+                'SELECT paid FROM all_booking WHERE id = ?',
+                [parseInt(rebook_from_booking_id)],
+                (currentBookingErr, currentBookingResult) => {
+                    if (!currentBookingErr && currentBookingResult.length > 0 && currentBookingResult[0].paid != null) {
+                        finalPaidAmount = parseFloat(currentBookingResult[0].paid) || 0;
+                        console.log('✅ [createBooking] Preserving existing booking paid amount for rebook:', finalPaidAmount);
+                        // Continue with booking insertion using preserved paid amount
+                        insertBookingWithFinalPaid();
+                    } else {
+                        // If we can't get current paid, fall through to voucher lookup
+                        console.log('⚠️ [createBooking] Could not get current booking paid, will use voucher lookup');
+                        // Continue with voucher lookup
+                        if ((isRedeemVoucherOperation || isRebookWithGiftVoucher) && voucher_code) {
+                            proceedWithVoucherLookup();
+                        } else {
+                            insertBookingWithFinalPaid();
+                        }
+                    }
+                }
+            );
+            return; // Exit early, will continue in callback
+        }
+        
+        // For non-rebook operations or if rebook paid lookup failed, proceed with voucher lookup
+        if ((isRedeemVoucherOperation || isRebookWithGiftVoucher) && voucher_code) {
+            proceedWithVoucherLookup();
+        } else {
+            insertBookingWithFinalPaid();
+        }
+        
+        function proceedWithVoucherLookup() {
             // Get original voucher price from all_vouchers table
+            // For rebook, voucher_code might be the booking's voucher_code (e.g., BAT26RSH)
+            // but we need to find the voucher by voucher_ref (e.g., GAT0GP3L9)
+            // First try direct voucher_ref match, then try via voucher_code_usage
             const getVoucherPaidSql = `
-                SELECT paid 
-                FROM all_vouchers 
-                WHERE UPPER(voucher_ref) = UPPER(?)
+                SELECT v.paid, v.voucher_ref, v.book_flight
+                FROM all_vouchers v
+                WHERE UPPER(v.voucher_ref) = UPPER(?)
                 LIMIT 1
             `;
             
             // Use synchronous query with Promise to get voucher paid amount
             const getVoucherPaid = () => {
                 return new Promise((resolve) => {
+                    // First try direct voucher_ref match
                     con.query(getVoucherPaidSql, [voucher_code.trim()], (err, result) => {
                         if (!err && result.length > 0 && result[0].paid != null && result[0].paid > 0) {
                             finalPaidAmount = parseFloat(result[0].paid) || 0;
                             console.log('✅ [createBooking] Found original voucher price from all_vouchers.paid:', finalPaidAmount);
                             resolve(finalPaidAmount);
+                        } else if (isRebook && rebook_from_booking_id) {
+                            // For rebook, try to find voucher via voucher_code_usage
+                            const rebookVoucherLookupSql = `
+                                SELECT v.paid, v.voucher_ref, v.book_flight
+                                FROM all_booking ab2
+                                INNER JOIN voucher_code_usage vcu ON vcu.booking_id = ab2.id
+                                INNER JOIN voucher_codes vc2 ON vc2.id = vcu.voucher_code_id
+                                INNER JOIN all_vouchers v ON v.voucher_ref = vc2.code
+                                WHERE ab2.id = ?
+                                LIMIT 1
+                            `;
+                            con.query(rebookVoucherLookupSql, [parseInt(rebook_from_booking_id)], (rebookErr, rebookResult) => {
+                                if (!rebookErr && rebookResult.length > 0 && rebookResult[0].paid != null && rebookResult[0].paid > 0) {
+                                    finalPaidAmount = parseFloat(rebookResult[0].paid) || 0;
+                                    console.log('✅ [createBooking] Found voucher price via voucher_code_usage for rebook:', finalPaidAmount);
+                                    resolve(finalPaidAmount);
+                                } else if (isRebook && rebook_from_booking_id) {
+                                    // Fallback: Try metadata matching with booking info
+                                    const metadataMatchSql = `
+                                        SELECT v.paid, v.voucher_ref, v.book_flight
+                                        FROM all_booking ab2
+                                        INNER JOIN all_vouchers v ON (
+                                            (ab2.email IS NOT NULL AND ab2.email != '' AND (
+                                                UPPER(ab2.email) = UPPER(v.email)
+                                                OR UPPER(ab2.email) = UPPER(v.recipient_email)
+                                                OR UPPER(ab2.email) = UPPER(v.purchaser_email)
+                                            ))
+                                            OR (ab2.phone IS NOT NULL AND ab2.phone != '' AND (
+                                                ab2.phone = v.phone
+                                                OR ab2.phone = v.recipient_phone
+                                                OR ab2.phone = v.purchaser_phone
+                                                OR ab2.phone = v.mobile
+                                                OR ab2.phone = v.purchaser_mobile
+                                            ))
+                                            OR (ab2.name IS NOT NULL AND ab2.name != '' AND (
+                                                UPPER(TRIM(ab2.name)) = UPPER(TRIM(COALESCE(v.name, '')))
+                                                OR UPPER(TRIM(ab2.name)) = UPPER(TRIM(COALESCE(v.recipient_name, '')))
+                                                OR UPPER(TRIM(ab2.name)) = UPPER(TRIM(COALESCE(v.purchaser_name, '')))
+                                            ))
+                                        )
+                                        WHERE ab2.id = ?
+                                        AND v.book_flight = 'Gift Voucher'
+                                        AND ab2.created_at >= v.created_at
+                                        AND ab2.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY)
+                                        ORDER BY ab2.created_at DESC
+                                        LIMIT 1
+                                    `;
+                                    con.query(metadataMatchSql, [parseInt(rebook_from_booking_id)], (metadataErr, metadataResult) => {
+                                        if (!metadataErr && metadataResult.length > 0 && metadataResult[0].paid != null && metadataResult[0].paid > 0) {
+                                            finalPaidAmount = parseFloat(metadataResult[0].paid) || 0;
+                                            console.log('✅ [createBooking] Found voucher price via metadata matching for rebook:', finalPaidAmount);
+                                            resolve(finalPaidAmount);
+                                        } else {
+                                            // Use frontend-provided paid value if available (from voucher.paid)
+                                            // This is the most reliable source for rebook operations
+                                            // Check if paid is provided and is a valid number (including 0 and small values like 0.54)
+                                            if (paid != null && paid !== '' && !isNaN(parseFloat(paid))) {
+                                                finalPaidAmount = parseFloat(paid);
+                                                console.log('✅ [createBooking] Using frontend-provided paid value for rebook:', finalPaidAmount);
+                                                resolve(finalPaidAmount);
+                                            } else {
+                                                console.log('⚠️ [createBooking] Could not find voucher price from all_vouchers, using provided paid/totalPrice:', finalPaidAmount);
+                                                resolve(finalPaidAmount);
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    console.log('⚠️ [createBooking] Could not find voucher price from all_vouchers, using provided paid/totalPrice:', finalPaidAmount);
+                                    resolve(finalPaidAmount);
+                                }
+                            });
                         } else {
                             console.log('⚠️ [createBooking] Could not find voucher price from all_vouchers, using provided paid/totalPrice:', finalPaidAmount);
                             resolve(finalPaidAmount);
@@ -10942,11 +11106,7 @@ app.post('/api/createBooking', (req, res) => {
             getVoucherPaid().then(() => {
                 insertBookingWithFinalPaid();
             });
-            return; // Exit early, will continue in callback
         }
-        
-        // If not Redeem Voucher, proceed directly
-        insertBookingWithFinalPaid();
         
         function insertBookingWithFinalPaid() {
         // Ensure voucher_code exists in voucher_codes table before inserting booking
@@ -11372,6 +11532,33 @@ app.post('/api/createBooking', (req, res) => {
                 }
             } else if (isRebook) {
                 console.log('🔄 Rebook detected - Same booking updated, no payment history transfer needed');
+                
+                // Update voucher's booking_id to point to the rebooked booking
+                // This ensures "Related Booking" information is preserved for Gift Vouchers
+                if (voucher_code) {
+                    const updateVoucherBookingIdSql = `
+                        UPDATE all_vouchers 
+                        SET booking_id = ? 
+                        WHERE voucher_ref = ? OR voucher_code = ?
+                    `;
+                    
+                    con.query(updateVoucherBookingIdSql, [bookingId, voucher_code, voucher_code], (voucherUpdateErr, voucherUpdateResult) => {
+                        if (voucherUpdateErr) {
+                            // Check if booking_id column exists
+                            if (voucherUpdateErr.code === 'ER_BAD_FIELD_ERROR') {
+                                console.log('ℹ️ booking_id column does not exist in all_vouchers table');
+                            } else {
+                                console.error('❌ Error updating voucher booking_id during rebook:', voucherUpdateErr);
+                            }
+                        } else {
+                            console.log('✅ Voucher booking_id updated successfully during rebook:', {
+                                voucher_code: voucher_code,
+                                bookingId: bookingId,
+                                affectedRows: voucherUpdateResult.affectedRows
+                            });
+                        }
+                    });
+                }
             }
 
             // If this booking was created via a rebook operation, previous history entries

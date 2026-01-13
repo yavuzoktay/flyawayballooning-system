@@ -437,7 +437,7 @@ const BookingPage = () => {
     const [sendingEmail, setSendingEmail] = useState(false);
     // Email and SMS checkboxes for Send a Message popup
     const [sendMessageEmailChecked, setSendMessageEmailChecked] = useState(true);
-    const [sendMessageSmsChecked, setSendMessageSmsChecked] = useState(false);
+    const [sendMessageSmsChecked, setSendMessageSmsChecked] = useState(true);
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsLoading, setEmailLogsLoading] = useState(false);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
@@ -1381,7 +1381,7 @@ const BookingPage = () => {
                     setSmsForm({ to: '', message: '', template: 'custom' });
                     setSmsPersonalNote('');
                     setSendMessageEmailChecked(true);
-                    setSendMessageSmsChecked(false);
+                    setSendMessageSmsChecked(true);
                     if (emailLogsContext) {
                         fetchEmailLogsForParams(emailLogsContext);
                     }
@@ -7275,7 +7275,22 @@ setBookingDetail(finalVoucherDetail);
       href={`https://flyawayballooning-system.com/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
       style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
     >
-      {dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm')}
+      {(() => {
+        // Parse flight_date as local time (no timezone conversion) to avoid date shift
+        // flight_date is stored as "YYYY-MM-DD HH:mm:ss" string without timezone info
+        const flightDateStr = bookingDetail.booking.flight_date;
+        if (typeof flightDateStr === 'string' && flightDateStr.match(/^\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}/)) {
+          // Parse as local time to avoid timezone conversion
+          const [datePart, timePart] = flightDateStr.split(/[\sT]/);
+          const [year, month, day] = datePart.split('-');
+          const [hour, minute] = (timePart || '00:00').split(':');
+          // Create date in local timezone (no UTC conversion)
+          const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+          return dayjs(localDate).format('DD/MM/YYYY HH:mm');
+        }
+        // Fallback to dayjs parsing if format doesn't match
+        return dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm');
+      })()}
     </a>
   ) : '-'}</Typography>
 )}
@@ -10181,7 +10196,7 @@ setBookingDetail(finalVoucherDetail);
                     onClose={() => {
                         setEmailModalOpen(false);
                         setSendMessageEmailChecked(true);
-                        setSendMessageSmsChecked(false);
+                        setSendMessageSmsChecked(true);
                         setSmsForm({ to: '', message: '', template: 'custom' });
                     }}
                     maxWidth={isMobile ? "md" : "lg"}

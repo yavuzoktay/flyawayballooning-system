@@ -215,7 +215,7 @@ const Manifest = () => {
     const [sendingEmail, setSendingEmail] = useState(false);
     // Email and SMS checkboxes for Send a Message popup
     const [sendMessageEmailChecked, setSendMessageEmailChecked] = useState(true);
-    const [sendMessageSmsChecked, setSendMessageSmsChecked] = useState(false);
+    const [sendMessageSmsChecked, setSendMessageSmsChecked] = useState(true);
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
     const [emailTemplates, setEmailTemplates] = useState([]);
@@ -235,7 +235,7 @@ const Manifest = () => {
     const [groupMessagePreviewBooking, setGroupMessagePreviewBooking] = useState(null);
     // Email and SMS checkboxes for Group Message popup
     const [groupMessageEmailChecked, setGroupMessageEmailChecked] = useState(true);
-    const [groupMessageSmsChecked, setGroupMessageSmsChecked] = useState(false);
+    const [groupMessageSmsChecked, setGroupMessageSmsChecked] = useState(true);
     const [groupSmsForm, setGroupSmsForm] = useState({ to: '', message: '', template: 'custom' });
     const [messagesModalOpen, setMessagesModalOpen] = useState(false);
     const [messagesLoading, setMessagesLoading] = useState(false);
@@ -340,7 +340,7 @@ const Manifest = () => {
         setGroupPersonalNote('');
         // Initialize checkbox states
         setGroupMessageEmailChecked(true);
-        setGroupMessageSmsChecked(false);
+        setGroupMessageSmsChecked(true);
         setGroupSmsForm({ to: '', message: '', template: 'custom' });
         // Set preview date/time once when modal opens
         const now = new Date();
@@ -510,7 +510,7 @@ const Manifest = () => {
         setGroupMessagePreviewBooking(null);
         setGroupActionMode('message');
         setGroupMessageEmailChecked(true);
-        setGroupMessageSmsChecked(false);
+        setGroupMessageSmsChecked(true);
         setGroupSmsForm({ to: '', message: '', template: 'custom' });
     };
 
@@ -1064,7 +1064,7 @@ const Manifest = () => {
                     setPersonalNote('');
                     setSmsForm({ to: '', message: '', template: 'custom' });
                     setSendMessageEmailChecked(true);
-                    setSendMessageSmsChecked(false);
+                    setSendMessageSmsChecked(true);
                     if (selectedBookingForEmail?.id) {
                         try {
                             const resp = await axios.get(`/api/bookingEmails/${selectedBookingForEmail.id}`);
@@ -5409,7 +5409,22 @@ const Manifest = () => {
                                                             href={`https://flyawayballooning-system.com/manifest?date=${dayjs(bookingDetail.booking.flight_date).format('YYYY-MM-DD')}&time=${dayjs(bookingDetail.booking.flight_date).format('HH:mm')}`}
                                                             style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
                                                         >
-                                                            {dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm')}
+                                                            {(() => {
+                                                                // Parse flight_date as local time (no timezone conversion) to avoid date shift
+                                                                // flight_date is stored as "YYYY-MM-DD HH:mm:ss" string without timezone info
+                                                                const flightDateStr = bookingDetail.booking.flight_date;
+                                                                if (typeof flightDateStr === 'string' && flightDateStr.match(/^\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}/)) {
+                                                                    // Parse as local time to avoid timezone conversion
+                                                                    const [datePart, timePart] = flightDateStr.split(/[\sT]/);
+                                                                    const [year, month, day] = datePart.split('-');
+                                                                    const [hour, minute] = (timePart || '00:00').split(':');
+                                                                    // Create date in local timezone (no UTC conversion)
+                                                                    const localDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+                                                                    return dayjs(localDate).format('DD/MM/YYYY HH:mm');
+                                                                }
+                                                                // Fallback to dayjs parsing if format doesn't match
+                                                                return dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm');
+                                                            })()}
                                                         </a>
                                                     ) : '-'}</Typography>
                                                 )}
@@ -7542,7 +7557,7 @@ const Manifest = () => {
                 onClose={() => {
                     setEmailModalOpen(false);
                     setSendMessageEmailChecked(true);
-                    setSendMessageSmsChecked(false);
+                    setSendMessageSmsChecked(true);
                     setSmsForm({ to: '', message: '', template: 'custom' });
                 }}
                 maxWidth="md"

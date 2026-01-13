@@ -166,9 +166,6 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 .then(res => {
                     if (res.data?.success && Array.isArray(res.data.data)) {
                         setPrivateCharterVoucherTypes(res.data.data);
-                        // #region agent log
-                        try{fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'rebook-private-vt',hypothesisId:'H2',location:'RebookAvailabilityModal.jsx:pcvtLoaded',message:'Loaded private charter voucher types',data:{count:res.data.data.length, sample:res.data.data.slice(0,3).map(v=>({id:v.id,title:v.title}))},timestamp:Date.now()})}).catch(()=>{});}catch(e){}
-                        // #endregion
                     }
                 })
                 .catch(err => {
