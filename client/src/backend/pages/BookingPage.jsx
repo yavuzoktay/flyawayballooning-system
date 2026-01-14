@@ -6480,20 +6480,6 @@ setBookingDetail(finalVoucherDetail);
                                 {/* Simple voucher display */}
                                 {activeTab === 'vouchers' && bookingDetail?.voucher ? (
                                     <Box sx={{ p: 3 }}>
-                                        <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
-                                            {(() => {
-                                                const voucher = bookingDetail?.voucher;
-                                                const title = getVoucherDetailsTitle(voucher);
-                                                console.log('🎯 Voucher title check:', {
-                                                    book_flight: voucher?.book_flight,
-                                                    voucher_type: voucher?.voucher_type,
-                                                    isGiftVoucher: isGiftVoucherDetails(voucher),
-                                                    resolvedTitle: title
-                                                });
-                                                return title;
-                                            })()}
-                                        </Typography>
-                                        
                                         <Grid container spacing={3}>
 
                                             
