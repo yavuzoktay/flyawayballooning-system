@@ -5378,61 +5378,31 @@ setBookingDetail(finalVoucherDetail);
                                     }}>
                                         
                                         {isMobile ? (
-                                            // Mobile: Bulk Email & Bulk SMS yan yana, iki kolon
-                                            <Box sx={{ display: 'flex', width: '100%', gap: 0.5 }}>
-                                                <Button
-                                                    variant="contained"
-                                                    color="primary"
-                                                    disabled={selectedBookingIds.length === 0}
-                                                    onClick={() => {
-                                                        if (selectedBookingIds.length === 0) return;
-                                                        // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
-                                                        const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
-                                                        if (primaryBooking) {
-                                                            openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                        } else if (filteredData.length > 0) {
-                                                            openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                        }
-                                                    }}
-                                                    sx={{
-                                                        flex: 1,
-                                                        height: 36,
-                                                        fontSize: '11px',
-                                                        padding: '4px 8px',
-                                                        minWidth: 0
-                                                    }}
-                                                >
-                                                    EMAIL
-                                                </Button>
-                                                <Button
-                                                    variant="contained"
-                                                    color="info"
-                                                    disabled={selectedBookingIds.length === 0}
-                                                    onClick={() => {
-                                                        if (selectedBookingIds.length === 0) return;
-                                                        // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
-                                                        const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
-                                                        if (primaryBooking) {
-                                                            openSmsModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                        } else if (filteredData.length > 0) {
-                                                            openSmsModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
-                                                        }
-                                                    }}
-                                                    sx={{
-                                                        flex: 1,
-                                                        height: 36,
-                                                        fontSize: '11px',
-                                                        padding: '4px 8px',
-                                                        minWidth: 0,
-                                                        background: '#17a2b8',
-                                                        '&:hover': {
-                                                            background: '#148a9b'
-                                                        }
-                                                    }}
-                                                >
-                                                    SMS
-                                                </Button>
-                                            </Box>
+                                            // Mobile: Email | SMS combined button
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                disabled={selectedBookingIds.length === 0}
+                                                onClick={() => {
+                                                    if (selectedBookingIds.length === 0) return;
+                                                    // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
+                                                    const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
+                                                    if (primaryBooking) {
+                                                        openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                    } else if (filteredData.length > 0) {
+                                                        openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                    }
+                                                }}
+                                                sx={{
+                                                    width: '100%',
+                                                    height: 36,
+                                                    fontSize: '11px',
+                                                    padding: '4px 8px',
+                                                    minWidth: 0
+                                                }}
+                                            >
+                                                EMAIL | SMS
+                                            </Button>
                                         ) : (
                                             <>
                                                 <Button
