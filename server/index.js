@@ -2733,7 +2733,9 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     // Remove non-answer fields
                     const { notes, __requiredKeys, ...answers } = additionalInfo;
 
-                    // Save each question answer
+                    // ------------------------------------------------------------------
+                    // 1) Legacy table: additional_info_answers (kept for backward compat)
+                    // ------------------------------------------------------------------
                     Object.keys(answers).forEach(questionKey => {
                         const answer = answers[questionKey];
                         if (answer !== undefined && answer !== null && answer !== '') {
@@ -2747,13 +2749,60 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
                             con.query(answerSql, [bookingId, questionId, answer], (answerErr) => {
                                 if (answerErr) {
-                                    console.error(`Error saving answer for ${questionKey}:`, answerErr);
+                                    console.error(`Error saving answer for ${questionKey} into additional_info_answers:`, answerErr);
                                 } else {
-                                    console.log(`Answer saved for question ${questionId}`);
+                                    console.log(`Answer saved for question ${questionId} into additional_info_answers`);
                                 }
                             });
                         }
                     });
+
+                    // ------------------------------------------------------------------
+                    // 2) New schema: additional_information_answers + JSON column
+                    //    This powers Booking / Voucher "Additional Information & Notes"
+                    // ------------------------------------------------------------------
+                    const additionalInformationAnswers = [];
+                    const jsonData = {};
+
+                    // Persist notes (if any) into JSON under "notes" key
+                    if (typeof notes === 'string' && notes.trim().length > 0) {
+                        jsonData.notes = notes.trim();
+                    }
+
+                    Object.keys(answers).forEach(questionKey => {
+                        const answer = answers[questionKey];
+                        if (answer !== undefined && answer !== null && String(answer).trim() !== '') {
+                            const questionId = questionKey.replace('question_', '');
+                            additionalInformationAnswers.push([bookingId, questionId, answer]);
+                            jsonData[questionKey] = answer;
+                        }
+                    });
+
+                    // Insert into additional_information_answers if we have any rows
+                    if (additionalInformationAnswers.length > 0) {
+                        const sql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                        con.query(sql, [additionalInformationAnswers], (err) => {
+                            if (err) {
+                                console.error('Error storing additional_information_answers for redeem booking:', err);
+                            } else {
+                                console.log('additional_information_answers stored successfully for redeem booking:', bookingId);
+                            }
+                        });
+                    }
+
+                    // Update all_booking.additional_information_json so getAllBookingData / getAllVoucherData can see answers
+                    const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
+                    con.query(
+                        'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
+                        [jsonPayload, bookingId],
+                        (err) => {
+                            if (err) {
+                                console.error('Error updating all_booking.additional_information_json for redeem booking:', err);
+                            } else {
+                                console.log('all_booking.additional_information_json updated for redeem booking:', bookingId);
+                            }
+                        }
+                    );
                 }
 
                 // Update voucher_codes table to mark as Used
@@ -10192,24 +10241,9 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     let additionalInfoData = null;
                     console.log('=== PARSING ADDITIONAL INFORMATION DATA ===');
 
-                    // First try voucher's additional_information_json
-                    if (row.additional_information_json) {
-                        console.log('Found voucher additional_information_json:', row.additional_information_json);
-                        try {
-                            if (typeof row.additional_information_json === 'string') {
-                                additionalInfoData = JSON.parse(row.additional_information_json);
-                            } else {
-                                additionalInfoData = row.additional_information_json;
-                            }
-                            console.log('Successfully parsed voucher additional_information_json:', additionalInfoData);
-                        } catch (e) {
-                            console.warn('Failed to parse voucher additional_information_json:', e);
-                        }
-                    }
-
-                    // If no voucher data, try booking's additional_information_json
-                    if (!additionalInfoData && row.booking_additional_information_json) {
-                        logToFile('Using booking additional_information_json:', row.booking_additional_information_json);
+                    // Prefer booking's additional_information_json when available (represents the actual booking answers)
+                    if (row.booking_additional_information_json) {
+                        logToFile('Using booking additional_information_json (preferred):', row.booking_additional_information_json);
                         try {
                             if (typeof row.booking_additional_information_json === 'string') {
                                 additionalInfoData = JSON.parse(row.booking_additional_information_json);
@@ -10219,6 +10253,21 @@ app.get('/api/getAllVoucherData', (req, res) => {
                             logToFile('Successfully parsed booking additional_information_json:', additionalInfoData);
                         } catch (e) {
                             logToFile('Failed to parse booking additional_information_json:', e);
+                        }
+                    }
+
+                    // If no booking data, fall back to voucher's additional_information_json
+                    if (!additionalInfoData && row.additional_information_json) {
+                        console.log('Using voucher additional_information_json as fallback:', row.additional_information_json);
+                        try {
+                            if (typeof row.additional_information_json === 'string') {
+                                additionalInfoData = JSON.parse(row.additional_information_json);
+                            } else {
+                                additionalInfoData = row.additional_information_json;
+                            }
+                            console.log('Successfully parsed voucher additional_information_json:', additionalInfoData);
+                        } catch (e) {
+                            console.warn('Failed to parse voucher additional_information_json:', e);
                         }
                     }
 
