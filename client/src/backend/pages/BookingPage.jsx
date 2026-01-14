@@ -6364,7 +6364,7 @@ setBookingDetail(finalVoucherDetail);
                             })()
                             : 'Booking Details'}
                     </DialogTitle>
-                    <DialogContent style={{ background: '#f7f7f7', minHeight: 500 }}>
+                    <DialogContent style={{ background: '#f7f7f7', minHeight: 500, padding: isMobile ? 0 : '24px' }}>
                         {loadingDetail ? (
                             <Typography>Loading...</Typography>
                         ) : detailError ? (
@@ -6378,7 +6378,7 @@ setBookingDetail(finalVoucherDetail);
                                 
                                 {/* Simple voucher display */}
                                 {activeTab === 'vouchers' && bookingDetail?.voucher ? (
-                                    <Box sx={{ p: 3 }}>
+                                    <Box sx={{ p: isMobile ? 0 : 3 }}>
                                         <Grid container spacing={3}>
 
                                             
