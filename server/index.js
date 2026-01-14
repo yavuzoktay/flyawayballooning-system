@@ -20346,42 +20346,12 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
 
 // Get availabilities filtered by location, flight type, and voucher types
 app.get('/api/availabilities/filter', (req, res) => {
-    const { location, flightType, voucherTypes, date, time, activityId } = req.query;
+    const requestStartTime = Date.now();
+    const { location, flightType, voucherTypes, date, time, activityId, startDate, endDate, month, year } = req.query;
 
     if (!location && !activityId) {
         return res.status(400).json({ success: false, message: 'Location or activityId is required' });
     }
-
-    // Debug: Log what flight types exist in the database for this filter
-    const debugSql = `
-        SELECT DISTINCT aa.flight_types, aa.voucher_types, COUNT(*) as count
-        FROM activity_availability aa 
-        JOIN activity a ON aa.activity_id = a.id 
-        WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'} AND a.status = 'Live' AND aa.status = 'open'
-        GROUP BY aa.flight_types, aa.voucher_types
-    `;
-
-    con.query(debugSql, [activityId || location], (debugErr, debugResult) => {
-        if (!debugErr) {
-            console.log('Available flight_types and voucher_types in database for', activityId ? `activity ${activityId}` : location, ':', debugResult);
-        }
-    });
-
-    // Additional debug: Check what's actually in the database
-    const debugSql2 = `
-        SELECT aa.id, aa.date, aa.time, aa.status, aa.available, aa.capacity, a.location, a.status as activity_status
-        FROM activity_availability aa 
-        JOIN activity a ON aa.activity_id = a.id 
-        WHERE ${activityId ? 'aa.activity_id = ?' : 'a.location = ?'}
-        ORDER BY aa.date, aa.time
-        LIMIT 10
-    `;
-
-    con.query(debugSql2, [activityId || location], (debugErr2, debugResult2) => {
-        if (!debugErr2) {
-            console.log('Raw database data for', activityId ? `activity ${activityId}` : location, ':', debugResult2);
-        }
-    });
 
     const parseList = (value) => {
         if (!value) return [];
@@ -20573,9 +20543,23 @@ app.get('/api/availabilities/filter', (req, res) => {
         sql += ` AND (aa.voucher_types = 'All' OR aa.voucher_types IS NOT NULL)`;
     }
 
-    if (date) {
+    // OPTIMIZATION: Add date range filters for incremental loading
+    if (startDate && endDate) {
+        // Date range filter (most efficient for pagination)
+        sql += ` AND aa.date >= ? AND aa.date <= ?`;
+        params.push(startDate, endDate);
+    } else if (month && year) {
+        // Month/year filter (for calendar month view)
+        sql += ` AND YEAR(aa.date) = ? AND MONTH(aa.date) = ?`;
+        params.push(parseInt(year), parseInt(month));
+    } else if (date) {
+        // Single date filter
         sql += ` AND aa.date = ?`;
         params.push(date);
+    } else {
+        // OPTIMIZATION: Default to next 60 days if no date filter specified
+        // This reduces initial load time significantly
+        sql += ` AND aa.date >= CURDATE() AND aa.date <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)`;
     }
 
     if (time) {
@@ -20585,12 +20569,18 @@ app.get('/api/availabilities/filter', (req, res) => {
 
     sql += ` ORDER BY aa.date, aa.time`;
 
+    const queryStartTime = Date.now();
+
     con.query(sql, params, (err, result) => {
+        const queryEndTime = Date.now();
+        const queryDuration = queryEndTime - queryStartTime;
+
         if (err) {
             console.error('Error fetching filtered availabilities:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
         }
 
+        const processingStartTime = Date.now();
         // Normalize date format to YYYY-MM-DD using local timezone to prevent 1-day offset
         const normalizeLocationValue = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
@@ -20674,27 +20664,26 @@ app.get('/api/availabilities/filter', (req, res) => {
             };
         });
 
-        console.log('Filtered availabilities response:', {
-            location,
-            activityId,
-            flightType,
-            voucherTypes,
-            count: normalizedResult.length,
-            sql: sql,
-            params: params,
-            sampleData: normalizedResult.slice(0, 3).map(r => ({
-                id: r.id,
-                date: r.date,
-                status: r.status,
-                available: r.available,
-                actualAvailable: r.actualAvailable,
-                heldSeats: r.heldSeats,
-                capacity: r.capacity,
-                flight_types: r.flight_types,
-                voucher_types: r.voucher_types
-            }))
-        });
+        const processingEndTime = Date.now();
+        const processingDuration = processingEndTime - processingStartTime;
+        const totalDuration = processingEndTime - requestStartTime;
 
+        // Only log in development or if explicitly enabled
+        if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_AVAILABILITY_LOGS === 'true') {
+            console.log('Filtered availabilities response:', {
+                location,
+                activityId,
+                flightType,
+                voucherTypes,
+                count: normalizedResult.length,
+                queryDuration,
+                processingDuration,
+                totalDuration
+            });
+        }
+
+        // Set cache headers for better performance
+        res.setHeader('Cache-Control', 'private, max-age=60'); // Cache for 60 seconds
         return res.json({ success: true, data: normalizedResult || [] });
     });
 });
