@@ -5867,143 +5867,72 @@ setBookingDetail(finalVoucherDetail);
                                     }}>
                                         
                                         {isMobile ? (
-                                            // Mobile: Bulk Email & Bulk SMS yan yana, iki kolon
-                                            <Box sx={{ display: 'flex', width: '100%', gap: 0.5 }}>
-                                                <Button
-                                                    variant="contained"
-                                                    color="primary"
-                                                    disabled={selectedVoucherIds.length === 0}
-                                                    onClick={() => {
-                                                        if (selectedVoucherIds.length === 0) return;
-                                                        // Çoklu alıcılar için varsayılan voucher'ı kullan (ilk seçilen)
-                                                        const primaryVoucher = filteredData.find(v => v.id === selectedVoucherIds[0]);
-                                                        if (primaryVoucher) {
-                                                            const originalVoucher = primaryVoucher._original || primaryVoucher;
-                                                            const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                            const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                            const email = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_email || primaryVoucher.email || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_email || primaryVoucher.email || '')
-                                                                    : (primaryVoucher.email || ''));
-                                                            const name = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_name || primaryVoucher.name || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_name || primaryVoucher.name || '')
-                                                                    : (primaryVoucher.name || ''));
-                                                            const voucherWithContext = {
-                                                                ...primaryVoucher,
-                                                                email,
-                                                                name,
-                                                                contextType: 'bulk',
-                                                                contextId: selectedVoucherIds.join(',')
-                                                            };
-                                                            openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                        } else if (filteredData.length > 0) {
-                                                            const firstVoucher = filteredData[0];
-                                                            const originalVoucher = firstVoucher._original || firstVoucher;
-                                                            const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                            const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                            const email = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_email || firstVoucher.email || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_email || firstVoucher.email || '')
-                                                                    : (firstVoucher.email || ''));
-                                                            const name = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_name || firstVoucher.name || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_name || firstVoucher.name || '')
-                                                                    : (firstVoucher.name || ''));
-                                                            const voucherWithContext = {
-                                                                ...firstVoucher,
-                                                                email,
-                                                                name,
-                                                                contextType: 'bulk',
-                                                                contextId: selectedVoucherIds.join(',')
-                                                            };
-                                                            openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                        }
-                                                    }}
-                                                    sx={{
-                                                        flex: 1,
-                                                        height: 36,
-                                                        fontSize: '11px',
-                                                        padding: '4px 8px',
-                                                        minWidth: 0
-                                                    }}
-                                                >
-                                                    EMAIL
-                                                </Button>
-                                                <Button
-                                                    variant="contained"
-                                                    color="info"
-                                                    disabled={selectedVoucherIds.length === 0}
-                                                    onClick={() => {
-                                                        if (selectedVoucherIds.length === 0) return;
-                                                        // Çoklu alıcılar için varsayılan voucher'ı kullan (ilk seçilen)
-                                                        const primaryVoucher = filteredData.find(v => v.id === selectedVoucherIds[0]);
-                                                        if (primaryVoucher) {
-                                                            const originalVoucher = primaryVoucher._original || primaryVoucher;
-                                                            const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                            const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                            const phone = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_phone || primaryVoucher.phone || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_phone || primaryVoucher.phone || '')
-                                                                    : (primaryVoucher.phone || ''));
-                                                            const name = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_name || primaryVoucher.name || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_name || primaryVoucher.name || '')
-                                                                    : (primaryVoucher.name || ''));
-                                                            const voucherWithContext = {
-                                                                ...primaryVoucher,
-                                                                phone,
-                                                                name,
-                                                                contextType: 'bulk',
-                                                                contextId: selectedVoucherIds.join(',')
-                                                            };
-                                                            openSmsModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                        } else if (filteredData.length > 0) {
-                                                            const firstVoucher = filteredData[0];
-                                                            const originalVoucher = firstVoucher._original || firstVoucher;
-                                                            const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                            const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                            const phone = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_phone || firstVoucher.phone || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_phone || firstVoucher.phone || '')
-                                                                    : (firstVoucher.phone || ''));
-                                                            const name = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_name || firstVoucher.name || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_name || firstVoucher.name || '')
-                                                                    : (firstVoucher.name || ''));
-                                                            const voucherWithContext = {
-                                                                ...firstVoucher,
-                                                                phone,
-                                                                name,
-                                                                contextType: 'bulk',
-                                                                contextId: selectedVoucherIds.join(',')
-                                                            };
-                                                            openSmsModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                        }
-                                                    }}
-                                                    sx={{
-                                                        flex: 1,
-                                                        height: 36,
-                                                        fontSize: '11px',
-                                                        padding: '4px 8px',
-                                                        minWidth: 0,
-                                                        background: '#17a2b8',
-                                                        '&:hover': {
-                                                            background: '#148a9b'
-                                                        }
-                                                    }}
-                                                >
-                                                    SMS
-                                                </Button>
-                                            </Box>
+                                            // Mobile: Email | SMS combined button
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                disabled={selectedVoucherIds.length === 0}
+                                                onClick={() => {
+                                                    if (selectedVoucherIds.length === 0) return;
+                                                    // Çoklu alıcılar için varsayılan voucher'ı kullan (ilk seçilen)
+                                                    const primaryVoucher = filteredData.find(v => v.id === selectedVoucherIds[0]);
+                                                    if (primaryVoucher) {
+                                                        const originalVoucher = primaryVoucher._original || primaryVoucher;
+                                                        const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
+                                                        const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
+                                                        const email = isFlightVoucher 
+                                                            ? (originalVoucher.purchaser_email || primaryVoucher.email || '')
+                                                            : (isGiftVoucher 
+                                                                ? (originalVoucher.recipient_email || primaryVoucher.email || '')
+                                                                : (primaryVoucher.email || ''));
+                                                        const name = isFlightVoucher 
+                                                            ? (originalVoucher.purchaser_name || primaryVoucher.name || '')
+                                                            : (isGiftVoucher 
+                                                                ? (originalVoucher.recipient_name || primaryVoucher.name || '')
+                                                                : (primaryVoucher.name || ''));
+                                                        const voucherWithContext = {
+                                                            ...primaryVoucher,
+                                                            email,
+                                                            name,
+                                                            contextType: 'bulk',
+                                                            contextId: selectedVoucherIds.join(',')
+                                                        };
+                                                        openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
+                                                    } else if (filteredData.length > 0) {
+                                                        const firstVoucher = filteredData[0];
+                                                        const originalVoucher = firstVoucher._original || firstVoucher;
+                                                        const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
+                                                        const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
+                                                        const email = isFlightVoucher 
+                                                            ? (originalVoucher.purchaser_email || firstVoucher.email || '')
+                                                            : (isGiftVoucher 
+                                                                ? (originalVoucher.recipient_email || firstVoucher.email || '')
+                                                                : (firstVoucher.email || ''));
+                                                        const name = isFlightVoucher 
+                                                            ? (originalVoucher.purchaser_name || firstVoucher.name || '')
+                                                            : (isGiftVoucher 
+                                                                ? (originalVoucher.recipient_name || firstVoucher.name || '')
+                                                                : (firstVoucher.name || ''));
+                                                        const voucherWithContext = {
+                                                            ...firstVoucher,
+                                                            email,
+                                                            name,
+                                                            contextType: 'bulk',
+                                                            contextId: selectedVoucherIds.join(',')
+                                                        };
+                                                        openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
+                                                    }
+                                                }}
+                                                sx={{
+                                                    width: '100%',
+                                                    height: 36,
+                                                    fontSize: '11px',
+                                                    padding: '4px 8px',
+                                                    minWidth: 0
+                                                }}
+                                            >
+                                                EMAIL | SMS
+                                            </Button>
                                         ) : (
                                             <>
                                                 <Button
