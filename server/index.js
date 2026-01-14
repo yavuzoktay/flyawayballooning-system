@@ -8140,7 +8140,7 @@ app.get('/api/getBookingByVoucherCode', (req, res) => {
     const sql = `
         SELECT 
             ab.*,
-            COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) AS resolved_voucher_code
+            COALESCE(vcu_map.code, ab.voucher_code, vc.code, v.voucher_ref) AS resolved_voucher_code
         FROM all_booking ab
         LEFT JOIN voucher_codes vc 
             ON vc.code = ab.voucher_code
@@ -8149,13 +8149,17 @@ app.get('/api/getBookingByVoucherCode', (req, res) => {
         LEFT JOIN voucher_codes vcu_map
             ON vcu_map.id = vcu.voucher_code_id
         LEFT JOIN all_vouchers v
-            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code)
-        WHERE COALESCE(ab.voucher_code, vc.code, vcu_map.code, v.voucher_ref) = ?
+            ON v.voucher_ref = vcu_map.code
+        WHERE 
+            ab.voucher_code = ?
+            OR vc.code = ?
+            OR vcu_map.code = ?
+            OR v.voucher_ref = ?
         ORDER BY ab.created_at DESC
         LIMIT 5
     `;
 
-    con.query(sql, [rawCode], (err, rows) => {
+    con.query(sql, [rawCode, rawCode, rawCode, rawCode], (err, rows) => {
         if (err) {
             console.error('Error in getBookingByVoucherCode:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
@@ -8288,7 +8292,7 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
     const sql = `
         SELECT 
             ab.*,
-            COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code, v.voucher_ref) AS resolved_voucher_code
+            COALESCE(vcu_map.code, vc2.code, ab.voucher_code, vc.code, v.voucher_ref) AS resolved_voucher_code
         FROM all_booking ab
         LEFT JOIN voucher_codes vc 
             ON vc.code = ab.voucher_code
@@ -8301,13 +8305,18 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
         LEFT JOIN voucher_codes vc2
             ON vc2.id = vcu2.voucher_code_id
         LEFT JOIN all_vouchers v
-            ON v.voucher_ref = COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code)
-        WHERE COALESCE(ab.voucher_code, vc.code, vcu_map.code, vc2.code, v.voucher_ref) = ?
+            ON v.voucher_ref = vcu_map.code
+        WHERE 
+            ab.voucher_code = ?
+            OR vc.code = ?
+            OR vcu_map.code = ?
+            OR vc2.code = ?
+            OR v.voucher_ref = ?
         ORDER BY ab.created_at DESC
         LIMIT 1
     `;
 
-    con.query(sql, [rawCode], (err, rows) => {
+    con.query(sql, [rawCode, rawCode, rawCode, rawCode, rawCode], (err, rows) => {
         if (err) {
             console.error('Error in findBookingByVoucherRef:', err);
             return res.status(500).json({ success: false, message: 'Database error', error: err });
@@ -8387,10 +8396,10 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
                 return res.status(500).json({ success: false, message: 'Database error', error: redeemErr });
             }
 
-            if (redeemRows && redeemRows.length > 0) {
-                console.log('✅ findBookingByVoucherRef: Found redeem voucher booking:', redeemRows[0].id);
-                return res.json({ success: true, booking: redeemRows[0] });
-            }
+                if (redeemRows && redeemRows.length > 0) {
+                    console.log('✅ findBookingByVoucherRef: Found redeem voucher booking:', redeemRows[0].id);
+                    return res.json({ success: true, booking: redeemRows[0] });
+                }
 
             // Last fallback: if metadata match still fails, pick the most recent Redeem Voucher booking
             // created after this voucher's created_at (within 30 days).
@@ -14265,7 +14274,8 @@ app.get('/api/getBookingDetail', async (req, res) => {
             (booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1 || booking.flight_type_source === 'Redeem Voucher')) {
             try {
                 // First, try to find the original redeemed voucher code via voucher_code_usage table
-                // This is the most reliable method since we explicitly link the redeemed voucher code during booking creation
+                // This is the most reliable method since we explicitly link the redeemed voucher code during booking creation.
+                // IMPORTANT: Do NOT restrict by voucher type here; redeemed codes can come from both Flight and Gift vouchers.
                 const [redeemedVoucherUsageRows] = await new Promise((resolve, reject) => {
                     con.query(`
                         SELECT vc.code as redeemed_voucher_code
@@ -14273,7 +14283,6 @@ app.get('/api/getBookingDetail', async (req, res) => {
                         INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
                         WHERE vcu.booking_id = ?
                         AND vc.code != ?
-                        AND vc.code IN (SELECT voucher_ref FROM all_vouchers WHERE book_flight = 'Flight Voucher')
                         ORDER BY vcu.used_at DESC
                         LIMIT 1
                     `, [booking_id, booking.voucher_code || ''], (err, rows) => {
