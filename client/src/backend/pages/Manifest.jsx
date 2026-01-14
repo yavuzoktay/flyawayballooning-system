@@ -2677,11 +2677,31 @@ const Manifest = () => {
                     }
                     return f;
                 }));
+            } else if (editField === 'phone' || editField === 'email') {
+                // Update bookingDetail state
+                setBookingDetail(prev => ({
+                    ...prev,
+                    booking: {
+                        ...prev.booking,
+                        [editField]: editValue
+                    }
+                }));
+                // Update flights state immediately for phone/email
+                setFlights(prevFlights => prevFlights.map(f => {
+                    if (f.id === bookingDetail.booking.id) {
+                        return {
+                            ...f,
+                            [editField]: editValue
+                        };
+                    }
+                    return f;
+                }));
+                // Don't call bookingHook.refetch() for phone/email updates to prevent useEffect from overwriting our flights state update
             } else {
             await fetchBookingDetail(bookingDetail.booking.id);
-            }
             if (typeof bookingHook.refetch === 'function') {
                 await bookingHook.refetch();
+            }
             }
             setEditField(null);
             setEditValue('');

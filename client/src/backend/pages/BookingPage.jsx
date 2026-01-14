@@ -6364,7 +6364,7 @@ setBookingDetail(finalVoucherDetail);
                             })()
                             : 'Booking Details'}
                     </DialogTitle>
-                    <DialogContent style={{ background: '#f7f7f7', minHeight: 500, padding: isMobile ? 0 : '24px' }}>
+                    <DialogContent style={{ background: '#f7f7f7', minHeight: 500 }}>
                         {loadingDetail ? (
                             <Typography>Loading...</Typography>
                         ) : detailError ? (

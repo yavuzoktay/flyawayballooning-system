@@ -20349,6 +20349,10 @@ app.get('/api/availabilities/filter', (req, res) => {
     const requestStartTime = Date.now();
     const { location, flightType, voucherTypes, date, time, activityId, startDate, endDate, month, year } = req.query;
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:20348',message:'Availabilities filter endpoint called',data:{location,flightType,voucherTypes,date,time,activityId,startDate,endDate,month,year,requestStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
     if (!location && !activityId) {
         return res.status(400).json({ success: false, message: 'Location or activityId is required' });
     }
@@ -20570,10 +20574,17 @@ app.get('/api/availabilities/filter', (req, res) => {
     sql += ` ORDER BY aa.date, aa.time`;
 
     const queryStartTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:20588',message:'SQL query starting',data:{sqlLength:sql.length,paramsCount:params.length,params:params,startDate,endDate,month,year,queryStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
 
     con.query(sql, params, (err, result) => {
         const queryEndTime = Date.now();
         const queryDuration = queryEndTime - queryStartTime;
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:20589',message:'SQL query completed',data:{queryDuration,resultCount:result?.length||0,hasError:!!err},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
 
         if (err) {
             console.error('Error fetching filtered availabilities:', err);
@@ -20667,6 +20678,10 @@ app.get('/api/availabilities/filter', (req, res) => {
         const processingEndTime = Date.now();
         const processingDuration = processingEndTime - processingStartTime;
         const totalDuration = processingEndTime - requestStartTime;
+
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:20675',message:'Response processing completed',data:{processingDuration,queryDuration,totalDuration,resultCount:normalizedResult.length,location,activityId,flightType,voucherTypes},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
 
         // Only log in development or if explicitly enabled
         if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_AVAILABILITY_LOGS === 'true') {
