@@ -1049,7 +1049,7 @@ const CustomerPortal = () => {
                                                 }
                                             }}
                                         >
-                                            Reschedule Your Flight
+                                            {isFlightVoucher ? 'Schedule Your Flight' : 'Reschedule Your Flight'}
                                         </Button>
                                     </span>
                                 </Tooltip>
