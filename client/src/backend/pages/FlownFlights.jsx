@@ -26,6 +26,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import dayjs from 'dayjs';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -43,6 +44,7 @@ const FlownFlights = () => {
     const [locationFilter, setLocationFilter] = useState('');
     const [experienceFilter, setExperienceFilter] = useState('');
     const [pilotFilter, setPilotFilter] = useState('');
+    const [yearFilter, setYearFilter] = useState('');
     const [operationalFields, setOperationalFields] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
     
@@ -260,6 +262,107 @@ const FlownFlights = () => {
         }
     };
 
+    // CSV export function
+    const handleExportCSV = () => {
+        if (!filteredFlights.length) {
+            alert('No data to export!');
+            return;
+        }
+
+        // Get all columns from the table data
+        const tableData = filteredFlights.map((item, index) => {
+            const baseData = {
+                row_id: index + 1,
+                id: item.id || '',
+                passenger_booking_id: item.id || '',
+                location: item.location || '',
+                flight_date: item.flight_date_display || (item.flight_date ? dayjs(item.flight_date).format('DD/MM/YYYY HH:mm A') : ''),
+                pax: item.pax || item.passenger_count || 0,
+                paid: item.paid || '0/0',
+                pilot: item.pilot || '-',
+                crew: item.crew || '-',
+                flight_period: item.flight_period || '-',
+                flight_type_display: item.flight_type_display || '-',
+                balloon_resource: item.balloon_resource || 'N/A',
+                aircraft_defects: item.aircraft_defects || '-',
+                vehicle_trailer_defects: item.vehicle_trailer_defects || '-',
+                flight_start_time: (() => {
+                    if (!item.flight_start_time || item.flight_start_time === '-') return '-';
+                    // Parse the date string and extract only time (HH:mm)
+                    const parsed = dayjs(item.flight_start_time, 'DD/MM/YYYY HH:mm');
+                    if (parsed.isValid()) {
+                        return parsed.format('HH:mm');
+                    }
+                    // Try other formats
+                    const parsed2 = dayjs(item.flight_start_time);
+                    if (parsed2.isValid()) {
+                        return parsed2.format('HH:mm');
+                    }
+                    return item.flight_start_time;
+                })(),
+                flight_end_time: (() => {
+                    if (!item.flight_end_time || item.flight_end_time === '-') return '-';
+                    // Parse the date string and extract only time (HH:mm)
+                    const parsed = dayjs(item.flight_end_time, 'DD/MM/YYYY HH:mm');
+                    if (parsed.isValid()) {
+                        return parsed.format('HH:mm');
+                    }
+                    // Try other formats
+                    const parsed2 = dayjs(item.flight_end_time);
+                    if (parsed2.isValid()) {
+                        return parsed2.format('HH:mm');
+                    }
+                    return item.flight_end_time;
+                })(),
+                total_flight_time: item.total_flight_time || '-'
+            };
+            
+            // Add operational selections as columns
+            if (item.operational_selections) {
+                operationalFields.forEach(field => {
+                    const columnKey = field.toLowerCase().replace(/\s+/g, '_');
+                    baseData[columnKey] = item.operational_selections[field] || '-';
+                });
+            } else {
+                operationalFields.forEach(field => {
+                    const columnKey = field.toLowerCase().replace(/\s+/g, '_');
+                    baseData[columnKey] = '-';
+                });
+            }
+            
+            return baseData;
+        });
+
+        // Get all columns
+        const columns = Object.keys(tableData[0]);
+        
+        // Create CSV rows
+        const csvRows = [columns.join(",")];
+        tableData.forEach(row => {
+            const values = columns.map(col => {
+                let val = row[col];
+                if (val === null || val === undefined) return '';
+                val = String(val).replace(/"/g, '""');
+                if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                    val = `"${val}"`;
+                }
+                return val;
+            });
+            csvRows.push(values.join(","));
+        });
+        
+        const csvString = csvRows.join("\n");
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'flown_flights_export.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    };
+
     const fetchFlownFlights = async () => {
         setLoading(true);
         try {
@@ -327,8 +430,21 @@ const FlownFlights = () => {
             });
         }
 
+        // Year filter
+        if (yearFilter) {
+            filtered = filtered.filter(flight => {
+                if (!flight.flight_date) return false;
+                const flightDate = dayjs(flight.flight_date);
+                if (flightDate.isValid()) {
+                    const flightYear = flightDate.year().toString();
+                    return flightYear === yearFilter;
+                }
+                return false;
+            });
+        }
+
         setFilteredFlights(filtered);
-    }, [searchTerm, locationFilter, experienceFilter, pilotFilter, flownFlights]);
+    }, [searchTerm, locationFilter, experienceFilter, pilotFilter, yearFilter, flownFlights]);
 
     // Get unique locations for filter
     const locations = useMemo(() => {
@@ -346,6 +462,19 @@ const FlownFlights = () => {
         return uniquePilots.sort();
     }, [flownFlights]);
 
+    // Get unique years for filter
+    const years = useMemo(() => {
+        const uniqueYears = [...new Set(flownFlights.map(f => {
+            if (!f.flight_date) return null;
+            const flightDate = dayjs(f.flight_date);
+            if (flightDate.isValid()) {
+                return flightDate.year().toString();
+            }
+            return null;
+        }).filter(Boolean))];
+        return uniqueYears.sort((a, b) => parseInt(b) - parseInt(a)); // Sort descending (newest first)
+    }, [flownFlights]);
+
     return (
         <div className="flown-flights-page-wrap">
             <Container maxWidth={false}>
@@ -361,48 +490,88 @@ const FlownFlights = () => {
                     </Box>
 
             {/* Action Buttons */}
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-end' }}>
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-end', gap: 1 }}>
                 {isMobile ? (
-                    <OutlinedInput
-                        readOnly
-                        onClick={handleDeleteSelected}
-                        disabled={!selectedIds || selectedIds.length === 0}
-                        value=""
-                        sx={{
-                            cursor: (!selectedIds || selectedIds.length === 0) ? 'not-allowed' : 'pointer',
-                            height: '32px',
-                            width: '40px',
-                            minWidth: '40px',
-                            maxWidth: '40px',
-                            opacity: (!selectedIds || selectedIds.length === 0) ? 0.5 : 1,
-                            '& input': {
-                                cursor: (!selectedIds || selectedIds.length === 0) ? 'not-allowed' : 'pointer',
-                                textAlign: 'center',
-                                padding: '0',
-                                display: 'none'
-                            },
-                            '& fieldset': {
-                                border: 'none'
+                    <>
+                        <OutlinedInput
+                            readOnly
+                            onClick={handleExportCSV}
+                            value=""
+                            sx={{
+                                cursor: 'pointer',
+                                height: '32px',
+                                width: '40px',
+                                minWidth: '40px',
+                                maxWidth: '40px',
+                                '& input': {
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    padding: '0',
+                                    display: 'none'
+                                },
+                                '& fieldset': {
+                                    border: 'none'
+                                }
+                            }}
+                            size="small"
+                            startAdornment={
+                                <InputAdornment position="start" sx={{ margin: 0 }}>
+                                    <FileDownloadIcon fontSize="small" color="primary" />
+                                </InputAdornment>
                             }
-                        }}
-                        size="small"
-                        startAdornment={
-                            <InputAdornment position="start" sx={{ margin: 0 }}>
-                                <DeleteIcon fontSize="small" color="error" />
-                            </InputAdornment>
-                        }
-                    />
+                        />
+                        <OutlinedInput
+                            readOnly
+                            onClick={handleDeleteSelected}
+                            disabled={!selectedIds || selectedIds.length === 0}
+                            value=""
+                            sx={{
+                                cursor: (!selectedIds || selectedIds.length === 0) ? 'not-allowed' : 'pointer',
+                                height: '32px',
+                                width: '40px',
+                                minWidth: '40px',
+                                maxWidth: '40px',
+                                opacity: (!selectedIds || selectedIds.length === 0) ? 0.5 : 1,
+                                '& input': {
+                                    cursor: (!selectedIds || selectedIds.length === 0) ? 'not-allowed' : 'pointer',
+                                    textAlign: 'center',
+                                    padding: '0',
+                                    display: 'none'
+                                },
+                                '& fieldset': {
+                                    border: 'none'
+                                }
+                            }}
+                            size="small"
+                            startAdornment={
+                                <InputAdornment position="start" sx={{ margin: 0 }}>
+                                    <DeleteIcon fontSize="small" color="error" />
+                                </InputAdornment>
+                            }
+                        />
+                    </>
                 ) : (
-                    <Button
-                        variant="outlined"
-                        color="error"
-                        onClick={handleDeleteSelected}
-                        disabled={!selectedIds || selectedIds.length === 0}
-                        startIcon={<DeleteIcon />}
-                        sx={{ height: 40 }}
-                    >
-                        Delete
-                    </Button>
+                    <>
+                        <Button
+                            variant="outlined"
+                            color="primary"
+                            onClick={handleExportCSV}
+                            startIcon={<FileDownloadIcon />}
+                            sx={{ height: 40 }}
+                        >
+                            Export
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            onClick={handleDeleteSelected}
+                            disabled={!selectedIds || selectedIds.length === 0}
+                            startIcon={<DeleteIcon />}
+                            sx={{ height: 40 }}
+                        >
+                            Delete
+                        </Button>
+                    </>
                 )}
             </Box>
 
@@ -432,6 +601,19 @@ const FlownFlights = () => {
                         <MenuItem value="">All</MenuItem>
                         <MenuItem value="Shared">Shared</MenuItem>
                         <MenuItem value="Private">Private</MenuItem>
+                    </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
+                    <InputLabel>By Year</InputLabel>
+                    <Select
+                        value={yearFilter}
+                        label="By Year"
+                        onChange={(e) => setYearFilter(e.target.value)}
+                    >
+                        <MenuItem value="">All</MenuItem>
+                        {years.map(year => (
+                            <MenuItem key={year} value={year}>{year}</MenuItem>
+                        ))}
                     </Select>
                 </FormControl>
                 <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
@@ -486,8 +668,34 @@ const FlownFlights = () => {
                             balloon_resource: item.balloon_resource || 'N/A',
                             aircraft_defects: item.aircraft_defects || '-',
                             vehicle_trailer_defects: item.vehicle_trailer_defects || '-',
-                            flight_start_time: item.flight_start_time || '-',
-                            flight_end_time: item.flight_end_time || '-',
+                            flight_start_time: (() => {
+                                if (!item.flight_start_time || item.flight_start_time === '-') return '-';
+                                // Parse the date string and extract only time (HH:mm)
+                                const parsed = dayjs(item.flight_start_time, 'DD/MM/YYYY HH:mm');
+                                if (parsed.isValid()) {
+                                    return parsed.format('HH:mm');
+                                }
+                                // Try other formats
+                                const parsed2 = dayjs(item.flight_start_time);
+                                if (parsed2.isValid()) {
+                                    return parsed2.format('HH:mm');
+                                }
+                                return item.flight_start_time;
+                            })(),
+                            flight_end_time: (() => {
+                                if (!item.flight_end_time || item.flight_end_time === '-') return '-';
+                                // Parse the date string and extract only time (HH:mm)
+                                const parsed = dayjs(item.flight_end_time, 'DD/MM/YYYY HH:mm');
+                                if (parsed.isValid()) {
+                                    return parsed.format('HH:mm');
+                                }
+                                // Try other formats
+                                const parsed2 = dayjs(item.flight_end_time);
+                                if (parsed2.isValid()) {
+                                    return parsed2.format('HH:mm');
+                                }
+                                return item.flight_end_time;
+                            })(),
                             total_flight_time: item.total_flight_time || '-'
                         };
                         

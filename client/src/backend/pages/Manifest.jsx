@@ -8517,7 +8517,7 @@ const Manifest = () => {
                     padding: isMobile ? '12px 16px' : '20px 24px',
                     borderBottom: '1px solid #e5e7eb'
                 }}>
-                    Log Flight - Operational Selections
+                    Log Flight
                 </DialogTitle>
                 <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                     {selectedGroupFlightsForClose && selectedGroupFlightsForClose.length > 0 && (() => {
@@ -8689,6 +8689,52 @@ const Manifest = () => {
                         </Typography>
                     ) : (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {/* Flight Start Time and Flight End Time */}
+                            <Box>
+                                <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                            Flight Start Time
+                                        </Typography>
+                                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                            <TimePicker
+                                                label="Start Time"
+                                                value={flightStartTime}
+                                                onChange={(newValue) => setFlightStartTime(newValue)}
+                                                format="HH:mm"
+                                                sx={{ width: '100%' }}
+                                                slotProps={{
+                                                    textField: {
+                                                        size: 'small',
+                                                        fullWidth: true
+                                                    }
+                                                }}
+                                            />
+                                        </LocalizationProvider>
+                                    </Box>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                            Flight End Time
+                                        </Typography>
+                                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                            <TimePicker
+                                                label="End Time"
+                                                value={flightEndTime}
+                                                onChange={(newValue) => setFlightEndTime(newValue)}
+                                                format="HH:mm"
+                                                sx={{ width: '100%' }}
+                                                slotProps={{
+                                                    textField: {
+                                                        size: 'small',
+                                                        fullWidth: true
+                                                    }
+                                                }}
+                                            />
+                                        </LocalizationProvider>
+                                    </Box>
+                                </Box>
+                            </Box>
+
                             {operationalFields.map((field) => (
                                 <FormControl key={field.id || field.name} fullWidth>
                                     <InputLabel>{field.name}</InputLabel>
@@ -8756,54 +8802,6 @@ const Manifest = () => {
                                     placeholder="Enter vehicle/trailer defects or issues..."
                                     variant="outlined"
                                 />
-                            </Box>
-
-                            {/* Flight Start Time */}
-                            <Box sx={{ mt: 2 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                                    Flight Start Time
-                                </Typography>
-                                <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
-                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                        <TimePicker
-                                            label="Start Time"
-                                            value={flightStartTime}
-                                            onChange={(newValue) => setFlightStartTime(newValue)}
-                                            format="HH:mm"
-                                            sx={{ flex: 1 }}
-                                            slotProps={{
-                                                textField: {
-                                                    size: 'small',
-                                                    fullWidth: true
-                                                }
-                                            }}
-                                        />
-                                    </LocalizationProvider>
-                                </Box>
-                            </Box>
-
-                            {/* Flight End Time */}
-                            <Box sx={{ mt: 2 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                                    Flight End Time
-                                </Typography>
-                                <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
-                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                        <TimePicker
-                                            label="End Time"
-                                            value={flightEndTime}
-                                            onChange={(newValue) => setFlightEndTime(newValue)}
-                                            format="HH:mm"
-                                            sx={{ flex: 1 }}
-                                            slotProps={{
-                                                textField: {
-                                                    size: 'small',
-                                                    fullWidth: true
-                                                }
-                                            }}
-                                        />
-                                    </LocalizationProvider>
-                                </Box>
                             </Box>
                         </Box>
                     )}
