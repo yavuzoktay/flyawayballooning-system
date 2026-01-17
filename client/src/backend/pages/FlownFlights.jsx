@@ -314,7 +314,8 @@ const FlownFlights = () => {
                     }
                     return item.flight_end_time;
                 })(),
-                total_flight_time: item.total_flight_time || '-'
+                total_flight_time: item.total_flight_time || '-',
+                duty_time: item.duty_time || '-'
             };
             
             // Add operational selections as columns
@@ -696,7 +697,8 @@ const FlownFlights = () => {
                                 }
                                 return item.flight_end_time;
                             })(),
-                            total_flight_time: item.total_flight_time || '-'
+                            total_flight_time: item.total_flight_time || '-',
+                            duty_time: item.duty_time || '-'
                         };
                         
                         // Helper function to convert field name to column key
@@ -733,6 +735,7 @@ const FlownFlights = () => {
                         "flight_start_time",
                         "flight_end_time",
                         "total_flight_time",
+                        "duty_time",
                         "pilot",
                         "crew",
                         "aircraft_defects",

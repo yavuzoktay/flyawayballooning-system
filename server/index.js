@@ -22639,6 +22639,37 @@ app.get('/api/flown-flights', (req, res) => {
                             }
                         }
                         return null;
+                    })(),
+                    duty_time: (() => {
+                        // Calculate duty time: 45 mins before flight start to 45 mins after flight end
+                        if (row.flight_start_time && row.flight_end_time) {
+                            try {
+                                const flightStart = moment(row.flight_start_time);
+                                const flightEnd = moment(row.flight_end_time);
+                                
+                                if (flightStart.isValid() && flightEnd.isValid()) {
+                                    // Calculate duty start (45 mins before flight start)
+                                    const dutyStart = moment(flightStart).subtract(45, 'minutes');
+                                    
+                                    // Calculate duty end (45 mins after flight end)
+                                    const dutyEnd = moment(flightEnd).add(45, 'minutes');
+                                    
+                                    // Calculate duration
+                                    const duration = moment.duration(dutyEnd.diff(dutyStart));
+                                    const hours = Math.floor(duration.asHours());
+                                    const minutes = duration.minutes();
+                                    
+                                    if (hours > 0) {
+                                        return `${hours}h ${minutes}m`;
+                                    } else {
+                                        return `${minutes}m`;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('Error calculating duty time:', e);
+                            }
+                        }
+                        return null;
                     })()
                 };
             });
