@@ -152,10 +152,10 @@ const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => 
   const menuItems = [
     { label: 'Home', path: '/', icon: <HomeIcon /> },
     { label: 'Booking', path: '/booking', icon: <BookingIcon /> },
-    { label: 'Flown Flights', path: '/flown-flights', icon: <FlownFlightsIcon /> },
     { label: 'Manifest', path: '/manifest', icon: <ManifestIcon /> },
     { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
     { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
+    { label: 'Flown Flights', path: '/flown-flights', icon: <FlownFlightsIcon /> },
     { label: 'Logs', path: '/logs', icon: <LogsIcon /> },
   ];
 
@@ -294,10 +294,10 @@ export const BottomNav = ({ hasNewBookings, hasNewVouchers, onMenuClick }) => {
   const menuItems = [
     { label: 'Home', path: '/', icon: <HomeIcon /> },
     { label: 'Booking', path: '/booking', icon: <BookingIcon /> },
-    { label: 'Flown Flights', path: '/flown-flights', icon: <FlownFlightsIcon /> },
     { label: 'Manifest', path: '/manifest', icon: <ManifestIcon /> },
     { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
     { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
+    { label: 'Flown Flights', path: '/flown-flights', icon: <FlownFlightsIcon /> },
     { label: 'Logs', path: '/logs', icon: <LogsIcon /> },
   ];
 

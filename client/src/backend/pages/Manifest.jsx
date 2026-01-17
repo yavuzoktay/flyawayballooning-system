@@ -3215,9 +3215,7 @@ const Manifest = () => {
     const [loadingOperationalSelections, setLoadingOperationalSelections] = useState(false);
     const [aircraftDefects, setAircraftDefects] = useState('');
     const [vehicleTrailerDefects, setVehicleTrailerDefects] = useState('');
-    const [flightStartDate, setFlightStartDate] = useState(null);
     const [flightStartTime, setFlightStartTime] = useState(null);
-    const [flightEndDate, setFlightEndDate] = useState(null);
     const [flightEndTime, setFlightEndTime] = useState(null);
 
     // Add handler to toggle status for a group
@@ -3376,9 +3374,7 @@ const Manifest = () => {
               operational_selections: selectedOperationalValues,
               aircraft_defects: aircraftDefects,
               vehicle_trailer_defects: vehicleTrailerDefects,
-              flight_start_date: flightStartDate,
               flight_start_time: flightStartTime,
-              flight_end_date: flightEndDate,
               flight_end_time: flightEndTime
             });
           } catch (err) {
@@ -3432,9 +3428,7 @@ const Manifest = () => {
         setSelectedOperationalValues({});
         setAircraftDefects('');
         setVehicleTrailerDefects('');
-        setFlightStartDate(null);
         setFlightStartTime(null);
-        setFlightEndDate(null);
         setFlightEndTime(null);
         setSelectedGroupFlightsForClose(null);
       } catch (err) {
@@ -8510,9 +8504,7 @@ const Manifest = () => {
                     setSelectedOperationalValues({});
                     setAircraftDefects('');
                     setVehicleTrailerDefects('');
-                    setFlightStartDate(null);
                     setFlightStartTime(null);
-                    setFlightEndDate(null);
                     setFlightEndTime(null);
                     setSelectedGroupFlightsForClose(null);
                 }}
@@ -8723,19 +8715,6 @@ const Manifest = () => {
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
                                     <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                        <DatePicker
-                                            label="Start Date"
-                                            value={flightStartDate}
-                                            onChange={(newValue) => setFlightStartDate(newValue)}
-                                            format="DD/MM/YYYY"
-                                            sx={{ flex: 1 }}
-                                            slotProps={{
-                                                textField: {
-                                                    size: 'small',
-                                                    fullWidth: true
-                                                }
-                                            }}
-                                        />
                                         <TimePicker
                                             label="Start Time"
                                             value={flightStartTime}
@@ -8760,19 +8739,6 @@ const Manifest = () => {
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
                                     <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                        <DatePicker
-                                            label="End Date"
-                                            value={flightEndDate}
-                                            onChange={(newValue) => setFlightEndDate(newValue)}
-                                            format="DD/MM/YYYY"
-                                            sx={{ flex: 1 }}
-                                            slotProps={{
-                                                textField: {
-                                                    size: 'small',
-                                                    fullWidth: true
-                                                }
-                                            }}
-                                        />
                                         <TimePicker
                                             label="End Time"
                                             value={flightEndTime}
@@ -8799,9 +8765,7 @@ const Manifest = () => {
                             setSelectedOperationalValues({});
                             setAircraftDefects('');
                             setVehicleTrailerDefects('');
-                            setFlightStartDate(null);
                             setFlightStartTime(null);
-                            setFlightEndDate(null);
                             setFlightEndTime(null);
                             setSelectedGroupFlightsForClose(null);
                         }}

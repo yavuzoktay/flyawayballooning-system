@@ -22353,8 +22353,10 @@ app.post('/api/operational-selections/field', (req, res) => {
         return res.status(400).json({ success: false, message: 'Field name is required' });
     }
 
+    const trimmedFieldName = field_name.trim();
+
     // Check if field already exists
-    con.query('SELECT DISTINCT field_name FROM operational_selections WHERE field_name = ?', [field_name.trim()], (err, results) => {
+    con.query('SELECT DISTINCT field_name FROM operational_selections WHERE field_name = ?', [trimmedFieldName], (err, results) => {
         if (err) {
             console.error('Error checking field existence:', err);
             return res.status(500).json({ success: false, message: 'Error checking field existence' });
@@ -22364,8 +22366,16 @@ app.post('/api/operational-selections/field', (req, res) => {
             return res.status(400).json({ success: false, message: 'Field already exists' });
         }
 
-        // Field doesn't exist, create it (just return success, actual values will be added via value endpoint)
-        res.json({ success: true, message: 'Field created successfully' });
+        // Field doesn't exist, create it by inserting a record with NULL field_value
+        // This allows the field to appear in the list even without values
+        const sql = 'INSERT INTO operational_selections (field_name, field_value, created_at, updated_at) VALUES (?, NULL, NOW(), NOW())';
+        con.query(sql, [trimmedFieldName], (err, result) => {
+            if (err) {
+                console.error('Error creating operational selection field:', err);
+                return res.status(500).json({ success: false, message: 'Error creating operational selection field' });
+            }
+            res.json({ success: true, message: 'Field created successfully', id: result.insertId });
+        });
     });
 });
 
@@ -22431,12 +22441,7 @@ app.delete('/api/operational-selections/value', (req, res) => {
 app.delete('/api/operational-selections/field/:field_name', (req, res) => {
     const { field_name } = req.params;
 
-    // Prevent deletion of default fields
-    const defaultFields = ['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'];
-    if (defaultFields.includes(field_name)) {
-        return res.status(400).json({ success: false, message: 'Cannot delete default fields' });
-    }
-
+    // Allow deletion of all fields, including default fields
     con.query('DELETE FROM operational_selections WHERE field_name = ?', [field_name], (err, result) => {
         if (err) {
             console.error('Error deleting operational selection field:', err);
@@ -22726,7 +22731,7 @@ con.query(`
 });
 
 app.post('/api/save-flight-operational-selections', (req, res) => {
-    const { booking_id, operational_selections, aircraft_defects, vehicle_trailer_defects, flight_start_date, flight_start_time, flight_end_date, flight_end_time } = req.body;
+    const { booking_id, operational_selections, aircraft_defects, vehicle_trailer_defects, flight_start_time, flight_end_time } = req.body;
 
     if (!booking_id) {
         return res.status(400).json({ success: false, message: 'Booking ID is required' });
@@ -22740,100 +22745,107 @@ app.post('/api/save-flight-operational-selections', (req, res) => {
     const aircraftDefects = aircraft_defects || null;
     const vehicleTrailerDefects = vehicle_trailer_defects || null;
     
-    // Combine date and time for flight_start_time and flight_end_time
-    let flightStartTime = null;
-    if (flight_start_date && flight_start_time) {
-        try {
-            // Handle dayjs objects or ISO strings from frontend
-            const startDate = moment(flight_start_date).isValid() 
-                ? moment(flight_start_date).format('YYYY-MM-DD')
-                : null;
-            const startTime = moment(flight_start_time).isValid()
-                ? moment(flight_start_time).format('HH:mm:ss')
-                : null;
-            if (startDate && startTime) {
-                flightStartTime = `${startDate} ${startTime}`;
-            }
-        } catch (e) {
-            console.warn('Error parsing flight_start_time:', e);
+    // Get flight_date from all_booking table and combine with time for flight_start_time and flight_end_time
+    con.query('SELECT flight_date FROM all_booking WHERE id = ?', [booking_id], (err, bookingResult) => {
+        if (err) {
+            console.error('Error fetching booking flight_date:', err);
+            return res.status(500).json({ success: false, message: 'Error fetching booking information' });
         }
-    }
-    
-    let flightEndTime = null;
-    if (flight_end_date && flight_end_time) {
-        try {
-            // Handle dayjs objects or ISO strings from frontend
-            const endDate = moment(flight_end_date).isValid()
-                ? moment(flight_end_date).format('YYYY-MM-DD')
-                : null;
-            const endTime = moment(flight_end_time).isValid()
-                ? moment(flight_end_time).format('HH:mm:ss')
-                : null;
-            if (endDate && endTime) {
-                flightEndTime = `${endDate} ${endTime}`;
-            }
-        } catch (e) {
-            console.warn('Error parsing flight_end_time:', e);
+        
+        if (bookingResult.length === 0) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
         }
-    }
+        
+        const flightDate = bookingResult[0].flight_date;
+        const flightDateStr = flightDate ? moment(flightDate).format('YYYY-MM-DD') : null;
+        
+        // Combine date from flight_date and time for flight_start_time and flight_end_time
+        let flightStartTime = null;
+        if (flightDateStr && flight_start_time) {
+            try {
+                const startTime = moment(flight_start_time).isValid()
+                    ? moment(flight_start_time).format('HH:mm:ss')
+                    : null;
+                if (startTime) {
+                    flightStartTime = `${flightDateStr} ${startTime}`;
+                }
+            } catch (e) {
+                console.warn('Error parsing flight_start_time:', e);
+            }
+        }
+        
+        let flightEndTime = null;
+        if (flightDateStr && flight_end_time) {
+            try {
+                const endTime = moment(flight_end_time).isValid()
+                    ? moment(flight_end_time).format('HH:mm:ss')
+                    : null;
+                if (endTime) {
+                    flightEndTime = `${flightDateStr} ${endTime}`;
+                }
+            } catch (e) {
+                console.warn('Error parsing flight_end_time:', e);
+            }
+        }
+        
+        // Store additional fields (non-default fields) in JSON
+        const additionalFields = {};
+        if (operational_selections) {
+            Object.keys(operational_selections).forEach(key => {
+                if (!['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'].includes(key)) {
+                    additionalFields[key] = operational_selections[key];
+                }
+            });
+        }
 
-    // Store additional fields (non-default fields) in JSON
-    const additionalFields = {};
-    if (operational_selections) {
-        Object.keys(operational_selections).forEach(key => {
-            if (!['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'].includes(key)) {
-                additionalFields[key] = operational_selections[key];
+        // Check if record exists
+        con.query('SELECT id FROM trip_booking WHERE booking_id = ?', [booking_id], (err, existing) => {
+            if (err) {
+                console.error('Error checking existing trip_booking:', err);
+                return res.status(500).json({ success: false, message: 'Error checking existing record' });
+            }
+
+            const additionalFieldsJson = Object.keys(additionalFields).length > 0 ? JSON.stringify(additionalFields) : null;
+
+            if (existing.length > 0) {
+                // Update existing record
+                const updateSql = `
+                    UPDATE trip_booking 
+                    SET refuel_location = ?, 
+                        land_owner_gift = ?, 
+                        landing_fee = ?, 
+                        vehicle_used = ?, 
+                        aircraft_defects = ?,
+                        vehicle_trailer_defects = ?,
+                        flight_start_time = ?,
+                        flight_end_time = ?,
+                        additional_fields = ?,
+                        updated_at = NOW()
+                    WHERE booking_id = ?
+                `;
+                con.query(updateSql, [refuelLocation, landOwnerGift, landingFee, vehicleUsed, aircraftDefects, vehicleTrailerDefects, flightStartTime, flightEndTime, additionalFieldsJson, booking_id], (updateErr) => {
+                    if (updateErr) {
+                        console.error('Error updating trip_booking:', updateErr);
+                        return res.status(500).json({ success: false, message: 'Error updating operational selections' });
+                    }
+                    res.json({ success: true, message: 'Operational selections updated successfully' });
+                });
+            } else {
+                // Insert new record
+                const insertSql = `
+                    INSERT INTO trip_booking 
+                    (booking_id, refuel_location, land_owner_gift, landing_fee, vehicle_used, aircraft_defects, vehicle_trailer_defects, flight_start_time, flight_end_time, additional_fields, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                `;
+                con.query(insertSql, [booking_id, refuelLocation, landOwnerGift, landingFee, vehicleUsed, aircraftDefects, vehicleTrailerDefects, flightStartTime, flightEndTime, additionalFieldsJson], (insertErr, result) => {
+                    if (insertErr) {
+                        console.error('Error inserting trip_booking:', insertErr);
+                        return res.status(500).json({ success: false, message: 'Error saving operational selections' });
+                    }
+                    res.json({ success: true, id: result.insertId, message: 'Operational selections saved successfully' });
+                });
             }
         });
-    }
-
-    // Check if record exists
-    con.query('SELECT id FROM trip_booking WHERE booking_id = ?', [booking_id], (err, existing) => {
-        if (err) {
-            console.error('Error checking existing trip_booking:', err);
-            return res.status(500).json({ success: false, message: 'Error checking existing record' });
-        }
-
-        const additionalFieldsJson = Object.keys(additionalFields).length > 0 ? JSON.stringify(additionalFields) : null;
-
-        if (existing.length > 0) {
-            // Update existing record
-            const updateSql = `
-                UPDATE trip_booking 
-                SET refuel_location = ?, 
-                    land_owner_gift = ?, 
-                    landing_fee = ?, 
-                    vehicle_used = ?, 
-                    aircraft_defects = ?,
-                    vehicle_trailer_defects = ?,
-                    flight_start_time = ?,
-                    flight_end_time = ?,
-                    additional_fields = ?,
-                    updated_at = NOW()
-                WHERE booking_id = ?
-            `;
-            con.query(updateSql, [refuelLocation, landOwnerGift, landingFee, vehicleUsed, aircraftDefects, vehicleTrailerDefects, flightStartTime, flightEndTime, additionalFieldsJson, booking_id], (updateErr) => {
-                if (updateErr) {
-                    console.error('Error updating trip_booking:', updateErr);
-                    return res.status(500).json({ success: false, message: 'Error updating operational selections' });
-                }
-                res.json({ success: true, message: 'Operational selections updated successfully' });
-            });
-        } else {
-            // Insert new record
-            const insertSql = `
-                INSERT INTO trip_booking 
-                (booking_id, refuel_location, land_owner_gift, landing_fee, vehicle_used, aircraft_defects, vehicle_trailer_defects, flight_start_time, flight_end_time, additional_fields, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            `;
-            con.query(insertSql, [booking_id, refuelLocation, landOwnerGift, landingFee, vehicleUsed, aircraftDefects, vehicleTrailerDefects, flightStartTime, flightEndTime, additionalFieldsJson], (insertErr, result) => {
-                if (insertErr) {
-                    console.error('Error inserting trip_booking:', insertErr);
-                    return res.status(500).json({ success: false, message: 'Error saving operational selections' });
-                }
-                res.json({ success: true, id: result.insertId, message: 'Operational selections saved successfully' });
-            });
-        }
     });
 });
 

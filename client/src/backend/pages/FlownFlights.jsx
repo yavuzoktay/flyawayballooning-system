@@ -40,9 +40,7 @@ const FlownFlights = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [locationFilter, setLocationFilter] = useState('');
-    const [statusFilter, setStatusFilter] = useState('');
     const [experienceFilter, setExperienceFilter] = useState('');
-    const [voucherTypeFilter, setVoucherTypeFilter] = useState('');
     const [pilotFilter, setPilotFilter] = useState('');
     const [operationalFields, setOperationalFields] = useState([]);
     
@@ -254,11 +252,6 @@ const FlownFlights = () => {
             filtered = filtered.filter(flight => flight.location === locationFilter);
         }
 
-        // Status filter
-        if (statusFilter) {
-            filtered = filtered.filter(flight => flight.status === statusFilter);
-        }
-
         // Experience filter
         if (experienceFilter) {
             filtered = filtered.filter(flight => {
@@ -272,11 +265,6 @@ const FlownFlights = () => {
             });
         }
 
-        // Voucher Type filter
-        if (voucherTypeFilter) {
-            filtered = filtered.filter(flight => flight.voucher_type === voucherTypeFilter);
-        }
-
         // Pilot filter
         if (pilotFilter) {
             filtered = filtered.filter(flight => {
@@ -286,7 +274,7 @@ const FlownFlights = () => {
         }
 
         setFilteredFlights(filtered);
-    }, [searchTerm, locationFilter, statusFilter, experienceFilter, voucherTypeFilter, pilotFilter, flownFlights]);
+    }, [searchTerm, locationFilter, experienceFilter, pilotFilter, flownFlights]);
 
     // Get unique locations for filter
     const locations = useMemo(() => {
@@ -294,11 +282,6 @@ const FlownFlights = () => {
         return uniqueLocations.sort();
     }, [flownFlights]);
 
-    // Get unique voucher types for filter
-    const voucherTypes = useMemo(() => {
-        const uniqueTypes = [...new Set(flownFlights.map(f => f.voucher_type).filter(Boolean))];
-        return uniqueTypes.sort();
-    }, [flownFlights]);
 
     // Get unique pilots for filter
     const pilots = useMemo(() => {
@@ -361,30 +344,6 @@ const FlownFlights = () => {
                         <MenuItem value="">All</MenuItem>
                         {pilots.map(pilot => (
                             <MenuItem key={pilot} value={pilot}>{pilot}</MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                        value={statusFilter}
-                        label="Status"
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                    >
-                        <MenuItem value="">All</MenuItem>
-                        <MenuItem value="Flown">Flown</MenuItem>
-                    </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
-                    <InputLabel>Voucher Type</InputLabel>
-                    <Select
-                        value={voucherTypeFilter}
-                        label="Voucher Type"
-                        onChange={(e) => setVoucherTypeFilter(e.target.value)}
-                    >
-                        <MenuItem value="">All</MenuItem>
-                        {voucherTypes.map(type => (
-                            <MenuItem key={type} value={type}>{type}</MenuItem>
                         ))}
                     </Select>
                 </FormControl>

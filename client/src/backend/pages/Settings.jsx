@@ -1011,50 +1011,42 @@ const Settings = () => {
                             values: []
                         };
                     }
-                    if (item.field_value) {
+                    // Only add non-null values to the values array
+                    if (item.field_value && item.field_value.trim() !== '') {
                         fieldsMap[item.field_name].values.push(item.field_value);
                     }
                 });
                 
-                // Default fields
-                const defaultFields = [
-                    { id: 1, name: 'Refuel Location', type: 'text', values: [] },
-                    { id: 2, name: 'Land Owner Gift', type: 'text', values: [] },
-                    { id: 3, name: 'Landing Fee', type: 'text', values: [] },
-                    { id: 4, name: 'Vehicle Used', type: 'text', values: [] }
-                ];
-                
-                // Merge with default fields
-                const defaultFieldsMap = {};
-                defaultFields.forEach(field => {
-                    defaultFieldsMap[field.name] = field;
-                });
-                
-                // Combine default fields with fetched data
-                const combinedFields = defaultFields.map(field => {
-                    if (fieldsMap[field.name]) {
-                        return {
-                            ...field,
-                            values: fieldsMap[field.name].values,
-                            id: fieldsMap[field.name].id
-                        };
-                    }
-                    return field;
-                });
+                // Default fields - only include if they exist in the database
+                const defaultFieldNames = ['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'];
+                const defaultFields = defaultFieldNames
+                    .filter(fieldName => fieldsMap[fieldName]) // Only include if exists in database
+                    .map((fieldName, index) => ({
+                        id: index + 1,
+                        name: fieldName,
+                        type: 'text',
+                        values: fieldsMap[fieldName].values || []
+                    }));
                 
                 // Add any new fields from database that aren't in defaults
+                const combinedFields = [...defaultFields];
                 Object.keys(fieldsMap).forEach(fieldName => {
-                    if (!defaultFieldsMap[fieldName]) {
+                    if (!defaultFieldNames.includes(fieldName)) {
                         combinedFields.push(fieldsMap[fieldName]);
                     }
                 });
                 
                 setOperationalFields(combinedFields);
                 setOperationalSelections(data);
+            } else {
+                // If no data, set empty fields
+                setOperationalFields([]);
+                setOperationalSelections([]);
             }
         } catch (error) {
             console.error('Error fetching operational selections:', error);
             setOperationalSelections([]);
+            setOperationalFields([]);
         }
     };
 
@@ -12809,24 +12801,35 @@ const Settings = () => {
                                             <h3 style={{ margin: 0, color: '#1f2937', fontSize: '18px', fontWeight: 600 }}>
                                                 {field.name}
                                             </h3>
-                                            {!['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'].includes(field.name) && (
-                                                <button
-                                                    className="btn btn-danger"
-                                                    onClick={async () => {
-                                                        if (window.confirm(`Are you sure you want to delete the field "${field.name}"?`)) {
-                                                            try {
-                                                                await axios.delete(`/api/operational-selections/field/${field.name}`);
-                                                                fetchOperationalSelections();
-                                                            } catch (error) {
-                                                                alert('Error deleting field: ' + (error.response?.data?.message || error.message));
+                                            <button
+                                                className="btn btn-danger"
+                                                onClick={async (e) => {
+                                                    e.stopPropagation(); // Prevent any parent click handlers
+                                                    const isDefaultField = ['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'].includes(field.name);
+                                                    const confirmMessage = isDefaultField 
+                                                        ? `Are you sure you want to delete the field "${field.name}"? This will delete all values for this field and may affect existing bookings.`
+                                                        : `Are you sure you want to delete the field "${field.name}"? This will delete all values for this field.`;
+                                                    
+                                                    if (window.confirm(confirmMessage)) {
+                                                        try {
+                                                            const response = await axios.delete(`/api/operational-selections/field/${encodeURIComponent(field.name)}`);
+                                                            if (response.data?.success) {
+                                                                // Successfully deleted, refresh the list
+                                                                await fetchOperationalSelections();
+                                                            } else {
+                                                                alert('Error deleting field: ' + (response.data?.message || 'Unknown error'));
                                                             }
+                                                        } catch (error) {
+                                                            console.error('Error deleting field:', error);
+                                                            alert('Error deleting field: ' + (error.response?.data?.message || error.message));
                                                         }
-                                                    }}
-                                                    style={{ padding: '6px 12px', fontSize: '13px' }}
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            )}
+                                                    }
+                                                }}
+                                                style={{ padding: '6px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                title={`Delete field "${field.name}" and all its values`}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                         
                                         <div style={{ marginBottom: '12px' }}>
@@ -12849,7 +12852,7 @@ const Settings = () => {
                                                             <span style={{ color: '#1976d2' }}>{value}</span>
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (window.confirm(`Are you sure you want to delete "${value}"?`)) {
+                                                                    if (window.confirm(`Are you sure you want to delete "${value}" from "${field.name}"?`)) {
                                                                         try {
                                                                             await axios.delete(`/api/operational-selections/value`, {
                                                                                 data: { field_name: field.name, field_value: value }
@@ -12866,11 +12869,13 @@ const Settings = () => {
                                                                     color: '#ef4444',
                                                                     cursor: 'pointer',
                                                                     padding: '2px 4px',
-                                                                    fontSize: '16px',
-                                                                    lineHeight: 1
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center'
                                                                 }}
+                                                                title={`Delete "${value}"`}
                                                             >
-                                                                ×
+                                                                <Trash2 size={14} />
                                                             </button>
                                                         </div>
                                                     ))
