@@ -8522,21 +8522,21 @@ const Manifest = () => {
                 <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                     {selectedGroupFlightsForClose && selectedGroupFlightsForClose.length > 0 && (() => {
                         const first = selectedGroupFlightsForClose[0];
-                        // Find flight time from time_slot or flight_date and format as AM/PM
+                        // Find flight time from time_slot or flight_date and format as AM/PM only
                         let displayFlightTime = 'N/A';
                         
                         // Try time_slot first
                         if (first.time_slot) {
                             const timeValue = dayjs(first.time_slot, 'HH:mm');
                             if (timeValue.isValid()) {
-                                displayFlightTime = timeValue.format('hh:mm A');
+                                displayFlightTime = timeValue.format('A');
                             } else {
                                 // Try parsing as string directly
                                 const timeStr = String(first.time_slot).trim();
                                 if (timeStr.match(/^\d{1,2}:\d{2}$/)) {
                                     const parsedTime = dayjs(timeStr, 'HH:mm');
                                     if (parsedTime.isValid()) {
-                                        displayFlightTime = parsedTime.format('hh:mm A');
+                                        displayFlightTime = parsedTime.format('A');
                                     }
                                 }
                             }
@@ -8545,20 +8545,20 @@ const Manifest = () => {
                         if (displayFlightTime === 'N/A' && first.flight_date) {
                             const flightDateMoment = dayjs(first.flight_date);
                             if (flightDateMoment.isValid()) {
-                                // Always format with AM/PM, even if time is midnight
-                                displayFlightTime = flightDateMoment.format('hh:mm A');
+                                // Always format with AM/PM only, even if time is midnight
+                                displayFlightTime = flightDateMoment.format('A');
                             } else if (typeof first.flight_date === 'string' && first.flight_date.length >= 16) {
                                 // Try to extract time from string format like "YYYY-MM-DD HH:mm:ss"
                                 const timePart = first.flight_date.substring(11, 16);
                                 const timeValue = dayjs(timePart, 'HH:mm');
                                 if (timeValue.isValid()) {
-                                    displayFlightTime = timeValue.format('hh:mm A');
+                                    displayFlightTime = timeValue.format('A');
                                 }
                             } else if (typeof first.flight_date === 'string') {
                                 // Try to parse any date string format
                                 const parsed = dayjs(first.flight_date);
                                 if (parsed.isValid()) {
-                                    displayFlightTime = parsed.format('hh:mm A');
+                                    displayFlightTime = parsed.format('A');
                                 }
                             }
                         }
@@ -8693,9 +8693,6 @@ const Manifest = () => {
                             <Box>
                                 <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-end' }}>
                                     <Box sx={{ flex: 1 }}>
-                                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                                            Flight Start Time
-                                        </Typography>
                                         <LocalizationProvider dateAdapter={AdapterDayjs}>
                                             <TimePicker
                                                 label="Start Time"
@@ -8713,9 +8710,6 @@ const Manifest = () => {
                                         </LocalizationProvider>
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
-                                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                                            Flight End Time
-                                        </Typography>
                                         <LocalizationProvider dateAdapter={AdapterDayjs}>
                                             <TimePicker
                                                 label="End Time"
@@ -8768,12 +8762,6 @@ const Manifest = () => {
                             
                             {/* Aircraft / Balloon Defects or Issues */}
                             <Box sx={{ mt: 2 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                                    Aircraft / Balloon Defects or Issues
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                                    Please describe ANY defects or issues with the aircraft if found or caused.
-                                </Typography>
                                 <TextField
                                     fullWidth
                                     multiline
@@ -8787,12 +8775,6 @@ const Manifest = () => {
 
                             {/* Vehicle / Trailer Issues */}
                             <Box sx={{ mt: 2 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                                    Vehicle / Trailer Issues
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                                    Please describe ANY defects or issues with the vehicle/trailer if found or caused.
-                                </Typography>
                                 <TextField
                                     fullWidth
                                     multiline
