@@ -23,6 +23,7 @@ import {
   Search as SearchIcon,
   Home as HomeIcon,
   Description as BookingIcon,
+  FlightTakeoff as FlownFlightsIcon,
   List as ManifestIcon,
   CalendarMonth as ActivityIcon,
   Settings as SettingsIcon,
@@ -151,6 +152,7 @@ const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => 
   const menuItems = [
     { label: 'Home', path: '/', icon: <HomeIcon /> },
     { label: 'Booking', path: '/booking', icon: <BookingIcon /> },
+    { label: 'Flown Flights', path: '/flown-flights', icon: <FlownFlightsIcon /> },
     { label: 'Manifest', path: '/manifest', icon: <ManifestIcon /> },
     { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
     { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
@@ -292,6 +294,7 @@ export const BottomNav = ({ hasNewBookings, hasNewVouchers, onMenuClick }) => {
   const menuItems = [
     { label: 'Home', path: '/', icon: <HomeIcon /> },
     { label: 'Booking', path: '/booking', icon: <BookingIcon /> },
+    { label: 'Flown Flights', path: '/flown-flights', icon: <FlownFlightsIcon /> },
     { label: 'Manifest', path: '/manifest', icon: <ManifestIcon /> },
     { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
     { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },

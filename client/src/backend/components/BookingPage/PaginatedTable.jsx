@@ -24,6 +24,7 @@ const PaginatedTable = ({
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || ''));
     const getColLabel = (col) => {
         if (typeof col === 'string') {
+            if (col === 'row_id') return 'ID';
             if (col === 'created_at' || col === 'created') return 'Created';
             if (col === 'voucher_booking_id') return 'Voucher/Booking ID';
             if (col === 'date_requested') return 'Date requested';
@@ -32,12 +33,28 @@ const PaginatedTable = ({
             if (col === 'actual_voucher_type') return 'Voucher Type';
             if (col === 'passenger_info') return 'Passengers';
             if (col === 'flight_attempts') return 'Attempts';
+            if (col === 'pilot') return 'Pilot';
+            if (col === 'crew') return 'Crew';
+            if (col === 'flight_period') return 'Flight Period';
+            if (col === 'flight_type_display') return 'Flight Type';
+            if (col === 'balloon_resource') return 'Balloon Resource';
+            if (col === 'flight_start_time') return 'Flight Start Time';
+            if (col === 'flight_end_time') return 'Flight End Time';
+            if (col === 'aircraft_defects') return 'Aircraft / Balloon Defects or Issues';
+            if (col === 'vehicle_trailer_defects') return 'Vehicle / Trailer Issues';
+            // Operational selections - capitalize each word properly
+            if (col === 'refuel_location') return 'Refuel Location';
+            if (col === 'land_owner_gift') return 'Land Owner Gift';
+            if (col === 'landing_fee') return 'Landing Fee';
+            if (col === 'vehicle_used') return 'Vehicle Used';
+            // For other operational fields (dynamically added), capitalize each word
             const label = col.replace(/_/g, ' ');
-            return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+            return label.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
         }
         if (col && col.label) return col.label;
         const id = getColId(col) || '';
         if (!id) return '';
+        if (id === 'row_id') return 'ID';
         if (id === 'created_at' || id === 'created') return 'Created';
         if (id === 'voucher_booking_id') return 'Voucher/Booking ID';
         if (id === 'date_requested') return 'Date requested';
@@ -45,8 +62,23 @@ const PaginatedTable = ({
         if (id === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
         if (id === 'actual_voucher_type') return 'Voucher Type';
         if (id === 'passenger_info') return 'Passengers';
+        if (id === 'pilot') return 'Pilot';
+        if (id === 'crew') return 'Crew';
+        if (id === 'flight_period') return 'Flight Period';
+        if (id === 'flight_type_display') return 'Flight Type';
+        if (id === 'balloon_resource') return 'Balloon Resource';
+        if (id === 'flight_start_time') return 'Flight Start Time';
+        if (id === 'flight_end_time') return 'Flight End Time';
+        if (id === 'aircraft_defects') return 'Aircraft / Balloon Defects or Issues';
+        if (id === 'vehicle_trailer_defects') return 'Vehicle / Trailer Issues';
+        // Operational selections - capitalize each word properly
+        if (id === 'refuel_location') return 'Refuel Location';
+        if (id === 'land_owner_gift') return 'Land Owner Gift';
+        if (id === 'landing_fee') return 'Landing Fee';
+        if (id === 'vehicle_used') return 'Vehicle Used';
+        // For other operational fields (dynamically added), capitalize each word
         const label = id.replace(/_/g, ' ');
-        return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+        return label.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
     };
 
     // Reset visible count when data length changes (filters, tab switch, etc.)
@@ -402,43 +434,71 @@ const PaginatedTable = ({
                                     // visible across browsers (especially Safari), give them
                                     // explicit pixel widths here.
                                     width:
+                                        id === 'row_id' ? '60px' :
                                         id === 'email' ? '240px' :
-                                       id === 'name' ? '180px' : 
-                                       id === 'voucher_code' ? '120px' :
+                                       id === 'name' ? '200px' : 
+                                       id === 'voucher_code' ? '150px' :
                                        id === 'status' ? '120px' : 
                                         id === 'voucher_type'
-                                            ? (context === 'vouchers' ? '220px' : '180px') :
+                                            ? (context === 'vouchers' ? '220px' : '200px') :
                                        id === 'actual_voucher_type' ? '150px' :
                                        id === 'voucher_ref' ? '160px' :
                                        id === 'passenger_info' ? '200px' :
-                                       id === 'created_at' || id === 'created' ? '120px' :
+                                       id === 'created_at' || id === 'created' || id === 'created_at_display' ? '140px' :
                                        id === 'flight_date' ? '200px' :
+                                       id === 'flight_period' ? '120px' :
+                                       id === 'flight_type_display' ? '120px' :
+                                       id === 'balloon_resource' ? '120px' :
+                                       id === 'flight_start_time' ? '180px' :
+                                       id === 'flight_end_time' ? '180px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
                                        id === 'flight_attempts' ? '100px' :
                                        id === 'expires' ? '140px' :
-                                       id === 'location' ? '140px' :
+                                       id === 'location' ? '150px' :
+                                       id === 'pilot' ? '150px' :
+                                       id === 'crew' ? '150px' :
+                                       id === 'aircraft_defects' ? '250px' :
+                                       id === 'vehicle_trailer_defects' ? '250px' :
+                                       id === 'refuel_location' ? '150px' :
+                                       id === 'land_owner_gift' ? '150px' :
+                                       id === 'landing_fee' ? '150px' :
+                                       id === 'vehicle_used' ? '150px' :
                                        id === 'redeemed' ? '120px' :
                                        'auto', 
                                     minWidth:
+                                        id === 'row_id' ? '60px' :
                                         id === 'email' ? '240px' :
-                                         id === 'name' ? '180px' : 
-                                         id === 'voucher_code' ? '120px' :
+                                         id === 'name' ? '200px' : 
+                                         id === 'voucher_code' ? '150px' :
                                          id === 'status' ? '120px' : 
                                         id === 'voucher_type'
-                                            ? (context === 'vouchers' ? '220px' : '180px') :
+                                            ? (context === 'vouchers' ? '220px' : '200px') :
                                          id === 'actual_voucher_type' ? '150px' :
                                          id === 'voucher_ref' ? '160px' :
                                          id === 'passenger_info' ? '200px' :
-                                         id === 'created_at' || id === 'created' ? '120px' :
+                                         id === 'created_at' || id === 'created' || id === 'created_at_display' ? '140px' :
                                          id === 'flight_date' ? '200px' :
+                                         id === 'flight_period' ? '120px' :
+                                         id === 'flight_type_display' ? '120px' :
+                                         id === 'balloon_resource' ? '120px' :
+                                         id === 'flight_start_time' ? '180px' :
+                                         id === 'flight_end_time' ? '180px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
                                          id === 'flight_attempts' ? '100px' :
                                          id === 'expires' ? '140px' :
-                                         id === 'location' ? '140px' :
+                                         id === 'location' ? '150px' :
+                                         id === 'pilot' ? '150px' :
+                                         id === 'crew' ? '150px' :
+                                         id === 'aircraft_defects' ? '250px' :
+                                         id === 'vehicle_trailer_defects' ? '250px' :
+                                         id === 'refuel_location' ? '150px' :
+                                         id === 'land_owner_gift' ? '150px' :
+                                         id === 'landing_fee' ? '150px' :
+                                         id === 'vehicle_used' ? '150px' :
                                          id === 'redeemed' ? '120px' :
-                                         '80px', 
+                                         '100px', 
                                 maxWidth: id === 'email' ? '240px' : undefined 
                                 }}
                             />
@@ -462,18 +522,22 @@ const PaginatedTable = ({
                                 />
                             </th>
                         )}
-                        {(selectable ? mainHead.slice(1) : mainHead).map((col, index) => (
-                            <th key={index} style={{ 
-                                padding: "8px",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                fontSize: "16px",
-                                fontWeight: "normal",
-                                fontFamily: "'Gilroy', sans-serif",
-                                textAlign: "left"
-                            }}>{col}</th>
-                        ))}
+                        {(selectable ? mainHead.slice(1) : mainHead).map((col, index) => {
+                            const colId = getColId(columns[index]);
+                            return (
+                                <th key={index} style={{ 
+                                    padding: "8px",
+                                    whiteSpace: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "normal" : "nowrap",
+                                    overflow: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "visible" : "hidden",
+                                    textOverflow: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "clip" : "ellipsis",
+                                    wordWrap: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "break-word" : "normal",
+                                    fontSize: "16px",
+                                    fontWeight: "normal",
+                                    fontFamily: "'Gilroy', sans-serif",
+                                    textAlign: "left"
+                                }}>{col}</th>
+                            );
+                        })}
                     </tr>
                 </thead>
                 <tbody>
@@ -499,10 +563,19 @@ const PaginatedTable = ({
                                                         <td key={id} style={{ 
                                                             textAlign: "left", 
                                                             padding: "8px", 
-                                                            whiteSpace: "nowrap",
-                                                            overflow: "hidden",
-                                                            textOverflow: "ellipsis",
-                                                            maxWidth: id === 'flight_date' ? "200px" : "200px",
+                                                            whiteSpace: (id === 'aircraft_defects' || id === 'vehicle_trailer_defects') ? "normal" : "nowrap",
+                                                            overflow: (id === 'aircraft_defects' || id === 'vehicle_trailer_defects') ? "visible" : "hidden",
+                                                            textOverflow: (id === 'aircraft_defects' || id === 'vehicle_trailer_defects') ? "clip" : "ellipsis",
+                                                            wordWrap: (id === 'aircraft_defects' || id === 'vehicle_trailer_defects') ? "break-word" : "normal",
+                                                            maxWidth: id === 'flight_date' ? "200px" : 
+                                                                     id === 'aircraft_defects' ? "250px" :
+                                                                     id === 'vehicle_trailer_defects' ? "250px" :
+                                                                     id === 'pilot' ? "150px" :
+                                                                     id === 'crew' ? "150px" :
+                                                                     id === 'name' ? "200px" :
+                                                                     id === 'location' ? "150px" :
+                                                                     id === 'voucher_code' ? "150px" :
+                                                                     "200px",
                                                             fontSize: "16px",
                                                             fontWeight: "normal",
                                                             fontFamily: "'Gilroy', sans-serif"

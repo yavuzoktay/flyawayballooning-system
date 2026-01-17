@@ -43,7 +43,7 @@ import axios from "axios";
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { DatePicker, TimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
@@ -1890,6 +1890,10 @@ const Manifest = () => {
     };
 
     const getFlightStatus = (flight) => {
+        if (!flight) {
+            return "Open"; // Default to Open if flight is null/undefined
+        }
+        
         if (flight.manual_status_override !== null && flight.manual_status_override !== undefined) {
             return flight.manual_status_override ? "Open" : "Closed";
         }
@@ -3202,6 +3206,20 @@ const Manifest = () => {
     // Add state for status update loading
     const [statusLoadingGroup, setStatusLoadingGroup] = useState(null);
 
+    // Close Flight Modal state
+    const [closeFlightModalOpen, setCloseFlightModalOpen] = useState(false);
+    const [selectedGroupFlightsForClose, setSelectedGroupFlightsForClose] = useState(null);
+    const [operationalSelections, setOperationalSelections] = useState([]);
+    const [operationalFields, setOperationalFields] = useState([]);
+    const [selectedOperationalValues, setSelectedOperationalValues] = useState({});
+    const [loadingOperationalSelections, setLoadingOperationalSelections] = useState(false);
+    const [aircraftDefects, setAircraftDefects] = useState('');
+    const [vehicleTrailerDefects, setVehicleTrailerDefects] = useState('');
+    const [flightStartDate, setFlightStartDate] = useState(null);
+    const [flightStartTime, setFlightStartTime] = useState(null);
+    const [flightEndDate, setFlightEndDate] = useState(null);
+    const [flightEndTime, setFlightEndTime] = useState(null);
+
     // Add handler to toggle status for a group
     const handleToggleGroupStatus = async (groupFlights) => {
       if (!groupFlights || groupFlights.length === 0) return;
@@ -3251,6 +3269,176 @@ const Manifest = () => {
         }
       } catch (err) {
         alert('Status update failed!');
+      }
+      setStatusLoadingGroup(null);
+    };
+
+    // Fetch operational selections
+    const fetchOperationalSelections = async () => {
+      setLoadingOperationalSelections(true);
+      try {
+        const response = await axios.get('/api/operational-selections');
+        if (response.data?.success) {
+          const data = response.data.data || [];
+          // Group by field_name and collect values
+          const fieldsMap = {};
+          data.forEach(item => {
+            if (!fieldsMap[item.field_name]) {
+              fieldsMap[item.field_name] = {
+                id: item.id,
+                name: item.field_name,
+                type: 'text',
+                values: []
+              };
+            }
+            if (item.field_value) {
+              fieldsMap[item.field_name].values.push(item.field_value);
+            }
+          });
+          
+          // Default fields
+          const defaultFields = [
+            { id: 1, name: 'Refuel Location', type: 'text', values: [] },
+            { id: 2, name: 'Land Owner Gift', type: 'text', values: [] },
+            { id: 3, name: 'Landing Fee', type: 'text', values: [] },
+            { id: 4, name: 'Vehicle Used', type: 'text', values: [] }
+          ];
+          
+          // Merge with default fields
+          const defaultFieldsMap = {};
+          defaultFields.forEach(field => {
+            defaultFieldsMap[field.name] = field;
+          });
+          
+          // Combine default fields with fetched data
+          const combinedFields = defaultFields.map(field => {
+            if (fieldsMap[field.name]) {
+              return {
+                ...field,
+                values: fieldsMap[field.name].values,
+                id: fieldsMap[field.name].id
+              };
+            }
+            return field;
+          });
+          
+          // Add any new fields from database that aren't in defaults
+          Object.keys(fieldsMap).forEach(fieldName => {
+            if (!defaultFieldsMap[fieldName]) {
+              combinedFields.push(fieldsMap[fieldName]);
+            }
+          });
+          
+          setOperationalFields(combinedFields);
+          setOperationalSelections(data);
+        }
+      } catch (error) {
+        console.error('Error fetching operational selections:', error);
+        setOperationalSelections([]);
+      } finally {
+        setLoadingOperationalSelections(false);
+      }
+    };
+
+    // Handler to close flight (set status to Closed)
+    const handleCloseFlight = (groupFlights) => {
+      if (!groupFlights || groupFlights.length === 0) return;
+      const first = groupFlights[0];
+      const currentStatus = getFlightStatus(first);
+      
+      // If already closed, show message
+      if (currentStatus === 'Closed') {
+        alert('This flight is already closed.');
+        return;
+      }
+      
+      // Open modal instead of direct confirmation
+      setSelectedGroupFlightsForClose(groupFlights);
+      fetchOperationalSelections();
+      setCloseFlightModalOpen(true);
+    };
+
+    // Handler to confirm close flight with operational selections
+    const handleConfirmCloseFlight = async () => {
+      if (!selectedGroupFlightsForClose || selectedGroupFlightsForClose.length === 0) return;
+      
+      const first = selectedGroupFlightsForClose[0];
+      setStatusLoadingGroup(first.id);
+      setCloseFlightModalOpen(false);
+      
+      try {
+        // 1. Save operational selections to trip_booking
+        const bookingId = first.id;
+        if (bookingId) {
+          try {
+            await axios.post('/api/save-flight-operational-selections', {
+              booking_id: bookingId,
+              operational_selections: selectedOperationalValues,
+              aircraft_defects: aircraftDefects,
+              vehicle_trailer_defects: vehicleTrailerDefects,
+              flight_start_date: flightStartDate,
+              flight_start_time: flightStartTime,
+              flight_end_date: flightEndDate,
+              flight_end_time: flightEndTime
+            });
+          } catch (err) {
+            console.error('Error saving operational selections:', err);
+            // Continue with closing flight even if saving selections fails
+          }
+        }
+
+        // 2. Update booking status to Flown
+        await Promise.all(selectedGroupFlightsForClose.map(f =>
+          axios.post('/api/updateBookingStatusToFlown', {
+            booking_id: f.id
+          })
+        ));
+        
+        // 3. Calculate total pax for all groupFlights
+        const totalPax = selectedGroupFlightsForClose.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
+        
+        // 4. Update availability
+        await axios.patch('/api/updateManifestStatus', {
+          booking_id: first.id,
+          old_status: 'Open',
+          new_status: 'Closed',
+          flight_date: first.flight_date,
+          location: first.location,
+          total_pax: totalPax
+        });
+        
+        // 5. Update UI state
+        setFlights(prev => prev.map(f =>
+          selectedGroupFlightsForClose.some(gf => gf.id === f.id)
+            ? { ...f, status: 'Flown', manual_status_override: 0 } // Status = Flown
+            : f
+        ));
+        
+        // 6. Refetch availabilities
+        if (Array.isArray(activity)) {
+          let all = [];
+          for (const act of activity) {
+            try {
+              const res = await axios.get(`/api/activity/${act.id}/availabilities`);
+              if (res.data.success && Array.isArray(res.data.data)) {
+                all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
+              }
+            } catch {}
+          }
+          setAvailabilities(all);
+        }
+
+        // Reset selections
+        setSelectedOperationalValues({});
+        setAircraftDefects('');
+        setVehicleTrailerDefects('');
+        setFlightStartDate(null);
+        setFlightStartTime(null);
+        setFlightEndDate(null);
+        setFlightEndTime(null);
+        setSelectedGroupFlightsForClose(null);
+      } catch (err) {
+        alert('Failed to close flight: ' + (err.response?.data?.message || err.message));
       }
       setStatusLoadingGroup(null);
     };
@@ -4810,7 +4998,9 @@ const Manifest = () => {
                                                 
                                                 {/* Book Button - Hidden on mobile */}
                                                 {!isMobile && (
-                                                <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
+                                                    </Box>
                                                 )}
                                                 {/* Three dots menu - Desktop only (mobile is in header) */}
                                                 {!isMobile && (
@@ -4827,7 +5017,27 @@ const Manifest = () => {
                                                 transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                                             >
                                                 <MenuItem onClick={() => handleGlobalMenuAction('cancelAllGuests')}>Cancel All Guests</MenuItem>
-                                                <MenuItem onClick={() => handleGlobalMenuAction('sendMessageAllGuests')}>Send Message to All Guests</MenuItem>
+                                                <MenuItem onClick={() => handleGlobalMenuAction('sendMessageAllGuests')}>Send Message to Guests</MenuItem>
+                                                <MenuItem 
+                                                    onClick={() => {
+                                                        handleGlobalMenuClose();
+                                                        if (globalMenuGroupFlights && globalMenuGroupFlights.length > 0) {
+                                                            handleCloseFlight(globalMenuGroupFlights);
+                                                        }
+                                                    }}
+                                                    disabled={!globalMenuGroup || statusLoadingGroup === (globalMenuGroup?.id) || (globalMenuGroup && getFlightStatus(globalMenuGroup) === 'Closed')}
+                                                    sx={{
+                                                        color: '#d32f2f',
+                                                        '&:hover': {
+                                                            backgroundColor: 'rgba(211, 47, 47, 0.08)'
+                                                        },
+                                                        '&.Mui-disabled': {
+                                                            color: 'rgba(0, 0, 0, 0.26)'
+                                                        }
+                                                    }}
+                                                >
+                                                    {statusLoadingGroup === (globalMenuGroup?.id) ? 'Closing...' : 'Close Flight'}
+                                                </MenuItem>
                                             </Menu>
                                         </Box>
                                         <Divider sx={{ marginY: isMobile ? 0.5 : 2 }} />
@@ -5920,13 +6130,18 @@ const Manifest = () => {
                                                                             }
                                                                         }
                                                                         
+                                                                        // Hide question if answer is "Not answered" or empty
+                                                                        if (!answer || (answer && answer.toString().trim().toLowerCase() === 'not answered')) {
+                                                                            return null;
+                                                                        }
+                                                                        
                                                                         return (
                                                                             <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
                                                                                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
                                                                                     {question.question_text}:
                                                                                 </Typography>
-                                                                                <Typography sx={{ color: answer ? '#333' : '#999', fontStyle: answer ? 'normal' : 'italic' }}>
-                                                                                    {answer ? answer : 'Not answered'}
+                                                                                <Typography sx={{ color: '#333' }}>
+                                                                                    {answer}
                                                                                 </Typography>
                                                                                 {question.help_text && (
                                                                                     <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>
@@ -8283,6 +8498,324 @@ const Manifest = () => {
                         disabled={smsSending || !smsForm.to || !smsForm.message}
                     >
                         {smsSending ? 'Sending...' : 'Send'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Close Flight Modal with Operational Selections */}
+            <Dialog 
+                open={closeFlightModalOpen} 
+                onClose={() => {
+                    setCloseFlightModalOpen(false);
+                    setSelectedOperationalValues({});
+                    setAircraftDefects('');
+                    setVehicleTrailerDefects('');
+                    setFlightStartDate(null);
+                    setFlightStartTime(null);
+                    setFlightEndDate(null);
+                    setFlightEndTime(null);
+                    setSelectedGroupFlightsForClose(null);
+                }}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ 
+                    fontWeight: 700, 
+                    fontSize: isMobile ? 18 : '20px',
+                    padding: isMobile ? '12px 16px' : '20px 24px',
+                    borderBottom: '1px solid #e5e7eb'
+                }}>
+                    Close Flight - Operational Selections
+                </DialogTitle>
+                <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
+                    {selectedGroupFlightsForClose && selectedGroupFlightsForClose.length > 0 && (() => {
+                        const first = selectedGroupFlightsForClose[0];
+                        // Find flight time from time_slot or flight_date and format as AM/PM
+                        let displayFlightTime = '';
+                        
+                        // Try time_slot first
+                        if (first.time_slot) {
+                            const timeValue = dayjs(first.time_slot, 'HH:mm');
+                            if (timeValue.isValid()) {
+                                displayFlightTime = timeValue.format('hh:mm A');
+                            }
+                        } 
+                        // If no time_slot, try to extract from flight_date
+                        else if (first.flight_date) {
+                            const flightDateMoment = dayjs(first.flight_date);
+                            if (flightDateMoment.isValid() && flightDateMoment.hour() !== 0 && flightDateMoment.minute() !== 0) {
+                                // Only use if time is not midnight (00:00)
+                                displayFlightTime = flightDateMoment.format('hh:mm A');
+                            } else if (typeof first.flight_date === 'string' && first.flight_date.length >= 16) {
+                                // Try to extract time from string format like "YYYY-MM-DD HH:mm:ss"
+                                const timePart = first.flight_date.substring(11, 16);
+                                const timeValue = dayjs(timePart, 'HH:mm');
+                                if (timeValue.isValid()) {
+                                    displayFlightTime = timeValue.format('hh:mm A');
+                                }
+                            }
+                        }
+                        
+                        // Get pilot information
+                        let pilotName = 'N/A';
+                        const activityId = getFlightActivityId(first);
+                        if (activityId && first.flight_date) {
+                            const date = typeof first.flight_date === 'string' ? first.flight_date.split(' ')[0] : dayjs(first.flight_date).format('YYYY-MM-DD');
+                            const time = first.time_slot ? first.time_slot.substring(0, 5) : (first.flight_date && typeof first.flight_date === 'string' && first.flight_date.length >= 16 ? first.flight_date.substring(11, 16) : null);
+                            if (date && time) {
+                                const pilotKey = slotKey(activityId, date, time);
+                                const pilotId = pilotAssignmentsBySlot[pilotKey];
+                                if (pilotId) {
+                                    pilotName = getPilotName(pilotId);
+                                }
+                            }
+                        }
+                        
+                        // Get crew information
+                        let crewName = 'N/A';
+                        if (activityId && first.flight_date) {
+                            const date = typeof first.flight_date === 'string' ? first.flight_date.split(' ')[0] : dayjs(first.flight_date).format('YYYY-MM-DD');
+                            const time = first.time_slot ? first.time_slot.substring(0, 5) : (first.flight_date && typeof first.flight_date === 'string' && first.flight_date.length >= 16 ? first.flight_date.substring(11, 16) : null);
+                            if (date && time) {
+                                const crewKey = slotKey(activityId, date, time);
+                                const crewId = crewAssignmentsBySlot[crewKey];
+                                if (crewId) {
+                                    crewName = getCrewMemberName(crewId);
+                                }
+                            }
+                        }
+                        
+                        // Get balloon resource
+                        let balloonResource = 'N/A';
+                        try {
+                            const flightPassengers = Array.isArray(first.passengers) ? first.passengers : [];
+                            const mockBookingDetail = {
+                                booking: {
+                                    experience: first.experience || first.flight_type,
+                                    flight_type: first.flight_type,
+                                    pax: flightPassengers.length,
+                                    passenger_count: flightPassengers.length
+                                },
+                                passengers: flightPassengers
+                            };
+                            const resourceInfo = getAssignedResourceInfo(mockBookingDetail);
+                            balloonResource = resourceInfo ? resourceInfo.resourceName : (first.balloon_resources || 'N/A');
+                        } catch (e) {
+                            console.warn('Error calculating balloon resource:', e);
+                            balloonResource = first.balloon_resources || 'N/A';
+                        }
+                        
+                        return (
+                            <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8fafc', borderRadius: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                    Flight Information:
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Location: {first.location}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Flight Type: {first.flight_type}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Time: {displayFlightTime || 'N/A'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Pilot: {pilotName === 'None' ? 'N/A' : pilotName}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Crew: {crewName === 'None' ? 'N/A' : crewName}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Balloon Resource: {balloonResource}
+                                </Typography>
+                            </Box>
+                        );
+                    })()}
+
+                    {loadingOperationalSelections ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                            <Typography>Loading operational selections...</Typography>
+                        </Box>
+                    ) : operationalFields.length === 0 ? (
+                        <Typography color="text.secondary" sx={{ py: 2 }}>
+                            No operational selections available. Please add selections in Settings.
+                        </Typography>
+                    ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            {operationalFields.map((field) => (
+                                <FormControl key={field.id || field.name} fullWidth>
+                                    <InputLabel>{field.name}</InputLabel>
+                                    <Select
+                                        value={selectedOperationalValues[field.name] || ''}
+                                        label={field.name}
+                                        onChange={(e) => {
+                                            setSelectedOperationalValues({
+                                                ...selectedOperationalValues,
+                                                [field.name]: e.target.value
+                                            });
+                                        }}
+                                    >
+                                        <MenuItem value="">
+                                            <em>None</em>
+                                        </MenuItem>
+                                        {field.values && field.values.length > 0 ? (
+                                            field.values.map((value, index) => (
+                                                <MenuItem key={index} value={value}>
+                                                    {value}
+                                                </MenuItem>
+                                            ))
+                                        ) : (
+                                            <MenuItem value="" disabled>
+                                                No options available
+                                            </MenuItem>
+                                        )}
+                                    </Select>
+                                    {field.values && field.values.length === 0 && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                                            Please add options in Settings → Operational Selections
+                                        </Typography>
+                                    )}
+                                </FormControl>
+                            ))}
+                            
+                            {/* Aircraft / Balloon Defects or Issues */}
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                    Aircraft / Balloon Defects or Issues
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                                    Please describe ANY defects or issues with the aircraft if found or caused.
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    value={aircraftDefects}
+                                    onChange={(e) => setAircraftDefects(e.target.value)}
+                                    placeholder="Enter aircraft defects or issues..."
+                                    variant="outlined"
+                                />
+                            </Box>
+
+                            {/* Vehicle / Trailer Issues */}
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                    Vehicle / Trailer Issues
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                                    Please describe ANY defects or issues with the vehicle/trailer if found or caused.
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    rows={3}
+                                    value={vehicleTrailerDefects}
+                                    onChange={(e) => setVehicleTrailerDefects(e.target.value)}
+                                    placeholder="Enter vehicle/trailer defects or issues..."
+                                    variant="outlined"
+                                />
+                            </Box>
+
+                            {/* Flight Start Time */}
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                    Flight Start Time
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
+                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                        <DatePicker
+                                            label="Start Date"
+                                            value={flightStartDate}
+                                            onChange={(newValue) => setFlightStartDate(newValue)}
+                                            format="DD/MM/YYYY"
+                                            sx={{ flex: 1 }}
+                                            slotProps={{
+                                                textField: {
+                                                    size: 'small',
+                                                    fullWidth: true
+                                                }
+                                            }}
+                                        />
+                                        <TimePicker
+                                            label="Start Time"
+                                            value={flightStartTime}
+                                            onChange={(newValue) => setFlightStartTime(newValue)}
+                                            format="HH:mm"
+                                            sx={{ flex: 1 }}
+                                            slotProps={{
+                                                textField: {
+                                                    size: 'small',
+                                                    fullWidth: true
+                                                }
+                                            }}
+                                        />
+                                    </LocalizationProvider>
+                                </Box>
+                            </Box>
+
+                            {/* Flight End Time */}
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+                                    Flight End Time
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 2, flexDirection: isMobile ? 'column' : 'row' }}>
+                                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                        <DatePicker
+                                            label="End Date"
+                                            value={flightEndDate}
+                                            onChange={(newValue) => setFlightEndDate(newValue)}
+                                            format="DD/MM/YYYY"
+                                            sx={{ flex: 1 }}
+                                            slotProps={{
+                                                textField: {
+                                                    size: 'small',
+                                                    fullWidth: true
+                                                }
+                                            }}
+                                        />
+                                        <TimePicker
+                                            label="End Time"
+                                            value={flightEndTime}
+                                            onChange={(newValue) => setFlightEndTime(newValue)}
+                                            format="HH:mm"
+                                            sx={{ flex: 1 }}
+                                            slotProps={{
+                                                textField: {
+                                                    size: 'small',
+                                                    fullWidth: true
+                                                }
+                                            }}
+                                        />
+                                    </LocalizationProvider>
+                                </Box>
+                            </Box>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ padding: isMobile ? '12px 16px' : '16px 24px', borderTop: '1px solid #e5e7eb' }}>
+                    <Button
+                        onClick={() => {
+                            setCloseFlightModalOpen(false);
+                            setSelectedOperationalValues({});
+                            setAircraftDefects('');
+                            setVehicleTrailerDefects('');
+                            setFlightStartDate(null);
+                            setFlightStartTime(null);
+                            setFlightEndDate(null);
+                            setFlightEndTime(null);
+                            setSelectedGroupFlightsForClose(null);
+                        }}
+                        color="inherit"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleConfirmCloseFlight}
+                        variant="contained"
+                        color="error"
+                        disabled={statusLoadingGroup !== null}
+                    >
+                        {statusLoadingGroup !== null ? 'Closing...' : 'Close Flight'}
                     </Button>
                 </DialogActions>
             </Dialog>

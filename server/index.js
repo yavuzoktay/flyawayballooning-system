@@ -15990,6 +15990,24 @@ app.post('/api/updateBookingStatus', (req, res) => {
     });
 });
 
+// Update booking status to Flown
+app.post('/api/updateBookingStatusToFlown', (req, res) => {
+    const { booking_id } = req.body;
+    if (!booking_id) {
+        return res.status(400).json({ success: false, message: 'booking_id is required' });
+    }
+    
+    // Update status to 'Flown' in all_booking table
+    const sql = 'UPDATE all_booking SET status = ?, manual_status_override = 0 WHERE id = ?';
+    con.query(sql, ['Flown', booking_id], (err, result) => {
+        if (err) {
+            console.error('Error updating booking status to Flown:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        res.json({ success: true, message: 'Booking status updated to Flown' });
+    });
+});
+
 // Helper function to handle flight attempts increment for voucher cancellations
 const handleFlightAttemptsIncrement = async (booking_id) => {
     try {
@@ -22294,6 +22312,506 @@ app.delete('/api/customer-portal-contents/:id', (req, res) => {
             return res.status(500).json({ success: false, message: 'Error deleting customer portal content' });
         }
         res.json({ success: true });
+    });
+});
+
+// Operational Selections endpoints
+// Create operational_selections table if it doesn't exist
+con.query(`
+    CREATE TABLE IF NOT EXISTS operational_selections (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        field_name VARCHAR(255) NOT NULL,
+        field_value VARCHAR(500),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_field_name (field_name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+`, (err) => {
+    if (err) {
+        console.error('Error creating operational_selections table:', err);
+    } else {
+        console.log('operational_selections table ready');
+    }
+});
+
+// Get all operational selections
+app.get('/api/operational-selections', (req, res) => {
+    con.query('SELECT * FROM operational_selections ORDER BY field_name ASC, created_at DESC', (err, results) => {
+        if (err) {
+            console.error('Error fetching operational selections:', err);
+            return res.status(500).json({ success: false, message: 'Error fetching operational selections' });
+        }
+        res.json({ success: true, data: results });
+    });
+});
+
+// Create new operational selection field
+app.post('/api/operational-selections/field', (req, res) => {
+    const { field_name } = req.body;
+
+    if (!field_name || !field_name.trim()) {
+        return res.status(400).json({ success: false, message: 'Field name is required' });
+    }
+
+    // Check if field already exists
+    con.query('SELECT DISTINCT field_name FROM operational_selections WHERE field_name = ?', [field_name.trim()], (err, results) => {
+        if (err) {
+            console.error('Error checking field existence:', err);
+            return res.status(500).json({ success: false, message: 'Error checking field existence' });
+        }
+
+        if (results.length > 0) {
+            return res.status(400).json({ success: false, message: 'Field already exists' });
+        }
+
+        // Field doesn't exist, create it (just return success, actual values will be added via value endpoint)
+        res.json({ success: true, message: 'Field created successfully' });
+    });
+});
+
+// Add value to operational selection field
+app.post('/api/operational-selections/value', (req, res) => {
+    const { field_name, field_value } = req.body;
+
+    if (!field_name || !field_name.trim()) {
+        return res.status(400).json({ success: false, message: 'Field name is required' });
+    }
+
+    if (!field_value || !field_value.trim()) {
+        return res.status(400).json({ success: false, message: 'Field value is required' });
+    }
+
+    // Check if value already exists for this field
+    con.query('SELECT * FROM operational_selections WHERE field_name = ? AND field_value = ?', 
+        [field_name.trim(), field_value.trim()], 
+        (err, results) => {
+            if (err) {
+                console.error('Error checking value existence:', err);
+                return res.status(500).json({ success: false, message: 'Error checking value existence' });
+            }
+
+            if (results.length > 0) {
+                return res.status(400).json({ success: false, message: 'Value already exists for this field' });
+            }
+
+            // Insert new value
+            const sql = 'INSERT INTO operational_selections (field_name, field_value, created_at, updated_at) VALUES (?, ?, NOW(), NOW())';
+            con.query(sql, [field_name.trim(), field_value.trim()], (err, result) => {
+                if (err) {
+                    console.error('Error adding operational selection value:', err);
+                    return res.status(500).json({ success: false, message: 'Error adding operational selection value' });
+                }
+                res.json({ success: true, id: result.insertId });
+            });
+        }
+    );
+});
+
+// Delete operational selection value
+app.delete('/api/operational-selections/value', (req, res) => {
+    const { field_name, field_value } = req.body;
+
+    if (!field_name || !field_value) {
+        return res.status(400).json({ success: false, message: 'Field name and value are required' });
+    }
+
+    con.query('DELETE FROM operational_selections WHERE field_name = ? AND field_value = ?', 
+        [field_name, field_value], 
+        (err, result) => {
+            if (err) {
+                console.error('Error deleting operational selection value:', err);
+                return res.status(500).json({ success: false, message: 'Error deleting operational selection value' });
+            }
+            res.json({ success: true });
+        }
+    );
+});
+
+// Delete operational selection field (deletes all values for that field)
+app.delete('/api/operational-selections/field/:field_name', (req, res) => {
+    const { field_name } = req.params;
+
+    // Prevent deletion of default fields
+    const defaultFields = ['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'];
+    if (defaultFields.includes(field_name)) {
+        return res.status(400).json({ success: false, message: 'Cannot delete default fields' });
+    }
+
+    con.query('DELETE FROM operational_selections WHERE field_name = ?', [field_name], (err, result) => {
+        if (err) {
+            console.error('Error deleting operational selection field:', err);
+            return res.status(500).json({ success: false, message: 'Error deleting operational selection field' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Get flown flights (completed flights) - Similar to getAllBookingData
+app.get('/api/flown-flights', (req, res) => {
+    const sql = `
+        SELECT 
+            ab.id,
+            ab.name,
+            ab.email,
+            ab.phone,
+            ab.flight_date,
+            ab.flight_date as flight_date_display,
+            ab.location,
+            ab.flight_type,
+            ab.status,
+            ab.created_at,
+            ab.created_at as created_at_display,
+            ab.voucher_type,
+            ab.voucher_code,
+            ab.flight_attempts,
+            ab.expires,
+            ab.paid,
+            ab.due,
+            ab.activity_id,
+            DATE(ab.flight_date) as flight_date_only,
+            TIME(ab.flight_date) as flight_time_only,
+            COUNT(DISTINCT p.id) as passenger_count,
+            COUNT(DISTINCT p.id) as pax,
+            (SELECT refuel_location FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as refuel_location,
+            (SELECT land_owner_gift FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as land_owner_gift,
+            (SELECT landing_fee FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as landing_fee,
+            (SELECT vehicle_used FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as vehicle_used,
+            (SELECT aircraft_defects FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as aircraft_defects,
+            (SELECT vehicle_trailer_defects FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as vehicle_trailer_defects,
+            (SELECT flight_start_time FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as flight_start_time,
+            (SELECT flight_end_time FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as flight_end_time,
+            (SELECT additional_fields FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as additional_fields,
+            (SELECT CONCAT(pt.first_name, ' ', pt.last_name) 
+             FROM flight_pilot_assignments fpa
+             LEFT JOIN pilots pt ON pt.id = fpa.pilot_id
+             WHERE ab.activity_id IS NOT NULL
+               AND ab.flight_date IS NOT NULL
+               AND fpa.activity_id = ab.activity_id 
+               AND fpa.date = DATE(ab.flight_date)
+               AND fpa.time = TIME(ab.flight_date)
+             LIMIT 1) as pilot_name,
+            (SELECT CONCAT(c.first_name, ' ', c.last_name) 
+             FROM flight_crew_assignments fca
+             LEFT JOIN crew c ON c.id = fca.crew_id
+             WHERE ab.activity_id IS NOT NULL
+               AND ab.flight_date IS NOT NULL
+               AND fca.activity_id = ab.activity_id 
+               AND fca.date = DATE(ab.flight_date)
+               AND fca.time = TIME(ab.flight_date)
+             LIMIT 1) as crew_name
+        FROM all_booking ab
+        LEFT JOIN passengers p ON p.booking_id = ab.id
+        WHERE ab.status = 'Flown'
+        GROUP BY ab.id, ab.name, ab.email, ab.phone, ab.flight_date, ab.location, 
+                 ab.flight_type, ab.status, ab.created_at, ab.voucher_type, ab.voucher_code, 
+                 ab.flight_attempts, ab.expires, ab.paid, ab.due, ab.activity_id
+        ORDER BY ab.flight_date DESC, ab.created_at DESC
+    `;
+
+    con.query(sql, (err, results) => {
+        if (err) {
+            console.error('Error fetching flown flights:', err);
+            return res.status(500).json({ success: false, message: 'Error fetching flown flights' });
+        }
+        
+        // Get operational selection fields from settings to know which columns to include
+        con.query('SELECT DISTINCT field_name FROM operational_selections ORDER BY field_name', (fieldErr, fieldResults) => {
+            const operationalFields = fieldResults && fieldResults.length > 0 
+                ? fieldResults.map(r => r.field_name)
+                : ['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'];
+            
+            // Format the results similar to getAllBookingData
+            const formatted = results.map(row => {
+                // Format flight_date as DD/MM/YYYY AM/PM if time exists
+                let flightDateFormatted = '';
+                let flightPeriod = ''; // AM or PM
+                if (row.flight_date) {
+                    const dateTime = moment(row.flight_date, ["YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD", "DD/MM/YYYY HH:mm", "DD/MM/YYYY"]);
+                    if (dateTime.isValid()) {
+                        const hour = dateTime.hour();
+                        const ampm = hour < 12 ? 'AM' : 'PM';
+                        flightPeriod = ampm; // Set flight period (AM/PM)
+                        const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+                        const minute = dateTime.minute();
+                        flightDateFormatted = dateTime.format('DD/MM/YYYY') + ' ' + displayHour + ':' + (minute < 10 ? '0' : '') + minute + ' ' + ampm;
+                    } else {
+                        flightDateFormatted = row.flight_date;
+                    }
+                }
+                
+                // Format flight_type to show Private or Shared
+                let flightTypeDisplay = '';
+                if (row.flight_type) {
+                    const flightTypeLower = row.flight_type.toLowerCase();
+                    if (flightTypeLower.includes('private')) {
+                        flightTypeDisplay = 'Private';
+                    } else if (flightTypeLower.includes('shared')) {
+                        flightTypeDisplay = 'Shared';
+                    } else {
+                        flightTypeDisplay = row.flight_type; // Keep original if not matching
+                    }
+                }
+                
+                // Parse additional_fields JSON if exists
+                let additionalFieldsParsed = {};
+                if (row.additional_fields) {
+                    try {
+                        additionalFieldsParsed = typeof row.additional_fields === 'string' 
+                            ? JSON.parse(row.additional_fields) 
+                            : row.additional_fields;
+                    } catch (e) {
+                        console.warn('Failed to parse additional_fields:', e);
+                    }
+                }
+                
+                // Build operational selections object
+                const operationalSelections = {
+                    'Refuel Location': row.refuel_location || '',
+                    'Land Owner Gift': row.land_owner_gift || '',
+                    'Landing Fee': row.landing_fee || '',
+                    'Vehicle Used': row.vehicle_used || '',
+                    ...additionalFieldsParsed
+                };
+                
+                // Calculate balloon resource
+                let balloonResource = 'N/A';
+                try {
+                    const mockBooking = {
+                        experience: row.flight_type,
+                        flight_type: row.flight_type,
+                        pax: row.pax || row.passenger_count || 0,
+                        passenger_count: row.pax || row.passenger_count || 0
+                    };
+                    const resourceInfo = getAssignedResourceInfo(mockBooking);
+                    if (resourceInfo && resourceInfo.resourceName) {
+                        // Extract number from "Balloon 210" or "Balloon 105"
+                        const match = resourceInfo.resourceName.match(/(\d+)/);
+                        if (match) {
+                            balloonResource = match[1]; // Returns "210" or "105"
+                        } else {
+                            balloonResource = resourceInfo.resourceName;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error calculating balloon resource:', e);
+                }
+                
+                return {
+                    ...row,
+                    flight_date_display: flightDateFormatted,
+                    created_at_display: row.created_at ? moment(row.created_at).format('DD/MM/YYYY') : '',
+                    pax: row.pax || row.passenger_count || 0,
+                    status: row.status || 'Flown',
+                    operational_selections: operationalSelections,
+                    operational_fields: operationalFields,
+                    pilot: row.pilot_name || '-',
+                    crew: row.crew_name || '-',
+                    flight_period: flightPeriod || '-',
+                    flight_type_display: flightTypeDisplay || '-',
+                    aircraft_defects: row.aircraft_defects || '',
+                    vehicle_trailer_defects: row.vehicle_trailer_defects || '',
+                    balloon_resource: balloonResource,
+                    flight_start_time: row.flight_start_time ? moment(row.flight_start_time).format('DD/MM/YYYY HH:mm') : null,
+                    flight_end_time: row.flight_end_time ? moment(row.flight_end_time).format('DD/MM/YYYY HH:mm') : null
+                };
+            });
+            
+            res.json({ success: true, data: formatted, operational_fields: operationalFields });
+        });
+    });
+});
+
+// Save flight operational selections to trip_booking
+// Create trip_booking table if it doesn't exist
+con.query(`
+    CREATE TABLE IF NOT EXISTS trip_booking (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        booking_id INT NOT NULL,
+        refuel_location VARCHAR(500),
+        land_owner_gift VARCHAR(500),
+        landing_fee VARCHAR(500),
+        vehicle_used VARCHAR(500),
+        aircraft_defects TEXT,
+        vehicle_trailer_defects TEXT,
+        additional_fields JSON,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_booking_id (booking_id),
+        FOREIGN KEY (booking_id) REFERENCES all_booking(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+`, (err) => {
+    if (err) {
+        console.error('Error creating trip_booking table:', err);
+    } else {
+        console.log('trip_booking table ready');
+        // Add new columns if they don't exist
+        con.query(`SHOW COLUMNS FROM trip_booking LIKE 'aircraft_defects'`, (err, results) => {
+            if (err) {
+                console.error('Error checking aircraft_defects column:', err);
+            } else if (results.length === 0) {
+                con.query(`ALTER TABLE trip_booking ADD COLUMN aircraft_defects TEXT`, (alterErr) => {
+                    if (alterErr) {
+                        console.error('Error adding aircraft_defects column:', alterErr);
+                    } else {
+                        console.log('aircraft_defects column added');
+                    }
+                });
+            }
+        });
+        
+        con.query(`SHOW COLUMNS FROM trip_booking LIKE 'vehicle_trailer_defects'`, (err, results) => {
+            if (err) {
+                console.error('Error checking vehicle_trailer_defects column:', err);
+            } else if (results.length === 0) {
+                con.query(`ALTER TABLE trip_booking ADD COLUMN vehicle_trailer_defects TEXT`, (alterErr) => {
+                    if (alterErr) {
+                        console.error('Error adding vehicle_trailer_defects column:', alterErr);
+                    } else {
+                        console.log('vehicle_trailer_defects column added');
+                    }
+                });
+            }
+        });
+        
+        con.query(`SHOW COLUMNS FROM trip_booking LIKE 'flight_start_time'`, (err, results) => {
+            if (err) {
+                console.error('Error checking flight_start_time column:', err);
+            } else if (results.length === 0) {
+                con.query(`ALTER TABLE trip_booking ADD COLUMN flight_start_time DATETIME`, (alterErr) => {
+                    if (alterErr) {
+                        console.error('Error adding flight_start_time column:', alterErr);
+                    } else {
+                        console.log('flight_start_time column added');
+                    }
+                });
+            }
+        });
+        
+        con.query(`SHOW COLUMNS FROM trip_booking LIKE 'flight_end_time'`, (err, results) => {
+            if (err) {
+                console.error('Error checking flight_end_time column:', err);
+            } else if (results.length === 0) {
+                con.query(`ALTER TABLE trip_booking ADD COLUMN flight_end_time DATETIME`, (alterErr) => {
+                    if (alterErr) {
+                        console.error('Error adding flight_end_time column:', alterErr);
+                    } else {
+                        console.log('flight_end_time column added');
+                    }
+                });
+            }
+        });
+    }
+});
+
+app.post('/api/save-flight-operational-selections', (req, res) => {
+    const { booking_id, operational_selections, aircraft_defects, vehicle_trailer_defects, flight_start_date, flight_start_time, flight_end_date, flight_end_time } = req.body;
+
+    if (!booking_id) {
+        return res.status(400).json({ success: false, message: 'Booking ID is required' });
+    }
+
+    // Prepare data for trip_booking table
+    const refuelLocation = operational_selections && operational_selections['Refuel Location'] ? operational_selections['Refuel Location'] : null;
+    const landOwnerGift = operational_selections && operational_selections['Land Owner Gift'] ? operational_selections['Land Owner Gift'] : null;
+    const landingFee = operational_selections && operational_selections['Landing Fee'] ? operational_selections['Landing Fee'] : null;
+    const vehicleUsed = operational_selections && operational_selections['Vehicle Used'] ? operational_selections['Vehicle Used'] : null;
+    const aircraftDefects = aircraft_defects || null;
+    const vehicleTrailerDefects = vehicle_trailer_defects || null;
+    
+    // Combine date and time for flight_start_time and flight_end_time
+    let flightStartTime = null;
+    if (flight_start_date && flight_start_time) {
+        try {
+            // Handle dayjs objects or ISO strings from frontend
+            const startDate = moment(flight_start_date).isValid() 
+                ? moment(flight_start_date).format('YYYY-MM-DD')
+                : null;
+            const startTime = moment(flight_start_time).isValid()
+                ? moment(flight_start_time).format('HH:mm:ss')
+                : null;
+            if (startDate && startTime) {
+                flightStartTime = `${startDate} ${startTime}`;
+            }
+        } catch (e) {
+            console.warn('Error parsing flight_start_time:', e);
+        }
+    }
+    
+    let flightEndTime = null;
+    if (flight_end_date && flight_end_time) {
+        try {
+            // Handle dayjs objects or ISO strings from frontend
+            const endDate = moment(flight_end_date).isValid()
+                ? moment(flight_end_date).format('YYYY-MM-DD')
+                : null;
+            const endTime = moment(flight_end_time).isValid()
+                ? moment(flight_end_time).format('HH:mm:ss')
+                : null;
+            if (endDate && endTime) {
+                flightEndTime = `${endDate} ${endTime}`;
+            }
+        } catch (e) {
+            console.warn('Error parsing flight_end_time:', e);
+        }
+    }
+
+    // Store additional fields (non-default fields) in JSON
+    const additionalFields = {};
+    if (operational_selections) {
+        Object.keys(operational_selections).forEach(key => {
+            if (!['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'].includes(key)) {
+                additionalFields[key] = operational_selections[key];
+            }
+        });
+    }
+
+    // Check if record exists
+    con.query('SELECT id FROM trip_booking WHERE booking_id = ?', [booking_id], (err, existing) => {
+        if (err) {
+            console.error('Error checking existing trip_booking:', err);
+            return res.status(500).json({ success: false, message: 'Error checking existing record' });
+        }
+
+        const additionalFieldsJson = Object.keys(additionalFields).length > 0 ? JSON.stringify(additionalFields) : null;
+
+        if (existing.length > 0) {
+            // Update existing record
+            const updateSql = `
+                UPDATE trip_booking 
+                SET refuel_location = ?, 
+                    land_owner_gift = ?, 
+                    landing_fee = ?, 
+                    vehicle_used = ?, 
+                    aircraft_defects = ?,
+                    vehicle_trailer_defects = ?,
+                    flight_start_time = ?,
+                    flight_end_time = ?,
+                    additional_fields = ?,
+                    updated_at = NOW()
+                WHERE booking_id = ?
+            `;
+            con.query(updateSql, [refuelLocation, landOwnerGift, landingFee, vehicleUsed, aircraftDefects, vehicleTrailerDefects, flightStartTime, flightEndTime, additionalFieldsJson, booking_id], (updateErr) => {
+                if (updateErr) {
+                    console.error('Error updating trip_booking:', updateErr);
+                    return res.status(500).json({ success: false, message: 'Error updating operational selections' });
+                }
+                res.json({ success: true, message: 'Operational selections updated successfully' });
+            });
+        } else {
+            // Insert new record
+            const insertSql = `
+                INSERT INTO trip_booking 
+                (booking_id, refuel_location, land_owner_gift, landing_fee, vehicle_used, aircraft_defects, vehicle_trailer_defects, flight_start_time, flight_end_time, additional_fields, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            `;
+            con.query(insertSql, [booking_id, refuelLocation, landOwnerGift, landingFee, vehicleUsed, aircraftDefects, vehicleTrailerDefects, flightStartTime, flightEndTime, additionalFieldsJson], (insertErr, result) => {
+                if (insertErr) {
+                    console.error('Error inserting trip_booking:', insertErr);
+                    return res.status(500).json({ success: false, message: 'Error saving operational selections' });
+                }
+                res.json({ success: true, id: result.insertId, message: 'Operational selections saved successfully' });
+            });
+        }
     });
 });
 

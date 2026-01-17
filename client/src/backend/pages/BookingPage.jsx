@@ -8148,13 +8148,18 @@ setBookingDetail(finalVoucherDetail);
                                                                             console.log(`❌ No answer found for question ${question.id}`);
                                                                         }
                                                                         
+                                                                        // Hide question if answer is "Not answered" or empty
+                                                                        if (!answer || (answer && answer.toString().trim().toLowerCase() === 'not answered')) {
+                                                                            return null;
+                                                                        }
+                                                                        
                                                                         return (
                                                                             <Box key={index} sx={{ mb: 2, p: 2, background: '#f0f8ff', borderRadius: 1, border: '1px solid #e0e0e0' }}>
                                                                                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
                                                                                     {question.question_text}:
                                                                                 </Typography>
-                                                                                <Typography sx={{ color: answer ? '#333' : '#999', fontStyle: answer ? 'normal' : 'italic' }}>
-                                                                                    {answer ? answer : 'Not answered'}
+                                                                                <Typography sx={{ color: '#333' }}>
+                                                                                    {answer}
                                                                                 </Typography>
                                                                                 {question.help_text && (
                                                                                     <Typography variant="caption" sx={{ color: '#666', mt: 1, display: 'block' }}>

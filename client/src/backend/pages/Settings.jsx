@@ -258,6 +258,20 @@ const Settings = () => {
         is_active: true
     });
 
+    // Operational Selections state
+    const [operationalSelections, setOperationalSelections] = useState([]);
+    const [operationalSelectionsExpanded, setOperationalSelectionsExpanded] = useState(false);
+    const [operationalFields, setOperationalFields] = useState([
+        { id: 1, name: 'Refuel Location', type: 'text', values: [] },
+        { id: 2, name: 'Land Owner Gift', type: 'text', values: [] },
+        { id: 3, name: 'Landing Fee', type: 'text', values: [] },
+        { id: 4, name: 'Vehicle Used', type: 'text', values: [] }
+    ]);
+    const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+    const [newFieldName, setNewFieldName] = useState('');
+    const [editingFieldId, setEditingFieldId] = useState(null);
+    const [newValueInputs, setNewValueInputs] = useState({});
+
     const RichTextEditor = ({ value, onChange, placeholder }) => {
         const editorRef = useRef(null);
         const inputDebounceRef = useRef(null);
@@ -781,6 +795,7 @@ const Settings = () => {
         fetchEmailTemplates();
         fetchSmsTemplates();
         fetchCustomerPortalContents();
+        fetchOperationalSelections();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -977,6 +992,86 @@ const Settings = () => {
         } catch (error) {
             console.error('Error fetching customer portal contents:', error);
             setCustomerPortalContents([]);
+        }
+    };
+
+    const fetchOperationalSelections = async () => {
+        try {
+            const response = await axios.get('/api/operational-selections');
+            if (response.data?.success) {
+                const data = response.data.data || [];
+                // Group by field_name and collect values
+                const fieldsMap = {};
+                data.forEach(item => {
+                    if (!fieldsMap[item.field_name]) {
+                        fieldsMap[item.field_name] = {
+                            id: item.id,
+                            name: item.field_name,
+                            type: 'text',
+                            values: []
+                        };
+                    }
+                    if (item.field_value) {
+                        fieldsMap[item.field_name].values.push(item.field_value);
+                    }
+                });
+                
+                // Default fields
+                const defaultFields = [
+                    { id: 1, name: 'Refuel Location', type: 'text', values: [] },
+                    { id: 2, name: 'Land Owner Gift', type: 'text', values: [] },
+                    { id: 3, name: 'Landing Fee', type: 'text', values: [] },
+                    { id: 4, name: 'Vehicle Used', type: 'text', values: [] }
+                ];
+                
+                // Merge with default fields
+                const defaultFieldsMap = {};
+                defaultFields.forEach(field => {
+                    defaultFieldsMap[field.name] = field;
+                });
+                
+                // Combine default fields with fetched data
+                const combinedFields = defaultFields.map(field => {
+                    if (fieldsMap[field.name]) {
+                        return {
+                            ...field,
+                            values: fieldsMap[field.name].values,
+                            id: fieldsMap[field.name].id
+                        };
+                    }
+                    return field;
+                });
+                
+                // Add any new fields from database that aren't in defaults
+                Object.keys(fieldsMap).forEach(fieldName => {
+                    if (!defaultFieldsMap[fieldName]) {
+                        combinedFields.push(fieldsMap[fieldName]);
+                    }
+                });
+                
+                setOperationalFields(combinedFields);
+                setOperationalSelections(data);
+            }
+        } catch (error) {
+            console.error('Error fetching operational selections:', error);
+            setOperationalSelections([]);
+        }
+    };
+
+    const handleAddValue = async (fieldName, value) => {
+        if (!value || !value.trim()) {
+            alert('Please enter a value');
+            return;
+        }
+        try {
+            await axios.post('/api/operational-selections/value', {
+                field_name: fieldName,
+                field_value: value.trim()
+            });
+            setNewValueInputs({ ...newValueInputs, [fieldName]: '' });
+            fetchOperationalSelections();
+        } catch (error) {
+            alert('Error adding value: ' + (error.response?.data?.message || error.message));
         }
     };
 
@@ -3238,17 +3333,6 @@ const Settings = () => {
                         >
                             <Plus size={20} />
                             Create Private Charter Voucher Type
-                        </button>
-                        <button 
-                            className="btn btn-secondary"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleSyncPricingFromActivities();
-                            }}
-                            style={{ margin: 0 }}
-                            title="Sync group pricing from activities to voucher types"
-                        >
-                            🔄 Sync Pricing
                         </button>
                         {privateCharterVoucherTypesExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
                     </div>
@@ -12657,6 +12741,295 @@ const Settings = () => {
                     </div>
                 )}
             </div>
+
+            {/* Operational Selections Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div 
+                    className="card-header"
+                    onClick={() => setOperationalSelectionsExpanded(!operationalSelectionsExpanded)}
+                    style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Operational Selections</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage operational selections including Refuel Location, Land Owner Gift, Landing Fee, and Vehicle Used.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <button 
+                            className="btn btn-primary"
+                            onClick={(e) => { e.stopPropagation(); setShowAddFieldModal(true); }}
+                            style={{ margin: 0 }}
+                        >
+                            <Plus size={20} />
+                            New Field
+                        </button>
+                        {operationalSelectionsExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+
+                {operationalSelectionsExpanded && (
+                    <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '0 0 12px 12px' }}>
+                        {operationalFields.length === 0 ? (
+                            <div style={{ 
+                                textAlign: 'center', 
+                                padding: '40px 20px', 
+                                color: '#6b7280',
+                                background: '#fff',
+                                borderRadius: '8px',
+                                border: '1px dashed #d1d5db'
+                            }}>
+                                <p style={{ margin: 0, fontSize: '15px' }}>No operational fields yet. Create your first field!</p>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                {operationalFields.map((field) => (
+                                    <div 
+                                        key={field.id || field.name} 
+                                        style={{ 
+                                            background: '#fff', 
+                                            borderRadius: '8px', 
+                                            padding: '20px',
+                                            border: '1px solid #e2e8f0',
+                                            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                            <h3 style={{ margin: 0, color: '#1f2937', fontSize: '18px', fontWeight: 600 }}>
+                                                {field.name}
+                                            </h3>
+                                            {!['Refuel Location', 'Land Owner Gift', 'Landing Fee', 'Vehicle Used'].includes(field.name) && (
+                                                <button
+                                                    className="btn btn-danger"
+                                                    onClick={async () => {
+                                                        if (window.confirm(`Are you sure you want to delete the field "${field.name}"?`)) {
+                                                            try {
+                                                                await axios.delete(`/api/operational-selections/field/${field.name}`);
+                                                                fetchOperationalSelections();
+                                                            } catch (error) {
+                                                                alert('Error deleting field: ' + (error.response?.data?.message || error.message));
+                                                            }
+                                                        }
+                                                    }}
+                                                    style={{ padding: '6px 12px', fontSize: '13px' }}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        
+                                        <div style={{ marginBottom: '12px' }}>
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                                {field.values && field.values.length > 0 ? (
+                                                    field.values.map((value, index) => (
+                                                        <div 
+                                                            key={index}
+                                                            style={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '8px',
+                                                                padding: '8px 12px',
+                                                                background: '#f0f8ff',
+                                                                border: '1px solid #b3d4ff',
+                                                                borderRadius: '6px',
+                                                                fontSize: '14px'
+                                                            }}
+                                                        >
+                                                            <span style={{ color: '#1976d2' }}>{value}</span>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (window.confirm(`Are you sure you want to delete "${value}"?`)) {
+                                                                        try {
+                                                                            await axios.delete(`/api/operational-selections/value`, {
+                                                                                data: { field_name: field.name, field_value: value }
+                                                                            });
+                                                                            fetchOperationalSelections();
+                                                                        } catch (error) {
+                                                                            alert('Error deleting value: ' + (error.response?.data?.message || error.message));
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                style={{
+                                                                    background: 'none',
+                                                                    border: 'none',
+                                                                    color: '#ef4444',
+                                                                    cursor: 'pointer',
+                                                                    padding: '2px 4px',
+                                                                    fontSize: '16px',
+                                                                    lineHeight: 1
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <span style={{ color: '#6b7280', fontStyle: 'italic' }}>No values added yet</span>
+                                                )}
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <input
+                                                    type="text"
+                                                    value={newValueInputs[field.name] || ''}
+                                                    onChange={(e) => setNewValueInputs({ ...newValueInputs, [field.name]: e.target.value })}
+                                                    placeholder={`Add new ${field.name.toLowerCase()}...`}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '8px 12px',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '6px',
+                                                        fontSize: '14px'
+                                                    }}
+                                                    onKeyPress={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            handleAddValue(field.name, newValueInputs[field.name]);
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    className="btn btn-primary"
+                                                    onClick={() => handleAddValue(field.name, newValueInputs[field.name])}
+                                                    disabled={!newValueInputs[field.name] || !newValueInputs[field.name].trim()}
+                                                    style={{ padding: '8px 16px', fontSize: '14px' }}
+                                                >
+                                                    Add
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Add New Field Modal */}
+            {showAddFieldModal && (
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {
+                        maxWidth: '500px',
+                        width: '90%'
+                    }}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {
+                            padding: '20px 24px',
+                            borderBottom: '1px solid #e5e7eb'
+                        }}>
+                            <h3 style={isMobile ? {
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 600
+                            } : {
+                                margin: 0,
+                                fontSize: '20px',
+                                fontWeight: 600,
+                                color: '#1f2937'
+                            }}>Add New Field</h3>
+                            <button
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowAddFieldModal(false);
+                                    setNewFieldName('');
+                                }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {
+                                    fontSize: '24px',
+                                    width: '32px',
+                                    height: '32px'
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ padding: isMobile ? '16px' : '24px' }}>
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                    Field Name <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={newFieldName}
+                                    onChange={(e) => setNewFieldName(e.target.value)}
+                                    placeholder="Enter field name (e.g., Refuel Location)"
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 12px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        fontSize: '14px'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{
+                            padding: isMobile ? '12px 16px' : '16px 24px',
+                            borderTop: '1px solid #e5e7eb',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                            gap: '12px'
+                        }}>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={() => {
+                                    setShowAddFieldModal(false);
+                                    setNewFieldName('');
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={async () => {
+                                    if (!newFieldName || !newFieldName.trim()) {
+                                        alert('Please enter a field name');
+                                        return;
+                                    }
+                                    try {
+                                        await axios.post('/api/operational-selections/field', {
+                                            field_name: newFieldName.trim()
+                                        });
+                                        fetchOperationalSelections();
+                                        setShowAddFieldModal(false);
+                                        setNewFieldName('');
+                                    } catch (error) {
+                                        alert('Error creating field: ' + (error.response?.data?.message || error.message));
+                                    }
+                                }}
+                            >
+                                Create Field
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Create Customer Portal Content Modal */}
             {showCustomerPortalForm && (

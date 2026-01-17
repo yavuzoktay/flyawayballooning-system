@@ -5,6 +5,7 @@ import MainLayout from './backend/layout/MainLayout';
 import '../src/assets/css/backend/style.css';
 import '../src/assets/css/backend/settings.css';
 import BookingPage from './backend/pages/BookingPage';
+import FlownFlights from './backend/pages/FlownFlights';
 import Manifest from './backend/pages/Manifest';
 import Profile from './backend/pages/Profile';
 import Activity from './backend/pages/Activity';
@@ -49,6 +50,7 @@ function App() {
             <Route path='/' element={<RequireAuth><MainLayout /></RequireAuth>}>
                 <Route path="/" element={<Index />} />
                 <Route path="/booking" element={<BookingPage />} />
+                <Route path="/flown-flights" element={<FlownFlights />} />
                 <Route path="/manifest" element={<Manifest />} />
                 <Route path="/profile/:booking_id/:email" element={<Profile />} />
                 <Route path="/activity" element={<Activity />} />
