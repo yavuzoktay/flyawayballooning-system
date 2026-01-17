@@ -723,24 +723,26 @@ const FlownFlights = () => {
                         return baseData;
                     })}
                     columns={[
-                        "row_id",
-                        "location",
-                        "flight_date",
-                        "passenger_booking_id",
-                        "flight_period",
-                        "flight_type_display",
-                        "balloon_resource",
-                        "pax",
-                        "paid",
-                        "flight_start_time",
-                        "flight_end_time",
-                        "total_flight_time",
-                        "duty_time",
-                        "pilot",
-                        "crew",
-                        "aircraft_defects",
-                        "vehicle_trailer_defects",
-                        ...operationalFields.map(field => field.toLowerCase().replace(/\s+/g, '_'))
+                        "row_id",                    // 1. ID
+                        "flight_date",               // 2. Flight Date
+                        "flight_period",            // 3. Flight Period
+                        "location",                  // 4. Location
+                        "flight_type_display",      // 5. Flight Type
+                        "pax",                      // 6. Total Passengers
+                        "balloon_resource",         // 7. Balloon Resource
+                        "pilot",                    // 8. Pilot
+                        "crew",                     // 9. Crew
+                        "passenger_booking_id",     // 10. Passenger Booking ID
+                        "flight_start_time",        // 11. Start time
+                        "flight_end_time",          // 12. End time
+                        "total_flight_time",        // 13. Total flight time
+                        "duty_time",                // 14. Duty time
+                        "refuel_location",          // 15. Refuel location
+                        "vehicle_used",             // 16. Vehicle used
+                        "land_owner_gift",          // 17. Land owner gift
+                        "landing_fee",              // 18. Landing fee
+                        "aircraft_defects",          // 19. Aircraft / Balloon Defects or Issues
+                        "vehicle_trailer_defects"    // 20. Vehicle / Trailer Issues
                     ]}
                     selectable={false}
                     onBookingIdClick={handleBookingIdClick}
