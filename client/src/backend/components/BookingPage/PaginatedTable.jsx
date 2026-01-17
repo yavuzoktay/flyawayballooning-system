@@ -43,7 +43,7 @@ const PaginatedTable = ({
             if (col === 'flight_end_time') return 'Flight End Time';
             if (col === 'total_flight_time') return 'Total Flight Time';
             if (col === 'duty_time') return 'Duty Time';
-            if (col === 'passenger_booking_id') return 'Passenger Booking ID';
+            if (col === 'passenger_booking_id') return 'Passenger Bookings';
             if (col === 'aircraft_defects') return 'Aircraft / Balloon Defects or Issues';
             if (col === 'vehicle_trailer_defects') return 'Vehicle / Trailer Issues';
             // Operational selections - capitalize each word properly
@@ -75,7 +75,7 @@ const PaginatedTable = ({
         if (id === 'flight_end_time') return 'Flight End Time';
         if (id === 'total_flight_time') return 'Total Flight Time';
         if (id === 'duty_time') return 'Duty Time';
-        if (id === 'passenger_booking_id') return 'Passenger Booking ID';
+        if (id === 'passenger_booking_id') return 'Passenger Bookings';
         if (id === 'aircraft_defects') return 'Aircraft / Balloon Defects or Issues';
         if (id === 'vehicle_trailer_defects') return 'Vehicle / Trailer Issues';
         // Operational selections - capitalize each word properly
@@ -455,12 +455,12 @@ const PaginatedTable = ({
                                        id === 'flight_date' ? '200px' :
                                        id === 'flight_period' ? '120px' :
                                        id === 'flight_type_display' ? '120px' :
-                                       id === 'balloon_resource' ? '120px' :
+                                       id === 'balloon_resource' ? '180px' :
                                        id === 'flight_start_time' ? '180px' :
                                        id === 'flight_end_time' ? '180px' :
                                        id === 'total_flight_time' ? '140px' :
                                        id === 'duty_time' ? '140px' :
-                                       id === 'passenger_booking_id' ? '150px' :
+                                       id === 'passenger_booking_id' ? '220px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
                                        id === 'flight_attempts' ? '100px' :
@@ -491,12 +491,12 @@ const PaginatedTable = ({
                                          id === 'flight_date' ? '200px' :
                                          id === 'flight_period' ? '120px' :
                                          id === 'flight_type_display' ? '120px' :
-                                         id === 'balloon_resource' ? '120px' :
+                                         id === 'balloon_resource' ? '180px' :
                                          id === 'flight_start_time' ? '180px' :
                                          id === 'flight_end_time' ? '180px' :
                                          id === 'total_flight_time' ? '140px' :
                                          id === 'duty_time' ? '140px' :
-                                         id === 'passenger_booking_id' ? '150px' :
+                                         id === 'passenger_booking_id' ? '220px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
                                          id === 'flight_attempts' ? '100px' :
