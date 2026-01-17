@@ -8612,39 +8612,41 @@ const Manifest = () => {
                             balloonResource = first.balloon_resources || 'N/A';
                         }
                         
-                        // Get total pax
-                        const totalPax = Array.isArray(first.passengers) && first.passengers.length > 0 
-                            ? first.passengers.length 
-                            : (first.pax || first.passenger_count || 0);
+                        // Get total pax - calculate across all bookings in selectedGroupFlightsForClose
+                        const totalPax = selectedGroupFlightsForClose.reduce((sum, flight) => {
+                            if (Array.isArray(flight.passengers) && flight.passengers.length > 0) {
+                                return sum + flight.passengers.length;
+                            } else {
+                                return sum + (flight.pax || flight.passenger_count || 0);
+                            }
+                        }, 0);
                         
-                        // Get total price
-                        let totalPrice = 'N/A';
-                        if (Array.isArray(first.passengers) && first.passengers.length > 0) {
-                            // Calculate from passenger prices
-                            const priceSum = first.passengers.reduce((sum, p) => {
-                                const price = parseFloat(p.price || 0);
-                                return sum + (isNaN(price) ? 0 : price);
+                        // Get total price - calculate across all bookings in selectedGroupFlightsForClose
+                        // First try to calculate from passenger prices
+                        let totalPriceSum = 0;
+                        let hasPassengerPrices = false;
+                        
+                        selectedGroupFlightsForClose.forEach(flight => {
+                            if (Array.isArray(flight.passengers) && flight.passengers.length > 0) {
+                                const priceSum = flight.passengers.reduce((sum, p) => {
+                                    const price = parseFloat(p.price || 0);
+                                    return sum + (isNaN(price) ? 0 : price);
+                                }, 0);
+                                if (priceSum > 0) {
+                                    totalPriceSum += priceSum;
+                                    hasPassengerPrices = true;
+                                }
+                            }
+                        });
+                        
+                        // If no passenger prices, use paid field (same as manifest page)
+                        if (!hasPassengerPrices || totalPriceSum === 0) {
+                            totalPriceSum = selectedGroupFlightsForClose.reduce((sum, flight) => {
+                                return sum + (parseFloat(flight.paid) || 0);
                             }, 0);
-                            if (priceSum > 0) {
-                                totalPrice = `£${priceSum.toFixed(2)}`;
-                            }
                         }
-                        // If no price from passengers, try paid + due
-                        if (totalPrice === 'N/A') {
-                            const paid = parseFloat(first.paid || 0);
-                            const due = parseFloat(first.due || 0);
-                            const total = paid + due;
-                            if (total > 0) {
-                                totalPrice = `£${total.toFixed(2)}`;
-                            }
-                        }
-                        // If still no price, try total_price field
-                        if (totalPrice === 'N/A' && first.total_price) {
-                            const total = parseFloat(first.total_price);
-                            if (!isNaN(total) && total > 0) {
-                                totalPrice = `£${total.toFixed(2)}`;
-                            }
-                        }
+                        
+                        const totalPrice = totalPriceSum > 0 ? `£${totalPriceSum.toFixed(2)}` : 'N/A';
                         
                         return (
                             <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8fafc', borderRadius: 1 }}>

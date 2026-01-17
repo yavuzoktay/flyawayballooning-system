@@ -606,12 +606,33 @@ const PaginatedTable = ({
                                                                 )
                                                             ) : id === 'passenger_booking_id' ? (
                                                                 onBookingIdClick ? (
-                                                                    <span
-                                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
-                                                                        onClick={() => onBookingIdClick && onBookingIdClick(item)}
-                                                                    >
-                                                                        {item[id]}
-                                                                    </span>
+                                                                    (() => {
+                                                                        const bookingIdsStr = item[id] || '';
+                                                                        const bookingIds = bookingIdsStr.toString().split(',').map(id => id.trim()).filter(id => id);
+                                                                        
+                                                                        if (bookingIds.length === 0) {
+                                                                            return <span>{item[id]}</span>;
+                                                                        }
+                                                                        
+                                                                        return (
+                                                                            <span>
+                                                                                {bookingIds.map((bookingId, idx) => (
+                                                                                    <React.Fragment key={bookingId}>
+                                                                                        <span
+                                                                                            style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                onBookingIdClick({ ...item, clickedBookingId: bookingId });
+                                                            }}
+                                                                                        >
+                                                                                            {bookingId}
+                                                                                        </span>
+                                                                                        {idx < bookingIds.length - 1 && <span style={{ margin: '0 4px' }}>, </span>}
+                                                                                    </React.Fragment>
+                                                                                ))}
+                                                                            </span>
+                                                                        );
+                                                                    })()
                                                                 ) : (
                                                                     <span>{item[id]}</span>
                                                                 )

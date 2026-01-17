@@ -203,7 +203,11 @@ const FlownFlights = () => {
     }, [detailDialogOpen, selectedBookingId]);
     
     const handleBookingIdClick = (item) => {
-        const bookingId = item.id || item.passenger_booking_id;
+        // Use clickedBookingId if available (from PaginatedTable when specific ID is clicked)
+        // Otherwise fallback to first booking ID from comma-separated list
+        const bookingId = item.clickedBookingId || 
+                         (item.passenger_booking_id ? item.passenger_booking_id.toString().split(',')[0].trim() : null) ||
+                         item.id || '';
         if (bookingId) {
             setSelectedBookingId(bookingId);
             setDetailDialogOpen(true);
@@ -274,7 +278,7 @@ const FlownFlights = () => {
             const baseData = {
                 row_id: index + 1,
                 id: item.id || '',
-                passenger_booking_id: item.id || '',
+                passenger_booking_id: item.booking_ids || item.id || '', // Use booking_ids (comma-separated) if available
                 location: item.location || '',
                 flight_date: item.flight_date_display || (item.flight_date ? dayjs(item.flight_date).format('DD/MM/YYYY HH:mm A') : ''),
                 pax: item.pax || item.passenger_count || 0,
@@ -657,7 +661,7 @@ const FlownFlights = () => {
                         const baseData = {
                             row_id: index + 1, // Auto-incrementing ID starting from 1
                             id: item.id || '',
-                            passenger_booking_id: item.id || '',
+                            passenger_booking_id: item.booking_ids || item.id || '', // Use booking_ids (comma-separated) if available
                             location: item.location || '',
                             flight_date: item.flight_date_display || (item.flight_date ? dayjs(item.flight_date).format('DD/MM/YYYY HH:mm A') : ''),
                             pax: item.pax || item.passenger_count || 0,
