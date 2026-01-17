@@ -22468,10 +22468,11 @@ app.get('/api/flown-flights', (req, res) => {
             ab.paid,
             ab.due,
             ab.activity_id,
+            ab.pax,
             DATE(ab.flight_date) as flight_date_only,
             TIME(ab.flight_date) as flight_time_only,
-            COUNT(DISTINCT p.id) as passenger_count,
-            COUNT(DISTINCT p.id) as pax,
+            COALESCE(ab.pax, (SELECT COUNT(*) FROM passengers WHERE booking_id = ab.id), 0) as passenger_count,
+            COALESCE(ab.pax, (SELECT COUNT(*) FROM passengers WHERE booking_id = ab.id), 0) as pax,
             (SELECT refuel_location FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as refuel_location,
             (SELECT land_owner_gift FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as land_owner_gift,
             (SELECT landing_fee FROM trip_booking WHERE booking_id = ab.id LIMIT 1) as landing_fee,
@@ -22504,7 +22505,7 @@ app.get('/api/flown-flights', (req, res) => {
         WHERE ab.status = 'Flown'
         GROUP BY ab.id, ab.name, ab.email, ab.phone, ab.flight_date, ab.location, 
                  ab.flight_type, ab.status, ab.created_at, ab.voucher_type, ab.voucher_code, 
-                 ab.flight_attempts, ab.expires, ab.paid, ab.due, ab.activity_id
+                 ab.flight_attempts, ab.expires, ab.paid, ab.due, ab.activity_id, ab.pax
         ORDER BY ab.flight_date DESC, ab.created_at DESC
     `;
 
@@ -22612,7 +22613,28 @@ app.get('/api/flown-flights', (req, res) => {
                     vehicle_trailer_defects: row.vehicle_trailer_defects || '',
                     balloon_resource: balloonResource,
                     flight_start_time: row.flight_start_time ? moment(row.flight_start_time).format('DD/MM/YYYY HH:mm') : null,
-                    flight_end_time: row.flight_end_time ? moment(row.flight_end_time).format('DD/MM/YYYY HH:mm') : null
+                    flight_end_time: row.flight_end_time ? moment(row.flight_end_time).format('DD/MM/YYYY HH:mm') : null,
+                    total_flight_time: (() => {
+                        if (row.flight_start_time && row.flight_end_time) {
+                            try {
+                                const start = moment(row.flight_start_time);
+                                const end = moment(row.flight_end_time);
+                                if (start.isValid() && end.isValid()) {
+                                    const duration = moment.duration(end.diff(start));
+                                    const hours = Math.floor(duration.asHours());
+                                    const minutes = duration.minutes();
+                                    if (hours > 0) {
+                                        return `${hours}h ${minutes}m`;
+                                    } else {
+                                        return `${minutes}m`;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('Error calculating total flight time:', e);
+                            }
+                        }
+                        return null;
+                    })()
                 };
             });
             

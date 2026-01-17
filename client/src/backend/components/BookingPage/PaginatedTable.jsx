@@ -11,7 +11,8 @@ const PaginatedTable = ({
     context = 'bookings',
     onEmailClick,
     onSmsClick,
-    onVoucherRefClick
+    onVoucherRefClick,
+    onBookingIdClick
 }) => {
     const [visibleCount, setVisibleCount] = useState(10); // Start with 10 items
     const [selectedRows, setSelectedRows] = useState([]);
@@ -40,6 +41,8 @@ const PaginatedTable = ({
             if (col === 'balloon_resource') return 'Balloon Resource';
             if (col === 'flight_start_time') return 'Flight Start Time';
             if (col === 'flight_end_time') return 'Flight End Time';
+            if (col === 'total_flight_time') return 'Total Flight Time';
+            if (col === 'passenger_booking_id') return 'Passenger Booking ID';
             if (col === 'aircraft_defects') return 'Aircraft / Balloon Defects or Issues';
             if (col === 'vehicle_trailer_defects') return 'Vehicle / Trailer Issues';
             // Operational selections - capitalize each word properly
@@ -69,6 +72,8 @@ const PaginatedTable = ({
         if (id === 'balloon_resource') return 'Balloon Resource';
         if (id === 'flight_start_time') return 'Flight Start Time';
         if (id === 'flight_end_time') return 'Flight End Time';
+        if (id === 'total_flight_time') return 'Total Flight Time';
+        if (id === 'passenger_booking_id') return 'Passenger Booking ID';
         if (id === 'aircraft_defects') return 'Aircraft / Balloon Defects or Issues';
         if (id === 'vehicle_trailer_defects') return 'Vehicle / Trailer Issues';
         // Operational selections - capitalize each word properly
@@ -451,6 +456,8 @@ const PaginatedTable = ({
                                        id === 'balloon_resource' ? '120px' :
                                        id === 'flight_start_time' ? '180px' :
                                        id === 'flight_end_time' ? '180px' :
+                                       id === 'total_flight_time' ? '140px' :
+                                       id === 'passenger_booking_id' ? '150px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
                                        id === 'flight_attempts' ? '100px' :
@@ -484,6 +491,8 @@ const PaginatedTable = ({
                                          id === 'balloon_resource' ? '120px' :
                                          id === 'flight_start_time' ? '180px' :
                                          id === 'flight_end_time' ? '180px' :
+                                         id === 'total_flight_time' ? '140px' :
+                                         id === 'passenger_booking_id' ? '150px' :
                                         id === 'pax' ? '80px' :
                                         id === 'paid' ? '120px' :
                                          id === 'flight_attempts' ? '100px' :
@@ -585,6 +594,17 @@ const PaginatedTable = ({
                                                                     <span
                                                                         style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
                                                                         onClick={() => onNameClick && onNameClick(item)}
+                                                                    >
+                                                                        {item[id]}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span>{item[id]}</span>
+                                                                )
+                                                            ) : id === 'passenger_booking_id' ? (
+                                                                onBookingIdClick ? (
+                                                                    <span
+                                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
+                                                                        onClick={() => onBookingIdClick && onBookingIdClick(item)}
                                                                     >
                                                                         {item[id]}
                                                                     </span>
