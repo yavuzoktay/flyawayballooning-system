@@ -297,7 +297,7 @@ export const BottomNav = ({ hasNewBookings, hasNewVouchers, onMenuClick }) => {
     { label: 'Manifest', path: '/manifest', icon: <ManifestIcon /> },
     { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
     { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
-    { label: 'Flown Flights', path: '/flown-flights', icon: <FlownFlightsIcon /> },
+    { label: 'Flown', path: '/flown-flights', icon: <FlownFlightsIcon /> },
     { label: 'Logs', path: '/logs', icon: <LogsIcon /> },
   ];
 

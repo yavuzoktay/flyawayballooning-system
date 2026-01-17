@@ -20,7 +20,8 @@ import {
     DialogActions,
     Grid,
     Divider,
-    IconButton
+    IconButton,
+    OutlinedInput
 } from "@mui/material";
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
@@ -43,6 +44,7 @@ const FlownFlights = () => {
     const [experienceFilter, setExperienceFilter] = useState('');
     const [pilotFilter, setPilotFilter] = useState('');
     const [operationalFields, setOperationalFields] = useState([]);
+    const [selectedIds, setSelectedIds] = useState([]);
     
     // Booking Details popup states
     const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -206,6 +208,58 @@ const FlownFlights = () => {
         }
     };
 
+    // Delete selected flights function
+    const handleDeleteSelected = async () => {
+        if (!selectedIds || selectedIds.length === 0) {
+            alert('Please select at least one flight to delete!');
+            return;
+        }
+
+        const itemCount = selectedIds.length;
+        const confirmMessage = `Are you sure you want to delete ${itemCount} flight${itemCount > 1 ? 's' : ''}? This action cannot be undone.`;
+        
+        if (!window.confirm(confirmMessage)) {
+            return;
+        }
+
+        try {
+            const deletePromises = selectedIds.map(id => {
+                return axios.delete(`/api/deleteBooking/${id}`);
+            });
+
+            const results = await Promise.allSettled(deletePromises);
+            
+            const successful = results.filter(r => r.status === 'fulfilled').length;
+            const failed = results.filter(r => r.status === 'rejected').length;
+
+            if (failed > 0) {
+                const errorMessages = results
+                    .filter(r => r.status === 'rejected')
+                    .map(r => {
+                        const error = r.reason;
+                        if (error?.response?.status === 404) {
+                            return 'Route not found';
+                        }
+                        return error?.response?.data?.message || error?.message || 'Unknown error';
+                    })
+                    .join('\n');
+                
+                alert(`Some flights could not be deleted:\n${errorMessages}\n\nSuccessfully deleted: ${successful} of ${itemCount}`);
+            } else {
+                alert(`Successfully deleted ${successful} flight${successful > 1 ? 's' : ''}`);
+            }
+
+            // Clear selections
+            setSelectedIds([]);
+
+            // Refresh data
+            fetchFlownFlights();
+        } catch (error) {
+            console.error('Error deleting flights:', error);
+            alert('An error occurred while deleting flights. Please try again.');
+        }
+    };
+
     const fetchFlownFlights = async () => {
         setLoading(true);
         try {
@@ -305,6 +359,52 @@ const FlownFlights = () => {
                             View and manage completed flights
                         </Typography>
                     </Box>
+
+            {/* Action Buttons */}
+            <Box sx={{ mb: 2, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-end' }}>
+                {isMobile ? (
+                    <OutlinedInput
+                        readOnly
+                        onClick={handleDeleteSelected}
+                        disabled={!selectedIds || selectedIds.length === 0}
+                        value=""
+                        sx={{
+                            cursor: (!selectedIds || selectedIds.length === 0) ? 'not-allowed' : 'pointer',
+                            height: '32px',
+                            width: '40px',
+                            minWidth: '40px',
+                            maxWidth: '40px',
+                            opacity: (!selectedIds || selectedIds.length === 0) ? 0.5 : 1,
+                            '& input': {
+                                cursor: (!selectedIds || selectedIds.length === 0) ? 'not-allowed' : 'pointer',
+                                textAlign: 'center',
+                                padding: '0',
+                                display: 'none'
+                            },
+                            '& fieldset': {
+                                border: 'none'
+                            }
+                        }}
+                        size="small"
+                        startAdornment={
+                            <InputAdornment position="start" sx={{ margin: 0 }}>
+                                <DeleteIcon fontSize="small" color="error" />
+                            </InputAdornment>
+                        }
+                    />
+                ) : (
+                    <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={handleDeleteSelected}
+                        disabled={!selectedIds || selectedIds.length === 0}
+                        startIcon={<DeleteIcon />}
+                        sx={{ height: 40 }}
+                    >
+                        Delete
+                    </Button>
+                )}
+            </Box>
 
             {/* Filters */}
             <Box sx={{ mb: 3, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 2, flexWrap: 'wrap' }}>
@@ -433,6 +533,8 @@ const FlownFlights = () => {
                     ]}
                     selectable={false}
                     onBookingIdClick={handleBookingIdClick}
+                    selectable={true}
+                    onSelectionChange={setSelectedIds}
                 />
             )}
 

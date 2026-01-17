@@ -3432,7 +3432,7 @@ const Manifest = () => {
         setFlightEndTime(null);
         setSelectedGroupFlightsForClose(null);
       } catch (err) {
-        alert('Failed to close flight: ' + (err.response?.data?.message || err.message));
+        alert('Failed to log flight: ' + (err.response?.data?.message || err.message));
       }
       setStatusLoadingGroup(null);
     };
@@ -5030,7 +5030,7 @@ const Manifest = () => {
                                                         }
                                                     }}
                                                 >
-                                                    {statusLoadingGroup === (globalMenuGroup?.id) ? 'Closing...' : 'Close Flight'}
+                                                    {statusLoadingGroup === (globalMenuGroup?.id) ? 'Logging...' : 'Log Flight'}
                                                 </MenuItem>
                                             </Menu>
                                         </Box>
@@ -8517,26 +8517,35 @@ const Manifest = () => {
                     padding: isMobile ? '12px 16px' : '20px 24px',
                     borderBottom: '1px solid #e5e7eb'
                 }}>
-                    Close Flight - Operational Selections
+                    Log Flight - Operational Selections
                 </DialogTitle>
                 <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
                     {selectedGroupFlightsForClose && selectedGroupFlightsForClose.length > 0 && (() => {
                         const first = selectedGroupFlightsForClose[0];
                         // Find flight time from time_slot or flight_date and format as AM/PM
-                        let displayFlightTime = '';
+                        let displayFlightTime = 'N/A';
                         
                         // Try time_slot first
                         if (first.time_slot) {
                             const timeValue = dayjs(first.time_slot, 'HH:mm');
                             if (timeValue.isValid()) {
                                 displayFlightTime = timeValue.format('hh:mm A');
+                            } else {
+                                // Try parsing as string directly
+                                const timeStr = String(first.time_slot).trim();
+                                if (timeStr.match(/^\d{1,2}:\d{2}$/)) {
+                                    const parsedTime = dayjs(timeStr, 'HH:mm');
+                                    if (parsedTime.isValid()) {
+                                        displayFlightTime = parsedTime.format('hh:mm A');
+                                    }
+                                }
                             }
                         } 
                         // If no time_slot, try to extract from flight_date
-                        else if (first.flight_date) {
+                        if (displayFlightTime === 'N/A' && first.flight_date) {
                             const flightDateMoment = dayjs(first.flight_date);
-                            if (flightDateMoment.isValid() && flightDateMoment.hour() !== 0 && flightDateMoment.minute() !== 0) {
-                                // Only use if time is not midnight (00:00)
+                            if (flightDateMoment.isValid()) {
+                                // Always format with AM/PM, even if time is midnight
                                 displayFlightTime = flightDateMoment.format('hh:mm A');
                             } else if (typeof first.flight_date === 'string' && first.flight_date.length >= 16) {
                                 // Try to extract time from string format like "YYYY-MM-DD HH:mm:ss"
@@ -8544,6 +8553,12 @@ const Manifest = () => {
                                 const timeValue = dayjs(timePart, 'HH:mm');
                                 if (timeValue.isValid()) {
                                     displayFlightTime = timeValue.format('hh:mm A');
+                                }
+                            } else if (typeof first.flight_date === 'string') {
+                                // Try to parse any date string format
+                                const parsed = dayjs(first.flight_date);
+                                if (parsed.isValid()) {
+                                    displayFlightTime = parsed.format('hh:mm A');
                                 }
                             }
                         }
@@ -8597,6 +8612,40 @@ const Manifest = () => {
                             balloonResource = first.balloon_resources || 'N/A';
                         }
                         
+                        // Get total pax
+                        const totalPax = Array.isArray(first.passengers) && first.passengers.length > 0 
+                            ? first.passengers.length 
+                            : (first.pax || first.passenger_count || 0);
+                        
+                        // Get total price
+                        let totalPrice = 'N/A';
+                        if (Array.isArray(first.passengers) && first.passengers.length > 0) {
+                            // Calculate from passenger prices
+                            const priceSum = first.passengers.reduce((sum, p) => {
+                                const price = parseFloat(p.price || 0);
+                                return sum + (isNaN(price) ? 0 : price);
+                            }, 0);
+                            if (priceSum > 0) {
+                                totalPrice = `£${priceSum.toFixed(2)}`;
+                            }
+                        }
+                        // If no price from passengers, try paid + due
+                        if (totalPrice === 'N/A') {
+                            const paid = parseFloat(first.paid || 0);
+                            const due = parseFloat(first.due || 0);
+                            const total = paid + due;
+                            if (total > 0) {
+                                totalPrice = `£${total.toFixed(2)}`;
+                            }
+                        }
+                        // If still no price, try total_price field
+                        if (totalPrice === 'N/A' && first.total_price) {
+                            const total = parseFloat(first.total_price);
+                            if (!isNaN(total) && total > 0) {
+                                totalPrice = `£${total.toFixed(2)}`;
+                            }
+                        }
+                        
                         return (
                             <Box sx={{ mb: 3, p: 2, backgroundColor: '#f8fafc', borderRadius: 1 }}>
                                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
@@ -8610,6 +8659,12 @@ const Manifest = () => {
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     Time: {displayFlightTime || 'N/A'}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Total Pax: {totalPax}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Total Price: {totalPrice}
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     Pilot: {pilotName === 'None' ? 'N/A' : pilotName}
@@ -8662,11 +8717,6 @@ const Manifest = () => {
                                             </MenuItem>
                                         )}
                                     </Select>
-                                    {field.values && field.values.length === 0 && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                                            Please add options in Settings → Operational Selections
-                                        </Typography>
-                                    )}
                                 </FormControl>
                             ))}
                             
@@ -8779,7 +8829,7 @@ const Manifest = () => {
                         color="error"
                         disabled={statusLoadingGroup !== null}
                     >
-                        {statusLoadingGroup !== null ? 'Closing...' : 'Close Flight'}
+                        {statusLoadingGroup !== null ? 'Logging...' : 'Log Flight'}
                     </Button>
                 </DialogActions>
             </Dialog>
