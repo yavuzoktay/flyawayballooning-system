@@ -7359,22 +7359,21 @@ app.get('/api/getAllBookingData', (req, res) => {
             const preserveStatuses = ['Flown', 'Checked In', 'No Show', 'Cancelled', 'Scheduled', 'Completed', 'Pending'];
             const shouldPreserveStatus = finalStatus && preserveStatuses.includes(finalStatus);
             
-            // REMOVED: Status override logic that was changing 'Flown' to 'Scheduled'
-            // This was causing the bug where status 'Flown' was being overridden
-            // Status should only be set to 'Scheduled' when explicitly updating, not during read operations
-            // if (hasFlightDate && !shouldPreserveStatus && (finalStatus === 'Open' || finalStatus === null || finalStatus === '')) {
-            //     finalStatus = 'Scheduled';
-            //     // Update database if booking exists
-            //     if (rest.id) {
-            //         con.query('UPDATE all_booking SET status = ? WHERE id = ?', ['Scheduled', rest.id], (updateErr) => {
-            //             if (updateErr) {
-            //                 console.warn('Failed to update status to Scheduled for booking with flight_date', rest.id, updateErr.message);
-            //             } else {
-            //                 console.log('✅ Updated status to Scheduled for booking with flight_date:', rest.id);
-            //             }
-            //         });
-            //     }
-            // }
+            // If flight_date exists and status is 'Open' (or null/empty), change it to 'Scheduled'
+            // But preserve all other statuses to avoid overriding 'Flown', 'Checked In', etc.
+            if (hasFlightDate && !shouldPreserveStatus && (finalStatus === 'Open' || finalStatus === null || finalStatus === '')) {
+                finalStatus = 'Scheduled';
+                // Update database if booking exists
+                if (rest.id) {
+                    con.query('UPDATE all_booking SET status = ? WHERE id = ?', ['Scheduled', rest.id], (updateErr) => {
+                        if (updateErr) {
+                            console.warn('Failed to update status to Scheduled for booking with flight_date', rest.id, updateErr.message);
+                        } else {
+                            console.log('✅ Updated status to Scheduled for booking with flight_date:', rest.id);
+                        }
+                    });
+                }
+            }
             
             // For Redeem Voucher bookings, if status is still 'Open', change it to 'Scheduled'
             if (flight_type_source === 'Redeem Voucher' && finalStatus === 'Open') {
