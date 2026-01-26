@@ -1582,6 +1582,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
             }
 
             // Voucher code is valid (no discount calculation needed)
+            const numberOfPassengersValue = voucher.max_uses || enriched?.numberOfVouchers || null;
             res.json({
                 success: true,
                 message: 'Voucher code is valid',
@@ -1593,7 +1594,7 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     voucher_type_detail: enriched?.voucher_type_detail || null, // Add voucher type detail to main response
                     final_amount: booking_amount, // No discount applied
                     // Use max_uses as numberOfPassengers (max_uses represents Number of Passengers in voucher_codes table)
-                    numberOfPassengers: voucher.max_uses || enriched?.numberOfVouchers || null,
+                    numberOfPassengers: numberOfPassengersValue,
                     // Extra detail block for Redeem Voucher UI
                     detail: enriched
                 }
