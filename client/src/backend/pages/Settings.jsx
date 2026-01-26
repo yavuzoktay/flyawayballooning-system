@@ -904,6 +904,7 @@ const Settings = () => {
         valid_until: dayjs().format('YYYY-MM-DD'),
         max_uses: '',
         voucher_type: '',
+        price_paid: '',
         applicable_locations: '',
         applicable_experiences: '',
         applicable_voucher_types: '',
@@ -1326,6 +1327,7 @@ const Settings = () => {
             valid_until: voucher.valid_until,
             max_uses: voucher.max_uses,
             voucher_type: voucher.voucher_type || '',
+            price_paid: voucher.price_paid || voucher.paid_amount || '',
             applicable_locations: voucher.applicable_locations,
             applicable_experiences: voucher.applicable_experiences,
             applicable_voucher_types: voucher.applicable_voucher_types,
@@ -2379,6 +2381,7 @@ const Settings = () => {
             valid_until: dayjs().format('YYYY-MM-DD'),
             max_uses: '',
             voucher_type: '',
+            price_paid: '',
             applicable_locations: '',
             applicable_experiences: '',
             applicable_voucher_types: '',
@@ -6497,6 +6500,59 @@ const Settings = () => {
                                         <option value="Private Charter">Private Charter</option>
                                         <option value="Proposal Flight">Proposal Flight</option>
                                     </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Price Paid</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={formData.price_paid}
+                                        onChange={(e) => setFormData({...formData, price_paid: e.target.value})}
+                                        placeholder="0.00"
+                                        min="0"
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            height: '32px',
+                                            boxSizing: 'border-box',
+                                            width: '100%'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
                                 </div>
                             </div>
                             

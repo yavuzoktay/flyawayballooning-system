@@ -1075,6 +1075,7 @@ app.post('/api/voucher-codes', (req, res) => {
         valid_until,
         max_uses,
         voucher_type,
+        price_paid,
         applicable_locations,
         applicable_experiences,
         applicable_voucher_types
@@ -1087,9 +1088,9 @@ app.post('/api/voucher-codes', (req, res) => {
 
     const sql = `
         INSERT INTO voucher_codes (
-            code, title, valid_from, valid_until, max_uses, voucher_type,
+            code, title, valid_from, valid_until, max_uses, voucher_type, paid_amount,
             applicable_locations, applicable_experiences, applicable_voucher_types
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -1099,6 +1100,7 @@ app.post('/api/voucher-codes', (req, res) => {
         valid_until || null,
         max_uses || null,
         voucher_type || null,
+        price_paid || null,
         applicable_locations || null,
         applicable_experiences || null,
         applicable_voucher_types || null
@@ -1127,6 +1129,7 @@ app.put('/api/voucher-codes/:id', (req, res) => {
         valid_until,
         max_uses,
         voucher_type,
+        price_paid,
         applicable_locations,
         applicable_experiences,
         applicable_voucher_types,
@@ -1141,7 +1144,7 @@ app.put('/api/voucher-codes/:id', (req, res) => {
     const sql = `
         UPDATE voucher_codes SET 
             code = ?, title = ?, valid_from = ?, valid_until = ?, 
-            max_uses = ?, voucher_type = ?, applicable_locations = ?, applicable_experiences = ?, 
+            max_uses = ?, voucher_type = ?, paid_amount = ?, applicable_locations = ?, applicable_experiences = ?, 
             applicable_voucher_types = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     `;
@@ -1153,6 +1156,7 @@ app.put('/api/voucher-codes/:id', (req, res) => {
         valid_until || null,
         max_uses || null,
         voucher_type || null,
+        price_paid || null,
         applicable_locations || null,
         applicable_experiences || null,
         applicable_voucher_types || null,
