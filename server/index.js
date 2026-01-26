@@ -1592,7 +1592,8 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                     voucher_type: voucher.applicable_voucher_types || enriched?.actual_voucher_type || null,
                     voucher_type_detail: enriched?.voucher_type_detail || null, // Add voucher type detail to main response
                     final_amount: booking_amount, // No discount applied
-                    numberOfPassengers: enriched?.numberOfVouchers || null,
+                    // Use max_uses as numberOfPassengers (max_uses represents Number of Passengers in voucher_codes table)
+                    numberOfPassengers: voucher.max_uses || enriched?.numberOfVouchers || null,
                     // Extra detail block for Redeem Voucher UI
                     detail: enriched
                 }
