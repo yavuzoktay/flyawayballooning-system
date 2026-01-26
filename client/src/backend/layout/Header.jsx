@@ -298,7 +298,6 @@ export const BottomNav = ({ hasNewBookings, hasNewVouchers, onMenuClick }) => {
     { label: 'Activity', path: '/activity', icon: <ActivityIcon /> },
     { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
     { label: 'Flown', path: '/flown-flights', icon: <FlownFlightsIcon /> },
-    { label: 'Logs', path: '/logs', icon: <LogsIcon /> },
   ];
 
   const handleChange = (event, newValue) => {
