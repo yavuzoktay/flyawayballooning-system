@@ -275,6 +275,8 @@ const Settings = () => {
     const RichTextEditor = ({ value, onChange, placeholder }) => {
         const editorRef = useRef(null);
         const inputDebounceRef = useRef(null);
+        const cursorPositionRef = useRef(null);
+        const isUpdatingFromValueRef = useRef(false);
         const [, startTransition] = useTransition();
         const [showButtonModal, setShowButtonModal] = useState(false);
         const [buttonText, setButtonText] = useState('');
@@ -282,12 +284,126 @@ const Settings = () => {
         const [showCustomerPortalLinkModal, setShowCustomerPortalLinkModal] = useState(false);
         const [customerPortalLinkText, setCustomerPortalLinkText] = useState('');
 
+        // Save cursor position as text offset (works even after DOM reset)
+        const saveCursorPosition = () => {
+            if (!editorRef.current) return;
+            try {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) return;
+                const range = selection.getRangeAt(0);
+                // Create a range from start of editor to cursor position
+                const rangeToCursor = document.createRange();
+                rangeToCursor.setStart(editorRef.current, 0);
+                rangeToCursor.setEnd(range.startContainer, range.startOffset);
+                // Get text content up to cursor - this gives us the text offset
+                const textBeforeCursor = rangeToCursor.toString();
+                const textOffset = textBeforeCursor.length;
+                
+                cursorPositionRef.current = {
+                    textOffset: textOffset,
+                    collapsed: range.collapsed
+                };
+            } catch (e) {
+                // Silently fail
+            }
+        };
+
+        // Restore cursor position using text offset
+        const restoreCursorPosition = () => {
+            if (!editorRef.current || !cursorPositionRef.current) return;
+            try {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                const targetOffset = cursorPositionRef.current.textOffset || 0;
+                
+                // Find the text node and offset that corresponds to the saved text offset
+                let currentOffset = 0;
+                const walker = document.createTreeWalker(
+                    editorRef.current,
+                    NodeFilter.SHOW_TEXT,
+                    null
+                );
+                
+                let textNode = null;
+                let nodeOffset = 0;
+                
+                while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    const nodeLength = node.textContent?.length || 0;
+                    
+                    if (currentOffset + nodeLength >= targetOffset) {
+                        textNode = node;
+                        nodeOffset = targetOffset - currentOffset;
+                        break;
+                    }
+                    currentOffset += nodeLength;
+                }
+                
+                if (textNode) {
+                    range.setStart(textNode, Math.min(nodeOffset, textNode.textContent?.length || 0));
+                    range.collapse(cursorPositionRef.current.collapsed);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } else {
+                    // Fallback: set cursor to end
+                    range.selectNodeContents(editorRef.current);
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            } catch (e) {
+                // If restoration fails, set cursor to end
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(editorRef.current);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        };
+
         useEffect(() => {
             if (!editorRef.current) return;
-            if (document.activeElement === editorRef.current) return;
-            const currentHtml = editorRef.current.innerHTML;
+            const isFocused = document.activeElement === editorRef.current;
+            const currentHtml = editorRef.current.innerHTML || '';
             const nextHtml = value || '';
-            if (currentHtml !== nextHtml) {
+            const htmlChanged = currentHtml !== nextHtml;
+            const isDomReset = currentHtml.length === 0 && nextHtml.length > 0;
+            
+            // CRITICAL: If DOM was reset (currentHtml.length === 0), this is likely a React re-render
+            // Restore the content and cursor position
+            if (isDomReset) {
+                // DOM was reset - restore content and cursor position
+                const hasSavedCursor = cursorPositionRef.current !== null;
+                editorRef.current.innerHTML = nextHtml;
+                if (hasSavedCursor) {
+                    // Restore focus and cursor position after DOM update
+                    requestAnimationFrame(() => {
+                        if (editorRef.current) {
+                            editorRef.current.focus();
+                            restoreCursorPosition();
+                        }
+                    });
+                }
+                return;
+            }
+            
+            // CRITICAL: Check flag FIRST - if we're updating from our own onChange, skip innerHTML update
+            if (isUpdatingFromValueRef.current) {
+                // This value change is from our own onChange (user typing), don't update innerHTML
+                return;
+            }
+            
+            // CRITICAL: If editor is focused, DO NOT update innerHTML as it will break cursor position
+            // Only update when editor is NOT focused (external value change)
+            if (isFocused) {
+                // Editor is focused - user is typing, don't update innerHTML
+                // The value prop change is from our own onChange, so we should ignore it
+                return;
+            }
+            
+            // Only update if HTML actually changed (external change, not from user input)
+            if (htmlChanged) {
                 editorRef.current.innerHTML = nextHtml;
             }
         }, [value]);
@@ -311,18 +427,33 @@ const Settings = () => {
         const scheduleChange = () => {
             if (!editorRef.current) return;
             const html = editorRef.current.innerHTML;
+            
             if (inputDebounceRef.current) {
                 clearTimeout(inputDebounceRef.current);
             }
+            
+            // Mark that we're updating from our own onChange BEFORE scheduling the timeout
+            // This ensures the flag is set before useEffect runs
+            isUpdatingFromValueRef.current = true;
             inputDebounceRef.current = setTimeout(() => {
                 inputDebounceRef.current = null;
                 startTransition(() => {
                     onChange(html);
                 });
+                // Reset flag after a delay to allow useEffect to skip the update
+                // Use longer delay to ensure useEffect has time to check the flag
+                setTimeout(() => {
+                    isUpdatingFromValueRef.current = false;
+                }, 100);
             }, 200);
         };
 
         const handleInput = () => {
+            // Save cursor position IMMEDIATELY on input, before scheduleChange
+            // This ensures cursor position is saved before useEffect runs
+            if (document.activeElement === editorRef.current) {
+                saveCursorPosition();
+            }
             scheduleChange();
         };
 
@@ -701,6 +832,12 @@ const Settings = () => {
                     contentEditable
                     onInput={handleInput}
                     onBlur={handleBlur}
+                    onFocus={(e) => {
+                        // Ensure focus is maintained
+                        if (editorRef.current) {
+                            editorRef.current.focus();
+                        }
+                    }}
                     style={{
                         width: '100%',
                         minHeight: '200px',

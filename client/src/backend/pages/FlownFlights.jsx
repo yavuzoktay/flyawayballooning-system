@@ -319,6 +319,76 @@ const FlownFlights = () => {
                     return item.flight_end_time;
                 })(),
                 total_flight_time: item.total_flight_time || '-',
+                duty_start_time: (() => {
+                    // If duty_start_time exists and is not null or '-', use it
+                    if (item.duty_start_time && item.duty_start_time !== '-' && item.duty_start_time !== null) {
+                        // Parse the date string and extract only time (HH:mm)
+                        const parsed = dayjs(item.duty_start_time, 'DD/MM/YYYY HH:mm');
+                        if (parsed.isValid()) {
+                            return parsed.format('HH:mm');
+                        }
+                        // Try other formats
+                        const parsed2 = dayjs(item.duty_start_time);
+                        if (parsed2.isValid()) {
+                            return parsed2.format('HH:mm');
+                        }
+                        return item.duty_start_time;
+                    }
+                    // If duty_start_time is missing, null, or '-', calculate from flight_start_time (45 mins before)
+                    if (item.flight_start_time && item.flight_start_time !== '-' && item.flight_start_time !== null) {
+                        try {
+                            // Server sends flight_start_time in DD/MM/YYYY HH:mm format
+                            let flightStart = dayjs(item.flight_start_time, 'DD/MM/YYYY HH:mm');
+                            if (!flightStart.isValid()) {
+                                // Try other formats as fallback
+                                flightStart = dayjs(item.flight_start_time);
+                            }
+                            if (flightStart.isValid()) {
+                                // Subtract 45 minutes
+                                const dutyStart = flightStart.subtract(45, 'minute');
+                                return dutyStart.format('HH:mm');
+                            }
+                        } catch (e) {
+                            console.warn('Error calculating duty start time:', e);
+                        }
+                    }
+                    return '-';
+                })(),
+                duty_end_time: (() => {
+                    // If duty_end_time exists and is not null or '-', use it
+                    if (item.duty_end_time && item.duty_end_time !== '-' && item.duty_end_time !== null) {
+                        // Parse the date string and extract only time (HH:mm)
+                        const parsed = dayjs(item.duty_end_time, 'DD/MM/YYYY HH:mm');
+                        if (parsed.isValid()) {
+                            return parsed.format('HH:mm');
+                        }
+                        // Try other formats
+                        const parsed2 = dayjs(item.duty_end_time);
+                        if (parsed2.isValid()) {
+                            return parsed2.format('HH:mm');
+                        }
+                        return item.duty_end_time;
+                    }
+                    // If duty_end_time is missing, null, or '-', calculate from flight_end_time (45 mins after)
+                    if (item.flight_end_time && item.flight_end_time !== '-' && item.flight_end_time !== null) {
+                        try {
+                            // Server sends flight_end_time in DD/MM/YYYY HH:mm format
+                            let flightEnd = dayjs(item.flight_end_time, 'DD/MM/YYYY HH:mm');
+                            if (!flightEnd.isValid()) {
+                                // Try other formats as fallback
+                                flightEnd = dayjs(item.flight_end_time);
+                            }
+                            if (flightEnd.isValid()) {
+                                // Add 45 minutes
+                                const dutyEnd = flightEnd.add(45, 'minute');
+                                return dutyEnd.format('HH:mm');
+                            }
+                        } catch (e) {
+                            console.warn('Error calculating duty end time:', e);
+                        }
+                    }
+                    return '-';
+                })(),
                 duty_time: item.duty_time || '-'
             };
             
@@ -702,6 +772,76 @@ const FlownFlights = () => {
                                 return item.flight_end_time;
                             })(),
                             total_flight_time: item.total_flight_time || '-',
+                            duty_start_time: (() => {
+                                // If duty_start_time exists and is not null or '-', use it
+                                if (item.duty_start_time && item.duty_start_time !== '-' && item.duty_start_time !== null) {
+                                    // Parse the date string and extract only time (HH:mm)
+                                    const parsed = dayjs(item.duty_start_time, 'DD/MM/YYYY HH:mm');
+                                    if (parsed.isValid()) {
+                                        return parsed.format('HH:mm');
+                                    }
+                                    // Try other formats
+                                    const parsed2 = dayjs(item.duty_start_time);
+                                    if (parsed2.isValid()) {
+                                        return parsed2.format('HH:mm');
+                                    }
+                                    return item.duty_start_time;
+                                }
+                                // If duty_start_time is missing, null, or '-', calculate from flight_start_time (45 mins before)
+                                if (item.flight_start_time && item.flight_start_time !== '-' && item.flight_start_time !== null) {
+                                    try {
+                                        // Server sends flight_start_time in DD/MM/YYYY HH:mm format
+                                        let flightStart = dayjs(item.flight_start_time, 'DD/MM/YYYY HH:mm');
+                                        if (!flightStart.isValid()) {
+                                            // Try other formats as fallback
+                                            flightStart = dayjs(item.flight_start_time);
+                                        }
+                                        if (flightStart.isValid()) {
+                                            // Subtract 45 minutes
+                                            const dutyStart = flightStart.subtract(45, 'minute');
+                                            return dutyStart.format('HH:mm');
+                                        }
+                                    } catch (e) {
+                                        console.warn('Error calculating duty start time:', e);
+                                    }
+                                }
+                                return '-';
+                            })(),
+                            duty_end_time: (() => {
+                                // If duty_end_time exists and is not null or '-', use it
+                                if (item.duty_end_time && item.duty_end_time !== '-' && item.duty_end_time !== null) {
+                                    // Parse the date string and extract only time (HH:mm)
+                                    const parsed = dayjs(item.duty_end_time, 'DD/MM/YYYY HH:mm');
+                                    if (parsed.isValid()) {
+                                        return parsed.format('HH:mm');
+                                    }
+                                    // Try other formats
+                                    const parsed2 = dayjs(item.duty_end_time);
+                                    if (parsed2.isValid()) {
+                                        return parsed2.format('HH:mm');
+                                    }
+                                    return item.duty_end_time;
+                                }
+                                // If duty_end_time is missing, null, or '-', calculate from flight_end_time (45 mins after)
+                                if (item.flight_end_time && item.flight_end_time !== '-' && item.flight_end_time !== null) {
+                                    try {
+                                        // Server sends flight_end_time in DD/MM/YYYY HH:mm format
+                                        let flightEnd = dayjs(item.flight_end_time, 'DD/MM/YYYY HH:mm');
+                                        if (!flightEnd.isValid()) {
+                                            // Try other formats as fallback
+                                            flightEnd = dayjs(item.flight_end_time);
+                                        }
+                                        if (flightEnd.isValid()) {
+                                            // Add 45 minutes
+                                            const dutyEnd = flightEnd.add(45, 'minute');
+                                            return dutyEnd.format('HH:mm');
+                                        }
+                                    } catch (e) {
+                                        console.warn('Error calculating duty end time:', e);
+                                    }
+                                }
+                                return '-';
+                            })(),
                             duty_time: item.duty_time || '-'
                         };
                         
@@ -740,13 +880,15 @@ const FlownFlights = () => {
                         "flight_start_time",        // 11. Start time
                         "flight_end_time",          // 12. End time
                         "total_flight_time",        // 13. Total flight time
-                        "duty_time",                // 14. Duty time
-                        "refuel_location",          // 15. Refuel location
-                        "vehicle_used",             // 16. Vehicle used
-                        "land_owner_gift",          // 17. Land owner gift
-                        "landing_fee",              // 18. Landing fee
-                        "aircraft_defects",          // 19. Aircraft / Balloon Defects or Issues
-                        "vehicle_trailer_defects"    // 20. Vehicle / Trailer Issues
+                        "duty_start_time",         // 14. Duty Start Time
+                        "duty_end_time",           // 15. Duty End Time
+                        "duty_time",                // 16. Duty time
+                        "refuel_location",          // 17. Refuel location
+                        "vehicle_used",             // 18. Vehicle used
+                        "land_owner_gift",          // 19. Land owner gift
+                        "landing_fee",              // 20. Landing fee
+                        "aircraft_defects",          // 21. Aircraft / Balloon Defects or Issues
+                        "vehicle_trailer_defects"    // 22. Vehicle / Trailer Issues
                     ]}
                     selectable={false}
                     onBookingIdClick={handleBookingIdClick}
