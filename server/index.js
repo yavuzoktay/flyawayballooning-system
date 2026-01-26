@@ -973,7 +973,7 @@ app.get('/api/voucher-codes', (req, res) => {
                  AND ab.voucher_code IS NOT NULL 
                  AND ab.voucher_code COLLATE utf8mb4_unicode_ci != '' COLLATE utf8mb4_unicode_ci
              ))
-        GROUP BY vc.id, vc.code, vc.title, vc.valid_from, vc.valid_until, vc.max_uses, vc.current_uses,
+        GROUP BY vc.id, vc.code, vc.title, vc.valid_from, vc.valid_until, vc.max_uses, vc.voucher_type, vc.current_uses,
                  vc.applicable_locations, vc.applicable_experiences, vc.applicable_voucher_types,
                  vc.is_active, vc.created_by, vc.source_type, vc.customer_email, vc.paid_amount,
                  vc.created_at, vc.updated_at
@@ -988,6 +988,7 @@ app.get('/api/voucher-codes', (req, res) => {
             NULL as valid_from,
             av.expires as valid_until,
             1 as max_uses,
+            av.voucher_type as voucher_type,
             CASE WHEN av.redeemed COLLATE utf8mb4_unicode_ci = 'Yes' COLLATE utf8mb4_unicode_ci THEN 1 ELSE 0 END as current_uses,
             NULL as applicable_locations,
             NULL as applicable_experiences,
@@ -1021,6 +1022,7 @@ app.get('/api/voucher-codes', (req, res) => {
             NULL as valid_from,
             ab.expires as valid_until,
             1 as max_uses,
+            ab.voucher_type as voucher_type,
             CASE WHEN ab.redeemed_voucher COLLATE utf8mb4_unicode_ci = 'Yes' COLLATE utf8mb4_unicode_ci THEN 1 ELSE 0 END as current_uses,
             NULL as applicable_locations,
             NULL as applicable_experiences,
@@ -27076,6 +27078,30 @@ const runVoucherCodeMigrations = () => {
                     console.error('Error adding voucher_type column:', alterErr);
                 } else if (!alterErr) {
                     console.log('✅ Added voucher_type column to voucher_codes table');
+                }
+            });
+            // Add source_type column if it doesn't exist
+            con.query(`ALTER TABLE voucher_codes ADD COLUMN source_type ENUM('admin_created', 'user_generated') DEFAULT 'admin_created' COMMENT 'Source of voucher code creation'`, (alterErr) => {
+                if (alterErr && alterErr.code !== 'ER_DUP_FIELDNAME') {
+                    console.error('Error adding source_type column:', alterErr);
+                } else if (!alterErr) {
+                    console.log('✅ Added source_type column to voucher_codes table');
+                }
+            });
+            // Add customer_email column if it doesn't exist
+            con.query(`ALTER TABLE voucher_codes ADD COLUMN customer_email VARCHAR(255) DEFAULT NULL COMMENT 'Customer email for user-generated codes'`, (alterErr) => {
+                if (alterErr && alterErr.code !== 'ER_DUP_FIELDNAME') {
+                    console.error('Error adding customer_email column:', alterErr);
+                } else if (!alterErr) {
+                    console.log('✅ Added customer_email column to voucher_codes table');
+                }
+            });
+            // Add paid_amount column if it doesn't exist
+            con.query(`ALTER TABLE voucher_codes ADD COLUMN paid_amount DECIMAL(10,2) DEFAULT 0 COMMENT 'Amount paid for user-generated codes'`, (alterErr) => {
+                if (alterErr && alterErr.code !== 'ER_DUP_FIELDNAME') {
+                    console.error('Error adding paid_amount column:', alterErr);
+                } else if (!alterErr) {
+                    console.log('✅ Added paid_amount column to voucher_codes table');
                 }
             });
         }
