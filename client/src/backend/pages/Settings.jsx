@@ -903,6 +903,7 @@ const Settings = () => {
         valid_from: dayjs().format('YYYY-MM-DD'),
         valid_until: dayjs().format('YYYY-MM-DD'),
         max_uses: '',
+        voucher_type: '',
         applicable_locations: '',
         applicable_experiences: '',
         applicable_voucher_types: '',
@@ -1324,6 +1325,7 @@ const Settings = () => {
             valid_from: voucher.valid_from,
             valid_until: voucher.valid_until,
             max_uses: voucher.max_uses,
+            voucher_type: voucher.voucher_type || '',
             applicable_locations: voucher.applicable_locations,
             applicable_experiences: voucher.applicable_experiences,
             applicable_voucher_types: voucher.applicable_voucher_types,
@@ -2376,6 +2378,7 @@ const Settings = () => {
             valid_from: dayjs().format('YYYY-MM-DD'),
             valid_until: dayjs().format('YYYY-MM-DD'),
             max_uses: '',
+            voucher_type: '',
             applicable_locations: '',
             applicable_experiences: '',
             applicable_voucher_types: '',
@@ -6226,7 +6229,7 @@ const Settings = () => {
                                         fontWeight: 500,
                                         color: '#374151',
                                         fontSize: '14px'
-                                    }}>Title *</label>
+                                    }}>Voucher Name *</label>
                                     <input
                                         type="text"
                                         value={formData.title}
@@ -6367,7 +6370,7 @@ const Settings = () => {
                                         fontWeight: 500,
                                         color: '#374151',
                                         fontSize: '14px'
-                                    }}>Maximum Uses</label>
+                                    }}>Number of Passengers</label>
                                     <input
                                         type="number"
                                         value={formData.max_uses}
@@ -6432,6 +6435,67 @@ const Settings = () => {
                                     >
                                         <option value={true}>Active</option>
                                         <option value={false}>Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="form-row" style={isMobile ? {
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                marginBottom: '12px'
+                            } : {
+                                display: 'flex',
+                                gap: '20px',
+                                marginBottom: '20px'
+                            }}>
+                                <div className="form-group" style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    flex: 1,
+                                    marginBottom: 0
+                                }}>
+                                    <label style={isMobile ? {
+                                        fontSize: '11px',
+                                        marginBottom: '4px',
+                                        fontWeight: 600
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>Voucher Type</label>
+                                    <select
+                                        value={formData.voucher_type}
+                                        onChange={(e) => setFormData({...formData, voucher_type: e.target.value})}
+                                        style={isMobile ? {
+                                            padding: '6px 8px',
+                                            fontSize: '13px',
+                                            borderRadius: '4px',
+                                            width: '100%',
+                                            height: '32px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer',
+                                            border: '1px solid #d1d5db'
+                                        } : {
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            border: '1px solid #d1d5db',
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            backgroundColor: '#fff',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <option value="">Select Voucher Type</option>
+                                        <option value="Any Day Flight">Any Day Flight</option>
+                                        <option value="Flexible Weekday">Flexible Weekday</option>
+                                        <option value="Weekday Morning">Weekday Morning</option>
+                                        <option value="Private Charter">Private Charter</option>
+                                        <option value="Proposal Flight">Proposal Flight</option>
                                     </select>
                                 </div>
                             </div>

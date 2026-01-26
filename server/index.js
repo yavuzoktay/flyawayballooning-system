@@ -939,6 +939,7 @@ app.get('/api/voucher-codes', (req, res) => {
             vc.valid_from,
             vc.valid_until,
             vc.max_uses,
+            vc.voucher_type,
             vc.current_uses,
             vc.applicable_locations,
             vc.applicable_experiences,
@@ -1073,6 +1074,7 @@ app.post('/api/voucher-codes', (req, res) => {
         valid_from,
         valid_until,
         max_uses,
+        voucher_type,
         applicable_locations,
         applicable_experiences,
         applicable_voucher_types
@@ -1085,9 +1087,9 @@ app.post('/api/voucher-codes', (req, res) => {
 
     const sql = `
         INSERT INTO voucher_codes (
-            code, title, valid_from, valid_until, max_uses, 
+            code, title, valid_from, valid_until, max_uses, voucher_type,
             applicable_locations, applicable_experiences, applicable_voucher_types
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -1096,6 +1098,7 @@ app.post('/api/voucher-codes', (req, res) => {
         valid_from || null,
         valid_until || null,
         max_uses || null,
+        voucher_type || null,
         applicable_locations || null,
         applicable_experiences || null,
         applicable_voucher_types || null
@@ -1123,6 +1126,7 @@ app.put('/api/voucher-codes/:id', (req, res) => {
         valid_from,
         valid_until,
         max_uses,
+        voucher_type,
         applicable_locations,
         applicable_experiences,
         applicable_voucher_types,
@@ -1137,7 +1141,7 @@ app.put('/api/voucher-codes/:id', (req, res) => {
     const sql = `
         UPDATE voucher_codes SET 
             code = ?, title = ?, valid_from = ?, valid_until = ?, 
-            max_uses = ?, applicable_locations = ?, applicable_experiences = ?, 
+            max_uses = ?, voucher_type = ?, applicable_locations = ?, applicable_experiences = ?, 
             applicable_voucher_types = ?, is_active = ?, updated_at = NOW()
         WHERE id = ?
     `;
@@ -1148,6 +1152,7 @@ app.put('/api/voucher-codes/:id', (req, res) => {
         valid_from || null,
         valid_until || null,
         max_uses || null,
+        voucher_type || null,
         applicable_locations || null,
         applicable_experiences || null,
         applicable_voucher_types || null,
@@ -26840,6 +26845,7 @@ const createVoucherCodesTable = `
         valid_until DATE NOT NULL COMMENT 'End date of validity',
         max_uses INT DEFAULT NULL COMMENT 'Maximum number of times this code can be used (NULL = unlimited)',
         current_uses INT DEFAULT 0 COMMENT 'Current number of times used',
+        voucher_type VARCHAR(100) DEFAULT NULL COMMENT 'Voucher type (Any Day Flight, Flexible Weekday, Weekday Morning, Private Charter, Proposal Flight)',
         applicable_locations TEXT COMMENT 'Comma-separated list of applicable locations (NULL = all locations)',
         applicable_experiences TEXT COMMENT 'Comma-separated list of applicable experiences (NULL = all experiences)',
         applicable_voucher_types TEXT COMMENT 'Comma-separated list of applicable voucher types (NULL = all types)',
@@ -27060,6 +27066,14 @@ const runVoucherCodeMigrations = () => {
             console.error('Error creating voucher_codes table:', err);
         } else {
             console.log('✅ Voucher codes table ready');
+            // Add voucher_type column if it doesn't exist
+            con.query(`ALTER TABLE voucher_codes ADD COLUMN voucher_type VARCHAR(100) DEFAULT NULL COMMENT 'Voucher type (Any Day Flight, Flexible Weekday, Weekday Morning, Private Charter, Proposal Flight)'`, (alterErr) => {
+                if (alterErr && alterErr.code !== 'ER_DUP_FIELDNAME') {
+                    console.error('Error adding voucher_type column:', alterErr);
+                } else if (!alterErr) {
+                    console.log('✅ Added voucher_type column to voucher_codes table');
+                }
+            });
         }
     });
 
