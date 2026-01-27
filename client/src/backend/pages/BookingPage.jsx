@@ -6874,7 +6874,12 @@ setBookingDetail(finalVoucherDetail);
                                             <Typography sx={{ 
                                                 mb: isMobile ? 0 : 1,
                                                 fontSize: isMobile ? '14px' : 'inherit'
-                                            }}><b>Voucher Type:</b> {bookingDetail.booking.voucher_type || '-'}</Typography>
+                                            }}><b>Voucher Type:</b> {
+                                                bookingDetail.booking.voucher_type
+                                                || bookingDetail.voucher?.voucher_type_detail
+                                                || bookingDetail.voucher?.voucher_type
+                                                || '-'
+                                            }</Typography>
                                             <Typography sx={{ 
                                                 mb: isMobile ? 0 : 1,
                                                 fontSize: isMobile ? '14px' : 'inherit'
