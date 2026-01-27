@@ -14201,12 +14201,15 @@ app.get('/api/getBookingDetail', async (req, res) => {
 
         // Fetch voucher info (type, flight attempts) when booking has voucher_code
         let voucherInfo = null;
+
         if (booking.voucher_code) {
             try {
                 const [voucherRows] = await new Promise((resolve, reject) => {
                     con.query(
-                        'SELECT id, voucher_type, book_flight, flight_attempts FROM all_vouchers WHERE voucher_ref = ? LIMIT 1',
-                        [booking.voucher_code],
+                        // Try to match both legacy voucher_ref and actual voucher code (vc_code)
+                        // booking.voucher_code may store either value depending on how the booking was created
+                        'SELECT id, voucher_type, book_flight, flight_attempts FROM all_vouchers WHERE voucher_ref = ? OR vc_code = ? LIMIT 1',
+                        [booking.voucher_code, booking.voucher_code],
                         (err, rows) => {
                             if (err) reject(err);
                             else resolve([rows]);
@@ -14217,11 +14220,64 @@ app.get('/api/getBookingDetail', async (req, res) => {
                     voucherInfo = voucherRows[0];
                     if ((!booking.voucher_type || booking.voucher_type.trim() === '') && voucherInfo.voucher_type) {
                         booking.voucher_type = voucherInfo.voucher_type;
-                        console.log('✅ getBookingDetail - voucher_type fetched from voucher:', booking.voucher_type);
+                        console.log('✅ getBookingDetail - voucher_type fetched from all_vouchers:', booking.voucher_type);
                     }
                 }
             } catch (voucherErr) {
                 console.warn('⚠️ getBookingDetail - Could not fetch voucher info:', voucherErr.message);
+            }
+        }
+
+        // If voucher_type is still empty, try to fetch it from voucher_codes (Admin Created Codes)
+        if (booking.voucher_code && (!booking.voucher_type || booking.voucher_type.trim() === '')) {
+            try {
+                const [codeRows] = await new Promise((resolve, reject) => {
+                    con.query(
+                        'SELECT voucher_type FROM voucher_codes WHERE UPPER(code) = UPPER(?) LIMIT 1',
+                        [booking.voucher_code],
+                        (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        }
+                    );
+                });
+                if (codeRows && codeRows.length > 0 && codeRows[0].voucher_type) {
+                    booking.voucher_type = codeRows[0].voucher_type;
+                    console.log('✅ getBookingDetail - voucher_type fetched from voucher_codes:', booking.voucher_type);
+                } else {
+                    console.log('ℹ️ getBookingDetail - No voucher_type found in voucher_codes for code:', booking.voucher_code);
+                }
+            } catch (codeErr) {
+                console.warn('⚠️ getBookingDetail - Could not fetch voucher_type from voucher_codes:', codeErr.message);
+            }
+        }
+
+        // If voucher_type is STILL empty, try to fetch it via voucher_code_usage → voucher_codes
+        if (!booking.voucher_type || booking.voucher_type.trim() === '') {
+            try {
+                const [usageRows] = await new Promise((resolve, reject) => {
+                    con.query(
+                        `
+                        SELECT vc.voucher_type, vc.code 
+                        FROM voucher_code_usage vcu
+                        INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
+                        WHERE vcu.booking_id = ?
+                        ORDER BY vcu.used_at DESC
+                        LIMIT 1
+                        `,
+                        [booking_id],
+                        (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        }
+                    );
+                });
+
+                if (usageRows && usageRows.length > 0 && usageRows[0].voucher_type) {
+                    booking.voucher_type = usageRows[0].voucher_type;
+                }
+            } catch (usageErr) {
+                console.warn('⚠️ getBookingDetail - Could not fetch voucher_type via voucher_code_usage:', usageErr.message);
             }
         }
 
@@ -14893,6 +14949,46 @@ app.get('/api/getBookingDetail', async (req, res) => {
         }
 
         // Add original redeemed voucher code to booking object for frontend display
+        // If voucher_type is still empty but we have originalRedeemedVoucherCode (e.g. Admin Created Codes),
+        // try to resolve voucher_type from voucher_codes or all_vouchers using that code.
+        if ((!booking.voucher_type || String(booking.voucher_type).trim() === '') && originalRedeemedVoucherCode) {
+            try {
+                // First try voucher_codes table (Admin Created Codes & redeemed vouchers)
+                const [redeemedCodeRows] = await new Promise((resolve, reject) => {
+                    con.query(
+                        'SELECT voucher_type FROM voucher_codes WHERE UPPER(code) = UPPER(?) LIMIT 1',
+                        [originalRedeemedVoucherCode],
+                        (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        }
+                    );
+                });
+
+                if (redeemedCodeRows && redeemedCodeRows.length > 0 && redeemedCodeRows[0].voucher_type) {
+                    booking.voucher_type = redeemedCodeRows[0].voucher_type;
+                } else {
+                    // Fallback: try all_vouchers table
+                    const [redeemedVoucherRows] = await new Promise((resolve, reject) => {
+                        con.query(
+                            'SELECT voucher_type FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?) LIMIT 1',
+                            [originalRedeemedVoucherCode],
+                            (err, rows) => {
+                                if (err) reject(err);
+                                else resolve([rows]);
+                            }
+                        );
+                    });
+
+                    if (redeemedVoucherRows && redeemedVoucherRows.length > 0 && redeemedVoucherRows[0].voucher_type) {
+                        booking.voucher_type = redeemedVoucherRows[0].voucher_type;
+                    }
+                }
+            } catch (redeemedResolveErr) {
+                console.warn('⚠️ getBookingDetail - Could not resolve voucher_type from originalRedeemedVoucherCode:', redeemedResolveErr.message);
+            }
+        }
+
         if (originalRedeemedVoucherCode) {
             booking.originalRedeemedVoucherCode = originalRedeemedVoucherCode;
         }
@@ -22533,20 +22629,62 @@ app.get('/api/flown-flights', (req, res) => {
             
             // Format the results similar to getAllBookingData
             const formatted = results.map(row => {
-                // Format flight_date as DD/MM/YYYY AM/PM if time exists
+                // Format flight_date as DD/MM/YYYY AM/PM if time exists (for display only)
                 let flightDateFormatted = '';
-                let flightPeriod = ''; // AM or PM
                 if (row.flight_date) {
-                    const dateTime = moment(row.flight_date, ["YYYY-MM-DD HH:mm", "YYYY-MM-DDTHH:mm", "YYYY-MM-DD", "DD/MM/YYYY HH:mm", "DD/MM/YYYY"]);
+                    const dateTime = moment(row.flight_date, [
+                        "YYYY-MM-DD HH:mm",
+                        "YYYY-MM-DDTHH:mm",
+                        "YYYY-MM-DD",
+                        "DD/MM/YYYY HH:mm",
+                        "DD/MM/YYYY"
+                    ]);
                     if (dateTime.isValid()) {
                         const hour = dateTime.hour();
                         const ampm = hour < 12 ? 'AM' : 'PM';
-                        flightPeriod = ampm; // Set flight period (AM/PM)
                         const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
                         const minute = dateTime.minute();
-                        flightDateFormatted = dateTime.format('DD/MM/YYYY') + ' ' + displayHour + ':' + (minute < 10 ? '0' : '') + minute + ' ' + ampm;
+                        flightDateFormatted =
+                            dateTime.format('DD/MM/YYYY') +
+                            ' ' +
+                            displayHour +
+                            ':' +
+                            (minute < 10 ? '0' : '') +
+                            minute +
+                            ' ' +
+                            ampm;
                     } else {
                         flightDateFormatted = row.flight_date;
+                    }
+                }
+
+                // Determine flight period (AM / PM)
+                // Priority: operational flight_start_time from trip_booking; fallback to booking flight_date
+                let flightPeriod = '';
+                if (row.flight_start_time) {
+                    const startTime = moment(row.flight_start_time, [
+                        "YYYY-MM-DD HH:mm",
+                        "YYYY-MM-DDTHH:mm",
+                        "DD/MM/YYYY HH:mm",
+                        "HH:mm",
+                        moment.ISO_8601
+                    ]);
+                    if (startTime.isValid()) {
+                        const hour = startTime.hour();
+                        flightPeriod = hour < 12 ? 'AM' : 'PM';
+                    }
+                }
+                if (!flightPeriod && row.flight_date) {
+                    const dateTime = moment(row.flight_date, [
+                        "YYYY-MM-DD HH:mm",
+                        "YYYY-MM-DDTHH:mm",
+                        "YYYY-MM-DD",
+                        "DD/MM/YYYY HH:mm",
+                        "DD/MM/YYYY"
+                    ]);
+                    if (dateTime.isValid()) {
+                        const hour = dateTime.hour();
+                        flightPeriod = hour < 12 ? 'AM' : 'PM';
                     }
                 }
                 
