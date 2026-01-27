@@ -7136,7 +7136,8 @@ app.get('/api/getAllBookingData', (req, res) => {
             v.flight_attempts as voucher_flight_attempts,
             v.paid as voucher_paid,
             -- flight_type_source: use from database if exists, otherwise will be calculated
-            ab.flight_type_source
+            ab.flight_type_source,
+            vc.voucher_type as code_voucher_type
         FROM all_booking ab
         LEFT JOIN voucher_codes vc 
             ON vc.code = ab.voucher_code
@@ -7171,6 +7172,7 @@ app.get('/api/getAllBookingData', (req, res) => {
                 voucher_experience_type,
                 voucher_book_flight,
                 voucher_paid,
+                code_voucher_type,
                 ...rest
             } = r;
 
@@ -7235,6 +7237,61 @@ app.get('/api/getAllBookingData', (req, res) => {
             let finalVoucherType = nonEmptyStringOrNull(rest.voucher_type);
             if (!finalVoucherType) {
                 finalVoucherType = nonEmptyStringOrNull(original_voucher_type);
+            }
+            // Fallback: use voucher_type from joined voucher_codes row (Admin Created Codes / Redeem booking codes)
+            if (!finalVoucherType) {
+                finalVoucherType = nonEmptyStringOrNull(code_voucher_type);
+            }
+
+            // If still empty for Redeem Voucher bookings, try voucher_code_usage → voucher_codes / all_vouchers
+            if (!finalVoucherType && rest.id && (rest.flight_type_source === 'Redeem Voucher' || isRedeemVoucher)) {
+                try {
+                    const [usageRows] = await new Promise((resolve, reject) => {
+                        con.query(
+                            `
+                            SELECT vc.voucher_type, vc.code 
+                            FROM voucher_code_usage vcu
+                            INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
+                            WHERE vcu.booking_id = ?
+                            ORDER BY vcu.used_at DESC
+                            LIMIT 2
+                            `,
+                            [rest.id],
+                            (err, rows) => {
+                                if (err) reject(err);
+                                else resolve([rows]);
+                            }
+                        );
+                    });
+
+                    if (usageRows && usageRows.length > 0) {
+                        // Prefer a row where voucher_type is not null
+                        const withType = usageRows.find(row => nonEmptyStringOrNull(row.voucher_type));
+                        if (withType && nonEmptyStringOrNull(withType.voucher_type)) {
+                            finalVoucherType = nonEmptyStringOrNull(withType.voucher_type);
+                        } else {
+                            // Fallback: try all_vouchers using the code from voucher_codes as voucher_ref
+                            const codeForLookup = usageRows[0].code;
+                            if (codeForLookup) {
+                                const [voucherRowsForUsage] = await new Promise((resolve, reject) => {
+                                    con.query(
+                                        'SELECT voucher_type FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?) LIMIT 1',
+                                        [codeForLookup],
+                                        (err, rows) => {
+                                            if (err) reject(err);
+                                            else resolve([rows]);
+                                        }
+                                    );
+                                });
+                                if (voucherRowsForUsage && voucherRowsForUsage.length > 0 && nonEmptyStringOrNull(voucherRowsForUsage[0].voucher_type)) {
+                                    finalVoucherType = nonEmptyStringOrNull(voucherRowsForUsage[0].voucher_type);
+                                }
+                            }
+                        }
+                    }
+                } catch (usageErr) {
+                    console.warn('[getAllBookingData] Could not resolve voucher_type via voucher_code_usage for booking', rest.id, usageErr.message);
+                }
             }
 
             // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
