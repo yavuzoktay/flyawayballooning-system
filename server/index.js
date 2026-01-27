@@ -15073,9 +15073,9 @@ app.post('/api/addPassenger', (req, res) => {
     const WEATHER_REFUND_PRICE = 47.5;
     const weatherRefundSelected = weather_refund === 1 || weather_refund === '1' || weather_refund === true;
 
-    // First, get current booking details including experience, location, activity_id, voucher_type, add_to_booking_items_total_price, choose_add_on, weather_refund_total_price, original_amount
-    const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, COALESCE(weather_refund_total_price, 0) as weather_refund_price, COALESCE(original_amount, 0) as original_amount, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
-    con.query(getBookingSql, [booking_id], (getErr, bookingRows) => {
+    // First, get current booking details including experience, location, activity_id, voucher_type, voucher_code, add_to_booking_items_total_price, choose_add_on, weather_refund_total_price, original_amount
+    const getBookingSql = 'SELECT paid, pax, due, experience, location, activity_id, voucher_type, voucher_code, COALESCE(add_to_booking_items_total_price, 0) as add_on_price, COALESCE(weather_refund_total_price, 0) as weather_refund_price, COALESCE(original_amount, 0) as original_amount, choose_add_on FROM all_booking WHERE id = ? LIMIT 1';
+    con.query(getBookingSql, [booking_id], async (getErr, bookingRows) => {
         if (getErr) {
             console.error('Error fetching booking details:', getErr);
             return res.status(500).json({ success: false, message: 'Database error fetching booking' });
@@ -15105,24 +15105,91 @@ app.post('/api/addPassenger', (req, res) => {
         const currentDue = parseFloat(booking.due) || 0;
         const experience = booking.experience || '';
         const location = booking.location || '';
-        const voucherType = booking.voucher_type || '';
+        let voucherType = booking.voucher_type || '';
+        const voucherCode = booking.voucher_code || '';
 
-        console.log('=== ADD PASSENGER - INITIAL INFO ===');
-        console.log('Booking ID:', booking_id);
-        console.log('Total Paid (with add-on):', totalPaid);
-        console.log('Add-on Price:', actualAddOnPrice);
-        console.log('Base Paid (for passengers):', currentPaid);
-        console.log('Current Pax:', currentPax);
-        console.log('Current Due:', currentDue);
-        console.log('Experience:', experience);
-        console.log('Location:', location);
-        console.log('Voucher Type:', voucherType);
-        console.log('Choose Add-on:', chooseAddOn);
+        // Resolve voucher_type if it's empty but we have voucher_code (similar to getBookingDetail)
+        if ((!voucherType || voucherType.trim() === '') && voucherCode) {
+            try {
+                // First try voucher_codes table (Admin Created Codes & redeemed vouchers)
+                const [codeRows] = await new Promise((resolve, reject) => {
+                    con.query(
+                        'SELECT voucher_type FROM voucher_codes WHERE UPPER(code) = UPPER(?) LIMIT 1',
+                        [voucherCode],
+                        (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        }
+                    );
+                });
 
-        // Check if this is a Private Charter booking
-        const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
+                if (codeRows && codeRows.length > 0 && codeRows[0].voucher_type) {
+                    voucherType = codeRows[0].voucher_type;
+                } else {
+                        // Fallback: try all_vouchers table
+                        const [voucherRows] = await new Promise((resolve, reject) => {
+                            con.query(
+                                'SELECT voucher_type FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?) LIMIT 1',
+                                [voucherCode],
+                                (err, rows) => {
+                                    if (err) reject(err);
+                                    else resolve([rows]);
+                                }
+                            );
+                        });
 
-        if (isPrivateCharter && location) {
+                    if (voucherRows && voucherRows.length > 0 && voucherRows[0].voucher_type) {
+                        voucherType = voucherRows[0].voucher_type;
+                    } else {
+                        // Final fallback: try voucher_code_usage → voucher_codes
+                        const [usageRows] = await new Promise((resolve, reject) => {
+                            con.query(
+                                `
+                                SELECT vc.voucher_type, vc.code
+                                FROM voucher_code_usage vcu
+                                INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
+                                WHERE vcu.booking_id = ?
+                                ORDER BY vcu.used_at DESC
+                                LIMIT 1
+                                `,
+                                [booking_id],
+                                (err, rows) => {
+                                    if (err) reject(err);
+                                    else resolve([rows]);
+                                }
+                            );
+                        });
+
+                        if (usageRows && usageRows.length > 0 && usageRows[0].voucher_type) {
+                            voucherType = usageRows[0].voucher_type;
+                        }
+                    }
+                }
+            } catch (resolveErr) {
+                console.warn('⚠️ addPassenger - Could not resolve voucher_type from voucher_code:', resolveErr.message);
+            }
+        }
+
+        // Wrap the rest of the logic in an async IIFE to properly await voucher_type resolution
+        (async () => {
+
+            console.log('=== ADD PASSENGER - INITIAL INFO ===');
+            console.log('Booking ID:', booking_id);
+            console.log('Total Paid (with add-on):', totalPaid);
+            console.log('Add-on Price:', actualAddOnPrice);
+            console.log('Base Paid (for passengers):', currentPaid);
+            console.log('Current Pax:', currentPax);
+            console.log('Current Due:', currentDue);
+            console.log('Experience:', experience);
+            console.log('Location:', location);
+            console.log('Voucher Code:', voucherCode);
+            console.log('Voucher Type (resolved):', voucherType);
+            console.log('Choose Add-on:', chooseAddOn);
+
+            // Check if this is a Private Charter booking
+            const isPrivateCharter = experience === 'Private Charter' || experience.includes('Private');
+
+            if (isPrivateCharter && location) {
             // For Private Charter, get pricing from activity table based on passenger count
             const activitySql = 'SELECT private_charter_pricing FROM activity WHERE location = ? AND status = "Live" ORDER BY id DESC LIMIT 1';
             con.query(activitySql, [location], (actErr, activityRows) => {
@@ -15257,54 +15324,119 @@ app.post('/api/addPassenger', (req, res) => {
                 return;
             }
 
-            // For add-guest passengers: calculate price as originalAmount / currentPax (BEFORE adding new guest)
-            // This is the price per passenger based on original amount divided by existing passenger count
-            // The new guest will pay this same price
+            // For add-guest passengers: First try to get voucher type price from activity table
+            // If voucher_type is present (e.g., "Weekday Morning"), use the price from activity table
             let newGuestPrice = 0;
-            if (originalAmount > 0 && currentPax > 0) {
-                newGuestPrice = originalAmount / currentPax;
-                console.log('=== ADD-GUEST PRICE CALCULATION ===');
-                console.log('Original Amount:', originalAmount);
-                console.log('Current Pax (before adding new guest):', currentPax);
-                console.log('New Guest Price (originalAmount / currentPax):', newGuestPrice);
-            } else {
-                // Fallback: use average if originalAmount not available
-                const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
-                newGuestPrice = basePricePerPassenger;
-                console.log('⚠️ Original Amount not available, using average price per passenger:', newGuestPrice);
+            let voucherTypePriceFromActivity = null;
+
+            // Check if we have voucher_type and location to fetch correct price
+            // If voucher_type is empty but we have location, use weekday_morning_price as default for Shared Flight
+            // (This handles Admin Created Codes that don't have voucher_type stored)
+            if (!voucherType && location && !isPrivateCharter) {
+                // For Shared Flight with no voucher_type, default to Weekday Morning pricing
+                voucherType = 'Weekday Morning';
             }
 
-            // Calculate new passenger's weather refund (if selected)
-            const newPassengerWeatherRefund = weatherRefundSelected ? WEATHER_REFUND_PRICE : 0;
+            if (voucherType && location) {
+                // Map voucher type to activity table column
+                const voucherTypeLower = (voucherType || '').toLowerCase().trim();
+                let priceColumn = null;
+                if (voucherTypeLower.includes('weekday morning')) {
+                    priceColumn = 'weekday_morning_price';
+                } else if (voucherTypeLower.includes('flexible weekday')) {
+                    priceColumn = 'flexible_weekday_price';
+                } else if (voucherTypeLower.includes('any day flight') || voucherTypeLower.includes('any day')) {
+                    priceColumn = 'any_day_flight_price';
+                }
 
-            // Calculate new weather refund total (existing + new passenger's weather refund if selected)
-            const newWeatherRefundTotal = weatherRefundPrice + newPassengerWeatherRefund;
+                if (priceColumn) {
+                    const activityPriceSql = `SELECT ${priceColumn} FROM activity WHERE location = ? AND status = 'Live' ORDER BY id DESC LIMIT 1`;
+                    con.query(activityPriceSql, [location], (priceErr, priceRows) => {
+                        if (!priceErr && priceRows && priceRows.length > 0 && priceRows[0][priceColumn]) {
+                            voucherTypePriceFromActivity = parseFloat(priceRows[0][priceColumn]) || null;
 
-            // New due calculation for add-guest:
-            // The new guest pays: newGuestPrice + weather refund (if selected)
-            // New due = currentDue + newGuestPrice + newPassengerWeatherRefund
-            // This adds the new guest's price to the existing due
-            const newDue = currentDue + newGuestPrice + newPassengerWeatherRefund;
+                            if (voucherTypePriceFromActivity && voucherTypePriceFromActivity > 0) {
+                                newGuestPrice = voucherTypePriceFromActivity;
+                                console.log('=== ADD-GUEST PRICE FROM VOUCHER TYPE ===');
+                                console.log('Voucher Type:', voucherType);
+                                console.log('Location:', location);
+                                console.log('Price Column:', priceColumn);
+                                console.log('Voucher Type Price from Activity:', voucherTypePriceFromActivity);
+                                console.log('New Guest Price (using voucher type price):', newGuestPrice);
+                            } else {
+                                // Fallback to original calculation
+                                calculateNewGuestPriceFallback();
+                            }
+                        } else {
+                            calculateNewGuestPriceFallback();
+                        }
+                        continueWithDueCalculation();
+                    });
+                    return; // Exit early, will continue in callback
+                } else {
+                    // No matching price column, use fallback
+                    calculateNewGuestPriceFallback();
+                    continueWithDueCalculation();
+                }
+            } else {
+                // No voucher_type or location, use fallback
+                calculateNewGuestPriceFallback();
+                continueWithDueCalculation();
+            }
 
-            console.log('=== SHARED FLIGHT ADD-GUEST PRICING ===');
-            console.log('Total Paid (includes existing weather refund):', totalPaid);
-            console.log('Current Paid (base, excluding weather refund):', currentPaid);
-            console.log('Current Due (before adding guest):', currentDue);
-            console.log('Current Pax (before adding guest):', currentPax);
-            console.log('Original Amount:', originalAmount);
-            console.log('New Guest Price (originalAmount / currentPax):', newGuestPrice);
-            console.log('Weather Refund Selected for new passenger:', weatherRefundSelected);
-            console.log('New Passenger Weather Refund Price:', newPassengerWeatherRefund);
-            console.log('New Weather Refund Total:', newWeatherRefundTotal);
-            console.log('New Due (currentDue + newGuestPrice + newPassengerWeatherRefund):', newDue);
+            function calculateNewGuestPriceFallback() {
+                // For add-guest passengers: calculate price as originalAmount / currentPax (BEFORE adding new guest)
+                // This is the price per passenger based on original amount divided by existing passenger count
+                // The new guest will pay this same price
+                if (originalAmount > 0 && currentPax > 0) {
+                    newGuestPrice = originalAmount / currentPax;
+                    console.log('=== ADD-GUEST PRICE CALCULATION (FALLBACK) ===');
+                    console.log('Original Amount:', originalAmount);
+                    console.log('Current Pax (before adding new guest):', currentPax);
+                    console.log('New Guest Price (originalAmount / currentPax):', newGuestPrice);
+                } else {
+                    // Fallback: use average if originalAmount not available
+                    const basePricePerPassenger = (currentPaid + currentDue) / currentPax;
+                    newGuestPrice = basePricePerPassenger;
+                    console.log('⚠️ Original Amount not available, using average price per passenger:', newGuestPrice);
+                }
+            }
 
-            // Set absolute due and weather refund total (no original_amount update for shared flight)
-            // Pass newGuestPrice as 5th parameter to store in passenger table
-            handlePassengerAddition(0, newDue, null, newWeatherRefundTotal, newGuestPrice);
+            function continueWithDueCalculation() {
+                // Calculate new passenger's weather refund (if selected)
+                const newPassengerWeatherRefund = weatherRefundSelected ? WEATHER_REFUND_PRICE : 0;
+
+                // Calculate new weather refund total (existing + new passenger's weather refund if selected)
+                const newWeatherRefundTotal = weatherRefundPrice + newPassengerWeatherRefund;
+
+                // New due calculation for add-guest:
+                // The new guest pays: newGuestPrice + weather refund (if selected)
+                // New due = currentDue + newGuestPrice + newPassengerWeatherRefund
+                // This adds the new guest's price to the existing due
+                const newDue = currentDue + newGuestPrice + newPassengerWeatherRefund;
+
+                console.log('=== SHARED FLIGHT ADD-GUEST PRICING ===');
+                console.log('Total Paid (includes existing weather refund):', totalPaid);
+                console.log('Current Paid (base, excluding weather refund):', currentPaid);
+                console.log('Current Due (before adding guest):', currentDue);
+                console.log('Current Pax (before adding guest):', currentPax);
+                console.log('Original Amount:', originalAmount);
+                console.log('Voucher Type:', voucherType);
+                console.log('Voucher Type Price from Activity:', voucherTypePriceFromActivity);
+                console.log('New Guest Price:', newGuestPrice);
+                console.log('Weather Refund Selected for new passenger:', weatherRefundSelected);
+                console.log('New Passenger Weather Refund Price:', newPassengerWeatherRefund);
+                console.log('New Weather Refund Total:', newWeatherRefundTotal);
+                console.log('New Due (currentDue + newGuestPrice + newPassengerWeatherRefund):', newDue);
+
+                // Set absolute due and weather refund total (no original_amount update for shared flight)
+                // Pass newGuestPrice as 5th parameter to store in passenger table
+                handlePassengerAddition(0, newDue, null, newWeatherRefundTotal, newGuestPrice);
+            }
         }
 
-        // Helper function to handle passenger addition
-        function handlePassengerAddition(pricePerPassenger, absoluteDue = null, newTotalPrice = null, newWeatherRefundTotal = null, newGuestPrice = null) {
+            // Helper function to handle passenger addition
+            function handlePassengerAddition(pricePerPassenger, absoluteDue = null, newTotalPrice = null, newWeatherRefundTotal = null, newGuestPrice = null) {
 
             // passenger tablosunda email, phone, ticket_type, weight, weather_refund ve price bilgisi varsa ekle
             // For add-guest passengers (Shared Flight), store the calculated price (originalAmount / currentPax)
@@ -15421,6 +15553,7 @@ app.post('/api/addPassenger', (req, res) => {
                 });
             });
         }
+        })(); // Close async IIFE
         
         // Helper function to update Google Calendar event when passenger count changes
         function updateGoogleCalendarForPassengerChange(bookingId, onComplete) {
