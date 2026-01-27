@@ -10366,6 +10366,46 @@ setBookingDetail(finalVoucherDetail);
                                 </Grid>
                             )}
                             {/* Email Template Preview */}
+                            {/* Shared personal note for Email/SMS (same as Manifest page) */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 500, 
+                                    fontSize: isMobile ? 13 : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
+                                    Add an optional, personalized note
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    placeholder="Nice to speak with you today!"
+                                    value={personalNote}
+                                    onChange={(e) => setPersonalNote(e.target.value)}
+                                    multiline
+                                    rows={isMobile ? 4 : 6}
+                                    variant="outlined"
+                                    size={isMobile ? "small" : "medium"}
+                                    sx={{ 
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: isMobile ? 2 : '6px',
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            },
+                                            '&:hover fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            }
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : '14px'
+                                        }
+                                    }}
+                                />
+                            </Grid>
+
                             {sendMessageEmailChecked && (
                                 <Grid item xs={12}>
                                     <Box sx={{ 
