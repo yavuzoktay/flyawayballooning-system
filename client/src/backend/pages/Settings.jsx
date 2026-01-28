@@ -391,6 +391,14 @@ const Settings = () => {
             // CRITICAL: Check flag FIRST - if we're updating from our own onChange, skip innerHTML update
             if (isUpdatingFromValueRef.current) {
                 // This value change is from our own onChange (user typing), don't update innerHTML
+                // But restore cursor position to prevent it from disappearing
+                if (isFocused && cursorPositionRef.current) {
+                    requestAnimationFrame(() => {
+                        if (editorRef.current && document.activeElement === editorRef.current) {
+                            restoreCursorPosition();
+                        }
+                    });
+                }
                 return;
             }
             
@@ -399,6 +407,14 @@ const Settings = () => {
             if (isFocused) {
                 // Editor is focused - user is typing, don't update innerHTML
                 // The value prop change is from our own onChange, so we should ignore it
+                // But restore cursor position to prevent it from disappearing
+                if (cursorPositionRef.current) {
+                    requestAnimationFrame(() => {
+                        if (editorRef.current && document.activeElement === editorRef.current) {
+                            restoreCursorPosition();
+                        }
+                    });
+                }
                 return;
             }
             
@@ -440,6 +456,13 @@ const Settings = () => {
                 startTransition(() => {
                     onChange(html);
                 });
+                // Restore cursor position after onChange is called
+                // Use requestAnimationFrame to ensure DOM is ready
+                requestAnimationFrame(() => {
+                    if (editorRef.current && document.activeElement === editorRef.current && cursorPositionRef.current) {
+                        restoreCursorPosition();
+                    }
+                });
                 // Reset flag after a delay to allow useEffect to skip the update
                 // Use longer delay to ensure useEffect has time to check the flag
                 setTimeout(() => {
@@ -455,6 +478,26 @@ const Settings = () => {
                 saveCursorPosition();
             }
             scheduleChange();
+        };
+
+        const handleKeyDown = (e) => {
+            // For space and other keys that might cause cursor to disappear
+            // Save cursor position before the key is processed
+            if (document.activeElement === editorRef.current) {
+                saveCursorPosition();
+            }
+        };
+
+        const handleKeyUp = (e) => {
+            // Restore cursor position after key is released
+            // This ensures cursor doesn't disappear when pressing space or other keys
+            if (document.activeElement === editorRef.current && cursorPositionRef.current) {
+                requestAnimationFrame(() => {
+                    if (editorRef.current && document.activeElement === editorRef.current) {
+                        restoreCursorPosition();
+                    }
+                });
+            }
         };
 
         const handleBlur = () => {
@@ -831,6 +874,8 @@ const Settings = () => {
                     ref={editorRef}
                     contentEditable
                     onInput={handleInput}
+                    onKeyDown={handleKeyDown}
+                    onKeyUp={handleKeyUp}
                     onBlur={handleBlur}
                     onFocus={(e) => {
                         // Ensure focus is maintained
@@ -863,6 +908,265 @@ const Settings = () => {
         body: getDefaultTemplateBody('Booking Confirmation'),
         category: 'User Defined Message'
     });
+    
+    // Refs for textarea elements
+    const emailBodyTextareaRef = useRef(null);
+    const emailBodyTextareaEditRef = useRef(null);
+    
+    // Function to insert prompt into textarea
+    const insertPromptIntoTextarea = (textareaRef, promptText) => {
+        if (!textareaRef || !textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const currentPlainText = textarea.value;
+        const newPlainText = currentPlainText.substring(0, start) + promptText + currentPlainText.substring(end);
+        const newCursorPos = start + promptText.length;
+        
+        // Convert plain text back to HTML format
+        const lines = newPlainText.split('\n').filter(line => line.trim() !== '' || line === '');
+        const html = lines.length > 0 
+            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+            : '';
+        
+        // Update textarea value directly first to avoid cursor jump
+        if (textareaRef.current) {
+            textareaRef.current.value = newPlainText;
+        }
+        
+        // Update state
+        setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+        
+        // Restore cursor position after state update
+        setTimeout(() => {
+            if (textareaRef.current) {
+                textareaRef.current.focus();
+                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        }, 10);
+    };
+    
+    // Function to handle Customer Portal Link insertion
+    const handleCustomerPortalLinkForTextarea = (textareaRef) => {
+        const linkText = prompt('Enter link text (e.g., View Your Booking):');
+        if (!linkText || !linkText.trim()) return;
+        const promptText = `[Customer Portal Link:${linkText.trim()}]`;
+        insertPromptIntoTextarea(textareaRef, promptText);
+    };
+    
+    // State for button modal
+    const [showButtonModalForTextarea, setShowButtonModalForTextarea] = useState(false);
+    const [buttonTextForTextarea, setButtonTextForTextarea] = useState('');
+    const [buttonUrlForTextarea, setButtonUrlForTextarea] = useState('');
+    const [currentTextareaRefForTextarea, setCurrentTextareaRefForTextarea] = useState(null);
+    
+    // Function to wrap selected text in textarea with HTML tags
+    const wrapTextInTextarea = (textareaRef, openTag, closeTag) => {
+        if (!textareaRef || !textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selectedText = text.substring(start, end);
+        
+        if (selectedText) {
+            const newText = text.substring(0, start) + openTag + selectedText + closeTag + text.substring(end);
+            const newCursorPos = start + openTag.length + selectedText.length + closeTag.length;
+            
+            // Convert plain text back to HTML format
+            const lines = newText.split('\n').filter(line => line.trim() !== '' || line === '');
+            const html = lines.length > 0 
+                ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+                : '';
+            
+            setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+            
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.value = newText;
+                    textareaRef.current.focus();
+                    textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                }
+            }, 10);
+        } else {
+            // If no selection, insert tags at cursor position
+            const newText = text.substring(0, start) + openTag + closeTag + text.substring(end);
+            const newCursorPos = start + openTag.length;
+            
+            const lines = newText.split('\n').filter(line => line.trim() !== '' || line === '');
+            const html = lines.length > 0 
+                ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+                : '';
+            
+            setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+            
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.value = newText;
+                    textareaRef.current.focus();
+                    textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                }
+            }, 10);
+        }
+    };
+    
+    // Formatting functions for textarea
+    const handleBoldForTextarea = (textareaRef) => {
+        wrapTextInTextarea(textareaRef, '<b>', '</b>');
+    };
+    
+    const handleItalicForTextarea = (textareaRef) => {
+        wrapTextInTextarea(textareaRef, '<i>', '</i>');
+    };
+    
+    const handleUnderlineForTextarea = (textareaRef) => {
+        wrapTextInTextarea(textareaRef, '<u>', '</u>');
+    };
+    
+    const handleListForTextarea = (textareaRef) => {
+        if (!textareaRef || !textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selectedText = text.substring(start, end);
+        
+        if (selectedText) {
+            // Split by lines and wrap each in <li>
+            const lines = selectedText.split('\n').filter(line => line.trim() !== '');
+            const listItems = lines.map(line => `<li>${line.trim()}</li>`).join('\n');
+            const newText = text.substring(0, start) + `<ul>\n${listItems}\n</ul>` + text.substring(end);
+            
+            const lines2 = newText.split('\n').filter(line => line.trim() !== '' || line === '');
+            const html = lines2.length > 0 
+                ? lines2.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+                : '';
+            
+            setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+            
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.value = newText;
+                    textareaRef.current.focus();
+                }
+            }, 10);
+        } else {
+            const newText = text.substring(0, start) + '<ul>\n<li></li>\n</ul>' + text.substring(end);
+            
+            const lines = newText.split('\n').filter(line => line.trim() !== '' || line === '');
+            const html = lines.length > 0 
+                ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+                : '';
+            
+            setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+            
+            setTimeout(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.value = newText;
+                    textareaRef.current.focus();
+                }
+            }, 10);
+        }
+    };
+    
+    const handleLinkForTextarea = (textareaRef) => {
+        if (!textareaRef || !textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const selectedText = text.substring(start, end);
+        
+        const url = prompt('Enter URL');
+        if (!url) return;
+        
+        const linkText = selectedText || prompt('Enter link text:');
+        if (!linkText) return;
+        
+        const newText = text.substring(0, start) + `<a href="${url}">${linkText}</a>` + text.substring(end);
+        const newCursorPos = start + `<a href="${url}">${linkText}</a>`.length;
+        
+        const lines = newText.split('\n').filter(line => line.trim() !== '' || line === '');
+        const html = lines.length > 0 
+            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+            : '';
+        
+        setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+        
+        setTimeout(() => {
+            if (textareaRef.current) {
+                textareaRef.current.value = newText;
+                textareaRef.current.focus();
+                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        }, 10);
+    };
+    
+    const handleClearForTextarea = (textareaRef) => {
+        if (!textareaRef || !textareaRef.current) return;
+        const textarea = textareaRef.current;
+        const text = textarea.value;
+        // Remove HTML tags but keep text
+        const cleanText = text.replace(/<[^>]*>/g, '');
+        
+        const lines = cleanText.split('\n').filter(line => line.trim() !== '' || line === '');
+        const html = lines.length > 0 
+            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+            : '';
+        
+        setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+        
+        setTimeout(() => {
+            if (textareaRef.current) {
+                textareaRef.current.value = cleanText;
+                textareaRef.current.focus();
+            }
+        }, 10);
+    };
+    
+    const handleAddButtonForTextarea = (textareaRef) => {
+        setButtonTextForTextarea('');
+        setButtonUrlForTextarea('');
+        setCurrentTextareaRefForTextarea(textareaRef);
+        setShowButtonModalForTextarea(true);
+    };
+    
+    const handleInsertButtonForTextarea = () => {
+        if (!buttonTextForTextarea || !buttonUrlForTextarea) {
+            alert('Please enter both button text and URL');
+            return;
+        }
+        
+        if (!currentTextareaRefForTextarea || !currentTextareaRefForTextarea.current) return;
+        const textarea = currentTextareaRefForTextarea.current;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        
+        const buttonHtml = `<a href="${buttonUrlForTextarea}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px 20px;background-color:#3274b4;color:white;text-decoration:none;border-radius:4px;font-weight:500;margin:5px 0;">${buttonTextForTextarea}</a>`;
+        const newText = text.substring(0, start) + buttonHtml + text.substring(end);
+        const newCursorPos = start + buttonHtml.length;
+        
+        const lines = newText.split('\n').filter(line => line.trim() !== '' || line === '');
+        const html = lines.length > 0 
+            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+            : '';
+        
+        setEmailTemplateFormData(prev => ({ ...prev, body: html }));
+        
+        setTimeout(() => {
+            if (currentTextareaRefForTextarea.current) {
+                currentTextareaRefForTextarea.current.value = newText;
+                currentTextareaRefForTextarea.current.focus();
+                currentTextareaRefForTextarea.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        }, 10);
+        
+        setShowButtonModalForTextarea(false);
+        setButtonTextForTextarea('');
+        setButtonUrlForTextarea('');
+        setCurrentTextareaRefForTextarea(null);
+    };
     
     // Collapsible sections state
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(false);
@@ -11843,6 +12147,44 @@ const Settings = () => {
 
                                         {/* Email Body */}
                                         <div style={{ padding: '0' }}>
+                                            {/* Toolbar with Formatting and Placeholder Buttons */}
+                                            <div style={isMobile ? {
+                                                padding: '8px 12px',
+                                                backgroundColor: '#fff',
+                                                borderBottom: '1px solid #e5e7eb'
+                                            } : {
+                                                padding: '12px 24px',
+                                                backgroundColor: '#fff',
+                                                borderBottom: '1px solid #e5e7eb'
+                                            }}>
+                                                <div style={{
+                                                    display: 'flex',
+                                                    gap: isMobile ? '4px' : '8px',
+                                                    flexWrap: 'wrap',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    {/* Formatting Buttons */}
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleBoldForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px' }}>B</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleItalicForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px', fontStyle: 'italic' }}>I</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleUnderlineForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px', textDecoration: 'underline' }}>U</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleListForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px' }}>• List</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleLinkForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px' }}>Link</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleClearForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px' }}>Clear</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleAddButtonForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px', backgroundColor: '#3274b4', color: 'white' }}>Button</button>
+                                                    <div style={{ width: '1px', backgroundColor: '#e5e7eb', margin: '0 4px' }}></div>
+                                                    {/* Placeholder Buttons */}
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[First Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[Last Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Last Name]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[Full Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Full Name]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[Email]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Email]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[Phone]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Phone]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[Booking ID]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Booking ID]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[First Name of Recipient]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name of Recipient]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[Experience Data]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Experience Data]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaRef, '[Receipt]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Receipt]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleCustomerPortalLinkForTextarea(emailBodyTextareaRef)} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#dbeafe', color: '#1d4ed8' }}>[Customer Portal Link]</button>
+                                                </div>
+                                            </div>
                                             {/* Editable Content Area */}
                                             <div style={isMobile ? {
                                                 padding: '12px',
@@ -11853,10 +12195,67 @@ const Settings = () => {
                                                 backgroundColor: '#fff',
                                                 minHeight: '200px'
                                             }}>
-                                                <RichTextEditor
-                                                    value={emailTemplateFormData.body}
-                                                    onChange={(html) => setEmailTemplateFormData({ ...emailTemplateFormData, body: html })}
+                                                <textarea
+                                                    ref={emailBodyTextareaRef}
+                                                    value={emailTemplateFormData.body ? (() => {
+                                                        // Convert HTML to plain text for display
+                                                        const html = emailTemplateFormData.body;
+                                                        if (!html) return '';
+                                                        // Replace HTML line breaks with newlines first
+                                                        let text = html
+                                                            .replace(/<br\s*\/?>/gi, '\n')
+                                                            .replace(/<\/p>\s*<p>/gi, '\n')
+                                                            .replace(/<\/p>/gi, '\n')
+                                                            .replace(/<p>/gi, '');
+                                                        // Strip all remaining HTML tags
+                                                        text = text.replace(/<[^>]*>/g, '');
+                                                        // Decode HTML entities
+                                                        const decodedText = text
+                                                            .replace(/&nbsp;/g, ' ')
+                                                            .replace(/&amp;/g, '&')
+                                                            .replace(/&lt;/g, '<')
+                                                            .replace(/&gt;/g, '>')
+                                                            .replace(/&quot;/g, '"')
+                                                            .replace(/&#39;/g, "'");
+                                                        // Clean up multiple newlines
+                                                        return decodedText.replace(/\n{3,}/g, '\n\n').trim();
+                                                    })() : ''}
+                                                    onChange={(e) => {
+                                                        // Convert plain text back to HTML format
+                                                        const plainText = e.target.value;
+                                                        // Preserve line breaks by converting to <p> tags
+                                                        const lines = plainText.split('\n').filter(line => line.trim() !== '' || line === '');
+                                                        const html = lines.length > 0 
+                                                            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+                                                            : '';
+                                                        setEmailTemplateFormData({ ...emailTemplateFormData, body: html });
+                                                    }}
                                                     placeholder="Enter your message here..."
+                                                    style={isMobile ? {
+                                                        width: '100%',
+                                                        border: 'none',
+                                                        outline: 'none',
+                                                        fontSize: '13px',
+                                                        lineHeight: '1.7',
+                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                        color: '#111827',
+                                                        padding: '4px 0',
+                                                        minHeight: '120px',
+                                                        resize: 'vertical',
+                                                        backgroundColor: 'transparent'
+                                                    } : {
+                                                        width: '100%',
+                                                        border: 'none',
+                                                        outline: 'none',
+                                                        fontSize: '14px',
+                                                        lineHeight: '1.7',
+                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                        color: '#111827',
+                                                        padding: '4px 0',
+                                                        minHeight: '150px',
+                                                        resize: 'vertical',
+                                                        backgroundColor: 'transparent'
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -13862,16 +14261,95 @@ const Settings = () => {
 
                                         {/* Email Body */}
                                         <div style={{ padding: '0' }}>
+                                            {/* Toolbar with Formatting and Placeholder Buttons */}
+                                            <div style={{
+                                                padding: '12px 24px',
+                                                backgroundColor: '#fff',
+                                                borderBottom: '1px solid #e5e7eb'
+                                            }}>
+                                                <div style={{
+                                                    display: 'flex',
+                                                    gap: '8px',
+                                                    flexWrap: 'wrap',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    {/* Formatting Buttons */}
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleBoldForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px' }}>B</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleItalicForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px', fontStyle: 'italic' }}>I</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleUnderlineForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px', textDecoration: 'underline' }}>U</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleListForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px' }}>• List</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleLinkForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px' }}>Link</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleClearForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px' }}>Clear</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleAddButtonForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px', backgroundColor: '#3274b4', color: 'white' }}>Button</button>
+                                                    <div style={{ width: '1px', backgroundColor: '#e5e7eb', margin: '0 4px' }}></div>
+                                                    {/* Placeholder Buttons */}
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[First Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[Last Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Last Name]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[Full Name]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Full Name]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[Email]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Email]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[Phone]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Phone]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[Booking ID]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Booking ID]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[First Name of Recipient]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[First Name of Recipient]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[Experience Data]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Experience Data]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => insertPromptIntoTextarea(emailBodyTextareaEditRef, '[Receipt]')} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#f3f4f6', color: '#6366f1' }}>[Receipt]</button>
+                                                    <button type="button" className="btn btn-secondary" onClick={() => handleCustomerPortalLinkForTextarea(emailBodyTextareaEditRef)} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: '#dbeafe', color: '#1d4ed8' }}>[Customer Portal Link]</button>
+                                                </div>
+                                            </div>
                                             {/* Editable Content Area */}
                                             <div style={{
                                                 padding: '24px',
                                                 backgroundColor: '#fff',
                                                 minHeight: '200px'
                                             }}>
-                                                <RichTextEditor
-                                                    value={emailTemplateFormData.body}
-                                                    onChange={(html) => setEmailTemplateFormData({ ...emailTemplateFormData, body: html })}
+                                                <textarea
+                                                    ref={emailBodyTextareaEditRef}
+                                                    value={emailTemplateFormData.body ? (() => {
+                                                        // Convert HTML to plain text for display
+                                                        const html = emailTemplateFormData.body;
+                                                        if (!html) return '';
+                                                        // Replace HTML line breaks with newlines first
+                                                        let text = html
+                                                            .replace(/<br\s*\/?>/gi, '\n')
+                                                            .replace(/<\/p>\s*<p>/gi, '\n')
+                                                            .replace(/<\/p>/gi, '\n')
+                                                            .replace(/<p>/gi, '');
+                                                        // Strip all remaining HTML tags
+                                                        text = text.replace(/<[^>]*>/g, '');
+                                                        // Decode HTML entities
+                                                        const decodedText = text
+                                                            .replace(/&nbsp;/g, ' ')
+                                                            .replace(/&amp;/g, '&')
+                                                            .replace(/&lt;/g, '<')
+                                                            .replace(/&gt;/g, '>')
+                                                            .replace(/&quot;/g, '"')
+                                                            .replace(/&#39;/g, "'");
+                                                        // Clean up multiple newlines
+                                                        return decodedText.replace(/\n{3,}/g, '\n\n').trim();
+                                                    })() : ''}
+                                                    onChange={(e) => {
+                                                        // Convert plain text back to HTML format
+                                                        const plainText = e.target.value;
+                                                        // Preserve line breaks by converting to <p> tags
+                                                        const lines = plainText.split('\n').filter(line => line.trim() !== '' || line === '');
+                                                        const html = lines.length > 0 
+                                                            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
+                                                            : '';
+                                                        setEmailTemplateFormData({ ...emailTemplateFormData, body: html });
+                                                    }}
                                                     placeholder="Enter your message here..."
+                                                    style={{
+                                                        width: '100%',
+                                                        border: 'none',
+                                                        outline: 'none',
+                                                        fontSize: '14px',
+                                                        lineHeight: '1.7',
+                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                        color: '#111827',
+                                                        padding: '4px 0',
+                                                        minHeight: '150px',
+                                                        resize: 'vertical',
+                                                        backgroundColor: 'transparent'
+                                                    }}
                                                 />
                                             </div>
                                         </div>
@@ -13902,6 +14380,113 @@ const Settings = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Button Modal for Textarea */}
+            {showButtonModalForTextarea && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10000
+                }} onClick={() => {
+                    setShowButtonModalForTextarea(false);
+                    setButtonTextForTextarea('');
+                    setButtonUrlForTextarea('');
+                    setCurrentTextareaRefForTextarea(null);
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '8px',
+                        padding: '24px',
+                        width: '90%',
+                        maxWidth: '500px',
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                    }} onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '20px', fontWeight: 600 }}>
+                            Add Button
+                        </h3>
+                        <div style={{ marginBottom: '16px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                Button Text <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={buttonTextForTextarea}
+                                onChange={(e) => setButtonTextForTextarea(e.target.value)}
+                                placeholder="Enter button text"
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '4px',
+                                    fontSize: '14px'
+                                }}
+                            />
+                        </div>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, color: '#374151' }}>
+                                Button URL <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={buttonUrlForTextarea}
+                                onChange={(e) => setButtonUrlForTextarea(e.target.value)}
+                                placeholder="Enter URL (e.g., https://example.com)"
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '4px',
+                                    fontSize: '14px'
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowButtonModalForTextarea(false);
+                                    setButtonTextForTextarea('');
+                                    setButtonUrlForTextarea('');
+                                    setCurrentTextareaRefForTextarea(null);
+                                }}
+                                style={{
+                                    padding: '8px 16px',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '4px',
+                                    backgroundColor: 'white',
+                                    color: '#374151',
+                                    cursor: 'pointer',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleInsertButtonForTextarea}
+                                style={{
+                                    padding: '8px 16px',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#3274b4',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Add Button
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

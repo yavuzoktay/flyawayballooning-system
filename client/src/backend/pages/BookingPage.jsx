@@ -61,20 +61,104 @@ const BookingPage = () => {
         return flightType.includes(filter);
     };
 
+    // Build filters for /api/getAllBookingData.
+    // Important: "Expired" is a derived status on the client (based on expires date),
+    // not always a raw ab.status value in the DB, so we should NOT pass it as a direct
+    // status filter to the backend; instead we filter "Expired" client‑side.
+    const buildGetAllBookingDataParams = (filters) => {
+        const params = { ...filters };
+        if (params.status === 'Expired') {
+            delete params.status;
+        }
+        return params;
+    };
+
+    // Compute the effective status used throughout the UI, matching the logic in PaginatedTable
+    // (including derived "Expired" state based on expires date).
+    const getEffectiveBookingStatus = (item) => {
+        const rawStatus = (item.status || '').toString().trim();
+        let displayStatus = rawStatus || '';
+
+        // First, mirror the "Expired" logic from PaginatedTable for bookings context
+        if (item.expires) {
+            try {
+                let expiresDate = item.expires;
+                let parsedDate = null;
+
+                if (typeof expiresDate === 'string' && expiresDate.trim() !== '') {
+                    // Try ISO / "YYYY-MM-DD HH:mm:ss"
+                    parsedDate = dayjs(expiresDate);
+
+                    // Fallback: DD/MM/YYYY
+                    if (!parsedDate.isValid()) {
+                        const parts = expiresDate.split('/');
+                        if (parts.length === 3) {
+                            let year = parts[2];
+                            if (year.length === 2) {
+                                year = '20' + year;
+                            }
+                            parsedDate = dayjs(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
+                        }
+                    }
+
+                    // Fallback: native Date
+                    if (!parsedDate.isValid()) {
+                        const dateObj = new Date(expiresDate);
+                        if (!isNaN(dateObj.getTime())) {
+                            parsedDate = dayjs(dateObj);
+                        }
+                    }
+
+                    if (parsedDate && parsedDate.isValid()) {
+                        const today = dayjs().startOf('day');
+                        const expiresStartOfDay = parsedDate.startOf('day');
+                        if (expiresStartOfDay.isBefore(today)) {
+                            return 'Expired';
+                        }
+                    }
+                }
+            } catch {
+                // Ignore parsing issues for filter purposes
+            }
+        }
+
+        // Normalize other statuses to match display values
+        if (rawStatus === 'Confirmed' || rawStatus === 'Scheduled') {
+            displayStatus = 'Scheduled';
+        } else if (rawStatus === 'Cancelled' || rawStatus === 'Canceled') {
+            displayStatus = 'Cancelled';
+        } else if (rawStatus === 'Flown' || rawStatus === 'Completed') {
+            displayStatus = 'Flown';
+        }
+
+        return displayStatus;
+    };
+
     // Advanced filter dialog state
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
 
     // Dynamic filter option lists for All Bookings tab
     const bookingStatusOptions = useMemo(() => {
         const set = new Set();
+
+        // Collect all distinct, normalized status values from booking data
         booking.forEach(b => {
             const raw = (b.status || '').toString().trim();
             if (!raw) return;
-            const normalized = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+            const normalized =
+                raw.length > 1
+                    ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+                    : raw.toUpperCase();
             set.add(normalized);
         });
-        // Remove undesired statuses
+
+        // Remove statuses we explicitly do NOT want to expose in the filter
         ['Confirmed', 'Flown', 'No show', 'Open', 'Waiting'].forEach(s => set.delete(s));
+
+        // Always expose "Expired" as a selectable status in the filter UI,
+        // even if it doesn't currently appear in the raw data
+        set.add('Expired');
+
         return Array.from(set).sort();
     }, [booking]);
 
@@ -1914,7 +1998,7 @@ const BookingPage = () => {
             // Debounce the API call by 300ms
             const timer = setTimeout(async () => {
                 try {
-                    const response = await axios.get(`/api/getAllBookingData`, { params: filters });
+                    const response = await axios.get(`/api/getAllBookingData`, { params: buildGetAllBookingDataParams(filters) });
                     const bookingData = response.data.data || [];
 
                     // Enrich bookings with voucher_type information from vouchers (for redeemed vouchers)
@@ -3866,7 +3950,7 @@ setBookingDetail(finalVoucherDetail);
                     
                     // Refresh all data
                     // Refresh booking data
-                    const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: filters });
+                    const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: buildGetAllBookingDataParams(filters) });
                     setBooking(bookingResponse.data.data || []);
                     setFilteredBookingData(bookingResponse.data.data || []);
                 
@@ -4139,7 +4223,7 @@ setBookingDetail(finalVoucherDetail);
                     // Refresh all data FIRST before deleting old booking
                     // This ensures the new booking appears in the table
                     // Refresh booking data
-                    const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: filters });
+                    const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: buildGetAllBookingDataParams(filters) });
                     const newBookingData = bookingResponse.data.data || [];
                     setBooking(newBookingData);
                     setFilteredBookingData(newBookingData);
@@ -4379,7 +4463,7 @@ setBookingDetail(finalVoucherDetail);
             
             // Refresh all data - NO DELETE needed because backend UPDATEs the same booking
             if (activeTab === 'bookings') {
-                const response = await axios.get(`/api/getAllBookingData`, { params: filters });
+                const response = await axios.get(`/api/getAllBookingData`, { params: buildGetAllBookingDataParams(filters) });
                 const updatedBookingData = response.data.data || [];
                 setBooking(updatedBookingData);
                 setFilteredBookingData(updatedBookingData);
@@ -5709,12 +5793,18 @@ setBookingDetail(finalVoucherDetail);
                                             }
                                             // Advanced multi Status filter (checkboxes)
                                             if (filters.statusMulti && filters.statusMulti.length > 0) {
-                                                const itemStatus = (item.status || '').toString().trim().toLowerCase();
-                                                const matchesAny = filters.statusMulti.some(s => s.toString().trim().toLowerCase() === itemStatus);
+                                                const effectiveStatus = (getEffectiveBookingStatus(item) || '').toString().trim().toLowerCase();
+                                                const matchesAny = filters.statusMulti.some(
+                                                    s => s.toString().trim().toLowerCase() === effectiveStatus
+                                                );
                                                 if (!matchesAny) return false;
                                             }
-                                            // Status dropdown filter
-                                            if (filters.status && item.status !== filters.status) return false;
+                                            // Status dropdown filter (uses effective display status so that
+                                            // selecting "Expired" works consistently with the table UI)
+                                            if (filters.status && filters.status !== 'Select') {
+                                                const effectiveStatus = getEffectiveBookingStatus(item);
+                                                if (effectiveStatus !== filters.status) return false;
+                                            }
                                             // Advanced multi Location filter (checkboxes)
                                             if (filters.locationMulti && filters.locationMulti.length > 0) {
                                                 const itemLocation = (item.location || '').toString().trim();
