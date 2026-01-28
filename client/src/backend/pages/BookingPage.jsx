@@ -7660,15 +7660,42 @@ setBookingDetail(finalVoucherDetail);
                                                                 const passengers = bookingDetail.passengers;
                                                                                                 
                                                                 // Calculate original passenger count from original_amount
-                                                                // original_amount = 220 * originalPaxCount (for Shared Flight)
-                                                                const BASE_PRICE_PER_PASSENGER = 220;
+                                                                // NOTE: This previously assumed Any Day base price (220).
+                                                                // We'll debug actual values to ensure we derive this correctly for
+                                                                // different voucher types (e.g. Flexible Weekday at £200).
+                                                                const DEBUG_BASE_PRICE_PER_PASSENGER = 220;
                                                                 const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
                                                                 const originalPaxCount = originalAmount > 0 
-                                                                    ? Math.round(originalAmount / BASE_PRICE_PER_PASSENGER) 
+                                                                    ? Math.round(originalAmount / DEBUG_BASE_PRICE_PER_PASSENGER) 
                                                                     : passengers.length; // Fallback to all passengers if original_amount is 0
                                                                                                 
                                                                                                 return passengers.map((p, i) => {
                                                                                                     const isOriginalPassenger = i < originalPaxCount; // First N passengers are from original booking (ballooning-book)
+
+                                                                                                    // #region agent log - passenger price debug (H1)
+                                                                                                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
+                                                                                                        method: 'POST',
+                                                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                                                        body: JSON.stringify({
+                                                                                                            sessionId: 'debug-session',
+                                                                                                            runId: 'passenger-price-pre',
+                                                                                                            hypothesisId: 'H1',
+                                                                                                            location: 'BookingPage.jsx:PassengerDetails:beforeDisplay',
+                                                                                                            message: 'Passenger price calc inputs',
+                                                                                                            data: {
+                                                                                                                bookingId: bookingDetail.booking?.id || null,
+                                                                                                                voucherType: bookingDetail.booking?.voucher_type || null,
+                                                                                                                experience: bookingDetail.booking?.experience || null,
+                                                                                                                originalAmount,
+                                                                                                                originalPaxCount,
+                                                                                                                passengerIndex: i,
+                                                                                                                passengerId: p.id || null,
+                                                                                                                storedPrice: p.price != null ? Number(p.price) : null
+                                                                                                            },
+                                                                                                            timestamp: Date.now()
+                                                                                                        })
+                                                                                                    }).catch(() => {});
+                                                                                                    // #endregion
                                                                                                     
                                                                                                     return (
                                                                 <Typography key={p.id}>
@@ -7824,13 +7851,16 @@ setBookingDetail(finalVoucherDetail);
                                                                                             originalPaxCount = bookingDetail.passengers ? bookingDetail.passengers.length : 1;
                                                                                         }
                                                                                         
-                                                                                        // All passengers pay the same base price: originalAmount / original passenger count (guest excluded from count)
+                                                                                        // All passengers should show the actual seat price for this passenger.
+                                                                                        // Prefer the stored passenger price (set at booking creation), since this
+                                                                                        // already reflects the correct voucher type pricing (e.g. Flexible Weekday £200).
+                                                                                        // Only fall back to originalAmount/originalPaxCount when passenger price is missing.
                                                                                         let basePricePerPassenger = 0;
-                                                                                        if (originalAmount > 0 && originalPaxCount > 0) {
+                                                                                        const storedPassengerPrice = p.price != null ? parseFloat(p.price) : NaN;
+                                                                                        if (!Number.isNaN(storedPassengerPrice) && storedPassengerPrice > 0) {
+                                                                                            basePricePerPassenger = storedPassengerPrice;
+                                                                                        } else if (originalAmount > 0 && originalPaxCount > 0) {
                                                                                             basePricePerPassenger = originalAmount / originalPaxCount;
-                                                                                        } else {
-                                                                                            // Fallback: use stored price if originalAmount not available
-                                                                                            basePricePerPassenger = parseFloat(p.price) || 0;
                                                                                         }
                                                                                         
                                                                                         // Add-on price (only for first passenger)
