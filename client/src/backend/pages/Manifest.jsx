@@ -3670,9 +3670,32 @@ const Manifest = () => {
         }
         try {
             lastCrewFetchRef.current = { date, inFlight: true };
-            await axios.get('/api/crew-assignments', { params: { date } });
-            // Don't auto-populate assignments from API - only show user selections
-            setCrewAssignmentsBySlot({});
+            const res = await axios.get('/api/crew-assignments', { params: { date } });
+
+            // Populate assignments from API response
+            const assignments = {};
+            if (Array.isArray(res?.data?.data)) {
+                res.data.data.forEach((assignment) => {
+                    if (assignment.activity_id && assignment.date && assignment.time && assignment.crew_id) {
+                        // Normalize date: handle ISO format ("2026-03-03T00:00:00.000Z") or YYYY-MM-DD
+                        let normalizedDate = assignment.date;
+                        if (normalizedDate.includes('T')) {
+                            normalizedDate = normalizedDate.substring(0, 10); // Extract YYYY-MM-DD
+                        }
+                        
+                        // Normalize time: handle HH:mm:ss format ("07:00:00") to HH:mm ("07:00")
+                        let normalizedTime = assignment.time;
+                        if (normalizedTime && normalizedTime.length >= 5) {
+                            normalizedTime = normalizedTime.substring(0, 5); // Extract HH:mm
+                        }
+                        
+                        const slotKeyValue = slotKey(assignment.activity_id, normalizedDate, normalizedTime);
+                        assignments[slotKeyValue] = assignment.crew_id;
+                    }
+                });
+            }
+
+            setCrewAssignmentsBySlot(assignments);
         } catch (err) {
             console.error('Error refreshing crew assignments:', err);
             setCrewAssignmentsBySlot({});
@@ -3693,9 +3716,32 @@ const Manifest = () => {
         }
         try {
             lastPilotFetchRef.current = { date, inFlight: true };
-            await axios.get('/api/pilot-assignments', { params: { date } });
-            // Don't auto-populate assignments from API - only show user selections
-            setPilotAssignmentsBySlot({});
+            const res = await axios.get('/api/pilot-assignments', { params: { date } });
+
+            // Populate assignments from API response
+            const assignments = {};
+            if (Array.isArray(res?.data?.data)) {
+                res.data.data.forEach((assignment) => {
+                    if (assignment.activity_id && assignment.date && assignment.time && assignment.pilot_id) {
+                        // Normalize date: handle ISO format ("2026-03-03T00:00:00.000Z") or YYYY-MM-DD
+                        let normalizedDate = assignment.date;
+                        if (normalizedDate.includes('T')) {
+                            normalizedDate = normalizedDate.substring(0, 10); // Extract YYYY-MM-DD
+                        }
+                        
+                        // Normalize time: handle HH:mm:ss format ("07:00:00") to HH:mm ("07:00")
+                        let normalizedTime = assignment.time;
+                        if (normalizedTime && normalizedTime.length >= 5) {
+                            normalizedTime = normalizedTime.substring(0, 5); // Extract HH:mm
+                        }
+                        
+                        const slotKeyValue = slotKey(assignment.activity_id, normalizedDate, normalizedTime);
+                        assignments[slotKeyValue] = assignment.pilot_id;
+                    }
+                });
+            }
+
+            setPilotAssignmentsBySlot(assignments);
         } catch (err) {
             console.error('Error refreshing pilot assignments:', err);
             setPilotAssignmentsBySlot({});
