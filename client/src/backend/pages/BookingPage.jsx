@@ -7672,31 +7672,6 @@ setBookingDetail(finalVoucherDetail);
                                                                                                 return passengers.map((p, i) => {
                                                                                                     const isOriginalPassenger = i < originalPaxCount; // First N passengers are from original booking (ballooning-book)
 
-                                                                                                    // #region agent log - passenger price debug (H1)
-                                                                                                    fetch('http://127.0.0.1:7243/ingest/83d02d4f-99e4-4d11-ae4c-75c735988481', {
-                                                                                                        method: 'POST',
-                                                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                                                        body: JSON.stringify({
-                                                                                                            sessionId: 'debug-session',
-                                                                                                            runId: 'passenger-price-pre',
-                                                                                                            hypothesisId: 'H1',
-                                                                                                            location: 'BookingPage.jsx:PassengerDetails:beforeDisplay',
-                                                                                                            message: 'Passenger price calc inputs',
-                                                                                                            data: {
-                                                                                                                bookingId: bookingDetail.booking?.id || null,
-                                                                                                                voucherType: bookingDetail.booking?.voucher_type || null,
-                                                                                                                experience: bookingDetail.booking?.experience || null,
-                                                                                                                originalAmount,
-                                                                                                                originalPaxCount,
-                                                                                                                passengerIndex: i,
-                                                                                                                passengerId: p.id || null,
-                                                                                                                storedPrice: p.price != null ? Number(p.price) : null
-                                                                                                            },
-                                                                                                            timestamp: Date.now()
-                                                                                                        })
-                                                                                                    }).catch(() => {});
-                                                                                                    // #endregion
-                                                                                                    
                                                                                                     return (
                                                                 <Typography key={p.id}>
                                                                             Passenger {i + 1}: {editingPassenger === p.id ? (

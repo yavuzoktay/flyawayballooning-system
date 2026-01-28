@@ -873,16 +873,16 @@ const Settings = () => {
                 <div
                     ref={editorRef}
                     contentEditable
+                    // Disable external grammar/spellcheck overlays (e.g. Grammarly, LanguageTool)
+                    // which can steal focus or reset the caret position in contentEditable fields.
+                    data-gramm="false"
+                    data-gramm_editor="false"
+                    data-enable-grammarly="false"
+                    data-lt-active="false"
                     onInput={handleInput}
                     onKeyDown={handleKeyDown}
                     onKeyUp={handleKeyUp}
                     onBlur={handleBlur}
-                    onFocus={(e) => {
-                        // Ensure focus is maintained
-                        if (editorRef.current) {
-                            editorRef.current.focus();
-                        }
-                    }}
                     style={{
                         width: '100%',
                         minHeight: '200px',
@@ -960,7 +960,10 @@ const Settings = () => {
     const [buttonUrlForTextarea, setButtonUrlForTextarea] = useState('');
     const [currentTextareaRefForTextarea, setCurrentTextareaRefForTextarea] = useState(null);
     
-    // Function to wrap selected text in textarea with HTML tags
+    // Function to wrap selected text in textarea with HTML tags.
+    // NOTE: For Message Template, we now treat body as raw HTML/text,
+    // so this helper simply wraps the selection and does NOT try to
+    // normalize into <p> paragraphs (to avoid corrupting existing markup).
     const wrapTextInTextarea = (textareaRef, openTag, closeTag) => {
         if (!textareaRef || !textareaRef.current) return;
         const textarea = textareaRef.current;
@@ -972,18 +975,11 @@ const Settings = () => {
         if (selectedText) {
             const newText = text.substring(0, start) + openTag + selectedText + closeTag + text.substring(end);
             const newCursorPos = start + openTag.length + selectedText.length + closeTag.length;
-            
-            // Convert plain text back to HTML format
-            const lines = newText.split('\n').filter(line => line.trim() !== '' || line === '');
-            const html = lines.length > 0 
-                ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
-                : '';
-            
-            setEmailTemplateFormData(prev => ({ ...prev, body: html }));
-            
+
+            setEmailTemplateFormData(prev => ({ ...prev, body: newText }));
+            textareaRef.current.value = newText;
             setTimeout(() => {
                 if (textareaRef.current) {
-                    textareaRef.current.value = newText;
                     textareaRef.current.focus();
                     textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
                 }
@@ -992,17 +988,11 @@ const Settings = () => {
             // If no selection, insert tags at cursor position
             const newText = text.substring(0, start) + openTag + closeTag + text.substring(end);
             const newCursorPos = start + openTag.length;
-            
-            const lines = newText.split('\n').filter(line => line.trim() !== '' || line === '');
-            const html = lines.length > 0 
-                ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
-                : '';
-            
-            setEmailTemplateFormData(prev => ({ ...prev, body: html }));
-            
+
+            setEmailTemplateFormData(prev => ({ ...prev, body: newText }));
+            textareaRef.current.value = newText;
             setTimeout(() => {
                 if (textareaRef.current) {
-                    textareaRef.current.value = newText;
                     textareaRef.current.focus();
                     textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
                 }
@@ -12197,64 +12187,42 @@ const Settings = () => {
                                             }}>
                                                 <textarea
                                                     ref={emailBodyTextareaRef}
-                                                    value={emailTemplateFormData.body ? (() => {
-                                                        // Convert HTML to plain text for display
-                                                        const html = emailTemplateFormData.body;
-                                                        if (!html) return '';
-                                                        // Replace HTML line breaks with newlines first
-                                                        let text = html
-                                                            .replace(/<br\s*\/?>/gi, '\n')
-                                                            .replace(/<\/p>\s*<p>/gi, '\n')
-                                                            .replace(/<\/p>/gi, '\n')
-                                                            .replace(/<p>/gi, '');
-                                                        // Strip all remaining HTML tags
-                                                        text = text.replace(/<[^>]*>/g, '');
-                                                        // Decode HTML entities
-                                                        const decodedText = text
-                                                            .replace(/&nbsp;/g, ' ')
-                                                            .replace(/&amp;/g, '&')
-                                                            .replace(/&lt;/g, '<')
-                                                            .replace(/&gt;/g, '>')
-                                                            .replace(/&quot;/g, '"')
-                                                            .replace(/&#39;/g, "'");
-                                                        // Clean up multiple newlines
-                                                        return decodedText.replace(/\n{3,}/g, '\n\n').trim();
-                                                    })() : ''}
-                                                    onChange={(e) => {
-                                                        // Convert plain text back to HTML format
-                                                        const plainText = e.target.value;
-                                                        // Preserve line breaks by converting to <p> tags
-                                                        const lines = plainText.split('\n').filter(line => line.trim() !== '' || line === '');
-                                                        const html = lines.length > 0 
-                                                            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
-                                                            : '';
-                                                        setEmailTemplateFormData({ ...emailTemplateFormData, body: html });
-                                                    }}
+                                                    value={emailTemplateFormData.body || ''}
+                                                    onChange={(e) =>
+                                                        setEmailTemplateFormData({
+                                                            ...emailTemplateFormData,
+                                                            body: e.target.value
+                                                        })
+                                                    }
                                                     placeholder="Enter your message here..."
                                                     style={isMobile ? {
                                                         width: '100%',
-                                                        border: 'none',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '8px',
                                                         outline: 'none',
                                                         fontSize: '13px',
                                                         lineHeight: '1.7',
-                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                        fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',
                                                         color: '#111827',
-                                                        padding: '4px 0',
-                                                        minHeight: '120px',
+                                                        padding: '8px 10px',
+                                                        minHeight: '150px',
                                                         resize: 'vertical',
-                                                        backgroundColor: 'transparent'
+                                                        backgroundColor: '#fff',
+                                                        boxSizing: 'border-box'
                                                     } : {
                                                         width: '100%',
-                                                        border: 'none',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '8px',
                                                         outline: 'none',
                                                         fontSize: '14px',
                                                         lineHeight: '1.7',
-                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                        fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',
                                                         color: '#111827',
-                                                        padding: '4px 0',
-                                                        minHeight: '150px',
+                                                        padding: '10px 12px',
+                                                        minHeight: '200px',
                                                         resize: 'vertical',
-                                                        backgroundColor: 'transparent'
+                                                        backgroundColor: '#fff',
+                                                        boxSizing: 'border-box'
                                                     }}
                                                 />
                                             </div>
@@ -14303,52 +14271,28 @@ const Settings = () => {
                                             }}>
                                                 <textarea
                                                     ref={emailBodyTextareaEditRef}
-                                                    value={emailTemplateFormData.body ? (() => {
-                                                        // Convert HTML to plain text for display
-                                                        const html = emailTemplateFormData.body;
-                                                        if (!html) return '';
-                                                        // Replace HTML line breaks with newlines first
-                                                        let text = html
-                                                            .replace(/<br\s*\/?>/gi, '\n')
-                                                            .replace(/<\/p>\s*<p>/gi, '\n')
-                                                            .replace(/<\/p>/gi, '\n')
-                                                            .replace(/<p>/gi, '');
-                                                        // Strip all remaining HTML tags
-                                                        text = text.replace(/<[^>]*>/g, '');
-                                                        // Decode HTML entities
-                                                        const decodedText = text
-                                                            .replace(/&nbsp;/g, ' ')
-                                                            .replace(/&amp;/g, '&')
-                                                            .replace(/&lt;/g, '<')
-                                                            .replace(/&gt;/g, '>')
-                                                            .replace(/&quot;/g, '"')
-                                                            .replace(/&#39;/g, "'");
-                                                        // Clean up multiple newlines
-                                                        return decodedText.replace(/\n{3,}/g, '\n\n').trim();
-                                                    })() : ''}
-                                                    onChange={(e) => {
-                                                        // Convert plain text back to HTML format
-                                                        const plainText = e.target.value;
-                                                        // Preserve line breaks by converting to <p> tags
-                                                        const lines = plainText.split('\n').filter(line => line.trim() !== '' || line === '');
-                                                        const html = lines.length > 0 
-                                                            ? lines.map(line => line.trim() === '' ? '<br>' : `<p>${line}</p>`).join('')
-                                                            : '';
-                                                        setEmailTemplateFormData({ ...emailTemplateFormData, body: html });
-                                                    }}
+                                                    value={emailTemplateFormData.body || ''}
+                                                    onChange={(e) =>
+                                                        setEmailTemplateFormData({
+                                                            ...emailTemplateFormData,
+                                                            body: e.target.value
+                                                        })
+                                                    }
                                                     placeholder="Enter your message here..."
                                                     style={{
                                                         width: '100%',
-                                                        border: 'none',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '8px',
                                                         outline: 'none',
                                                         fontSize: '14px',
                                                         lineHeight: '1.7',
-                                                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                                                        fontFamily: '-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif',
                                                         color: '#111827',
-                                                        padding: '4px 0',
-                                                        minHeight: '150px',
+                                                        padding: '10px 12px',
+                                                        minHeight: '200px',
                                                         resize: 'vertical',
-                                                        backgroundColor: 'transparent'
+                                                        backgroundColor: '#fff',
+                                                        boxSizing: 'border-box'
                                                     }}
                                                 />
                                             </div>
