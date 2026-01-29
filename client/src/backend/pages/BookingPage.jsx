@@ -4832,19 +4832,21 @@ setBookingDetail(finalVoucherDetail);
         }
     }, [detailDialogOpen, bookingDetail]);
 
-    // Add this useEffect to auto-split paid among passengers for display
+    // Add this useEffect to auto-split (paid + due) among passengers for display
     useEffect(() => {
         if (detailDialogOpen && bookingDetail?.booking && Array.isArray(bookingDetail.passengers) && bookingDetail.passengers.length > 0) {
             const paid = parseFloat(bookingDetail.booking.paid) || 0;
+            const due = parseFloat(bookingDetail.booking.due) || 0;
+            const totalAmount = paid + due;
             const n = bookingDetail.passengers.length;
-            const perPassenger = n > 0 ? parseFloat((paid / n).toFixed(2)) : 0;
+            const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
             // Sadece UI için, DB'ye yazma
             setBookingDetail(prev => ({
                 ...prev,
                 passengers: prev.passengers.map((p) => ({ ...p, price: perPassenger }))
             }));
         }
-    }, [detailDialogOpen, bookingDetail?.booking?.paid, bookingDetail?.passengers?.length]);
+    }, [detailDialogOpen, bookingDetail?.booking?.paid, bookingDetail?.booking?.due, bookingDetail?.passengers?.length]);
 
     // Add handler:
     const handleDeleteDateRequests = async () => {
@@ -7826,42 +7828,26 @@ setBookingDetail(finalVoucherDetail);
                                                                                             );
                                                                                         }
                                                                                         
-                                                                                        // For Shared Flight: Calculate price as originalAmount / original passenger count (guest NOT included in count)
-                                                                                        // All passengers (original + guest) pay the same base price: originalAmount / original passenger count
-                                                                                        const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
+                                                                                        // For Shared Flight: Calculate price as (paid + due) / passenger count
+                                                                                        // Total amount = paid + due; per passenger = totalAmount / passengerCount
+                                                                                        const paid = parseFloat(bookingDetail.booking?.paid) || 0;
+                                                                                        const due = parseFloat(bookingDetail.booking?.due) || 0;
+                                                                                        const totalAmount = paid + due;
                                                                                         const addOnTotalPrice = parseFloat(bookingDetail.booking?.add_to_booking_items_total_price) || 0;
                                                                                         const WEATHER_REFUND_PRICE = 47.5;
                                                                                         const hasWeatherRefund = p.weather_refund === 1 || p.weather_refund === '1' || p.weather_refund === true;
                                                                                         const weatherRefundPrice = hasWeatherRefund ? WEATHER_REFUND_PRICE : 0;
                                                                                         
-                                                                                        // Original passenger count (guest NOT included)
-                                                                                        // Calculate original passenger count from original_amount
-                                                                                        // original_amount = passenger_count * base_price_per_passenger
-                                                                                        const BASE_PRICE_PER_PASSENGER = 220;
-                                                                                        let originalPaxCount = 0;
-                                                                                        if (originalAmount > 0 && BASE_PRICE_PER_PASSENGER > 0) {
-                                                                                            // Calculate original passenger count: originalAmount / BASE_PRICE_PER_PASSENGER
-                                                                                            // Use Math.floor to avoid rounding errors (e.g., 660 / 220 = 3.0, not 3.2159)
-                                                                                            originalPaxCount = Math.floor(originalAmount / BASE_PRICE_PER_PASSENGER);
-                                                                                            // If result is 0 or invalid, fallback to passenger count
-                                                                                            if (originalPaxCount <= 0) {
-                                                                                                originalPaxCount = bookingDetail.passengers ? bookingDetail.passengers.length : 1;
-                                                                                            }
-                                                                                        } else {
-                                                                                            // Fallback: use passenger count if originalAmount not available
-                                                                                            originalPaxCount = bookingDetail.passengers ? bookingDetail.passengers.length : 1;
-                                                                                        }
+                                                                                        const currentPaxCount = bookingDetail.passengers ? bookingDetail.passengers.length : 1;
                                                                                         
-                                                                                        // All passengers should show the actual seat price for this passenger.
-                                                                                        // Prefer the stored passenger price (set at booking creation), since this
-                                                                                        // already reflects the correct voucher type pricing (e.g. Flexible Weekday £200).
-                                                                                        // Only fall back to originalAmount/originalPaxCount when passenger price is missing.
+                                                                                        // All passengers should show (paid + due) / passenger count
+                                                                                        // Prefer the stored passenger price from useEffect (which uses paid+due), fallback to calculated value
                                                                                         let basePricePerPassenger = 0;
                                                                                         const storedPassengerPrice = p.price != null ? parseFloat(p.price) : NaN;
                                                                                         if (!Number.isNaN(storedPassengerPrice) && storedPassengerPrice > 0) {
                                                                                             basePricePerPassenger = storedPassengerPrice;
-                                                                                        } else if (originalAmount > 0 && originalPaxCount > 0) {
-                                                                                            basePricePerPassenger = originalAmount / originalPaxCount;
+                                                                                        } else if (totalAmount > 0 && currentPaxCount > 0) {
+                                                                                            basePricePerPassenger = totalAmount / currentPaxCount;
                                                                                         }
                                                                                         
                                                                                         // Add-on price (only for first passenger)

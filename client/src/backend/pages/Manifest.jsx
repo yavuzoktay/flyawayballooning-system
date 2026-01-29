@@ -5991,9 +5991,11 @@ const Manifest = () => {
                                                                                     );
                                                                                 }
                                                                                 
-                                                                                // For Shared Flight: Calculate price as originalAmount/pax (only for original booking passengers) + add_on (only first) + weather_refundable
-                                                                                // For add-guest passengers: use stored price (calculated as originalAmount / currentPax when added) + weather_refundable
-                                                                                const originalAmount = parseFloat(bookingDetail.booking?.original_amount) || 0;
+                                                                                // For Shared Flight: Calculate price as (paid + due) / passenger count + add_on (only first) + weather_refundable
+                                                                                // Total amount = paid + due; per passenger = totalAmount / passengerCount
+                                                                                const paid = parseFloat(bookingDetail.booking?.paid) || 0;
+                                                                                const due = parseFloat(bookingDetail.booking?.due) || 0;
+                                                                                const totalAmount = paid + due;
                                                                                 const addOnTotalPrice = parseFloat(bookingDetail.booking?.add_to_booking_items_total_price) || 0;
                                                                                 const WEATHER_REFUND_PRICE = 47.5;
                                                                                 const hasWeatherRefund = p.weather_refund === 1 || p.weather_refund === '1' || p.weather_refund === true;
@@ -6003,14 +6005,15 @@ const Manifest = () => {
                                                                                 let addOnPrice = 0;
                                                                                 
                                                                                 if (isOriginalPassenger && originalPaxCount > 0) {
-                                                                                    // Original booking passengers (from ballooning-book): use originalAmount/pax
-                                                                                    basePricePerPassenger = originalAmount / originalPaxCount;
+                                                                                    // Original booking passengers: use (paid + due) / passenger count
+                                                                                    basePricePerPassenger = totalAmount / originalPaxCount;
                                                                                     // Add-on price (only for first passenger)
                                                                                     const isFirstPassenger = i === 0;
                                                                                     addOnPrice = isFirstPassenger ? addOnTotalPrice : 0;
                                                                                 } else {
-                                                                                    // Add-guest passengers: use stored price (calculated as originalAmount / currentPax when added, where currentPax is the passenger count BEFORE adding the new guest)
-                                                                                    basePricePerPassenger = parseFloat(p.price) || 0;
+                                                                                    // Add-guest passengers: use same calculation (paid + due) / current passenger count
+                                                                                    const currentPax = bookingDetail.passengers ? bookingDetail.passengers.length : 1;
+                                                                                    basePricePerPassenger = currentPax > 0 ? totalAmount / currentPax : (parseFloat(p.price) || 0);
                                                                                     addOnPrice = 0; // Add-on is only for first original passenger
                                                                                 }
                                                                                 
