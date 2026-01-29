@@ -1521,6 +1521,10 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         voucherTypeDetail = 'Flexible Weekday';
                     } else if (title.includes('any day') || title.includes('anytime')) {
                         voucherTypeDetail = 'Any Day Flight';
+                    } else if (title.includes('private charter')) {
+                        voucherTypeDetail = 'Private Charter';
+                    } else if (title.includes('proposal flight')) {
+                        voucherTypeDetail = 'Proposal Flight';
                     }
                 }
                 
@@ -1533,6 +1537,10 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         voucherTypeDetail = 'Flexible Weekday';
                     } else if (voucherType.includes('any day') || voucherType.includes('anytime')) {
                         voucherTypeDetail = 'Any Day Flight';
+                    } else if (voucherType.includes('private charter')) {
+                        voucherTypeDetail = 'Private Charter';
+                    } else if (voucherType.includes('proposal flight')) {
+                        voucherTypeDetail = 'Proposal Flight';
                     }
                 }
                 
@@ -1545,6 +1553,10 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         voucherTypeDetail = 'Flexible Weekday';
                     } else if (bookFlight.includes('any day') || bookFlight.includes('anytime')) {
                         voucherTypeDetail = 'Any Day Flight';
+                    } else if (bookFlight.includes('private charter')) {
+                        voucherTypeDetail = 'Private Charter';
+                    } else if (bookFlight.includes('proposal flight')) {
+                        voucherTypeDetail = 'Proposal Flight';
                     }
                 }
                 
@@ -1571,6 +1583,10 @@ app.post('/api/voucher-codes/validate', (req, res) => {
                         voucherTypeDetail = 'Flexible Weekday';
                     } else if (title.includes('any day') || title.includes('anytime')) {
                         voucherTypeDetail = 'Any Day Flight';
+                    } else if (title.includes('private charter')) {
+                        voucherTypeDetail = 'Private Charter';
+                    } else if (title.includes('proposal flight')) {
+                        voucherTypeDetail = 'Proposal Flight';
                     }
                 }
                 
@@ -1583,15 +1599,28 @@ app.post('/api/voucher-codes/validate', (req, res) => {
 
             // Voucher code is valid (no discount calculation needed)
             const numberOfPassengersValue = voucher.max_uses || enriched?.numberOfVouchers || null;
+
+            // Derive experience_type from voucher_type for Admin Created Codes (Shared vs Private)
+            const vcVoucherType = (voucher.voucher_type || '').trim();
+            const sharedVoucherTypes = ['Flexible Weekday', 'Flexible Weekday Flight', 'Weekday Morning', 'Weekday Morning Flight', 'Any Day Flight', 'Any Day', 'Anytime'];
+            const privateVoucherTypes = ['Private Charter', 'Proposal Flight'];
+            const isSharedVoucher = sharedVoucherTypes.some(t => vcVoucherType.toLowerCase() === t.toLowerCase());
+            const isPrivateVoucher = privateVoucherTypes.some(t => vcVoucherType.toLowerCase() === t.toLowerCase());
+            let derivedExperienceType = voucher.applicable_experiences || enriched?.experience || null;
+            if (!derivedExperienceType && vcVoucherType) {
+                derivedExperienceType = isPrivateVoucher ? 'Private Charter' : (isSharedVoucher ? 'Shared Flight' : null);
+            }
+            const voucherTypeDetail = voucher.voucher_type || enriched?.voucher_type_detail || voucher.applicable_voucher_types || null;
+
             res.json({
                 success: true,
                 message: 'Voucher code is valid',
                 data: {
                     ...voucher,
                     // Keep response shape consistent with getAllVoucherData fields when possible
-                    experience_type: voucher.applicable_experiences || enriched?.experience || null,
-                    voucher_type: voucher.applicable_voucher_types || enriched?.actual_voucher_type || null,
-                    voucher_type_detail: enriched?.voucher_type_detail || null, // Add voucher type detail to main response
+                    experience_type: derivedExperienceType,
+                    voucher_type: voucher.voucher_type || voucher.applicable_voucher_types || enriched?.actual_voucher_type || null,
+                    voucher_type_detail: voucherTypeDetail,
                     final_amount: booking_amount, // No discount applied
                     // Use max_uses as numberOfPassengers (max_uses represents Number of Passengers in voucher_codes table)
                     numberOfPassengers: numberOfPassengersValue,
