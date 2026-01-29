@@ -550,11 +550,12 @@ const FlownFlights = () => {
         return uniqueYears.sort((a, b) => parseInt(b) - parseInt(a)); // Sort descending (newest first)
     }, [flownFlights]);
 
-    // Summary totals: flight hours per balloon, pilot flight hours, pilot duty hours
+    // Summary totals: flight hours per balloon, pilot flight hours, pilot duty hours, total passengers
     const flightSummary = useMemo(() => {
         const balloonHours = {};
         const pilotFlightHours = {};
         const pilotDutyHours = {};
+        let totalPassengers = 0;
 
         const parseDurationMinutes = (startStr, endStr) => {
             if (!startStr || !endStr || startStr === '-' || endStr === '-') return null;
@@ -578,6 +579,9 @@ const FlownFlights = () => {
             const balloon = item.balloon_resource || 'N/A';
             const pilot = (item.pilot || '').trim();
             const pilotKey = pilot && pilot !== '-' ? pilot : null;
+
+            // Total passengers flown
+            totalPassengers += parseInt(item.pax || item.passenger_count || 0, 10) || 0;
 
             // Flight hours: from flight_start_time and flight_end_time
             let flightMins = parseDurationMinutes(item.flight_start_time, item.flight_end_time);
@@ -612,7 +616,8 @@ const FlownFlights = () => {
         return {
             balloonHours: Object.entries(balloonHours).map(([k, v]) => ({ balloon: k, minutes: v, formatted: formatMinutes(v) })),
             pilotFlightHours: Object.entries(pilotFlightHours).map(([k, v]) => ({ pilot: k, minutes: v, formatted: formatMinutes(v) })),
-            pilotDutyHours: Object.entries(pilotDutyHours).map(([k, v]) => ({ pilot: k, minutes: v, formatted: formatMinutes(v) }))
+            pilotDutyHours: Object.entries(pilotDutyHours).map(([k, v]) => ({ pilot: k, minutes: v, formatted: formatMinutes(v) })),
+            totalPassengers
         };
     }, [filteredFlights]);
 
@@ -979,17 +984,23 @@ const FlownFlights = () => {
                         justifyContent: 'flex-end'
                     }}
                 >
-                    {flightSummary.balloonHours.length > 0 && (
+                    {(flightSummary.balloonHours.length > 0 || flightSummary.totalPassengers > 0) && (
                         <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
-                            Total Flight Hours (by Balloon):{' '}
-                            {flightSummary.balloonHours.map(({ balloon, formatted }) => (
-                                <Box key={balloon} component="span" sx={{ mr: 1 }}>
-                                    Balloon {balloon}: {formatted}
-                                </Box>
-                            ))}
+                            {flightSummary.balloonHours.length > 0 && (
+                                <>
+                                    Total Flight Hours (by Balloon):{' '}
+                                    {flightSummary.balloonHours.map(({ balloon, formatted }) => (
+                                        <Box key={balloon} component="span" sx={{ mr: 1 }}>
+                                            Balloon {balloon}: {formatted}
+                                        </Box>
+                                    ))}
+                                    {' '}|{' '}
+                                </>
+                            )}
+                            Total Passengers Flown: {flightSummary.totalPassengers}
                         </Typography>
                     )}
-                    {flightSummary.balloonHours.length > 0 && flightSummary.pilotFlightHours.length > 0 && (
+                    {(flightSummary.balloonHours.length > 0 || flightSummary.totalPassengers > 0) && flightSummary.pilotFlightHours.length > 0 && (
                         <Typography component="span" sx={{ color: '#d1d5db', mx: 0.5 }}>|</Typography>
                     )}
                     {flightSummary.pilotFlightHours.length > 0 && (
