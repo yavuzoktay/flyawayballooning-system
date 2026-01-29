@@ -1612,13 +1612,20 @@ const Settings = () => {
         setSelectedExperience(null);
     };
 
+    // Format date for HTML date input (YYYY-MM-DD) - handles various input formats
+    const formatDateForInput = (dateVal) => {
+        if (!dateVal) return '';
+        const d = dayjs(dateVal);
+        return d.isValid() ? d.format('YYYY-MM-DD') : '';
+    };
+
     const handleEdit = (voucher) => {
         setSelectedVoucher(voucher);
         setFormData({
             code: voucher.code,
             title: voucher.title,
-            valid_from: voucher.valid_from,
-            valid_until: voucher.valid_until,
+            valid_from: formatDateForInput(voucher.valid_from),
+            valid_until: formatDateForInput(voucher.valid_until),
             max_uses: voucher.max_uses,
             voucher_type: voucher.voucher_type || '',
             price_paid: voucher.price_paid || voucher.paid_amount || '',
