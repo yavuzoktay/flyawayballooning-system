@@ -495,6 +495,15 @@ const Manifest = () => {
         if (typeof bookingHook.refetch === 'function') {
             await bookingHook.refetch();
         }
+
+        // Refresh crew and pilot assignments (cancel clears slot assignments)
+        // Invalidate cache so refresh actually re-fetches
+        if (selectedDate) {
+            lastCrewFetchRef.current = { date: null, inFlight: false };
+            lastPilotFetchRef.current = { date: null, inFlight: false };
+            refreshCrewAssignments(selectedDate);
+            refreshPilotAssignments(selectedDate);
+        }
     };
 
     const closeGroupMessageModal = () => {
@@ -3061,6 +3070,17 @@ const Manifest = () => {
                     bookingHook.refetch();
                 }
             }, 500);
+
+            // Refresh crew and pilot assignments for both old and new dates (rebook clears old slot)
+            // Invalidate cache so refresh actually re-fetches (otherwise cache skips re-fetch for same date)
+            lastCrewFetchRef.current = { date: null, inFlight: false };
+            lastPilotFetchRef.current = { date: null, inFlight: false };
+            await Promise.all([
+                selectedDate ? refreshCrewAssignments(selectedDate) : Promise.resolve(),
+                date ? refreshCrewAssignments(date) : Promise.resolve(),
+                selectedDate ? refreshPilotAssignments(selectedDate) : Promise.resolve(),
+                date ? refreshPilotAssignments(date) : Promise.resolve()
+            ]);
             
             // Show success message
             alert('Booking successfully rebooked! Confirmation email has been sent.');
@@ -3651,6 +3671,17 @@ const Manifest = () => {
     const [pilotNotification, setPilotNotification] = useState({ show: false, message: '', type: 'success' });
 
     const slotKey = React.useCallback((activityId, date, time) => `${activityId}_${date}_${time}`, []);
+
+    // Normalize flight_date to (YYYY-MM-DD, HH:mm) for slot key consistency with crew-assignments API
+    const getSlotPartsFromFlightDate = React.useCallback((flightDate) => {
+        if (!flightDate) return { datePart: '', timePart: '' };
+        const parsed = dayjs(flightDate, ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DDTHH:mm', 'YYYY-MM-DD HH:mm', 'DD/MM/YYYY HH:mm', 'DD/MM/YYYY']);
+        if (!parsed.isValid()) {
+            const s = String(flightDate);
+            return { datePart: s.substring(0, 10), timePart: s.length >= 16 ? s.substring(11, 16) : (s.length >= 13 ? s.substring(11, 13) + ':' + (s.substring(13, 15) || '00') : '') };
+        }
+        return { datePart: parsed.format('YYYY-MM-DD'), timePart: parsed.format('HH:mm') };
+    }, []);
 
     // Try to resolve activity id from various possible shapes on flight objects
     const getFlightActivityId = (flight) => {
@@ -4779,7 +4810,8 @@ const Manifest = () => {
                                                     {/* Crew Selection - Compact */}
                                                     {(() => {
                                                         const activityIdForSlot = getFlightActivityId(first);
-                                                        const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                                                        const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
+                                                        const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
                                                         const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
                                                         const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
                                                         const selectedCrew = crewList.find(c => c.id == currentCrewId);
@@ -4822,7 +4854,8 @@ const Manifest = () => {
                                                     {/* Pilot Selection - Compact */}
                                                     {(() => {
                                                         const activityIdForSlot = getFlightActivityId(first);
-                                                        const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                                                        const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
+                                                        const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
                                                         const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
                                                         const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
                                                         const selectedPilot = pilotList.find(p => p.id == currentPilotId);
@@ -4892,21 +4925,9 @@ const Manifest = () => {
                                                 {/* Desktop: Crew Selection Dropdown */}
                                                 {!isMobile && (() => {
                             const activityIdForSlot = getFlightActivityId(first);
-                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                            const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
+                            const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
                             const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
-                            
-                            // Debug logging
-                            if (process.env.NODE_ENV === 'development') {
-                                console.log('Dropdown for flight:', first.id, 'slotKey:', slotKeyValue, 'currentCrewId:', currentCrewId, 'all assignments:', crewAssignmentsBySlot);
-                                console.log('Flight data:', { 
-                                    id: first.id, 
-                                    activity_id: activityIdForSlot, 
-                                    flight_date: first.flight_date,
-                                    date_part: (first.flight_date||'').substring(0,10),
-                                    time_part: (first.flight_date||'').substring(11,16),
-                                    fullFlight: first
-                                });
-                            }
                             
                             // Check if activityId is valid
                             const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
@@ -4972,7 +4993,8 @@ const Manifest = () => {
                                                 {/* Desktop: Pilot Selection Dropdown */}
                                                 {!isMobile && (() => {
                             const activityIdForSlot = getFlightActivityId(first);
-                            const slotKeyValue = slotKey(activityIdForSlot, (first.flight_date||'').substring(0,10), (first.flight_date||'').substring(11,16));
+                            const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
+                            const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
                             const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
                             
                             // Check if activityId is valid

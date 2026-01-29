@@ -11629,9 +11629,9 @@ app.post('/api/createBooking', (req, res) => {
         // For rebook operations, get old booking info BEFORE UPDATE to preserve old flight_date
         let oldBookingInfo = null;
         if (isRebook && rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
-            // Get old booking info synchronously before UPDATE
+            // Get old booking info synchronously before UPDATE (include activity_id for crew/pilot clearance)
             con.query(
-                'SELECT google_calendar_event_id, flight_date, location, flight_type, pax, time_slot FROM all_booking WHERE id = ?',
+                'SELECT google_calendar_event_id, flight_date, location, flight_type, pax, time_slot, activity_id FROM all_booking WHERE id = ?',
                 [parseInt(rebook_from_booking_id)],
                 (oldBookingErr, oldBookingResult) => {
                     if (!oldBookingErr && oldBookingResult.length > 0) {
@@ -11737,7 +11737,7 @@ app.post('/api/createBooking', (req, res) => {
                         // Fallback: query database (shouldn't happen if oldBookingInfo was set)
                         await new Promise((queryResolve) => {
                             con.query(
-                                'SELECT google_calendar_event_id, flight_date, location, flight_type, pax, time_slot FROM all_booking WHERE id = ?',
+                                'SELECT google_calendar_event_id, flight_date, location, flight_type, pax, time_slot, activity_id FROM all_booking WHERE id = ?',
                                 [parseInt(rebook_from_booking_id)],
                                 (oldBookingErr, oldBookingResult) => {
                                     
@@ -11808,6 +11808,35 @@ app.post('/api/createBooking', (req, res) => {
                                     console.error('❌ [Rebook Cleanup] Error finding and deleting old Google Calendar event by details:', findDeleteErr);
                                     
                                 }
+                            }
+
+                            // Clear crew and pilot assignments for the OLD slot (rebook moves booking to new date)
+                            try {
+                                let clearActivityId = oldBooking.activity_id;
+                                if (!clearActivityId && oldLocation) {
+                                    const [actRows] = await new Promise((resolve, reject) => {
+                                        con.query("SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1", [oldLocation], (e, r) => e ? reject(e) : resolve([r]));
+                                    });
+                                    clearActivityId = actRows && actRows[0] ? actRows[0].id : null;
+                                }
+                                if (clearActivityId && oldFlightDate) {
+                                    const clearDate = moment(oldFlightDate).format('YYYY-MM-DD');
+                                    let clearTime = oldTimeSlot || (oldFlightDate && typeof oldFlightDate === 'string' && oldFlightDate.includes(' ') ? oldFlightDate.split(' ')[1] : null);
+                                    if (clearTime && clearTime.length === 5 && /^\d{2}:\d{2}$/.test(clearTime)) clearTime = clearTime + ':00';
+                                    if (clearTime) {
+                                        const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                                        const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                                        await new Promise((resolve, reject) => {
+                                            con.query(delCrew, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                        });
+                                        await new Promise((resolve, reject) => {
+                                            con.query(delPilot, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                        });
+                                        console.log('✅ [Rebook Cleanup] Cleared crew and pilot assignments for old slot:', { activity_id: clearActivityId, date: clearDate, time: clearTime });
+                                    }
+                                }
+                            } catch (clearErr) {
+                                console.error('❌ [Rebook Cleanup] Error clearing crew/pilot for old slot:', clearErr);
                             }
                         })();
                     }
@@ -16657,8 +16686,8 @@ app.patch('/api/updateBookingField', (req, res) => {
                     console.log('🔄 [updateBookingField] Status changed to Cancelled for booking ID:', booking_id);
                     console.log('🔄 [updateBookingField] Normalized value:', normalizedValue, 'Original value:', value);
                     
-                    // Delete Google Calendar event if it exists
-                    con.query('SELECT google_calendar_event_id, flight_date, location, flight_type, pax FROM all_booking WHERE id = ?', [booking_id], (calendarErr, calendarRows) => {
+                    // Delete Google Calendar event if it exists; also get activity_id for crew/pilot clearance
+                    con.query('SELECT google_calendar_event_id, flight_date, location, flight_type, pax, activity_id, time_slot FROM all_booking WHERE id = ?', [booking_id], (calendarErr, calendarRows) => {
                         if (calendarErr) {
                             console.error('❌ [updateBookingField] Error fetching booking details for calendar cleanup:', calendarErr);
                             console.error('❌ [updateBookingField] Booking ID:', booking_id);
@@ -16670,6 +16699,8 @@ app.patch('/api/updateBookingField', (req, res) => {
                             const location = calendarRows[0].location;
                             const flightType = calendarRows[0].flight_type;
                             const pax = calendarRows[0].pax;
+                            const activityId = calendarRows[0].activity_id;
+                            const timeSlot = calendarRows[0].time_slot;
                             
                             console.log('📅 [updateBookingField] Booking details fetched:', {
                                 booking_id,
@@ -16679,6 +16710,37 @@ app.patch('/api/updateBookingField', (req, res) => {
                                 flightType,
                                 pax
                             });
+
+                            // Clear crew and pilot assignments for this cancelled slot
+                            (async () => {
+                                try {
+                                    let clearActivityId = activityId;
+                                    if (!clearActivityId && location) {
+                                        const [actRows] = await new Promise((resolve, reject) => {
+                                            con.query("SELECT id FROM activity WHERE location = ? AND status = 'Live' LIMIT 1", [location], (e, r) => e ? reject(e) : resolve([r]));
+                                        });
+                                        clearActivityId = actRows && actRows[0] ? actRows[0].id : null;
+                                    }
+                                    if (clearActivityId && flightDate) {
+                                        const clearDate = moment(flightDate).format('YYYY-MM-DD');
+                                        let clearTime = timeSlot || (flightDate && typeof flightDate === 'string' && flightDate.includes(' ') ? flightDate.split(' ')[1] : null);
+                                        if (clearTime && clearTime.length === 5 && /^\d{2}:\d{2}$/.test(clearTime)) clearTime = clearTime + ':00';
+                                        if (clearTime) {
+                                            const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                                            const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                                            await new Promise((resolve, reject) => {
+                                                con.query(delCrew, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                            });
+                                            await new Promise((resolve, reject) => {
+                                                con.query(delPilot, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                            });
+                                            console.log('✅ [updateBookingField] Cleared crew and pilot assignments for cancelled slot:', { activity_id: clearActivityId, date: clearDate, time: clearTime });
+                                        }
+                                    }
+                                } catch (clearErr) {
+                                    console.error('❌ [updateBookingField] Error clearing crew/pilot for cancelled slot:', clearErr);
+                                }
+                            })();
                             
                             // If event ID exists, delete it
                             if (eventId && eventId.trim() !== '') {
@@ -22160,6 +22222,25 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                 else resolve(result);
             });
         });
+
+        // When cancelling, clear crew and pilot assignments for this slot
+        if (new_status === 'Cancelled' && activity_id && formattedDate && formattedTime) {
+            try {
+                let clearTime = formattedTime;
+                if (clearTime && clearTime.length === 5 && /^\d{2}:\d{2}$/.test(clearTime)) clearTime = clearTime + ':00';
+                const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                await new Promise((resolve, reject) => {
+                    con.query(delCrew, [activity_id, formattedDate, clearTime], (e) => e ? reject(e) : resolve());
+                });
+                await new Promise((resolve, reject) => {
+                    con.query(delPilot, [activity_id, formattedDate, clearTime], (e) => e ? reject(e) : resolve());
+                });
+                console.log('✅ [Cancel] Cleared crew and pilot assignments for cancelled slot:', { activity_id, date: formattedDate, time: clearTime });
+            } catch (clearErr) {
+                console.error('❌ [Cancel] Error clearing crew/pilot for cancelled slot:', clearErr);
+            }
+        }
 
         // Update Google Calendar event based on status change
         try {
