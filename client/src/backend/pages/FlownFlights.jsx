@@ -1212,7 +1212,29 @@ const FlownFlights = () => {
                                         <Typography sx={{ 
                                             mb: isMobile ? 0 : 1,
                                             fontSize: isMobile ? '14px' : 'inherit'
-                                        }}><b>Flight Attempts:</b> {bookingDetail.booking.flight_attempts ?? 0}</Typography>
+                                        }}><b>Flight Attempts:</b> {editField === 'flight_attempts' ? (
+                                            <>
+                                                <input value={editValue} onChange={e => setEditValue(e.target.value.replace(/[^0-9]/g, ''))} style={{marginRight: 8, width: 60}} />
+                                                <Button size="small" onClick={handleEditSave} disabled={savingEdit}>Save</Button>
+                                                <Button size="small" onClick={handleEditCancel}>Cancel</Button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                {bookingDetail.booking.flight_attempts ?? 0}
+                                                <IconButton 
+                                                    size="small" 
+                                                    onClick={() => handleEditClick('flight_attempts', String(bookingDetail.booking.flight_attempts ?? 0))}
+                                                    sx={{ 
+                                                        padding: isMobile ? '2px' : '8px',
+                                                        '& .MuiSvgIcon-root': {
+                                                            fontSize: isMobile ? '12px' : 'inherit'
+                                                        }
+                                                    }}
+                                                >
+                                                    <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                </IconButton>
+                                            </>
+                                        )}</Typography>
                                         <Typography sx={{ 
                                             mb: isMobile ? 0 : 1,
                                             fontSize: isMobile ? '14px' : 'inherit'
