@@ -550,6 +550,72 @@ const FlownFlights = () => {
         return uniqueYears.sort((a, b) => parseInt(b) - parseInt(a)); // Sort descending (newest first)
     }, [flownFlights]);
 
+    // Summary totals: flight hours per balloon, pilot flight hours, pilot duty hours
+    const flightSummary = useMemo(() => {
+        const balloonHours = {};
+        const pilotFlightHours = {};
+        const pilotDutyHours = {};
+
+        const parseDurationMinutes = (startStr, endStr) => {
+            if (!startStr || !endStr || startStr === '-' || endStr === '-') return null;
+            const formats = ['DD/MM/YYYY HH:mm', 'YYYY-MM-DD HH:mm', 'YYYY-MM-DDTHH:mm', dayjs.ISO_8601];
+            const start = dayjs(startStr, formats);
+            const end = dayjs(endStr, formats);
+            if (!start.isValid() || !end.isValid()) return null;
+            return end.diff(start, 'minute', true);
+        };
+
+        const parseDurationFromString = (str) => {
+            if (!str || str === '-') return null;
+            const match = String(str).match(/(?:(\d+)h\s*)?(?:(\d+)m)?/);
+            if (!match) return null;
+            const h = parseInt(match[1] || 0, 10);
+            const m = parseInt(match[2] || 0, 10);
+            return h * 60 + m;
+        };
+
+        filteredFlights.forEach((item) => {
+            const balloon = item.balloon_resource || 'N/A';
+            const pilot = (item.pilot || '').trim();
+            const pilotKey = pilot && pilot !== '-' ? pilot : null;
+
+            // Flight hours: from flight_start_time and flight_end_time
+            let flightMins = parseDurationMinutes(item.flight_start_time, item.flight_end_time);
+            if (flightMins == null) {
+                flightMins = parseDurationFromString(item.total_flight_time);
+            }
+            if (flightMins != null && flightMins >= 0) {
+                balloonHours[balloon] = (balloonHours[balloon] || 0) + flightMins;
+                if (pilotKey) {
+                    pilotFlightHours[pilotKey] = (pilotFlightHours[pilotKey] || 0) + flightMins;
+                }
+            }
+
+            // Duty hours: from duty_start_time and duty_end_time
+            let dutyMins = parseDurationMinutes(item.duty_start_time, item.duty_end_time);
+            if (dutyMins == null) {
+                dutyMins = parseDurationFromString(item.duty_time);
+            }
+            if (dutyMins != null && dutyMins >= 0 && pilotKey) {
+                pilotDutyHours[pilotKey] = (pilotDutyHours[pilotKey] || 0) + dutyMins;
+            }
+        });
+
+        const formatMinutes = (mins) => {
+            if (mins == null || mins < 0) return '-';
+            const h = Math.floor(mins / 60);
+            const m = Math.round(mins % 60);
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        };
+
+        return {
+            balloonHours: Object.entries(balloonHours).map(([k, v]) => ({ balloon: k, minutes: v, formatted: formatMinutes(v) })),
+            pilotFlightHours: Object.entries(pilotFlightHours).map(([k, v]) => ({ pilot: k, minutes: v, formatted: formatMinutes(v) })),
+            pilotDutyHours: Object.entries(pilotDutyHours).map(([k, v]) => ({ pilot: k, minutes: v, formatted: formatMinutes(v) }))
+        };
+    }, [filteredFlights]);
+
     return (
         <div className="flown-flights-page-wrap">
             <Container maxWidth={false}>
@@ -895,6 +961,61 @@ const FlownFlights = () => {
                     selectable={true}
                     onSelectionChange={setSelectedIds}
                 />
+            )}
+
+            {/* Summary row: Total flight hours per balloon, Pilot Flight Hours, Pilot Duty Hours */}
+            {!loading && filteredFlights.length > 0 && (
+                <Box
+                    sx={{
+                        mt: 2,
+                        p: 2,
+                        backgroundColor: '#fff',
+                        borderRadius: 1,
+                        border: '1px solid #e5e7eb',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 2,
+                        alignItems: 'center',
+                        justifyContent: 'flex-end'
+                    }}
+                >
+                    {flightSummary.balloonHours.length > 0 && (
+                        <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
+                            Total Flight Hours (by Balloon):{' '}
+                            {flightSummary.balloonHours.map(({ balloon, formatted }) => (
+                                <Box key={balloon} component="span" sx={{ mr: 1 }}>
+                                    Balloon {balloon}: {formatted}
+                                </Box>
+                            ))}
+                        </Typography>
+                    )}
+                    {flightSummary.balloonHours.length > 0 && flightSummary.pilotFlightHours.length > 0 && (
+                        <Typography component="span" sx={{ color: '#d1d5db', mx: 0.5 }}>|</Typography>
+                    )}
+                    {flightSummary.pilotFlightHours.length > 0 && (
+                        <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
+                            Pilot Flight Hours:{' '}
+                            {flightSummary.pilotFlightHours.map(({ pilot, formatted }) => (
+                                <Box key={pilot} component="span" sx={{ mr: 1 }}>
+                                    {pilot}: {formatted}
+                                </Box>
+                            ))}
+                        </Typography>
+                    )}
+                    {flightSummary.pilotFlightHours.length > 0 && flightSummary.pilotDutyHours.length > 0 && (
+                        <Typography component="span" sx={{ color: '#d1d5db', mx: 0.5 }}>|</Typography>
+                    )}
+                    {flightSummary.pilotDutyHours.length > 0 && (
+                        <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
+                            Pilot Duty Hours:{' '}
+                            {flightSummary.pilotDutyHours.map(({ pilot, formatted }) => (
+                                <Box key={pilot} component="span" sx={{ mr: 1 }}>
+                                    {pilot}: {formatted}
+                                </Box>
+                            ))}
+                        </Typography>
+                    )}
+                </Box>
             )}
 
             {/* Booking Details Dialog - Same as BookingPage */}
