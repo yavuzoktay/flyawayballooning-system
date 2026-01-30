@@ -3358,19 +3358,11 @@ const Manifest = () => {
       }
     };
 
-    // Handler to close flight (set status to Closed)
+    // Handler to close flight (Log Flight - set status to Flown)
     const handleCloseFlight = (groupFlights) => {
       if (!groupFlights || groupFlights.length === 0) return;
-      const first = groupFlights[0];
-      const currentStatus = getFlightStatus(first);
       
-      // If already closed, show message
-      if (currentStatus === 'Closed') {
-        alert('This flight is already closed.');
-        return;
-      }
-      
-      // Open modal instead of direct confirmation
+      // Open Log Flight modal - allow for both Open and Closed (SOLD OUT) flights
       setSelectedGroupFlightsForClose(groupFlights);
       fetchOperationalSelections();
       setCloseFlightModalOpen(true);
