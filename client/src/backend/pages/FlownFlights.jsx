@@ -961,9 +961,8 @@ const FlownFlights = () => {
                         "aircraft_defects",          // 21. Aircraft / Balloon Defects or Issues
                         "vehicle_trailer_defects"    // 22. Vehicle / Trailer Issues
                     ]}
-                    selectable={false}
-                    onBookingIdClick={handleBookingIdClick}
                     selectable={true}
+                    onBookingIdClick={handleBookingIdClick}
                     onSelectionChange={setSelectedIds}
                 />
             )}
@@ -988,7 +987,7 @@ const FlownFlights = () => {
                         <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
                             {flightSummary.balloonHours.length > 0 && (
                                 <>
-                                    Total Flight Hours (by Balloon):{' '}
+                                    {' '}
                                     {flightSummary.balloonHours.map(({ balloon, formatted }) => (
                                         <Box key={balloon} component="span" sx={{ mr: 1 }}>
                                             Balloon {balloon}: {formatted}
@@ -1005,10 +1004,10 @@ const FlownFlights = () => {
                     )}
                     {flightSummary.pilotFlightHours.length > 0 && (
                         <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
-                            Pilot Flight Hours:{' '}
+                            
                             {flightSummary.pilotFlightHours.map(({ pilot, formatted }) => (
                                 <Box key={pilot} component="span" sx={{ mr: 1 }}>
-                                    {pilot}: {formatted}
+                                    {pilot} Flight: {formatted}
                                 </Box>
                             ))}
                         </Typography>
@@ -1018,10 +1017,10 @@ const FlownFlights = () => {
                     )}
                     {flightSummary.pilotDutyHours.length > 0 && (
                         <Typography component="span" sx={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>
-                            Pilot Duty Hours:{' '}
+               
                             {flightSummary.pilotDutyHours.map(({ pilot, formatted }) => (
                                 <Box key={pilot} component="span" sx={{ mr: 1 }}>
-                                    {pilot}: {formatted}
+                                    {pilot} Duty: {formatted}
                                 </Box>
                             ))}
                         </Typography>
