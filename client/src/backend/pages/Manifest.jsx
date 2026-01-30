@@ -5087,7 +5087,7 @@ const Manifest = () => {
                                                             handleCloseFlight(globalMenuGroupFlights);
                                                         }
                                                     }}
-                                                    disabled={!globalMenuGroup || statusLoadingGroup === (globalMenuGroup?.id) || (globalMenuGroup && getFlightStatus(globalMenuGroup) === 'Closed')}
+                                                    disabled={!globalMenuGroup || statusLoadingGroup === (globalMenuGroup?.id)}
                                                     sx={{
                                                         color: '#d32f2f',
                                                         '&:hover': {
