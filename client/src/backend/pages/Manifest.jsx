@@ -3377,22 +3377,22 @@ const Manifest = () => {
       setCloseFlightModalOpen(false);
       
       try {
-        // 1. Save operational selections to trip_booking
-        const bookingId = first.id;
-        if (bookingId) {
-          try {
-            await axios.post('/api/save-flight-operational-selections', {
-              booking_id: bookingId,
+        // 1. Save operational selections to trip_booking for ALL bookings in the group
+        // (flown-flights API uses MIN(booking_id) per group, so saving for all ensures data is found)
+        try {
+          await Promise.all(selectedGroupFlightsForClose.map(f =>
+            axios.post('/api/save-flight-operational-selections', {
+              booking_id: f.id,
               operational_selections: selectedOperationalValues,
               aircraft_defects: aircraftDefects,
               vehicle_trailer_defects: vehicleTrailerDefects,
               flight_start_time: flightStartTime,
               flight_end_time: flightEndTime
-            });
-          } catch (err) {
-            console.error('Error saving operational selections:', err);
-            // Continue with closing flight even if saving selections fails
-          }
+            })
+          ));
+        } catch (err) {
+          console.error('Error saving operational selections:', err);
+          // Continue with closing flight even if saving selections fails
         }
 
         // 2. Update booking status to Flown

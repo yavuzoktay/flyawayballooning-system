@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
+import { useTheme, useMediaQuery } from "@mui/material";
 
 const PaginatedTable = ({
     data,
@@ -21,12 +22,22 @@ const PaginatedTable = ({
     const loadingRef = useRef(false);
     const prevSelectedIdsRef = useRef([]); // Track previous selected IDs to avoid infinite loops
 
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Location column width: narrower on mobile to give more space to other columns
+    const locationColWidth = isMobile ? '80px' : '150px';
+    // Created column width: narrower on mobile (DD/MM/YYYY fits in ~85px)
+    const createdColWidth = isMobile ? '85px' : '140px';
+    // Name column width: narrower on mobile
+    const nameColWidth = isMobile ? '100px' : '200px';
+
     // Helper to get column id/label
-    const getColId = (col) => (typeof col === 'string' ? col : (col?.id || ''));
+    const getColId = (col) => (typeof col === 'string' ? col : (col?.id || col?.key || ''));
     const getColLabel = (col) => {
         if (typeof col === 'string') {
             if (col === 'row_id') return 'ID';
-            if (col === 'created_at' || col === 'created') return 'Created';
+            if (col === 'created_at' || col === 'created' || col === 'created_at_display') return 'Created';
             if (col === 'voucher_booking_id') return 'Voucher/Booking ID';
             if (col === 'date_requested') return 'Date requested';
             if (col === 'flight_type') return 'Experience';
@@ -61,7 +72,7 @@ const PaginatedTable = ({
         const id = getColId(col) || '';
         if (!id) return '';
         if (id === 'row_id') return 'ID';
-        if (id === 'created_at' || id === 'created') return 'Created';
+        if (id === 'created_at' || id === 'created' || id === 'created_at_display') return 'Created';
         if (id === 'voucher_booking_id') return 'Voucher/Booking ID';
         if (id === 'date_requested') return 'Date requested';
         if (id === 'flight_type') return 'Experience';
@@ -447,7 +458,7 @@ const PaginatedTable = ({
                                     width:
                                         id === 'row_id' ? '60px' :
                                         id === 'email' ? '240px' :
-                                       id === 'name' ? '200px' : 
+                                       id === 'name' ? nameColWidth : 
                                        id === 'voucher_code' ? '150px' :
                                        id === 'status' ? '120px' : 
                                         id === 'voucher_type'
@@ -455,7 +466,7 @@ const PaginatedTable = ({
                                        id === 'actual_voucher_type' ? '150px' :
                                        id === 'voucher_ref' ? '160px' :
                                        id === 'passenger_info' ? '200px' :
-                                       id === 'created_at' || id === 'created' || id === 'created_at_display' ? '140px' :
+                                       id === 'created_at' || id === 'created' || id === 'created_at_display' ? createdColWidth :
                                        id === 'flight_date' ? '200px' :
                                        id === 'flight_period' ? '120px' :
                                        id === 'flight_type_display' ? '120px' :
@@ -471,7 +482,7 @@ const PaginatedTable = ({
                                         id === 'paid' ? '120px' :
                                        id === 'flight_attempts' ? '100px' :
                                        id === 'expires' ? '140px' :
-                                       id === 'location' ? '150px' :
+                                       id === 'location' ? locationColWidth :
                                        id === 'pilot' ? '150px' :
                                        id === 'crew' ? '150px' :
                                        id === 'aircraft_defects' ? '250px' :
@@ -485,7 +496,7 @@ const PaginatedTable = ({
                                     minWidth:
                                         id === 'row_id' ? '60px' :
                                         id === 'email' ? '240px' :
-                                         id === 'name' ? '200px' : 
+                                         id === 'name' ? nameColWidth : 
                                          id === 'voucher_code' ? '150px' :
                                          id === 'status' ? '120px' : 
                                         id === 'voucher_type'
@@ -493,7 +504,7 @@ const PaginatedTable = ({
                                          id === 'actual_voucher_type' ? '150px' :
                                          id === 'voucher_ref' ? '160px' :
                                          id === 'passenger_info' ? '200px' :
-                                         id === 'created_at' || id === 'created' || id === 'created_at_display' ? '140px' :
+                                         id === 'created_at' || id === 'created' || id === 'created_at_display' ? createdColWidth :
                                          id === 'flight_date' ? '200px' :
                                          id === 'flight_period' ? '120px' :
                                          id === 'flight_type_display' ? '120px' :
@@ -509,7 +520,7 @@ const PaginatedTable = ({
                                         id === 'paid' ? '120px' :
                                          id === 'flight_attempts' ? '100px' :
                                          id === 'expires' ? '140px' :
-                                         id === 'location' ? '150px' :
+                                         id === 'location' ? locationColWidth :
                                          id === 'pilot' ? '150px' :
                                          id === 'crew' ? '150px' :
                                          id === 'aircraft_defects' ? '250px' :
@@ -593,8 +604,8 @@ const PaginatedTable = ({
                                                                      id === 'vehicle_trailer_defects' ? "250px" :
                                                                      id === 'pilot' ? "150px" :
                                                                      id === 'crew' ? "150px" :
-                                                                     id === 'name' ? "200px" :
-                                                                     id === 'location' ? "150px" :
+                                                                     id === 'name' ? nameColWidth :
+                                                                     id === 'location' ? locationColWidth :
                                                                      id === 'voucher_code' ? "150px" :
                                                                      "200px",
                                                             fontSize: "16px",

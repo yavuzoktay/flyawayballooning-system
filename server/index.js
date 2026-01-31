@@ -22845,74 +22845,109 @@ app.delete('/api/operational-selections/field/:field_name', (req, res) => {
 });
 
 // Get flown flights (completed flights) - Similar to getAllBookingData
+// Use derived table + LEFT JOIN trip_booking to avoid MySQL "Invalid use of group function" with MIN() in correlated subqueries
 app.get('/api/flown-flights', (req, res) => {
     const sql = `
         SELECT 
-            MIN(ab.id) as id,
-            MIN(ab.name) as name,
-            MIN(ab.email) as email,
-            MIN(ab.phone) as phone,
-            MIN(ab.flight_date) as flight_date,
-            MIN(ab.flight_date) as flight_date_display,
-            ab.location,
-            ab.flight_type,
-            MIN(ab.status) as status,
-            MIN(ab.created_at) as created_at,
-            MIN(ab.created_at) as created_at_display,
-            MIN(ab.voucher_type) as voucher_type,
-            MIN(ab.voucher_code) as voucher_code,
-            MIN(ab.flight_attempts) as flight_attempts,
-            MIN(ab.expires) as expires,
-            SUM(COALESCE(ab.paid, 0)) as paid,
-            SUM(COALESCE(ab.due, 0)) as due,
-            MIN(ab.activity_id) as activity_id,
-            SUM(
-                CASE 
-                    WHEN ab.pax IS NOT NULL AND ab.pax > 0 THEN ab.pax
-                    ELSE (SELECT COUNT(*) FROM passengers p2 WHERE p2.booking_id = ab.id)
-                END
-            ) as pax,
-            SUM(
-                CASE 
-                    WHEN ab.pax IS NOT NULL AND ab.pax > 0 THEN ab.pax
-                    ELSE (SELECT COUNT(*) FROM passengers p2 WHERE p2.booking_id = ab.id)
-                END
-            ) as passenger_count,
-            DATE(MIN(ab.flight_date)) as flight_date_only,
-            TIME(MIN(ab.flight_date)) as flight_time_only,
-            GROUP_CONCAT(DISTINCT ab.id ORDER BY ab.id SEPARATOR ', ') as booking_ids,
-            (SELECT refuel_location FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as refuel_location,
-            (SELECT land_owner_gift FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as land_owner_gift,
-            (SELECT landing_fee FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as landing_fee,
-            (SELECT vehicle_used FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as vehicle_used,
-            (SELECT aircraft_defects FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as aircraft_defects,
-            (SELECT vehicle_trailer_defects FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as vehicle_trailer_defects,
-            (SELECT flight_start_time FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as flight_start_time,
-            (SELECT flight_end_time FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as flight_end_time,
-            (SELECT additional_fields FROM trip_booking WHERE booking_id = MIN(ab.id) LIMIT 1) as additional_fields,
+            g.id,
+            g.name,
+            g.email,
+            g.phone,
+            g.flight_date,
+            g.flight_date_display,
+            g.location,
+            g.flight_type,
+            g.status,
+            g.created_at,
+            g.created_at_display,
+            g.voucher_type,
+            g.voucher_code,
+            g.flight_attempts,
+            g.expires,
+            g.paid,
+            g.due,
+            g.activity_id,
+            g.pax,
+            g.passenger_count,
+            g.flight_date_only,
+            g.flight_time_only,
+            g.booking_ids,
+            tb.refuel_location,
+            tb.land_owner_gift,
+            tb.landing_fee,
+            tb.vehicle_used,
+            tb.aircraft_defects,
+            tb.vehicle_trailer_defects,
+            tb.flight_start_time,
+            tb.flight_end_time,
+            tb.additional_fields,
             (SELECT CONCAT(pt.first_name, ' ', pt.last_name) 
              FROM flight_pilot_assignments fpa
              LEFT JOIN pilots pt ON pt.id = fpa.pilot_id
-             WHERE ab.activity_id IS NOT NULL
-               AND ab.flight_date IS NOT NULL
-               AND fpa.activity_id = MIN(ab.activity_id) 
-               AND fpa.date = DATE(ab.flight_date)
-               AND fpa.time = TIME(ab.flight_date)
+             WHERE g.activity_id IS NOT NULL
+               AND g.flight_date IS NOT NULL
+               AND fpa.activity_id = g.activity_id
+               AND fpa.date = DATE(g.flight_date)
+               AND fpa.time = TIME(g.flight_date)
              LIMIT 1) as pilot_name,
             (SELECT CONCAT(c.first_name, ' ', c.last_name) 
              FROM flight_crew_assignments fca
              LEFT JOIN crew c ON c.id = fca.crew_id
-             WHERE ab.activity_id IS NOT NULL
-               AND ab.flight_date IS NOT NULL
-               AND fca.activity_id = MIN(ab.activity_id) 
-               AND fca.date = DATE(ab.flight_date)
-               AND fca.time = TIME(ab.flight_date)
+             WHERE g.activity_id IS NOT NULL
+               AND g.flight_date IS NOT NULL
+               AND fca.activity_id = g.activity_id
+               AND fca.date = DATE(g.flight_date)
+               AND fca.time = TIME(g.flight_date)
              LIMIT 1) as crew_name
-        FROM all_booking ab
-        LEFT JOIN passengers p ON p.booking_id = ab.id
-        WHERE ab.status = 'Flown'
-        GROUP BY DATE(ab.flight_date), ab.location, ab.flight_type
-        ORDER BY MIN(ab.flight_date) DESC, MIN(ab.created_at) DESC
+        FROM (
+            SELECT 
+                MIN(ab.id) as id,
+                MIN(ab.name) as name,
+                MIN(ab.email) as email,
+                MIN(ab.phone) as phone,
+                MIN(ab.flight_date) as flight_date,
+                MIN(ab.flight_date) as flight_date_display,
+                ab.location,
+                ab.flight_type,
+                MIN(ab.status) as status,
+                MIN(ab.created_at) as created_at,
+                MIN(ab.created_at) as created_at_display,
+                MIN(ab.voucher_type) as voucher_type,
+                MIN(ab.voucher_code) as voucher_code,
+                MIN(ab.flight_attempts) as flight_attempts,
+                MIN(ab.expires) as expires,
+                SUM(COALESCE(ab.paid, 0)) as paid,
+                SUM(COALESCE(ab.due, 0)) as due,
+                MIN(ab.activity_id) as activity_id,
+                SUM(
+                    CASE 
+                        WHEN ab.pax IS NOT NULL AND ab.pax > 0 THEN ab.pax
+                        ELSE (SELECT COUNT(*) FROM passenger p2 WHERE p2.booking_id = ab.id)
+                    END
+                ) as pax,
+                SUM(
+                    CASE 
+                        WHEN ab.pax IS NOT NULL AND ab.pax > 0 THEN ab.pax
+                        ELSE (SELECT COUNT(*) FROM passenger p2 WHERE p2.booking_id = ab.id)
+                    END
+                ) as passenger_count,
+                DATE(MIN(ab.flight_date)) as flight_date_only,
+                TIME(MIN(ab.flight_date)) as flight_time_only,
+                GROUP_CONCAT(DISTINCT ab.id ORDER BY ab.id SEPARATOR ', ') as booking_ids
+            FROM all_booking ab
+            WHERE ab.status = 'Flown'
+            GROUP BY DATE(ab.flight_date), ab.location, ab.flight_type
+        ) g
+        LEFT JOIN trip_booking tb ON tb.booking_id = (
+            SELECT tb2.booking_id
+            FROM trip_booking tb2
+            WHERE FIND_IN_SET(tb2.booking_id, REPLACE(g.booking_ids, ' ', '')) > 0
+            ORDER BY (tb2.flight_start_time IS NOT NULL AND tb2.flight_end_time IS NOT NULL) DESC,
+                     tb2.refuel_location IS NOT NULL DESC,
+                     tb2.booking_id ASC
+            LIMIT 1
+        )
+        ORDER BY g.flight_date DESC, g.created_at DESC
     `;
 
     con.query(sql, (err, results) => {

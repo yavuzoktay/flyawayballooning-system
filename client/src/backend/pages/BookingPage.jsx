@@ -5527,15 +5527,15 @@ setBookingDetail(finalVoucherDetail);
                                                 value={filters.search}
                                                 onChange={(e) => handleFilterChange("search", e.target.value)}
                                                 sx={{ 
-                                                    fontSize: 11,
+                                                    fontSize: 16,
                                                     flex: '1 1 100%',
                                                     minWidth: 0,
                                                     width: '100%',
-                                                    '& input::placeholder': { fontSize: 11 },
-                                                    height: '32px',
+                                                    '& input::placeholder': { fontSize: 16 },
+                                                    height: '36px',
                                                     '& .MuiOutlinedInput-input': {
                                                         padding: '6px 8px',
-                                                        fontSize: '11px'
+                                                        fontSize: '16px'
                                                     }
                                                 }}
                                                 size="small"
@@ -5864,7 +5864,7 @@ setBookingDetail(finalVoucherDetail);
                                         selectable={true}
                                         onSelectionChange={handleBookingSelectionChange}
                                         columns={[
-                                            "created_at_display",
+                                            { key: "created_at_display", label: "Created" },
                                             "name",
                                             "voucher_type",
                                             "location",
@@ -6104,15 +6104,15 @@ setBookingDetail(finalVoucherDetail);
                                                 value={filters.search}
                                                 onChange={(e) => handleFilterChange("search", e.target.value)}
                                                 sx={{ 
-                                                    fontSize: 11,
+                                                    fontSize: 16,
                                                     flex: '1 1 100%',
                                                     minWidth: 0,
                                                     width: '100%',
-                                                    '& input::placeholder': { fontSize: 11 },
-                                                    height: '32px',
+                                                    '& input::placeholder': { fontSize: 16 },
+                                                    height: '36px',
                                                     '& .MuiOutlinedInput-input': {
                                                         padding: '6px 8px',
-                                                        fontSize: '11px'
+                                                        fontSize: '16px'
                                                     }
                                                 }}
                                                 size="small"
