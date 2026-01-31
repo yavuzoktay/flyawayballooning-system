@@ -31,6 +31,9 @@ const PaginatedTable = ({
     const createdColWidth = isMobile ? '85px' : '140px';
     // Name column width: narrower on mobile
     const nameColWidth = isMobile ? '100px' : '200px';
+    // Book Flight / Voucher Type column width: narrower on mobile
+    const voucherTypeColWidth = isMobile ? '100px' : (context === 'vouchers' ? '220px' : '200px');
+    const actualVoucherTypeColWidth = isMobile ? '100px' : '150px';
 
     // Helper to get column id/label
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || col?.key || ''));
@@ -462,8 +465,8 @@ const PaginatedTable = ({
                                        id === 'voucher_code' ? '150px' :
                                        id === 'status' ? '120px' : 
                                         id === 'voucher_type'
-                                            ? (context === 'vouchers' ? '220px' : '200px') :
-                                       id === 'actual_voucher_type' ? '150px' :
+                                            ? voucherTypeColWidth :
+                                       id === 'actual_voucher_type' ? actualVoucherTypeColWidth :
                                        id === 'voucher_ref' ? '160px' :
                                        id === 'passenger_info' ? '200px' :
                                        id === 'created_at' || id === 'created' || id === 'created_at_display' ? createdColWidth :
@@ -500,8 +503,8 @@ const PaginatedTable = ({
                                          id === 'voucher_code' ? '150px' :
                                          id === 'status' ? '120px' : 
                                         id === 'voucher_type'
-                                            ? (context === 'vouchers' ? '220px' : '200px') :
-                                         id === 'actual_voucher_type' ? '150px' :
+                                            ? voucherTypeColWidth :
+                                         id === 'actual_voucher_type' ? actualVoucherTypeColWidth :
                                          id === 'voucher_ref' ? '160px' :
                                          id === 'passenger_info' ? '200px' :
                                          id === 'created_at' || id === 'created' || id === 'created_at_display' ? createdColWidth :
@@ -606,6 +609,8 @@ const PaginatedTable = ({
                                                                      id === 'crew' ? "150px" :
                                                                      id === 'name' ? nameColWidth :
                                                                      id === 'location' ? locationColWidth :
+                                                                     id === 'voucher_type' ? voucherTypeColWidth :
+                                                                     id === 'actual_voucher_type' ? actualVoucherTypeColWidth :
                                                                      id === 'voucher_code' ? "150px" :
                                                                      "200px",
                                                             fontSize: "16px",
