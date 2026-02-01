@@ -5367,12 +5367,20 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
  */
 async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, currency = 'GBP') {
     try {
+        // Extract funnel_type, experience_type, product_type for GA_Purchase_Completed
+        const funnelType = session.metadata?.funnel_type || 'booking';
+        const experienceType = session.metadata?.experience_type || 'shared';
+        const productType = session.metadata?.product_type || '';
+        
         console.log('📊 [Google Ads] sendGoogleAdsConversionIfNeeded called:', {
             transactionId,
             value,
             currency,
             sessionId: session?.id,
-            hasMetadata: !!session?.metadata
+            hasMetadata: !!session?.metadata,
+            funnelType,
+            experienceType,
+            productType
         });
         
         // Extract Google Ads IDs from session metadata
@@ -5401,7 +5409,8 @@ async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, cu
 
         console.log('📊 [Google Ads] Proceeding with conversion send...');
 
-        // Send conversion to Google Ads
+        // Send conversion to Google Ads (GA_Purchase_Completed - Primary conversion)
+        // Use funnel_type + experience_type to select conversion action: GA_Flight_Purchase_*, GA_Voucher_Purchase_*
         const conversionResult = await sendGoogleAdsConversion({
             transactionId: transactionId,
             value: value,
@@ -5410,7 +5419,10 @@ async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, cu
             wbraid: wbraid,
             gbraid: gbraid,
             conversionDateTime: new Date().toISOString(),
-            allowTestPayments: false // Don't allow test payments in production webhooks
+            allowTestPayments: false, // Don't allow test payments in production webhooks
+            funnelType,
+            experienceType,
+            productType
         });
 
         if (conversionResult.success) {
@@ -25090,11 +25102,31 @@ app.post('/api/create-checkout-session', async (req, res) => {
             gbraid: userSessionData?.gbraid || null
         };
 
+        // Derive funnel_type, experience_type, product_type for Google Ads full-funnel tracking
+        let funnelType = 'booking';
+        let experienceType = 'shared';
+        let productType = '';
+        const sourceData = bookingData || voucherData || {};
+        const chooseFlightType = sourceData.chooseFlightType || {};
+        const selectedVoucherType = sourceData.selectedVoucherType || {};
+        if (type === 'voucher') {
+            const isGift = (sourceData.book_flight || sourceData.voucher_type || '').toLowerCase().includes('gift');
+            funnelType = isGift ? 'gift' : 'voucher';
+        } else if (type === 'booking') {
+            funnelType = 'booking';
+        }
+        const flightTypeStr = (chooseFlightType.type || '').toLowerCase();
+        experienceType = flightTypeStr.includes('private') ? 'private' : 'shared';
+        productType = selectedVoucherType.title || sourceData.voucher_type || '';
+
         // Prepare metadata for Stripe checkout session
         // This metadata will be available in the webhook for Google Ads conversion tracking
         const sessionMetadata = {
             type: type || (voucherData ? 'voucher' : 'booking'),
-            session_id: 'PLACEHOLDER' // Will be updated below
+            session_id: 'PLACEHOLDER', // Will be updated below
+            funnel_type: funnelType,
+            experience_type: experienceType,
+            product_type: productType
         };
 
         // Add Google Ads IDs to metadata if present

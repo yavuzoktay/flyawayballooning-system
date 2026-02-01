@@ -37,6 +37,11 @@ const GOOGLE_ADS_API_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_A
 let CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
 let CONVERSION_ID = process.env.GOOGLE_ADS_CONVERSION_ID;
 let CONVERSION_LABEL = process.env.GOOGLE_ADS_CONVERSION_LABEL;
+// Primary conversion action IDs for full-funnel tracking (optional - fallback to CONVERSION_ID)
+let CONVERSION_ID_FLIGHT_SHARED = process.env.GOOGLE_ADS_CONVERSION_ID_FLIGHT_SHARED;
+let CONVERSION_ID_FLIGHT_PRIVATE = process.env.GOOGLE_ADS_CONVERSION_ID_FLIGHT_PRIVATE;
+let CONVERSION_ID_VOUCHER_SHARED = process.env.GOOGLE_ADS_CONVERSION_ID_VOUCHER_SHARED;
+let CONVERSION_ID_VOUCHER_PRIVATE = process.env.GOOGLE_ADS_CONVERSION_ID_VOUCHER_PRIVATE;
 let DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
 let CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
 let CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
@@ -102,6 +107,10 @@ function reloadEnvVariables() {
     CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
     CONVERSION_ID = process.env.GOOGLE_ADS_CONVERSION_ID;
     CONVERSION_LABEL = process.env.GOOGLE_ADS_CONVERSION_LABEL;
+    CONVERSION_ID_FLIGHT_SHARED = process.env.GOOGLE_ADS_CONVERSION_ID_FLIGHT_SHARED;
+    CONVERSION_ID_FLIGHT_PRIVATE = process.env.GOOGLE_ADS_CONVERSION_ID_FLIGHT_PRIVATE;
+    CONVERSION_ID_VOUCHER_SHARED = process.env.GOOGLE_ADS_CONVERSION_ID_VOUCHER_SHARED;
+    CONVERSION_ID_VOUCHER_PRIVATE = process.env.GOOGLE_ADS_CONVERSION_ID_VOUCHER_PRIVATE;
     DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
     CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
     CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
@@ -184,6 +193,9 @@ async function getAccessToken() {
  * @param {string} [params.wbraid] - Web-to-app conversion ID
  * @param {string} [params.gbraid] - Google Browser ID
  * @param {string} [params.conversionDateTime] - Conversion date/time in ISO format (defaults to now)
+ * @param {string} [params.funnelType] - booking | gift | voucher (for conversion action selection)
+ * @param {string} [params.experienceType] - shared | private (for conversion action selection)
+ * @param {string} [params.productType] - Product type for GA_Purchase_Completed
  * @returns {Promise<Object>} API response
  */
 async function sendConversion({
@@ -194,7 +206,10 @@ async function sendConversion({
     wbraid = null,
     gbraid = null,
     conversionDateTime = null,
-    allowTestPayments = false // Allow test payments (for testing endpoints)
+    allowTestPayments = false, // Allow test payments (for testing endpoints)
+    funnelType = 'booking',
+    experienceType = 'shared',
+    productType = ''
 }) {
     // Reload environment variables to ensure we have the latest values
     // This is important if .env was updated without server restart
@@ -456,11 +471,23 @@ async function sendConversion({
             ? new Date(conversionDateTime)
             : new Date();
 
+        // Select conversion action ID based on funnel_type + experience_type (GA_Flight_Purchase_*, GA_Voucher_Purchase_*)
+        // Fallback to single CONVERSION_ID if specific IDs not configured
+        let conversionActionId = CONVERSION_ID;
+        const isFlight = funnelType === 'booking';
+        const isVoucher = funnelType === 'voucher' || funnelType === 'gift';
+        const isShared = experienceType === 'shared';
+        const isPrivate = experienceType === 'private';
+        if (isFlight && isShared && CONVERSION_ID_FLIGHT_SHARED) conversionActionId = CONVERSION_ID_FLIGHT_SHARED;
+        else if (isFlight && isPrivate && CONVERSION_ID_FLIGHT_PRIVATE) conversionActionId = CONVERSION_ID_FLIGHT_PRIVATE;
+        else if (isVoucher && isShared && CONVERSION_ID_VOUCHER_SHARED) conversionActionId = CONVERSION_ID_VOUCHER_SHARED;
+        else if (isVoucher && isPrivate && CONVERSION_ID_VOUCHER_PRIVATE) conversionActionId = CONVERSION_ID_VOUCHER_PRIVATE;
+
         // Build conversion action resource name
         // google-ads-api package automatically adds customer_id from Customer instance
         // So we need to use the full resource name format: customers/{customer_id}/conversionActions/{conversion_action_id}
         // Customer ID must be WITHOUT dashes (format: customers/XXXXXXXXXX/conversionActions/ID)
-        const conversionActionResourceName = `customers/${customerIdForApi}/conversionActions/${CONVERSION_ID}`;
+        const conversionActionResourceName = `customers/${customerIdForApi}/conversionActions/${conversionActionId}`;
         console.log('📊 [Google Ads] Conversion Action Resource Name:', conversionActionResourceName);
         console.log('📊 [Google Ads] Customer ID in resource name (no dashes):', customerIdForApi);
         console.log('📊 [Google Ads] Using CONVERSION_ID:', CONVERSION_ID);
