@@ -25187,6 +25187,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             voucherData: normalizedVoucherData,
             extendVoucherData: extendVoucherData || null, // Store extend voucher data
             userSessionData: userSessionData || null, // Store user session data
+            totalPrice: Number(totalPrice) || 0, // For conversion_data in session-status
             timestamp: Date.now() // Add timestamp for debugging
         };
         // File logging for saved session voucherData
@@ -27790,11 +27791,40 @@ app.get('/api/debug/vouchers-table-structure', (req, res) => {
 });
 
 // Session status endpoint to avoid duplicate creation from client
+// When processed, also returns conversion_data for client-side Google Ads conversion tracking
 app.get('/api/session-status', (req, res) => {
     const { session_id } = req.query;
     if (!session_id) return res.status(400).json({ processed: false, message: 'session_id is required' });
     const data = stripeSessionStore[session_id];
-    return res.json({ processed: !!(data && (data.processed || data.processing)), type: data?.type || null });
+    const processed = !!(data && (data.processed || data.processing));
+    const result = { processed, type: data?.type || null };
+
+    // When processed, include conversion_data so frontend can fire gtag conversion (webhook may have run first)
+    // Skip extend_voucher - not a primary purchase conversion
+    if (processed && data && data.type !== 'extend_voucher') {
+        const source = data.bookingData || data.voucherData || {};
+        const chooseFlightType = source.chooseFlightType || {};
+        const flightTypeStr = (chooseFlightType.type || '').toLowerCase();
+        let funnelType = 'booking';
+        if (data.type === 'voucher') {
+            const isGift = (source.book_flight || source.voucher_type || '').toLowerCase().includes('gift');
+            funnelType = isGift ? 'gift' : 'voucher';
+        } else if (data.type === 'booking') {
+            funnelType = 'booking';
+        }
+        const experienceType = flightTypeStr.includes('private') ? 'private' : 'shared';
+        const productType = (source.selectedVoucherType?.title || source.voucher_type || '').toString();
+        const value = Number(data.totalPrice || 0);
+        result.conversion_data = {
+            transaction_id: session_id,
+            value,
+            currency: 'GBP',
+            funnel_type: funnelType,
+            experience_type: experienceType,
+            product_type: productType
+        };
+    }
+    return res.json(result);
 });
 
 // Crew Assignment Migrations
