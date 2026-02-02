@@ -5561,8 +5561,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     await savePaymentHistory(session, bookingId, null);
 
                     // Send Google Ads conversion tracking (server-side)
-                    // Use payment intent ID if available, otherwise use session ID as transaction ID
-                    const transactionId = session.payment_intent || session.id;
+                    // Use payment intent ID if available (string or expanded object), otherwise session ID
+                    const pi = session.payment_intent;
+                    const transactionId = (typeof pi === 'string' ? pi : pi?.id) || session.id;
                     const conversionValue = session.amount_total ? Number(session.amount_total) / 100 : Number(storeData.totalPrice || 0);
                     const conversionCurrency = session.currency?.toUpperCase() || 'GBP';
                     
@@ -5660,8 +5661,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     storeData.voucherData.voucher_id = voucherId;
 
                     // Send Google Ads conversion tracking (server-side)
-                    // Use payment intent ID if available, otherwise use session ID as transaction ID
-                    const transactionId = session.payment_intent || session.id;
+                    // Use payment intent ID if available (string or expanded object), otherwise session ID
+                    const piVoucher = session.payment_intent;
+                    const transactionId = (typeof piVoucher === 'string' ? piVoucher : piVoucher?.id) || session.id;
                     const conversionValue = resolvedPaidAmount || Number(storeData.totalPrice || 0);
                     const conversionCurrency = session.currency?.toUpperCase() || 'GBP';
                     

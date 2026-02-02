@@ -35,6 +35,8 @@ const GOOGLE_ADS_API_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_A
 
 // Environment variables - Use let so they can be reloaded
 let CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
+// When using Manager account: ADVERTISER_CUSTOMER_ID = account with conversion actions, CUSTOMER_ID = Manager (login)
+let ADVERTISER_CUSTOMER_ID = process.env.GOOGLE_ADS_ADVERTISER_CUSTOMER_ID;
 let CONVERSION_ID = process.env.GOOGLE_ADS_CONVERSION_ID;
 let CONVERSION_LABEL = process.env.GOOGLE_ADS_CONVERSION_LABEL;
 // Primary conversion action IDs for full-funnel tracking (optional - fallback to CONVERSION_ID)
@@ -105,6 +107,7 @@ function reloadEnvVariables() {
     
     // Reload variables directly from process.env
     CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
+    ADVERTISER_CUSTOMER_ID = process.env.GOOGLE_ADS_ADVERTISER_CUSTOMER_ID;
     CONVERSION_ID = process.env.GOOGLE_ADS_CONVERSION_ID;
     CONVERSION_LABEL = process.env.GOOGLE_ADS_CONVERSION_LABEL;
     CONVERSION_ID_FLIGHT_SHARED = process.env.GOOGLE_ADS_CONVERSION_ID_FLIGHT_SHARED;
@@ -289,8 +292,10 @@ async function sendConversion({
         console.log('  - REFRESH_TOKEN:', REFRESH_TOKEN ? 'SET' : 'NOT SET');
         
         // Format customer ID (remove dashes if present)
-        // Try to get from process.env directly if CUSTOMER_ID is still empty
-        let customerIdToUse = CUSTOMER_ID || process.env.GOOGLE_ADS_CUSTOMER_ID;
+        // When GOOGLE_ADS_ADVERTISER_CUSTOMER_ID is set: use it as customer_id (conversion actions live there)
+        // and use GOOGLE_ADS_CUSTOMER_ID as login_customer_id (Manager account for auth)
+        let customerIdToUse = ADVERTISER_CUSTOMER_ID || process.env.GOOGLE_ADS_ADVERTISER_CUSTOMER_ID || CUSTOMER_ID || process.env.GOOGLE_ADS_CUSTOMER_ID;
+        const loginCustomerIdRaw = ADVERTISER_CUSTOMER_ID ? (CUSTOMER_ID || process.env.GOOGLE_ADS_CUSTOMER_ID) : null;
         
         if (!customerIdToUse) {
             const errorMsg = 'GOOGLE_ADS_CUSTOMER_ID environment variable is not set or empty';
@@ -344,21 +349,28 @@ async function sendConversion({
         }
         
         const formattedCustomerId = customerIdValue.replace(/-/g, '');
+        let formattedLoginCustomerId = null;
+        if (loginCustomerIdRaw) {
+            const loginVal = String(loginCustomerIdRaw).trim().replace(/["']/g, '').replace(/-/g, '');
+            if (loginVal && /^\d{10}$/.test(loginVal)) formattedLoginCustomerId = loginVal;
+        }
         console.log('📊 [Google Ads] Customer ID from env (raw):', JSON.stringify(CUSTOMER_ID));
+        console.log('📊 [Google Ads] Advertiser ID (for conversions):', ADVERTISER_CUSTOMER_ID ? 'SET' : 'NOT SET');
+        console.log('📊 [Google Ads] Login Customer ID (Manager):', formattedLoginCustomerId ? 'SET' : 'NOT SET');
         console.log('📊 [Google Ads] Customer ID (after quote removal):', JSON.stringify(customerIdValue));
         console.log('📊 [Google Ads] Formatted Customer ID (no dashes):', formattedCustomerId);
 
         // Initialize Google Ads API client
-        // For Manager Accounts accessing sub-accounts, we might need login_customer_id
-        // But first, let's try without it since we're using the Manager Account ID directly
+        // When ADVERTISER_CUSTOMER_ID is set: login_customer_id = Manager, customer_id = Advertiser
         const clientConfig = {
             client_id: CLIENT_ID,
             client_secret: CLIENT_SECRET,
             developer_token: DEVELOPER_TOKEN,
         };
-        
-        // If using Manager Account to access a sub-account, uncomment this:
-        // clientConfig.login_customer_id = formattedCustomerId; // Manager Account ID
+        if (formattedLoginCustomerId) {
+            clientConfig.login_customer_id = formattedLoginCustomerId;
+            console.log('📊 [Google Ads] Using Manager account (login_customer_id) to access Advertiser account');
+        }
         
         console.log('📊 [Google Ads] GoogleAdsApi client initialized');
         console.log('📊 [Google Ads] Developer Token:', DEVELOPER_TOKEN ? `${DEVELOPER_TOKEN.substring(0, 5)}...` : 'NOT SET');
