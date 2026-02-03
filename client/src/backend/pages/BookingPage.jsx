@@ -1082,13 +1082,33 @@ const BookingPage = () => {
                 }
             }
 
-            // Validate SMS template selection
-            if (!smsForm.template || smsForm.template === 'custom') {
-                if (!smsForm.message || smsForm.message.trim().length === 0) {
-                    alert('SMS message is required. Please select an SMS template or enter a custom message.');
-                    return;
-                }
+            // Validate SMS message - required for both custom and template selections
+            const messageValue = smsForm.message || '';
+            const trimmedMessage = messageValue.trim();
+            
+            console.log('🔍 SMS Validation - smsForm:', smsForm);
+            console.log('🔍 SMS Validation - messageValue:', JSON.stringify(messageValue), 'length:', messageValue.length);
+            console.log('🔍 SMS Validation - trimmedMessage:', JSON.stringify(trimmedMessage), 'trimmed length:', trimmedMessage.length);
+            
+            if (!messageValue || trimmedMessage.length === 0) {
+                console.error('❌ SMS validation failed - message is empty or only whitespace');
+                alert('SMS message is required. Please enter a custom message or select an SMS template.');
+                return;
             }
+            
+            // Update smsForm with trimmed message synchronously to ensure clean state
+            if (messageValue !== trimmedMessage) {
+                console.log('🔧 Trimming SMS message - updating state');
+                // Use functional update to ensure we have the latest state
+                setSmsForm(prev => {
+                    const updated = { ...prev, message: trimmedMessage };
+                    console.log('🔧 Updated smsForm with trimmed message:', updated);
+                    return updated;
+                });
+                // Note: State update is async, but we'll use trimmedMessage directly in the send logic below
+            }
+            
+            console.log('✅ SMS validation passed - message:', trimmedMessage.substring(0, 50) + (trimmedMessage.length > 50 ? '...' : ''));
         }
 
         setSendingEmail(true);
@@ -1230,8 +1250,8 @@ const BookingPage = () => {
                     const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
                     smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
                 } else if (smsForm.message && smsForm.message.trim().length > 0) {
-                    // Custom SMS message
-                    smsMessage = smsForm.message;
+                    // Custom SMS message - always use trimmed version to avoid whitespace issues
+                    smsMessage = smsForm.message.trim();
                     const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
                     smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
                 } else {
@@ -4957,10 +4977,12 @@ setBookingDetail(finalVoucherDetail);
         console.log('📋 Current smsForm:', smsForm);
         
         if (!templateValue || templateValue === 'custom') {
+            // When switching to custom, keep existing message if user has typed something
+            // Only clear if message is from a template (not user-entered)
             setSmsForm(prev => ({ 
                 ...prev, 
-                template: 'custom', 
-                message: '' 
+                template: 'custom'
+                // Don't clear message - let user keep what they typed
             }));
             return;
         }
@@ -11025,6 +11047,66 @@ setBookingDetail(finalVoucherDetail);
                                         )}
                                     </Select>
                                 </FormControl>
+                            </Grid>
+                            {/* Message input - shown when custom template is selected or for editing template message */}
+                            <Grid item xs={12}>
+                                <Typography variant="subtitle2" sx={{ 
+                                    mb: isMobile ? 0.5 : 1, 
+                                    fontWeight: 500, 
+                                    fontSize: isMobile ? 13 : '14px',
+                                    color: isMobile ? 'inherit' : '#374151'
+                                }}>
+                                    {smsForm.template === 'custom' ? 'Message *' : 'Message (you can edit the template)'}
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    placeholder={smsForm.template === 'custom' ? 'Enter your custom message...' : 'Template message will appear here...'}
+                                    value={smsForm.message || ''}
+                                    onChange={(e) => {
+                                        const rawValue = e.target.value;
+                                        // Trim the value to remove leading/trailing whitespace for validation
+                                        // But keep the raw value in the field so user can see what they're typing
+                                        const newMessage = rawValue;
+                                        console.log('📝 SMS message input changed - raw:', JSON.stringify(rawValue), 'length:', rawValue.length);
+                                        console.log('📝 SMS message input changed - trimmed:', JSON.stringify(rawValue.trim()), 'trimmed length:', rawValue.trim().length);
+                                        setSmsForm(prev => {
+                                            const updated = { ...prev, message: newMessage };
+                                            console.log('📝 Updated smsForm:', updated);
+                                            return updated;
+                                        });
+                                    }}
+                                    onBlur={(e) => {
+                                        // Trim whitespace when user leaves the field
+                                        const trimmedValue = e.target.value.trim();
+                                        if (trimmedValue !== e.target.value) {
+                                            console.log('📝 Trimming SMS message on blur');
+                                            setSmsForm(prev => ({ ...prev, message: trimmedValue }));
+                                        }
+                                    }}
+                                    multiline
+                                    rows={isMobile ? 3 : 4}
+                                    variant="outlined"
+                                    size={isMobile ? "small" : "medium"}
+                                    required={smsForm.template === 'custom'}
+                                    sx={{ 
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: isMobile ? 2 : '6px',
+                                            fontSize: isMobile ? '14px' : '14px',
+                                            '& fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#d1d5db'
+                                            },
+                                            '&:hover fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#9ca3af'
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: isMobile ? 'inherit' : '#3b82f6'
+                                            }
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: isMobile ? '14px' : '14px'
+                                        }
+                                    }}
+                                />
                             </Grid>
                             <Grid item xs={12}>
                                 <Typography variant="subtitle2" sx={{ 
