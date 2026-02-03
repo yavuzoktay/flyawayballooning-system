@@ -76,6 +76,28 @@ const CustomerPortal = () => {
     // Extract token from URL - handle both /customerPortal/:token and /customerPortal/:token/index
     const token = tokenParam ? tokenParam.split('/')[0] : null;
 
+    // Determine portal context:
+    // - If the token decodes to an id starting with "voucher-", we are viewing the Voucher portal
+    //   (even if that voucher was redeemed into a booking).
+    // - Additionally allow forcing voucher view via URL param: ?view=voucher
+    const forceVoucherView = (() => {
+        try {
+            if (typeof window !== 'undefined') {
+                const qs = new URLSearchParams(window.location.search || '');
+                if ((qs.get('view') || '').toLowerCase() === 'voucher') return true;
+            }
+        } catch {}
+        try {
+            if (!token || typeof window === 'undefined') return false;
+            // token is base64; decode and check first part (idToUse)
+            const decoded = window.atob(token.replace(/-/g, '+').replace(/_/g, '/'));
+            const firstPart = String(decoded || '').split('|')[0] || '';
+            return firstPart.startsWith('voucher-');
+        } catch {
+            return false;
+        }
+    })();
+
     const fetchBookingData = async () => {
         if (!token) {
             setError('Invalid token');
@@ -624,10 +646,15 @@ const CustomerPortal = () => {
                         {(() => {
                             const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
                             const voucherType = (bookingData.voucher_type || '').toString().trim().toLowerCase();
-                            const isFlightVoucher = bookingData.is_flight_voucher || 
-                                bookFlight === 'flight voucher' || 
+                            const isVoucherRedeemed =
+                                bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                            const isFlightVoucherBase =
+                                bookingData.is_flight_voucher ||
+                                bookFlight === 'flight voucher' ||
                                 voucherType === 'flight voucher';
-                            return isFlightVoucher ? 'Your Booking Flight Voucher' : 'Your Booking';
+                            // If voucher has been redeemed into a booking, show standard "Your Booking" portal
+                            const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
+                            return isFlightVoucherSection ? 'Your Booking Flight Voucher' : 'Your Booking';
                         })()}
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -636,14 +663,19 @@ const CustomerPortal = () => {
                             {(() => {
                                 const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
                                 const voucherType = (bookingData.voucher_type || '').toString().trim().toLowerCase();
-                                const isFlightVoucher = bookingData.is_flight_voucher || 
-                                    bookFlight === 'flight voucher' || 
+                                const isVoucherRedeemed =
+                                    bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                                const isFlightVoucherBase =
+                                    bookingData.is_flight_voucher ||
+                                    bookFlight === 'flight voucher' ||
                                     voucherType === 'flight voucher';
+                                // If voucher has been redeemed into a booking, treat as regular booking in Customer Portal
+                                const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
                                 
                                 // For Flight Vouchers (Your Booking Flight Voucher section), show both Booking ID and Voucher Ref (non-clickable)
                                 // For regular bookings (Your Booking section), show only Booking ID - NO Voucher Ref
-                                if (isFlightVoucher && bookingData.voucher_ref) {
-                                    const isRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                                if (isFlightVoucherSection && bookingData.voucher_ref) {
+                                    const isRedeemed = isVoucherRedeemed;
                                     return (
                                         <Box sx={{ mb: 2 }}>
                                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 0.5 }}>
@@ -719,10 +751,11 @@ const CustomerPortal = () => {
                                     const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
                                     
                                     const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
-                                    // Only apply redeemed check for Flight Voucher section
+                                    // Only apply redeemed check for Flight Voucher section (not yet redeemed)
                                     const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
-                                    const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
-                                    const shouldApplyRedeemedCheck = isFlightVoucher;
+                                    const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
+                                    const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
+                                    const shouldApplyRedeemedCheck = isFlightVoucherSection;
                                     const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired || hoursUntilFlight <= 120;
                                     
                                     return (
@@ -867,10 +900,11 @@ const CustomerPortal = () => {
                                     const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
                                     
                                     const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
-                                    // Only apply redeemed check for Flight Voucher section
+                                    // Only apply redeemed check for Flight Voucher section (not yet redeemed)
                                     const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
-                                    const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
-                                    const shouldApplyRedeemedCheck = isFlightVoucher;
+                                    const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
+                                    const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
+                                    const shouldApplyRedeemedCheck = isFlightVoucherSection;
                                     const isDisabled = extendingVoucher || isFlightDatePassed || hoursUntilFlight <= 120;
                                     
                                     const isExtendDisabled = isDisabled || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired;
@@ -934,15 +968,17 @@ const CustomerPortal = () => {
                         const isExpired = expiryDate ? expiryDate.isBefore(now, 'day') : false;
 
                         // Check if voucher is redeemed (for Flight Voucher)
-                        const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
-                        // Determine if this is a Flight Voucher section
+                        const isVoucherRedeemed =
+                            bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                        // Determine if this is a Flight Voucher-based booking
                         const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
-                        const isFlightVoucher = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
+                        const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                         
-                        // IMPORTANT: is_voucher_redeemed should only affect "Your Booking Flight Voucher" section
-                        // For regular bookings ("Your Booking" section), is_voucher_redeemed should NOT disable buttons
-                        // This allows bookings created from redeemed vouchers to still have functional buttons
-                        const shouldApplyRedeemedCheck = isFlightVoucher;
+                        // IMPORTANT:
+                        // - "Your Booking Flight Voucher" section (voucher not yet redeemed) => redeemed durumu butonları kilitler
+                        // - Redeemed voucher'dan oluşan normal booking ("Your Booking" bölümü) => redeemed, butonları KİLİTLEMEZ
+                        const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
+                        const shouldApplyRedeemedCheck = isFlightVoucherSection;
 
                         // If voucher / booking has expired, ALL actions in the portal must be disabled
                         // regardless of flight date / 120-hour rules.
@@ -1049,7 +1085,7 @@ const CustomerPortal = () => {
                                                 }
                                             }}
                                         >
-                                            {isFlightVoucher ? 'Schedule Your Flight' : 'Reschedule Your Flight'}
+                                            {isFlightVoucherSection ? 'Schedule Your Flight' : 'Reschedule Your Flight'}
                                         </Button>
                                     </span>
                                 </Tooltip>
@@ -1122,9 +1158,13 @@ const CustomerPortal = () => {
                             Passengers
                         </Typography>
                         {bookingData.passengers.map((passenger, index) => {
-                            // For Flight Voucher, disable editing - only display passenger info
-                            const isFlightVoucher = bookingData.is_flight_voucher || bookingData.book_flight === 'Flight Voucher';
-                            const isEditing = !isFlightVoucher && editingPassenger === passenger.id;
+                            // For Flight Voucher section (not yet redeemed), disable editing - only display passenger info
+                            // For redeemed vouchers (normal bookings), allow editing
+                            const isVoucherRedeemed = bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                            const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
+                            const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
+                            const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
+                            const isEditing = !isFlightVoucherSection && editingPassenger === passenger.id;
                             return (
                                 <Box key={passenger.id || index} sx={{ mb: 2, p: 2, borderRadius: 1 }}>
                                     {/* Name Section */}
@@ -1151,7 +1191,7 @@ const CustomerPortal = () => {
                                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                                     {passenger.first_name} {passenger.last_name}
                                                 </Typography>
-                                                {!isFlightVoucher && (
+                                                {!isFlightVoucherSection && (
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleEditPassengerClick(passenger)}

@@ -17846,10 +17846,17 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
 
         // Get passengers for this booking
         // For Flight Voucher, prioritize voucher_passenger_details from all_vouchers
+        // BUT if voucher is already redeemed into a booking, use passenger table (latest data)
         // For other types, use passenger table
         let finalPassengerRows = [];
         
-        if (isFlightVoucher && voucherInfo && voucherInfo.voucher_passenger_details) {
+        const voucherIsRedeemed =
+            voucherInfo &&
+            (voucherInfo.redeemed === 'Yes' ||
+             voucherInfo.status === 'Used' ||
+             voucherInfo.redeemed === 1);
+        
+        if (isFlightVoucher && voucherInfo && voucherInfo.voucher_passenger_details && !voucherIsRedeemed) {
             // Flight Voucher: parse passenger details from voucher_passenger_details JSON
             try {
                 const voucherPassengerList = parsePassengerList(voucherInfo.voucher_passenger_details);
@@ -17860,7 +17867,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 const fallbackPhone = voucherInfo.purchaser_phone || voucherInfo.purchaser_mobile || voucherInfo.phone || voucherInfo.mobile || booking.phone || '';
                 
                 finalPassengerRows = voucherPassengerList.map((vp, index) => ({
-                    id: vp.id || null,
+                    // Ensure a stable, non-null id so frontend editing logic only affects one passenger at a time
+                    id: vp.id || vp.passenger_id || index + 1,
                     booking_id: booking.id,
                     first_name: vp.first_name || vp.firstName || '',
                     last_name: vp.last_name || vp.lastName || '',
@@ -29387,18 +29395,35 @@ function buildCustomerPortalToken(booking = {}) {
         booking.portal_link_token;
     if (explicitToken) return explicitToken;
 
-    // For Flight Voucher, use voucher ID instead of booking ID
+    // For Flight Voucher, use voucher ID instead of booking ID (unless it's already redeemed into a booking)
     // For Gift Voucher, use voucher ID
     // For other types, use booking ID
     const isFlightVoucher = booking.book_flight === 'Flight Voucher' || booking.is_flight_voucher;
     const isGiftVoucher = booking.book_flight === 'Gift Voucher';
+    const isVoucherIdForced = (() => {
+        try {
+            const idRaw = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+            return String(idRaw).startsWith('voucher-');
+        } catch {
+            return false;
+        }
+    })();
+    const isRedeemedVoucher = (() => {
+        const v = booking.redeemed_voucher ?? booking.is_voucher_redeemed ?? booking.redeemed ?? booking._original?.redeemed;
+        if (v === undefined || v === null) return false;
+        if (typeof v === 'string') return v.trim().toLowerCase() === 'yes' || v.trim().toLowerCase() === 'true';
+        return v === 1 || v === true;
+    })();
     
     // Get voucher ID from _original if available, or from booking.voucher_id
     const voucherId = booking._original?.id || booking.voucher_id || null;
     
     // Determine ID to use: voucher ID for Flight/Gift Voucher, booking ID for others
     let idToUse = '';
-    if (isFlightVoucher || isGiftVoucher) {
+    if (isVoucherIdForced) {
+        // Caller explicitly provided voucher-* id; keep voucher context even if redeemed
+        idToUse = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+    } else if ((isFlightVoucher || isGiftVoucher) && !isRedeemedVoucher) {
         // Use voucher ID with prefix for Flight/Gift Voucher
         if (voucherId) {
             idToUse = `voucher-${voucherId}`;
