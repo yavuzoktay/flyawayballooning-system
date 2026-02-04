@@ -1592,6 +1592,19 @@ const BookingPage = () => {
         console.log('🎯 handleEmailTemplateChange called with:', templateValue);
         console.log('📚 Available templates:', emailTemplates);
         
+        // Eğer kullanıcı Custom Message seçtiyse, hazır şablon yerine boş/göreli bir içerik bırak
+        if (templateValue === 'custom') {
+            const defaultSubject = emailForm.subject || `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name || ''}`;
+            setEmailForm((prev) => ({
+                ...prev,
+                subject: defaultSubject,
+                // Mesajı boş bırak ki kullanıcı tamamen özgürce yazabilsin
+                message: '',
+                template: 'custom'
+            }));
+            return;
+        }
+
         let subject = '';
         let message = '';
 
@@ -10434,15 +10447,20 @@ setBookingDetail(finalVoucherDetail);
                                                             }
                                                         }}
                                                     >
+                                                        {/* Veritabanındaki email şablonları */}
                                                         {emailTemplates.map((template) => (
                                                             <MenuItem key={template.id} value={template.id} sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
                                                                 {template.name}
                                                             </MenuItem>
                                                         ))}
+                                                        {/* Her zaman mevcut olan Custom Message seçeneği */}
+                                                        <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>
+                                                            Custom Message
+                                                        </MenuItem>
+                                                        {/* Eğer hiç DB şablonu yoksa birkaç basit varsayılan ekle */}
                                                         {emailTemplates.length === 0 && (
                                                             <>
                                                                 <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
-                                                                <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
                                                                 <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
                                                                 <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
                                                                 <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
