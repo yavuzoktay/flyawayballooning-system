@@ -1082,33 +1082,26 @@ const BookingPage = () => {
                 }
             }
 
-            // Validate SMS message - required for both custom and template selections
+            // Validate SMS message - accept Message field OR either personalized note field (popup has two: personalNote and smsPersonalNote)
             const messageValue = smsForm.message || '';
             const trimmedMessage = messageValue.trim();
+            const trimmedSmsNote = (smsPersonalNote || '').trim();
+            const trimmedSharedNote = (personalNote || '').trim();
+            const effectiveSmsMessage = trimmedMessage || trimmedSmsNote || trimmedSharedNote;
             
-            console.log('🔍 SMS Validation - smsForm:', smsForm);
-            console.log('🔍 SMS Validation - messageValue:', JSON.stringify(messageValue), 'length:', messageValue.length);
-            console.log('🔍 SMS Validation - trimmedMessage:', JSON.stringify(trimmedMessage), 'trimmed length:', trimmedMessage.length);
-            
-            if (!messageValue || trimmedMessage.length === 0) {
-                console.error('❌ SMS validation failed - message is empty or only whitespace');
-                alert('SMS message is required. Please enter a custom message or select an SMS template.');
+            if (!effectiveSmsMessage) {
+                console.error('❌ SMS validation failed - message and personal notes are empty or only whitespace');
+                alert('SMS message is required. Please enter a custom message in the Message field, or in the personalized note field below.');
                 return;
             }
             
-            // Update smsForm with trimmed message synchronously to ensure clean state
-            if (messageValue !== trimmedMessage) {
-                console.log('🔧 Trimming SMS message - updating state');
-                // Use functional update to ensure we have the latest state
-                setSmsForm(prev => {
-                    const updated = { ...prev, message: trimmedMessage };
-                    console.log('🔧 Updated smsForm with trimmed message:', updated);
-                    return updated;
-                });
-                // Note: State update is async, but we'll use trimmedMessage directly in the send logic below
+            if (trimmedMessage.length === 0 && (trimmedSmsNote || trimmedSharedNote)) {
+                setSmsForm(prev => ({ ...prev, message: trimmedSmsNote || trimmedSharedNote }));
+            } else if (messageValue !== trimmedMessage) {
+                setSmsForm(prev => ({ ...prev, message: trimmedMessage }));
             }
             
-            console.log('✅ SMS validation passed - message:', trimmedMessage.substring(0, 50) + (trimmedMessage.length > 50 ? '...' : ''));
+            console.log('✅ SMS validation passed - effective message length:', effectiveSmsMessage.length);
         }
 
         setSendingEmail(true);
@@ -1249,12 +1242,14 @@ const BookingPage = () => {
                     // Replace SMS prompts with booking data
                     const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
                     smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
-                } else if (smsForm.message && smsForm.message.trim().length > 0) {
-                    // Custom SMS message - always use trimmed version to avoid whitespace issues
-                    smsMessage = smsForm.message.trim();
+                } else {
+                    // Custom SMS message: use Message field, or if empty use either personalized note (shared personalNote or SMS smsPersonalNote)
+                    const mainPart = (smsForm.message || '').trim() || (smsPersonalNote || '').trim() || (personalNote || '').trim();
+                    smsMessage = mainPart;
                     const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
                     smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
-                } else {
+                }
+                if (!smsMessage) {
                     // Fallback: Convert email template to SMS format (only if email template exists)
                     if (emailForm.message && emailForm.message.trim().length > 0) {
                         const dbTemplate = emailTemplates.find(
@@ -1286,8 +1281,13 @@ const BookingPage = () => {
                 }
                 
                 // Calculate available space for personal note (SMS limit is 1600 characters)
+                // When main message came from Message field, append both note fields; otherwise main already includes user text
                 const SMS_MAX_LENGTH = 1600;
-                const personalNoteText = personalNote ? `\n\n${personalNote}` : '';
+                const hasMainFromMessage = !!(smsForm.message || '').trim();
+                const smsNoteToAppend = hasMainFromMessage
+                    ? [smsPersonalNote, personalNote].map(s => (s || '').trim()).filter(Boolean).join('\n\n')
+                    : '';
+                const personalNoteText = smsNoteToAppend ? `\n\n${smsNoteToAppend}` : '';
                 
                 // If message is too long, truncate it
                 if (smsMessage.length + personalNoteText.length > SMS_MAX_LENGTH) {
@@ -1304,15 +1304,15 @@ const BookingPage = () => {
                     }
                 }
                 
-                // Combine template message with personal note for SMS (if there's space)
+                // Combine main message with SMS personal note (only append if user had main message – otherwise note was already used as message)
                 let finalSmsMessage = smsMessage;
-                if (personalNote) {
-                    const combinedLength = smsMessage.length + personalNote.length + 2; // +2 for \n\n
+                if (smsNoteToAppend) {
+                    const combinedLength = smsMessage.length + smsNoteToAppend.length + 2; // +2 for \n\n
                     if (combinedLength <= SMS_MAX_LENGTH) {
-                        finalSmsMessage = `${smsMessage}\n\n${personalNote}`;
+                        finalSmsMessage = `${smsMessage}\n\n${smsNoteToAppend}`;
                     } else {
                         // Personal note doesn't fit, truncate main message more to make room
-                        const spaceForNote = personalNote.length + 10; // +10 for \n\n and buffer
+                        const spaceForNote = smsNoteToAppend.length + 10; // +10 for \n\n and buffer
                         const maxMainLength = SMS_MAX_LENGTH - spaceForNote;
                         if (maxMainLength > 100) {
                             smsMessage = smsMessage.substring(0, maxMainLength).trim();
@@ -1321,10 +1321,10 @@ const BookingPage = () => {
                             if (lastPeriod > maxMainLength * 0.7) {
                                 smsMessage = smsMessage.substring(0, lastPeriod + 1);
                             }
-                            finalSmsMessage = `${smsMessage}\n\n${personalNote}`;
+                            finalSmsMessage = `${smsMessage}\n\n${smsNoteToAppend}`;
                         } else {
                             // Not enough space, skip personal note
-                            console.warn('⚠️ Personal note too long, skipping to fit SMS limit');
+                            console.warn('⚠️ SMS personal note too long, skipping to fit SMS limit');
                             finalSmsMessage = smsMessage;
                         }
                     }
@@ -11217,11 +11217,22 @@ setBookingDetail(finalVoucherDetail);
                                                 }}>
                                                     {(() => {
                                                         const booking = selectedBookingForEmail || bookingDetail?.booking || {};
-                                                        const messageText = smsForm.message || '';
-                                                        const messageWithPrompts = replaceSmsPrompts(messageText, booking);
-                                                        const finalMessage = smsPersonalNote 
-                                                            ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${smsPersonalNote}`
-                                                            : messageWithPrompts;
+                                                        const rawMessage = smsForm.message || '';
+                                                        const messageWithPrompts = replaceSmsPrompts(rawMessage, booking);
+                                                        const hasMainMessage = !!(messageWithPrompts && messageWithPrompts.trim().length > 0);
+                                                        const trimmedNote = (smsPersonalNote || '').trim();
+
+                                                        let finalMessage = '';
+                                                        if (hasMainMessage) {
+                                                            // If user has a main Message, append optional note once
+                                                            finalMessage = trimmedNote
+                                                                ? `${messageWithPrompts}\n\n${trimmedNote}`
+                                                                : messageWithPrompts;
+                                                        } else {
+                                                            // If no main Message, use only the note (no duplication)
+                                                            finalMessage = trimmedNote || messageWithPrompts;
+                                                        }
+
                                                         return finalMessage || 'Your message will appear here...';
                                                     })()}
                                                 </Box>

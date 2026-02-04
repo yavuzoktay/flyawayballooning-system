@@ -32396,6 +32396,113 @@ function ensureSmsLogsSchema(callback) {
     });
 }
 
+// Send SMS for vouchers (Flight Voucher / Gift Voucher)
+// Reuses the same Twilio configuration as booking SMS, but fetches data from all_vouchers
+app.post('/api/sendVoucherSms', async (req, res) => {
+    try {
+        const { voucherId, to, body, templateId, voucherData } = req.body;
+        if (!to || !body) {
+            return res.status(400).json({ success: false, message: 'to and body required' });
+        }
+
+        // Fetch voucher data to replace placeholders
+        let voucher = voucherData && typeof voucherData === 'object' ? voucherData : {};
+        if (voucherId) {
+            try {
+                const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
+                const [voucherRows] = await con.promise().query(voucherQuery, [voucherId]);
+                if (voucherRows && voucherRows.length > 0) {
+                    const dbVoucher = voucherRows[0];
+                    // Normalise some fields to look like booking for placeholder replacement
+                    voucher = {
+                        ...dbVoucher,
+                        name: dbVoucher.name || dbVoucher.purchaser_name || dbVoucher.recipient_name || '',
+                        email: dbVoucher.email || dbVoucher.purchaser_email || dbVoucher.recipient_email || '',
+                        phone: dbVoucher.phone || dbVoucher.mobile || dbVoucher.purchaser_phone || dbVoucher.recipient_phone || '',
+                        voucher_code: dbVoucher.voucher_ref || dbVoucher.voucher_code || ''
+                    };
+                    console.log('📋 Fetched voucher for SMS:', {
+                        id: voucher.id,
+                        name: voucher.name,
+                        email: voucher.email,
+                        phone: voucher.phone
+                    });
+                } else {
+                    console.warn('⚠️ No voucher found with id:', voucherId);
+                }
+            } catch (err) {
+                console.error('❌ Error fetching voucher data for placeholder replacement:', err.message, err.stack);
+            }
+        } else {
+            console.warn('⚠️ No voucherId provided for SMS placeholder replacement');
+        }
+
+        // Replace placeholders in SMS body
+        const bodyWithPrompts = replaceSmsPrompts(body, voucher);
+        console.log('📝 Voucher SMS body before replacement:', body.substring(0, 100));
+        console.log('📝 Voucher SMS body after replacement:', bodyWithPrompts.substring(0, 100));
+
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+            const missing = [
+                !TWILIO_ACCOUNT_SID ? 'TWILIO_ACCOUNT_SID' : null,
+                !TWILIO_AUTH_TOKEN ? 'TWILIO_AUTH_TOKEN' : null
+            ].filter(Boolean).join(', ');
+            console.error('Twilio not configured. Missing:', missing);
+            return res.status(500).json({ success: false, message: `Twilio not configured: missing ${missing}` });
+        }
+
+        const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+        const createParams = {
+            to,
+            body: bodyWithPrompts,
+            statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+        };
+
+        const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+        const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+
+        console.log('📱 Twilio sender configuration check (voucher):', {
+            hasFromNumber,
+            hasMessagingService,
+            fromNumberValue: TWILIO_FROM_NUMBER,
+            messagingServiceValue: TWILIO_MESSAGING_SERVICE_SID ? 'SET' : 'NOT SET'
+        });
+
+        if (hasMessagingService) {
+            createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+            console.log('📱 Using TWILIO_MESSAGING_SERVICE_SID for voucher SMS:', TWILIO_MESSAGING_SERVICE_SID);
+        } else if (!hasFromNumber) {
+            createParams.from = 'FLYAWAY';
+            console.log('📱 Using FLYAWAY as alphanumeric sender ID (voucher SMS)');
+        } else {
+            createParams.from = TWILIO_FROM_NUMBER.trim();
+            console.log('📱 Using TWILIO_FROM_NUMBER for voucher SMS:', TWILIO_FROM_NUMBER);
+        }
+
+        console.log('📱 Sending voucher SMS via Twilio:', {
+            to,
+            from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
+            bodyLength: body.length
+        });
+
+        const msg = await client.messages.create(createParams);
+
+        ensureSmsLogsSchema(() => {
+            const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+            // Reuse booking_id column to store voucherId for voucher messages
+            con.query(sql, [voucherId || null, to, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
+                if (err) console.error('Error logging voucher sms:', err);
+            });
+        });
+
+        res.json({ success: true, sid: msg.sid, status: msg.status });
+    } catch (e) {
+        console.error('Voucher SMS send error:', e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
 // Send SMS
 // Helper function to replace SMS template placeholders with booking data (plain text, no HTML)
 function replaceSmsPrompts(text = '', booking = {}) {
@@ -33727,6 +33834,18 @@ app.get('/api/bookingSms/:bookingId', (req, res) => {
     ensureSmsLogsSchema(() => {
         const sql = `SELECT * FROM sms_logs WHERE booking_id = ? ORDER BY sent_at DESC`;
         con.query(sql, [bookingId], (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows || [] });
+        });
+    });
+});
+
+// Fetch SMS logs for a voucher (reuses booking_id column to store voucherId)
+app.get('/api/voucherSms/:voucherId', (req, res) => {
+    const { voucherId } = req.params;
+    ensureSmsLogsSchema(() => {
+        const sql = `SELECT * FROM sms_logs WHERE booking_id = ? ORDER BY sent_at DESC`;
+        con.query(sql, [voucherId], (err, rows) => {
             if (err) return res.status(500).json({ success: false, message: err.message });
             res.json({ success: true, data: rows || [] });
         });
