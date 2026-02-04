@@ -32075,6 +32075,137 @@ app.post('/api/sendBookingEmail', async (req, res) => {
     }
 });
 
+// Send voucher email via SendGrid (or SMTP fallback)
+app.post('/api/sendVoucherEmail', async (req, res) => {
+    console.log('POST /api/sendVoucherEmail called');
+    const { voucherId, to, subject, message, template, voucherData } = req.body;
+
+    try {
+        // Validate required fields
+        if (!to || !subject || !message) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: to, subject, and message are required'
+            });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(to)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format'
+            });
+        }
+
+        // Check if SendGrid is configured
+        if (!process.env.SENDGRID_API_KEY) {
+            console.error('SendGrid API key not configured');
+            return res.status(500).json({
+                success: false,
+                message: 'Email service not configured'
+            });
+        }
+
+        const containsHtml = typeof message === 'string' && /<\/?[a-z][\s\S]*>/i.test(message);
+        const sanitizeComments = (input) =>
+            input ? input.replace(/<!--[\s\S]*?-->/g, '') : input;
+        const normalizeHtml = (html) => sanitizeComments(html || '');
+
+        const rawHtml = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
+        const htmlBody = normalizeEmailBodyStyles(rawHtml);
+        const textBody = containsHtml ? convertHtmlToText(htmlBody) : message;
+
+        // Prepare email content
+        // Always use info@flyawayballooning.com as from email address
+        const emailContent = {
+            to: to,
+            from: {
+                email: 'info@flyawayballooning.com',
+                name: 'Fly Away Ballooning'
+            },
+            subject: subject,
+            text: textBody,
+            html: htmlBody,
+            // Add custom tracking
+            custom_args: {
+                voucher_id: voucherId?.toString() || 'unknown',
+                template_type: template || 'custom'
+            }
+        };
+
+        // Send email via SendGrid (with SMTP fallback)
+        console.log(`Sending voucher email to ${to}`);
+        const { provider: emailProvider, messageId } = await sendEmailWithFallback(emailContent, {
+            context: 'send_voucher_email'
+        });
+        console.log(`Voucher email sent to ${to} via ${emailProvider}`);
+
+        // Log email activity for voucher
+        {
+            const logSql = `
+                INSERT INTO email_logs (
+                    booking_id,
+                    recipient_email,
+                    subject,
+                    template_type,
+                    message_html,
+                    message_text,
+                    sent_at,
+                    status,
+                    message_id,
+                    opens,
+                    clicks,
+                    last_event,
+                    last_event_at,
+                    context_type,
+                    context_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
+            `;
+            ensureEmailLogsSchema(() => {
+                const contextType = 'voucher';
+                const contextId = voucherId ? String(voucherId) : (to || '');
+                const bookingIdValue = null; // vouchers are not bookings
+                con.query(logSql, [
+                    bookingIdValue,
+                    to,
+                    subject,
+                    template || 'custom',
+                    htmlBody,
+                    textBody,
+                    messageId,
+                    contextType,
+                    contextId
+                ], (err) => {
+                    if (err) {
+                        console.error('Error logging voucher email activity:', err);
+                    } else {
+                        console.log('Voucher email activity logged successfully');
+                    }
+                });
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Voucher email sent successfully',
+            provider: emailProvider,
+            messageId
+        });
+
+    } catch (error) {
+        console.error('Error sending voucher email:', error);
+
+        const statusCode = error.code && Number(error.code) ? Number(error.code) : 500;
+        res.status(statusCode).json({
+            success: false,
+            message: 'Failed to send email',
+            error: error.response?.body?.errors?.[0]?.message || error.message
+        });
+    }
+});
+
 // Send bulk booking email via SendGrid
 app.post('/api/sendBulkBookingEmail', async (req, res) => {
     console.log('POST /api/sendBulkBookingEmail called');
