@@ -19840,6 +19840,14 @@ app.get('/api/analytics', async (req, res) => {
         return sql;
     };
     // 1. Booking Attempts
+    // Query all bookings from all_booking table (matching the "All Booking" table view)
+    // flight_attempts represents the number of cancellations/reschedules:
+    // - 0 = 1st attempt (no cancellations)
+    // - 1 = 2nd attempt (1 cancellation)
+    // - 2 = 3rd attempt (2 cancellations)
+    // - 3 = 4th attempt (3 cancellations)
+    // - 4 = 5th attempt (4 cancellations)
+    // - 5+ = 6+ attempts (5+ cancellations)
     const attemptsSql = `
         SELECT flight_attempts
         FROM all_booking
@@ -19852,24 +19860,72 @@ app.get('/api/analytics', async (req, res) => {
         const total = rows.length;
         let first = 0, second = 0, third = 0, fourth = 0, fifth = 0, sixthPlus = 0;
         rows.forEach(r => {
-            // Fallback: if flight_attempts is undefined/null, treat as 1
-            const att = Number((r.flight_attempts !== undefined && r.flight_attempts !== null) ? r.flight_attempts : 1);
-            if (att === 1) first++;
-            else if (att === 2) second++;
-            else if (att === 3) third++;
-            else if (att === 4) fourth++;
-            else if (att === 5) fifth++;
-            else sixthPlus++;
+            // Treat null/undefined as 0 (1st attempt)
+            const att = Number((r.flight_attempts !== undefined && r.flight_attempts !== null) ? r.flight_attempts : 0);
+            if (att === 0) first++;
+            else if (att === 1) second++;
+            else if (att === 2) third++;
+            else if (att === 3) fourth++;
+            else if (att === 4) fifth++;
+            else sixthPlus++; // att >= 5
         });
-        const pct = n => total ? Math.round((n / total) * 100) : 0;
-        const bookingAttempts = {
-            first: pct(first),
-            second: pct(second),
-            third: pct(third),
-            fourth: pct(fourth),
-            fifth: pct(fifth),
-            sixthPlus: pct(sixthPlus)
+        // Calculate percentages with proper rounding to ensure sum is 100%
+        const calculatePercentages = (counts, total) => {
+            if (total === 0) {
+                return {
+                    first: 0,
+                    second: 0,
+                    third: 0,
+                    fourth: 0,
+                    fifth: 0,
+                    sixthPlus: 0
+                };
+            }
+            // Calculate raw percentages
+            const raw = {
+                first: (counts.first / total) * 100,
+                second: (counts.second / total) * 100,
+                third: (counts.third / total) * 100,
+                fourth: (counts.fourth / total) * 100,
+                fifth: (counts.fifth / total) * 100,
+                sixthPlus: (counts.sixthPlus / total) * 100
+            };
+            // Round each percentage
+            const rounded = {
+                first: Math.round(raw.first),
+                second: Math.round(raw.second),
+                third: Math.round(raw.third),
+                fourth: Math.round(raw.fourth),
+                fifth: Math.round(raw.fifth),
+                sixthPlus: Math.round(raw.sixthPlus)
+            };
+            // Calculate sum of rounded percentages
+            const sum = rounded.first + rounded.second + rounded.third + rounded.fourth + rounded.fifth + rounded.sixthPlus;
+            // Adjust if sum is not 100% (due to rounding)
+            if (sum !== 100 && total > 0) {
+                // Find the category with the largest fractional part and adjust it
+                const fractionalParts = {
+                    first: raw.first - rounded.first,
+                    second: raw.second - rounded.second,
+                    third: raw.third - rounded.third,
+                    fourth: raw.fourth - rounded.fourth,
+                    fifth: raw.fifth - rounded.fifth,
+                    sixthPlus: raw.sixthPlus - rounded.sixthPlus
+                };
+                // Sort by fractional part (descending) to find which to adjust
+                const sorted = Object.entries(fractionalParts)
+                    .sort((a, b) => b[1] - a[1]);
+                // Adjust the category with largest fractional part
+                const diff = 100 - sum;
+                if (diff > 0) {
+                    rounded[sorted[0][0]] += diff;
+                } else {
+                    rounded[sorted[sorted.length - 1][0]] += diff;
+                }
+            }
+            return rounded;
         };
+        const bookingAttempts = calculatePercentages({ first, second, third, fourth, fifth, sixthPlus }, total);
         // 2. Sales by Source
         // First, find the question_id for "How did you hear about us?" question
         const findQuestionSql = `

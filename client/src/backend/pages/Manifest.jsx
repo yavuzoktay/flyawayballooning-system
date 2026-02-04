@@ -423,6 +423,10 @@ const Manifest = () => {
                 subject = 'Flight update';
                 message = getDefaultTemplateMessageHtml('To Be Updated', previewBooking) || '';
                 break;
+            case 'custom':
+                subject = '🎈 From Fly Away';
+                message = '';
+                break;
             default:
                 subject = groupMessageForm.subject || '';
                 message = getDefaultTemplateMessageHtml(templateName, previewBooking) || groupMessageForm.message || '';
@@ -7543,10 +7547,10 @@ const Manifest = () => {
                                                             {template.name}
                                                         </MenuItem>
                                                     ))}
+                                                    <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
                                                     {emailTemplates.length === 0 && (
                                                         <>
                                                             <MenuItem value="to_be_updated" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>To Be Updated</MenuItem>
-                                                            <MenuItem value="custom" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Custom Message</MenuItem>
                                                             <MenuItem value="confirmation" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Booking Confirmation</MenuItem>
                                                             <MenuItem value="reminder" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Reminder</MenuItem>
                                                             <MenuItem value="reschedule" sx={{ fontSize: isMobile ? 'inherit' : '14px' }}>Flight Rescheduling</MenuItem>
