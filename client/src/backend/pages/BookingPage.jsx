@@ -1594,7 +1594,8 @@ const BookingPage = () => {
         
         // Eğer kullanıcı Custom Message seçtiyse, hazır şablon yerine boş/göreli bir içerik bırak
         if (templateValue === 'custom') {
-            const defaultSubject = emailForm.subject || `Regarding your Fly Away Ballooning booking - ${selectedBookingForEmail?.name || ''}`;
+            // 🎈 From Fly Away
+            const defaultSubject = '🎈 From Fly Away';
             setEmailForm((prev) => ({
                 ...prev,
                 subject: defaultSubject,
