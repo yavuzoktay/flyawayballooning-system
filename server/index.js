@@ -18652,6 +18652,154 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             });
         });
 
+        // === Google Calendar Sync for Customer Portal Reschedule ===
+        try {
+            const existingEventId = booking.google_calendar_event_id;
+            if (existingEventId) {
+                // Normalize new flight date/time and related fields
+                const newFlightDate = dayjs(flight_date);
+                const bookingDateTime = newFlightDate.format('YYYY-MM-DD HH:mm:ss');
+                const newLocation = location || booking.location;
+                const timeSlot = newFlightDate.format('HH:mm:ss');
+                const flightType = booking.flight_type || 'Shared Flight';
+
+                // Recalculate total passenger count for this slot (same logic as createBooking / rebook)
+                const getTotalPassengersSql = `
+                    SELECT SUM(pax) as total_passengers 
+                    FROM all_booking 
+                    WHERE flight_date = ? 
+                      AND location = ? 
+                      AND flight_type = ? 
+                      AND time_slot = ?
+                      AND status != 'Cancelled'
+                `;
+
+                let totalPassengers = booking.pax || 0;
+                try {
+                    const [paxResult] = await con.promise().query(getTotalPassengersSql, [
+                        bookingDateTime,
+                        newLocation,
+                        flightType,
+                        timeSlot || null
+                    ]);
+                    if (paxResult && paxResult.length > 0 && paxResult[0].total_passengers != null) {
+                        totalPassengers = parseInt(paxResult[0].total_passengers, 10);
+                    }
+                } catch (paxErr) {
+                    console.warn('⚠️ Customer Portal Reschedule - Failed to recalculate passenger count for calendar sync:', paxErr.message);
+                }
+
+                try {
+                    await updateCalendarEvent(existingEventId, {
+                        location: newLocation,
+                        flightType: flightType,
+                        passengerCount: totalPassengers,
+                        flightDate: bookingDateTime,
+                        crewMember: null, // crew ataması ayrı akışta yönetiliyor
+                        bookingId: bookingId.toString()
+                    });
+                    console.log('✅ Customer Portal Reschedule - Google Calendar event updated:', existingEventId);
+                } catch (calendarError) {
+                    const errorMessage = 'Error updating Google Calendar event during customer portal reschedule';
+                    const errorDetails = `Booking ID: ${bookingId}, Flight Date: ${bookingDateTime}, Location: ${newLocation}`;
+                    const stackTrace = calendarError.stack || calendarError.message || 'No stack trace';
+                    console.error('❌', errorMessage, calendarError);
+                    saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'customer-portal-reschedule.updateCalendarEvent');
+                    // Calendar hatası reschedule işlemini iptal etmesin
+                }
+            } else {
+                // No existing event ID – attempt best-effort Calendar sync using find/delete + create
+                console.log('ℹ️ Customer Portal Reschedule - No google_calendar_event_id on booking, attempting best-effort Calendar sync');
+
+                // 1) Try to find and delete old event based on previous flight details
+                if (booking.flight_date && booking.location) {
+                    try {
+                        const oldFlightDate = dayjs(booking.flight_date).format('YYYY-MM-DD HH:mm:ss');
+                        const oldFlightType = booking.flight_type || 'Shared Flight';
+                        const oldPassengerCount = booking.pax || 0;
+
+                        await findAndDeleteCalendarEventByDetails({
+                            location: booking.location,
+                            flightType: oldFlightType,
+                            passengerCount: oldPassengerCount,
+                            flightDate: oldFlightDate,
+                            bookingId
+                        });
+                    } catch (findErr) {
+                        console.warn('⚠️ Customer Portal Reschedule - Could not find/delete old calendar event:', findErr.message);
+                    }
+                }
+
+                // 2) Create a new event for the rescheduled slot (similar to createBooking flow)
+                try {
+                    const newFlightDate = dayjs(flight_date);
+                    const bookingDateTime = newFlightDate.format('YYYY-MM-DD HH:mm:ss');
+                    const newLocation = location || booking.location;
+                    const timeSlot = newFlightDate.format('HH:mm:ss');
+                    const flightType = booking.flight_type || 'Shared Flight';
+
+                    // Recalculate total passenger count for this slot
+                    const getTotalPassengersSql = `
+                        SELECT SUM(pax) as total_passengers 
+                        FROM all_booking 
+                        WHERE flight_date = ? 
+                          AND location = ? 
+                          AND flight_type = ? 
+                          AND time_slot = ?
+                          AND status != 'Cancelled'
+                    `;
+
+                    let totalPassengers = booking.pax || 0;
+                    try {
+                        const [paxResult] = await con.promise().query(getTotalPassengersSql, [
+                            bookingDateTime,
+                            newLocation,
+                            flightType,
+                            timeSlot || null
+                        ]);
+                        if (paxResult && paxResult.length > 0 && paxResult[0].total_passengers != null) {
+                            totalPassengers = parseInt(paxResult[0].total_passengers, 10);
+                        }
+                    } catch (paxErr) {
+                        console.warn('⚠️ Customer Portal Reschedule - Failed to recalculate passenger count for new calendar event:', paxErr.message);
+                    }
+
+                    const eventId = await createCalendarEvent({
+                        location: newLocation,
+                        flightType: flightType,
+                        passengerCount: totalPassengers,
+                        flightDate: bookingDateTime,
+                        crewMember: null,
+                        pilotMember: null,
+                        bookingId: bookingId.toString()
+                    });
+
+                    if (eventId) {
+                        // Save new event ID back to booking for future syncs
+                        con.query(
+                            'UPDATE all_booking SET google_calendar_event_id = ? WHERE id = ?',
+                            [eventId, bookingId],
+                            (updateErr) => {
+                                if (updateErr) {
+                                    console.error('❌ Error updating booking with new Google Calendar event ID during customer portal reschedule:', updateErr);
+                                } else {
+                                    console.log('✅ Customer Portal Reschedule - New Google Calendar event created and ID saved:', eventId);
+                                }
+                            }
+                        );
+                    }
+                } catch (createErr) {
+                    const errorMessage = 'Error creating Google Calendar event during customer portal reschedule (no existing event ID)';
+                    const errorDetails = `Booking ID: ${bookingId}, New flight_date: ${flight_date}, Location: ${location || booking.location}`;
+                    const stackTrace = createErr.stack || createErr.message || 'No stack trace';
+                    console.error('❌', errorMessage, createErr);
+                    saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'customer-portal-reschedule.createCalendarEvent');
+                }
+            }
+        } catch (calendarOuterErr) {
+            console.warn('⚠️ Customer Portal Reschedule - Calendar sync outer error:', calendarOuterErr.message);
+        }
+
         // Add history entry for reschedule
         const historySql = `
             INSERT INTO booking_status_history (booking_id, status, changed_at, notes)

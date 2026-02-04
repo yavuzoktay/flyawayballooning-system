@@ -875,11 +875,17 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         setConfirmDialogOpen(false);
         setSubmitting(true);
         try {
-            // Check if this is a Flight Voucher with voucher_ref (should use redeem flow)
+            // Check if this is a Flight Voucher with voucher_ref AND it has NOT already been redeemed
             const voucherRef = bookingData?.voucher_ref || bookingData?.voucher_code;
+            const isVoucherRedeemed =
+                bookingData?.is_voucher_redeemed === true ||
+                bookingData?.is_voucher_redeemed === 1 ||
+                bookingData?.redeemed_voucher === 'Yes' ||
+                bookingData?.redeemed_voucher === 1;
             const isFlightVoucherWithVoucherCode = isFlightVoucher && voucherRef;
+            const shouldUseRedeemFlow = isFlightVoucherWithVoucherCode && !isVoucherRedeemed;
 
-            if (isFlightVoucherWithVoucherCode) {
+            if (shouldUseRedeemFlow) {
                 // Use createRedeemBooking endpoint for Flight Voucher reschedule (redeem flow)
                 console.log('🔄 Flight Voucher reschedule - Using redeem booking flow');
                 console.log('Voucher Ref:', voucherRef);
