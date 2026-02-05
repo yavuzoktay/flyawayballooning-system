@@ -30755,7 +30755,7 @@ function generateGiftVoucherConfirmationEmail(voucher, template = null) {
     });
 }
 
-async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delayHours = 24) {
+async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delayHours = 48) {
     try {
         if (!process.env.SENDGRID_API_KEY) {
             console.warn('⚠️ [scheduleReceivedGiftVoucherEmail] SendGrid API key not configured, skipping scheduled email.');
