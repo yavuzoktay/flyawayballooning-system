@@ -20126,13 +20126,20 @@ app.get('/api/analytics', async (req, res) => {
                                     const locationDataMap = {};
 
                                     // 1. Get from all_booking table
+                                    // IMPORTANT:
+                                    // A voucher purchase (all_vouchers) that later becomes a booking (all_booking)
+                                    // would otherwise be counted twice (once in bookings, once in vouchers).
+                                    // To avoid double-counting, exclude bookings that are linked to an existing voucher_ref.
                                     const bookingLocSql = `
-                        SELECT location, COUNT(*) as count
-                        FROM all_booking
-                                        WHERE flight_date IS NOT NULL AND status IN ('Flown', 'Confirmed', 'Scheduled')
-                                        AND location IS NOT NULL AND location != ''
-                                        ${dateFilter()}
-                        GROUP BY location
+                        SELECT ab.location, COUNT(*) as count
+                        FROM all_booking ab
+                        LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                        WHERE ab.flight_date IS NOT NULL
+                          AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
+                          AND ab.location IS NOT NULL AND ab.location != ''
+                          AND v.id IS NULL
+                          ${dateFilter('ab.flight_date')}
+                        GROUP BY ab.location
                     `;
 
                                     con.query(bookingLocSql, [], (errBookingLoc, bookingLocRows) => {
@@ -20296,13 +20303,22 @@ app.get('/api/analytics', async (req, res) => {
                                                                 value
                                                             })).sort((a, b) => b.value - a.value);
                                                             // 9. Refundable Liability
-                                                            // Rules:
+                                                            // Goal:
+                                                            // - Show the total *weather refundable* price (WX add-on)
+                                                            //   for bookings/vouchers that are still refundable.
+                                                            // Rules for bookings:
                                                             // - Booking has NOT been marked as Flown
                                                             // - Booking has NOT expired (expires is null or in the future)
-                                                            // - Booking was purchased with the Refundable add-on (WX)
+                                                            // - Booking has a non-zero weather_refund_total_price OR
+                                                            //   has the WX add-on in choose_add_on
                                                             // We also continue to respect the analytics date filter, applied on the expires column
                                                             const refundableSql = `
-                                        SELECT choose_add_on, paid, status, expires
+                                        SELECT 
+                                            COALESCE(weather_refund_total_price, 0) AS weather_refund_total_price,
+                                            choose_add_on,
+                                            paid,
+                                            status,
+                                            expires
                                         FROM all_booking
                                         WHERE paid IS NOT NULL
                                           AND paid > 0
@@ -20313,26 +20329,51 @@ app.get('/api/analytics', async (req, res) => {
                                                             con.query(refundableSql, [], (err9, refRows) => {
                                                                 if (err9) return res.status(500).json({ error: 'Failed to fetch refundable liability' });
                                                                 let refundableLiability = 0;
+
                                                                 refRows.forEach(row => {
                                                                     try {
-                                                                        if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
-                                                                        let arr = [];
-                                                                        try {
-                                                                            if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
-                                                                                arr = JSON.parse(row.choose_add_on);
-                                                                            }
-                                                                        } catch (e) {
-                                                                            console.error('Refundable JSON parse error:', e);
-                                                                            arr = [];
-                                                                        }
-                                                                        if (Array.isArray(arr)) {
-                                                                            arr.forEach(a => {
-                                                                                if (a.name && a.name.toLowerCase().includes('wx')) {
-                                                                                    refundableLiability += Number(row.paid) - (Number(a.price) || 47.5);
+                                                                        // Primary source: dedicated weather_refund_total_price column
+                                                                        let rowLiability = Number(row.weather_refund_total_price) || 0;
+
+                                                                        // Fallback for legacy data where weather_refund_total_price is 0
+                                                                        // but WX information lives in choose_add_on
+                                                                        if (rowLiability === 0 && row.choose_add_on && typeof row.choose_add_on === 'string' && row.choose_add_on.trim() !== '') {
+                                                                            let wxTotal = 0;
+                                                                            let parsed = null;
+                                                                            const trimmed = row.choose_add_on.trim();
+
+                                                                            // Newer records may store JSON array of add-ons
+                                                                            if (trimmed.startsWith('[')) {
+                                                                                try {
+                                                                                    parsed = JSON.parse(trimmed);
+                                                                                } catch (e) {
+                                                                                    console.error('Refundable JSON parse error (booking JSON):', e);
                                                                                 }
-                                                                            });
+                                                                            }
+
+                                                                            if (Array.isArray(parsed)) {
+                                                                                parsed.forEach(a => {
+                                                                                    if (!a || !a.name) return;
+                                                                                    if (a.name.toLowerCase().includes('wx')) {
+                                                                                        const price = Number(a.price) || 47.5;
+                                                                                        wxTotal += price;
+                                                                                    }
+                                                                                });
+                                                                            } else {
+                                                                                // Very old records may only have a plain string like "WX Refundable"
+                                                                                if (trimmed.toLowerCase().includes('wx')) {
+                                                                                    // Use legacy default per-booking WX price if we can't see the exact value
+                                                                                    wxTotal += 47.5;
+                                                                                }
+                                                                            }
+
+                                                                            rowLiability += wxTotal;
                                                                         }
-                                                                    } catch (e) { console.error('Refundable JSON parse error:', e); }
+
+                                                                        refundableLiability += rowLiability;
+                                                                    } catch (e) {
+                                                                        console.error('Refundable liability calculation error:', e);
+                                                                    }
                                                                 });
                                                                 // 10. Flown Flights by Location (only after manifest date and not cancelled)
                                                                 const flownSql = `

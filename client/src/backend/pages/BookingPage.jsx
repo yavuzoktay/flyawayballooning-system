@@ -6694,12 +6694,14 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : (
                                                             <>
                                                                 {(() => {
-                                                                    // For Gift Voucher, use recipient_email; for Flight Voucher, use email
+                                                                    // For Gift Voucher Details popup, the Email field should show
+                                                                    // the purchaser contact email coming from getAllVoucherData.email.
+                                                                    // For Flight Vouchers, keep using v.email.
                                                                     const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
-                                                                    const emailValue = isGiftVoucher 
-                                                                        ? (v.recipient_email || v.email || '-')
+                                                                    const emailValue = isGiftVoucher
+                                                                        ? (v.email || v.purchaser_email || '-')
                                                                         : (v.email || '-');
-                                                                    // If email exists and is not '-', make it a clickable link
+                                                                    // If email exists and is not '-', make it a clickable mailto link
                                                                     if (emailValue && emailValue !== '-') {
                                                                         return (
                                                                             <a 
