@@ -3623,6 +3623,126 @@ const BACKEND_PUBLIC_URL = process.env.BACKEND_PUBLIC_URL || process.env.API_BAS
 const MERCHANT_FEED_CACHE_TTL_MS = 10 * 60 * 1000;
 let merchantFeedCache = { xml: null, at: 0 };
 
+function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
+    const activitiesByLocation = {};
+    (activityRows || []).forEach((row) => {
+        const loc = (row.location || '').trim();
+        if (!loc || activitiesByLocation[loc]) return;
+        activitiesByLocation[loc] = row;
+    });
+    const locations = Object.keys(activitiesByLocation);
+    const defaultPrivatePrices = { 'Private Charter': 900, 'Proposal Flight': 1000 };
+    const resolvePrivatePriceForLocation = (vt, privateCharterPricingMap) => {
+        let p = parseFloat(vt.price_per_person);
+        if (!Number.isNaN(p) && p > 0) return p;
+        const title = (vt.title || '').trim();
+        const norm = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+        let val = privateCharterPricingMap[title] ?? privateCharterPricingMap[vt.title];
+        if (val == null && typeof privateCharterPricingMap === 'object') {
+            for (const k of Object.keys(privateCharterPricingMap)) {
+                if (norm(k) === norm(title)) { val = privateCharterPricingMap[k]; break; }
+            }
+        }
+        if (val != null && val !== '') {
+            if (typeof val === 'object') {
+                const tier = val['2'] ?? val['3'] ?? val['4'] ?? val['8'];
+                const parsed = parseFloat(tier);
+                if (!Number.isNaN(parsed)) return parsed;
+            } else {
+                const parsed = parseFloat(val);
+                if (!Number.isNaN(parsed)) return parsed;
+            }
+        }
+        for (const [k, v] of Object.entries(defaultPrivatePrices)) {
+            if (norm(k) === norm(title)) return v;
+        }
+        return 0;
+    };
+    const escapeXml = (s) => {
+        if (s == null || s === undefined) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    };
+    const toItem = (item, flightType, price, locationName) => {
+        const title = (item.title || 'Balloon Flight').trim();
+        const priceNum = parseFloat(price) || 0;
+        if (!priceNum || priceNum <= 0) return null;
+        const displayTitle = locationName ? `${locationName} ${title}` : title;
+        const id = `${flightType}-${displayTitle}`.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        let link = `${BOOK_SITE_BASE_URL}/?startAt=voucher-type&voucherTitle=${encodeURIComponent(title)}`;
+        if (locationName) link += `&location=${encodeURIComponent(locationName)}`;
+        let imageLink = (item.image_url || '').trim();
+        if (imageLink && !imageLink.startsWith('http')) {
+            imageLink = imageLink.startsWith('/') ? `${BACKEND_PUBLIC_URL}${imageLink}` : `${BACKEND_PUBLIC_URL}/${imageLink}`;
+        }
+        if (!imageLink) imageLink = `${BOOK_SITE_BASE_URL}/favicon.ico`;
+        const desc = (item.description || 'Hot air balloon flight experience with Fly Away Ballooning.').trim().substring(0, 500);
+        return { id, title: `${displayTitle} - ${flightType} - Fly Away Ballooning`, description: desc, link, image_link: imageLink, price: `${priceNum.toFixed(2)} GBP` };
+    };
+    const sharedProcessed = [];
+    (locations.length ? locations : [null]).forEach((loc) => {
+        const act = loc ? activitiesByLocation[loc] : null;
+        (sharedRows || []).forEach((vt) => {
+            let p = act ? null : vt.price_per_person;
+            if (act) {
+                if (vt.title === 'Weekday Morning') p = act.weekday_morning_price;
+                else if (vt.title === 'Flexible Weekday') p = act.flexible_weekday_price;
+                else if (vt.title === 'Any Day Flight') p = act.any_day_flight_price;
+                if (p == null) p = vt.price_per_person;
+            }
+            const item = toItem(vt, 'Shared Flight', p, loc || null);
+            if (item) sharedProcessed.push(item);
+        });
+    });
+    const privateProcessed = [];
+    (locations.length ? locations : [null]).forEach((loc) => {
+        let privateCharterPricingMap = {};
+        if (loc && activitiesByLocation[loc] && activitiesByLocation[loc].private_charter_pricing) {
+            try {
+                const raw = activitiesByLocation[loc].private_charter_pricing;
+                privateCharterPricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+            } catch (e) {}
+        }
+        (privateRows || []).forEach((vt) => {
+            const price = resolvePrivatePriceForLocation(vt, privateCharterPricingMap);
+            const item = toItem(vt, 'Private Charter', price, loc || null);
+            if (item) privateProcessed.push(item);
+        });
+    });
+    const items = [...sharedProcessed, ...privateProcessed];
+    const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
+    const channelLink = BOOK_SITE_BASE_URL;
+    const channelDesc = 'Hot air balloon flight vouchers and experiences - Shared Flight and Private Charter. Book at flyawayballooning-book.com';
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n<channel>\n';
+    xml += `<title>${escapeXml(channelTitle)}</title>\n<link>${escapeXml(channelLink)}</link>\n<description>${escapeXml(channelDesc)}</description>\n`;
+    for (const it of items) {
+        xml += `<item>\n  <g:id>${escapeXml(it.id)}</g:id>\n  <g:title>${escapeXml(it.title)}</g:title>\n  <g:description>${escapeXml(it.description)}</g:description>\n  <g:link>${escapeXml(it.link)}</g:link>\n  <g:image_link>${escapeXml(it.image_link)}</g:image_link>\n  <g:condition>new</g:condition>\n  <g:availability>in stock</g:availability>\n  <g:price>${escapeXml(it.price)}</g:price>\n  <g:brand>Fly Away Ballooning</g:brand>\n</item>\n`;
+    }
+    xml += '</channel>\n</rss>';
+    return xml;
+}
+
+function fetchMerchantFeed(callback) {
+    const sqlShared = `SELECT id, title, description, image_url, price_per_person FROM voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
+    const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
+    const sqlActivities = `SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY location ASC, id ASC`;
+    let pending = 3;
+    const results = { shared: null, private: null, activities: null };
+    let firstError = null;
+    const done = () => {
+        if (--pending !== 0) return;
+        if (firstError) return callback(firstError);
+        try {
+            const xml = buildMerchantFeedXml(results.shared, results.private, results.activities);
+            callback(null, xml);
+        } catch (e) {
+            callback(e);
+        }
+    };
+    con.query(sqlShared, [], (err, rows) => { if (err) firstError = err; else results.shared = rows; done(); });
+    con.query(sqlPrivate, [], (err, rows) => { if (err) firstError = err; else results.private = rows; done(); });
+    con.query(sqlActivities, [], (err, rows) => { if (err) firstError = err; else results.activities = rows; done(); });
+}
+
 const serveMerchantCenterFeed = (req, res) => {
     const setCorsForFeed = () => {
         setCorsHeaders(req, res);
@@ -3632,156 +3752,11 @@ const serveMerchantCenterFeed = (req, res) => {
         setCorsForFeed();
         return res.send(merchantFeedCache.xml);
     }
-    const sqlShared = `SELECT id, title, description, image_url, price_per_person FROM voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
-    const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
-    const sqlActivities = `SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY location ASC, id ASC`;
-    con.query(sqlShared, [], (errShared, sharedRows) => {
-        if (errShared) {
-            setCorsForFeed();
-            return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
-        }
-        con.query(sqlPrivate, [], (errPrivate, privateRows) => {
-            if (errPrivate) {
-                setCorsForFeed();
-                return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
-            }
-            con.query(sqlActivities, [], (errAct, activityRows) => {
-                setCorsForFeed();
-                if (errAct) {
-                    return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
-                }
-                const locationSlug = (loc) => (loc || '').toString().trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'location';
-                const activitiesByLocation = {};
-                (activityRows || []).forEach((row) => {
-                    const loc = (row.location || '').trim();
-                    if (!loc || activitiesByLocation[loc]) return;
-                    activitiesByLocation[loc] = row;
-                });
-                const locations = Object.keys(activitiesByLocation);
-                const defaultPrivatePrices = { 'Private Charter': 900, 'Proposal Flight': 1000 };
-                const resolvePrivatePriceForLocation = (vt, privateCharterPricingMap) => {
-                    let p = parseFloat(vt.price_per_person);
-                    if (!Number.isNaN(p) && p > 0) return p;
-                    const title = (vt.title || '').trim();
-                    const norm = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
-                    let val = privateCharterPricingMap[title] ?? privateCharterPricingMap[vt.title];
-                    if (val == null && typeof privateCharterPricingMap === 'object') {
-                        for (const k of Object.keys(privateCharterPricingMap)) {
-                            if (norm(k) === norm(title)) {
-                                val = privateCharterPricingMap[k];
-                                break;
-                            }
-                        }
-                    }
-                    if (val != null && val !== '') {
-                        if (typeof val === 'object') {
-                            const tier = val['2'] ?? val['3'] ?? val['4'] ?? val['8'];
-                            const parsed = parseFloat(tier);
-                            if (!Number.isNaN(parsed)) return parsed;
-                        } else {
-                            const parsed = parseFloat(val);
-                            if (!Number.isNaN(parsed)) return parsed;
-                        }
-                    }
-                    for (const [k, v] of Object.entries(defaultPrivatePrices)) {
-                        if (norm(k) === norm(title)) return v;
-                    }
-                    return 0;
-                };
-            const escapeXml = (s) => {
-                if (s == null || s === undefined) return '';
-                const str = String(s);
-                return str
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&apos;');
-            };
-            const toItem = (item, flightType, price, locationName) => {
-                const title = (item.title || 'Balloon Flight').trim();
-                const priceNum = parseFloat(price) || 0;
-                if (!priceNum || priceNum <= 0) return null;
-                const displayTitle = locationName ? `${locationName} ${title}` : title;
-                const idBase = `${flightType}-${displayTitle}`.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-                const id = locationName ? `${idBase}` : idBase;
-                let link = `${BOOK_SITE_BASE_URL}/?startAt=voucher-type&voucherTitle=${encodeURIComponent(title)}`;
-                if (locationName) link += `&location=${encodeURIComponent(locationName)}`;
-                let imageLink = (item.image_url || '').trim();
-                if (imageLink && !imageLink.startsWith('http')) {
-                    imageLink = imageLink.startsWith('/') ? `${BACKEND_PUBLIC_URL}${imageLink}` : `${BACKEND_PUBLIC_URL}/${imageLink}`;
-                }
-                if (!imageLink) imageLink = `${BOOK_SITE_BASE_URL}/favicon.ico`;
-                const desc = (item.description || 'Hot air balloon flight experience with Fly Away Ballooning.').trim().substring(0, 500);
-                return {
-                    id,
-                    title: `${displayTitle} - ${flightType} - Fly Away Ballooning`,
-                    description: desc,
-                    link,
-                    image_link: imageLink,
-                    price: `${priceNum.toFixed(2)} GBP`
-                };
-            };
-            const sharedProcessed = [];
-            (locations.length ? locations : [null]).forEach((loc) => {
-                const act = loc ? activitiesByLocation[loc] : null;
-                (sharedRows || []).forEach((vt) => {
-                    let p = act ? null : vt.price_per_person;
-                    if (act) {
-                        if (vt.title === 'Weekday Morning') p = act.weekday_morning_price;
-                        else if (vt.title === 'Flexible Weekday') p = act.flexible_weekday_price;
-                        else if (vt.title === 'Any Day Flight') p = act.any_day_flight_price;
-                        if (p == null) p = vt.price_per_person;
-                    }
-                    const item = toItem(vt, 'Shared Flight', p, loc || null);
-                    if (item) sharedProcessed.push(item);
-                });
-            });
-            const privateProcessed = [];
-            (locations.length ? locations : [null]).forEach((loc) => {
-                let privateCharterPricingMap = {};
-                if (loc && activitiesByLocation[loc] && activitiesByLocation[loc].private_charter_pricing) {
-                    try {
-                        const raw = activitiesByLocation[loc].private_charter_pricing;
-                        privateCharterPricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
-                    } catch (e) {
-                        privateCharterPricingMap = {};
-                    }
-                }
-                (privateRows || []).forEach((vt) => {
-                    const price = resolvePrivatePriceForLocation(vt, privateCharterPricingMap);
-                    const item = toItem(vt, 'Private Charter', price, loc || null);
-                    if (item) privateProcessed.push(item);
-                });
-            });
-            const items = [...sharedProcessed, ...privateProcessed];
-            const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
-            const channelLink = BOOK_SITE_BASE_URL;
-            const channelDesc = 'Hot air balloon flight vouchers and experiences - Shared Flight and Private Charter. Book at flyawayballooning-book.com';
-            let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-            xml += '<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n';
-            xml += '<channel>\n';
-            xml += `<title>${escapeXml(channelTitle)}</title>\n`;
-            xml += `<link>${escapeXml(channelLink)}</link>\n`;
-            xml += `<description>${escapeXml(channelDesc)}</description>\n`;
-            for (const it of items) {
-                xml += '<item>\n';
-                xml += `  <g:id>${escapeXml(it.id)}</g:id>\n`;
-                xml += `  <g:title>${escapeXml(it.title)}</g:title>\n`;
-                xml += `  <g:description>${escapeXml(it.description)}</g:description>\n`;
-                xml += `  <g:link>${escapeXml(it.link)}</g:link>\n`;
-                xml += `  <g:image_link>${escapeXml(it.image_link)}</g:image_link>\n`;
-                xml += '  <g:condition>new</g:condition>\n';
-                xml += '  <g:availability>in stock</g:availability>\n';
-                xml += `  <g:price>${escapeXml(it.price)}</g:price>\n`;
-                xml += '  <g:brand>Fly Away Ballooning</g:brand>\n';
-                xml += '</item>\n';
-            }
-            xml += '</channel>\n</rss>';
-            merchantFeedCache = { xml, at: Date.now() };
-            res.send(xml);
-            });
-        });
+    fetchMerchantFeed((err, xml) => {
+        setCorsForFeed();
+        if (err) return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
+        merchantFeedCache = { xml, at: Date.now() };
+        res.send(xml);
     });
 };
 
@@ -24230,6 +24205,18 @@ app.listen(PORT, '0.0.0.0', () => {
     setTimeout(() => {
         cleanupCancelledCalendarEventsOnStartup();
     }, 5000); // 5 second delay
+
+    // Pre-warm Merchant Center feed cache so first request does not hit DB (avoids 504)
+    setTimeout(() => {
+        if (typeof fetchMerchantFeed === 'function') {
+            fetchMerchantFeed((err, xml) => {
+                if (!err && xml) {
+                    merchantFeedCache = { xml, at: Date.now() };
+                    console.log('Merchant Center feed cache warmed successfully');
+                }
+            });
+        }
+    }, 8000);
 
     // Set up periodic updates every 5 minutes (maintenance only)
     setInterval(updateAvailabilityStatus, 5 * 60 * 1000);
