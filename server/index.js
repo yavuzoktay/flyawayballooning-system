@@ -3620,11 +3620,18 @@ app.get('/api/voucher-types', (req, res) => {
 const BOOK_SITE_BASE_URL = process.env.BOOK_SITE_BASE_URL || 'https://flyawayballooning-book.com';
 const BACKEND_PUBLIC_URL = process.env.BACKEND_PUBLIC_URL || process.env.API_BASE_URL || 'https://flyawayballooning-system.com';
 
+const MERCHANT_FEED_CACHE_TTL_MS = 10 * 60 * 1000;
+let merchantFeedCache = { xml: null, at: 0 };
+
 const serveMerchantCenterFeed = (req, res) => {
     const setCorsForFeed = () => {
         setCorsHeaders(req, res);
         res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
     };
+    if (merchantFeedCache.xml && (Date.now() - merchantFeedCache.at) < MERCHANT_FEED_CACHE_TTL_MS) {
+        setCorsForFeed();
+        return res.send(merchantFeedCache.xml);
+    }
     const sqlShared = `SELECT id, title, description, image_url, price_per_person FROM voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
     const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
     const sqlActivities = `SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY location ASC, id ASC`;
@@ -3771,6 +3778,7 @@ const serveMerchantCenterFeed = (req, res) => {
                 xml += '</item>\n';
             }
             xml += '</channel>\n</rss>';
+            merchantFeedCache = { xml, at: Date.now() };
             res.send(xml);
             });
         });
