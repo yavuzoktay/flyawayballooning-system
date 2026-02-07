@@ -3623,6 +3623,17 @@ const BACKEND_PUBLIC_URL = process.env.BACKEND_PUBLIC_URL || process.env.API_BAS
 const MERCHANT_FEED_CACHE_TTL_MS = 10 * 60 * 1000;
 let merchantFeedCache = { xml: null, at: 0 };
 
+function getEmptyMerchantFeedXml() {
+    const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
+    const channelLink = BOOK_SITE_BASE_URL;
+    const channelDesc = 'Hot air balloon flight vouchers and experiences - Shared Flight and Private Charter. Book at flyawayballooning-book.com';
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n<channel>\n' +
+        '<title>' + (channelTitle || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</title>\n' +
+        '<link>' + (channelLink || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</link>\n' +
+        '<description>' + (channelDesc || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</description>\n' +
+        '</channel>\n</rss>';
+}
+
 function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
     const activitiesByLocation = {};
     (activityRows || []).forEach((row) => {
@@ -3727,7 +3738,7 @@ function fetchMerchantFeed(callback) {
         try {
             callback(null, buildMerchantFeedXml([], [], []));
         } catch (e) {
-            callback(e);
+            callback(null, getEmptyMerchantFeedXml());
         }
         return;
     }
@@ -3738,13 +3749,14 @@ function fetchMerchantFeed(callback) {
     const results = { shared: [], private: [], activities: [] };
     const done = () => {
         if (--pending !== 0) return;
+        let xml;
         try {
-            const xml = buildMerchantFeedXml(results.shared, results.private, results.activities);
-            callback(null, xml);
+            xml = buildMerchantFeedXml(results.shared, results.private, results.activities);
         } catch (e) {
-            console.error('Merchant feed build error:', e);
-            callback(e);
+            console.error('Merchant feed build error:', e && e.message ? e.message : e);
+            xml = getEmptyMerchantFeedXml();
         }
+        callback(null, xml);
     };
     con.query(sqlShared, [], (err, rows) => {
         if (err) {
@@ -3786,9 +3798,9 @@ const serveMerchantCenterFeed = (req, res) => {
     }
     fetchMerchantFeed((err, xml) => {
         setCorsForFeed();
-        if (err) return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
-        merchantFeedCache = { xml, at: Date.now() };
-        res.send(xml);
+        const body = xml || getEmptyMerchantFeedXml();
+        if (!err) merchantFeedCache = { xml: body, at: Date.now() };
+        res.status(200).send(body);
     });
 };
 
