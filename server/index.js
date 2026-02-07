@@ -2535,59 +2535,98 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     }
                     
                     // Also link the REDEEMED voucher code to the booking via voucher_code_usage table
-                    // This allows getBookingDetail to easily find the original redeemed voucher code
+                    // This allows getBookingDetail to show the correct "Redeemed Voucher: Yes GATORAL33" (Gift/Flight voucher ref)
                     if (cleanVoucherCode && cleanVoucherCode.trim() && bookingId) {
-                        // First, get the voucher_code_id from voucher_codes table for the redeemed voucher code
+                        const linkRedeemedCode = (redeemedVoucherCodeId) => {
+                            const customerEmail = passengerData && passengerData[0] && passengerData[0].email ? passengerData[0].email : null;
+                            const checkUsageSql = 'SELECT id FROM voucher_code_usage WHERE booking_id = ? AND voucher_code_id = ?';
+                            con.query(checkUsageSql, [bookingId, redeemedVoucherCodeId], (checkErr, checkRows) => {
+                                if (checkErr) {
+                                    console.error('Error checking existing voucher_code_usage for redeemed voucher:', checkErr);
+                                    return;
+                                }
+                                if (!checkRows || checkRows.length === 0) {
+                                    const redeemedUsageSql = `
+                                        INSERT INTO voucher_code_usage (
+                                            voucher_code_id, booking_id, customer_email,
+                                            discount_applied, original_amount, final_amount
+                                        ) VALUES (?, ?, ?, ?, ?, ?)
+                                    `;
+                                    const redeemedUsageValues = [
+                                        redeemedVoucherCodeId,
+                                        bookingId,
+                                        customerEmail || 'unknown@example.com',
+                                        0,
+                                        paidAmount || 0,
+                                        paidAmount || 0
+                                    ];
+                                    con.query(redeemedUsageSql, redeemedUsageValues, (redeemedUsageErr) => {
+                                        if (redeemedUsageErr) {
+                                            console.error('Error linking redeemed voucher code to booking via voucher_code_usage:', redeemedUsageErr);
+                                        } else {
+                                            console.log('✅ Redeemed voucher code linked to booking via voucher_code_usage:', cleanVoucherCode.trim());
+                                        }
+                                    });
+                                }
+                            });
+                        };
+                        // First try voucher_codes (case-insensitive)
                         con.query(
-                            'SELECT id FROM voucher_codes WHERE code = ?',
+                            'SELECT id FROM voucher_codes WHERE UPPER(code) = UPPER(?) LIMIT 1',
                             [cleanVoucherCode.trim()],
                             (redeemedVoucherCodeErr, redeemedVoucherCodeRows) => {
                                 if (redeemedVoucherCodeErr) {
                                     console.error('Error finding voucher_code_id for redeemed voucher code:', redeemedVoucherCodeErr);
                                     return;
                                 }
-                                
                                 if (redeemedVoucherCodeRows && redeemedVoucherCodeRows.length > 0) {
-                                    const redeemedVoucherCodeId = redeemedVoucherCodeRows[0].id;
-                                    const customerEmail = passengerData && passengerData[0] && passengerData[0].email ? passengerData[0].email : null;
-                                    
-                                    // Insert into voucher_code_usage to link the redeemed voucher code with the booking
-                                    // Use a different approach: check if already exists to avoid duplicates
-                                    const checkUsageSql = 'SELECT id FROM voucher_code_usage WHERE booking_id = ? AND voucher_code_id = ?';
-                                    con.query(checkUsageSql, [bookingId, redeemedVoucherCodeId], (checkErr, checkRows) => {
-                                        if (checkErr) {
-                                            console.error('Error checking existing voucher_code_usage for redeemed voucher:', checkErr);
+                                    linkRedeemedCode(redeemedVoucherCodeRows[0].id);
+                                    return;
+                                }
+                                // Gift vouchers may exist only in all_vouchers.voucher_ref; ensure we have a voucher_codes row and link it
+                                con.query(
+                                    'SELECT voucher_ref, paid FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?) LIMIT 1',
+                                    [cleanVoucherCode.trim()],
+                                    (avErr, avRows) => {
+                                        if (avErr || !avRows || avRows.length === 0) {
+                                            console.warn('⚠️ Redeemed voucher code not found in voucher_codes or all_vouchers:', cleanVoucherCode.trim());
                                             return;
                                         }
-                                        
-                                        if (!checkRows || checkRows.length === 0) {
-                                            const redeemedUsageSql = `
-                                                INSERT INTO voucher_code_usage (
-                                                    voucher_code_id, booking_id, customer_email,
-                                                    discount_applied, original_amount, final_amount
-                                                ) VALUES (?, ?, ?, ?, ?, ?)
-                                            `;
-                                            const redeemedUsageValues = [
-                                                redeemedVoucherCodeId,
-                                                bookingId,
-                                                customerEmail || 'unknown@example.com',
-                                                0, // discount_applied (no discount for redeem voucher)
-                                                paidAmount || 0, // original_amount
-                                                paidAmount || 0  // final_amount (same as original for redeem voucher)
-                                            ];
-                                            
-                                            con.query(redeemedUsageSql, redeemedUsageValues, (redeemedUsageErr) => {
-                                                if (redeemedUsageErr) {
-                                                    console.error('Error linking redeemed voucher code to booking via voucher_code_usage:', redeemedUsageErr);
-                                                } else {
-                                                    console.log('✅ Redeemed voucher code linked to booking via voucher_code_usage:', cleanVoucherCode.trim());
+                                        const codeToInsert = (avRows[0].voucher_ref || cleanVoucherCode).toString().trim();
+                                        const paidForVoucher = parseFloat(avRows[0].paid) || paidAmount || 0;
+                                        const insertRedeemedSql = `
+                                            INSERT INTO voucher_codes (
+                                                code, title, valid_from, valid_until, max_uses, current_uses,
+                                                applicable_locations, applicable_experiences, applicable_voucher_types,
+                                                is_active, created_at, updated_at, source_type, customer_email, paid_amount
+                                            ) VALUES (?, ?, NOW(), ?, 1, 1, ?, ?, ?, 0, NOW(), NOW(), 'redeemed_voucher', ?, ?)
+                                            ON DUPLICATE KEY UPDATE current_uses = current_uses + 1, is_active = 0, updated_at = NOW()
+                                        `;
+                                        const validUntil = expiresDateFinal ? moment(expiresDateFinal).format('YYYY-MM-DD') : moment().add(24, 'months').format('YYYY-MM-DD');
+                                        con.query(insertRedeemedSql, [
+                                            codeToInsert,
+                                            'Redeemed (Gift/Flight) - ' + (chooseLocation || ''),
+                                            validUntil,
+                                            chooseLocation || null,
+                                            resolvedVoucherType || null,
+                                            resolvedVoucherType || null,
+                                            passengerData && passengerData[0] && passengerData[0].email ? passengerData[0].email : null,
+                                            paidForVoucher
+                                        ], (insErr, insResult) => {
+                                            if (insErr) {
+                                                console.warn('⚠️ Could not insert redeemed code into voucher_codes:', insErr.message);
+                                                return;
+                                            }
+                                            con.query('SELECT id FROM voucher_codes WHERE UPPER(code) = UPPER(?) LIMIT 1', [codeToInsert], (selErr, selRows) => {
+                                                if (selErr || !selRows || selRows.length === 0) {
+                                                    console.warn('⚠️ Could not get voucher_code id after insert for:', codeToInsert);
+                                                    return;
                                                 }
+                                                linkRedeemedCode(selRows[0].id);
                                             });
-                                        }
-                                    });
-                                } else {
-                                    console.warn('⚠️ Warning: Redeemed voucher code not found in voucher_codes table:', cleanVoucherCode.trim());
-                                }
+                                        });
+                                    }
+                                );
                             }
                         );
                     }
@@ -2962,6 +3001,135 @@ app.post('/api/createRedeemBooking', (req, res) => {
             } // end of createBookingWithGeneratedCode
         } // end of createBookingWithPrice
     } // end of createRedeemBookingLogic
+});
+
+// One-time backfill: link existing Redeem Voucher bookings to the correct voucher ref (so Booking Details shows e.g. GATORAL33 not GATLHW96Q)
+app.post('/api/backfill-redeemed-voucher-codes', (req, res) => {
+    const sqlGetRedeemBookings = `
+        SELECT id, voucher_code, email, created_at, paid
+        FROM all_booking
+        WHERE (redeemed_voucher = 'Yes' OR redeemed_voucher = 1)
+        AND (flight_type_source = 'Redeem Voucher' OR flight_type_source IS NULL)
+        AND id > 0
+        ORDER BY id ASC
+    `;
+    con.query(sqlGetRedeemBookings, [], (err, bookings) => {
+        if (err) {
+            return res.status(500).json({ success: false, error: err.message });
+        }
+        const results = { processed: 0, linked: 0, skipped: 0, errors: [] };
+        if (!bookings || bookings.length === 0) {
+            return res.json({ success: true, message: 'No redeem bookings to backfill', ...results });
+        }
+        let processed = 0;
+        const bookingVoucherCode = (b) => (b.voucher_code || '').toString().trim();
+        const next = (index) => {
+            if (index >= bookings.length) {
+                return res.json({
+                    success: true,
+                    message: `Backfill complete. Processed: ${results.processed}, linked: ${results.linked}, skipped: ${results.skipped}`,
+                    ...results
+                });
+            }
+            const b = bookings[index];
+            const bid = b.id;
+            const bCode = bookingVoucherCode(b);
+            con.query(
+                `SELECT vc.id, vc.code FROM voucher_code_usage vcu
+                 INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
+                 WHERE vcu.booking_id = ?`,
+                [bid],
+                (qErr, usageRows) => {
+                    if (qErr) {
+                        results.errors.push({ booking_id: bid, error: qErr.message });
+                        results.processed++;
+                        return next(index + 1);
+                    }
+                    const hasOtherCode = usageRows && usageRows.some((r) => String(r.code || '').trim().toUpperCase() !== (bCode || '').toUpperCase());
+                    if (hasOtherCode) {
+                        results.skipped++;
+                        results.processed++;
+                        return next(index + 1);
+                    }
+                    const findVoucherSql = `
+                        SELECT voucher_ref, paid FROM all_vouchers
+                        WHERE (redeemed = 'Yes' OR status = 'Used')
+                        AND created_at <= ?
+                        AND (book_flight = 'Flight Voucher' OR book_flight LIKE '%Gift%')
+                        AND (UPPER(TRIM(?)) = '' OR email = ? OR purchaser_email = ? OR recipient_email = ?)
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    `;
+                    con.query(findVoucherSql, [b.created_at || '9999-12-31', b.email || '', b.email || '', b.email || '', b.email || ''], (vErr, vRows) => {
+                        if (vErr || !vRows || vRows.length === 0) {
+                            results.processed++;
+                            results.skipped++;
+                            return next(index + 1);
+                        }
+                        const voucherRef = (vRows[0].voucher_ref || '').toString().trim();
+                        if (!voucherRef) {
+                            results.processed++;
+                            return next(index + 1);
+                        }
+                        con.query('SELECT id FROM voucher_codes WHERE UPPER(code) = UPPER(?) LIMIT 1', [voucherRef], (cErr, cRows) => {
+                            let voucherCodeId = cRows && cRows[0] && cRows[0].id;
+                            const doLink = () => {
+                                if (!voucherCodeId) return next(index + 1);
+                                con.query(
+                                    'SELECT id FROM voucher_code_usage WHERE booking_id = ? AND voucher_code_id = ?',
+                                    [bid, voucherCodeId],
+                                    (uErr, uRows) => {
+                                        if (uErr || (uRows && uRows.length > 0)) {
+                                            results.processed++;
+                                            if (uRows && uRows.length > 0) results.skipped++;
+                                            return next(index + 1);
+                                        }
+                                        const paid = parseFloat(vRows[0].paid) || parseFloat(b.paid) || 0;
+                                        con.query(
+                                            `INSERT INTO voucher_code_usage (voucher_code_id, booking_id, customer_email, discount_applied, original_amount, final_amount)
+                                             VALUES (?, ?, ?, 0, ?, ?)`,
+                                            [voucherCodeId, bid, b.email || 'unknown@example.com', paid, paid],
+                                            (insErr) => {
+                                                if (insErr) {
+                                                    results.errors.push({ booking_id: bid, voucher_ref: voucherRef, error: insErr.message });
+                                                } else {
+                                                    results.linked++;
+                                                }
+                                                results.processed++;
+                                                return next(index + 1);
+                                            }
+                                        );
+                                    }
+                                );
+                            };
+                            if (voucherCodeId) {
+                                doLink();
+                                return;
+                            }
+                            con.query(
+                                `INSERT INTO voucher_codes (code, paid_amount, is_active, current_uses, max_uses, created_at, updated_at)
+                                 VALUES (?, ?, 1, 1, 1, NOW(), NOW())
+                                 ON DUPLICATE KEY UPDATE updated_at = NOW()`,
+                                [voucherRef, parseFloat(vRows[0].paid) || 0],
+                                (insErr) => {
+                                    if (insErr) {
+                                        results.errors.push({ booking_id: bid, voucher_ref: voucherRef, error: 'voucher_codes insert: ' + insErr.message });
+                                        results.processed++;
+                                        return next(index + 1);
+                                    }
+                                    con.query('SELECT id FROM voucher_codes WHERE UPPER(code) = UPPER(?) LIMIT 1', [voucherRef], (sErr, sRows) => {
+                                        voucherCodeId = sRows && sRows[0] && sRows[0].id;
+                                        doLink();
+                                    });
+                                }
+                            );
+                        });
+                    });
+                }
+            );
+        };
+        next(0);
+    });
 });
 
 // Mark voucher as redeemed
@@ -14479,10 +14647,10 @@ app.get('/api/getBookingDetail', async (req, res) => {
                         FROM voucher_code_usage vcu
                         INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
                         WHERE vcu.booking_id = ?
-                        AND vc.code != ?
+                        AND (UPPER(vc.code) != UPPER(?) OR ? IS NULL OR ? = '')
                         ORDER BY vcu.used_at DESC
                         LIMIT 1
-                    `, [booking_id, booking.voucher_code || ''], (err, rows) => {
+                    `, [booking_id, booking.voucher_code || '', booking.voucher_code || '', booking.voucher_code || ''], (err, rows) => {
                         if (err) reject(err);
                         else resolve([rows]);
                     });
@@ -14506,29 +14674,31 @@ app.get('/api/getBookingDetail', async (req, res) => {
                     // If not found, try to find by email and created_at (voucher created before booking)
                     if (booking.voucher_code) {
                         const [voucherRowsByCode] = await new Promise((resolve, reject) => {
-                            con.query('SELECT voucher_ref, voucher_passenger_details FROM all_vouchers WHERE voucher_ref = ? LIMIT 1', [booking.voucher_code], (err, rows) => {
+                            con.query('SELECT voucher_ref, voucher_passenger_details FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?) LIMIT 1', [booking.voucher_code], (err, rows) => {
                                 if (err) reject(err);
                                 else resolve([rows]);
                             });
                         });
                         if (voucherRowsByCode && voucherRowsByCode.length > 0) {
                             voucherRows = voucherRowsByCode;
+                            // When booking was created via createBooking (admin Redeem), voucher_code IS the redeemed code (Gift/Flight ref)
+                            originalRedeemedVoucherCode = voucherRowsByCode[0]?.voucher_ref || booking.voucher_code || null;
                         }
                     }
                     
-                    // If not found by voucher_code, try to find by email and created_at
+                    // If not found by voucher_code, try to find by email and created_at (include both Flight and Gift vouchers)
                     if (!voucherRows || voucherRows.length === 0) {
                         const [voucherRowsByEmail] = await new Promise((resolve, reject) => {
                             con.query(`
                                 SELECT voucher_ref, voucher_passenger_details 
                                 FROM all_vouchers 
-                                WHERE (email = ? OR purchaser_email = ?) 
-                                AND created_at < ? 
-                                AND book_flight = 'Flight Voucher'
+                                WHERE (email = ? OR purchaser_email = ? OR recipient_email = ?) 
+                                AND created_at <= ?
+                                AND (book_flight = 'Flight Voucher' OR book_flight LIKE '%Gift%')
                                 AND (redeemed = 'Yes' OR status = 'Used')
                                 ORDER BY created_at DESC 
                                 LIMIT 1
-                            `, [booking.email, booking.email, booking.created_at || '9999-12-31'], (err, rows) => {
+                            `, [booking.email, booking.email, booking.email, booking.created_at || '9999-12-31'], (err, rows) => {
                                 if (err) reject(err);
                                 else resolve([rows]);
                             });
@@ -14538,26 +14708,28 @@ app.get('/api/getBookingDetail', async (req, res) => {
                             originalRedeemedVoucherCode = voucherRowsByEmail[0]?.voucher_ref || null;
                         }
                     } else {
-                        // Found by voucher_code - but this is the new voucher code, not the original redeemed one
-                        // Need to find the original redeemed voucher code by looking for vouchers that were redeemed around the same time
-                        const [originalVoucherRows] = await new Promise((resolve, reject) => {
-                            con.query(`
-                                SELECT voucher_ref 
-                                FROM all_vouchers 
-                                WHERE (email = ? OR purchaser_email = ?) 
-                                AND created_at < ? 
-                                AND book_flight = 'Flight Voucher'
-                                AND (redeemed = 'Yes' OR status = 'Used')
-                                AND created_at >= DATE_SUB(?, INTERVAL 30 DAY)
-                                ORDER BY created_at DESC 
-                                LIMIT 1
-                            `, [booking.email, booking.email, booking.created_at || '9999-12-31', booking.created_at || '9999-12-31'], (err, rows) => {
-                                if (err) reject(err);
-                                else resolve([rows]);
+                        // Found by voucher_code - already set originalRedeemedVoucherCode above when we had voucherRowsByCode
+                        // If we got here from the "originalVoucherRows" path (same email, Flight Voucher), keep that logic for backward compat
+                        if (!originalRedeemedVoucherCode) {
+                            const [originalVoucherRows] = await new Promise((resolve, reject) => {
+                                con.query(`
+                                    SELECT voucher_ref 
+                                    FROM all_vouchers 
+                                    WHERE (email = ? OR purchaser_email = ?) 
+                                    AND created_at < ? 
+                                    AND (book_flight = 'Flight Voucher' OR book_flight LIKE '%Gift%')
+                                    AND (redeemed = 'Yes' OR status = 'Used')
+                                    AND created_at >= DATE_SUB(?, INTERVAL 30 DAY)
+                                    ORDER BY created_at DESC 
+                                    LIMIT 1
+                                `, [booking.email, booking.email, booking.created_at || '9999-12-31', booking.created_at || '9999-12-31'], (err, rows) => {
+                                    if (err) reject(err);
+                                    else resolve([rows]);
+                                });
                             });
-                        });
-                        if (originalVoucherRows && originalVoucherRows.length > 0) {
-                            originalRedeemedVoucherCode = originalVoucherRows[0]?.voucher_ref || null;
+                            if (originalVoucherRows && originalVoucherRows.length > 0) {
+                                originalRedeemedVoucherCode = originalVoucherRows[0]?.voucher_ref || null;
+                            }
                         }
                     }
                 }

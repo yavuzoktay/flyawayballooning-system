@@ -196,11 +196,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         }
     }, [open, location, bookingDetail]);
     
-    // Initialize passenger data based on numberOfVouchers when modal opens
+    // Initialize passenger data when modal opens. For Gift Voucher Redeem, only show Passenger 1 (single slot).
     useEffect(() => {
         if (open && isGiftVoucherDetails && numberOfVouchers > 0) {
-            // Initialize passenger data array with empty objects
-            const initialPassengerData = Array.from({ length: numberOfVouchers }, (_, index) => ({
+            // Gift Voucher Redeem: only list Passenger 1 in Passenger Information (other passengers are not shown)
+            const passengerSlots = 1;
+            const initialPassengerData = Array.from({ length: passengerSlots }, () => ({
                 firstName: '',
                 lastName: '',
                 weight: '',
@@ -208,7 +209,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 email: ''
             }));
             setPassengerData(initialPassengerData);
-            console.log('Initialized passenger data for', numberOfVouchers, 'vouchers');
+            console.log('Initialized passenger data for Gift Voucher Redeem (Passenger 1 only)');
         }
     }, [open, isGiftVoucherDetails, numberOfVouchers]);
     

@@ -1038,114 +1038,123 @@ const CustomerPortal = () => {
 
                         return (
                             <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #d1d5db' }}>
-                                {/* Reschedule Flight Button - Disabled if expired, cancelled, or within 120 hours */}
-                                <Tooltip 
-                                    title={
-                                        isExpired 
-                                            ? "Voucher / Booking has expired"
-                                            : isFullyRefunded
-                                                ? "Full refund has been processed. This booking cannot be rescheduled."
-                                            : (isVoucherRedeemed && shouldApplyRedeemedCheck)
-                                                ? "Voucher has been redeemed and cannot be rescheduled"
-                                                : (!canReschedule 
-                                                    ? (isCancelled 
-                                                        ? "Flight cancelled - pick a new date"
-                                                        : "Less than 120 hours remaining until your flight")
-                                                    : "")
-                                    }
-                                    arrow
+                                {/* Action Buttons Row - Reschedule / Cancel side by side on desktop */}
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        gap: 1.5,
+                                        alignItems: 'stretch',
+                                        width: '100%',
+                                    }}
                                 >
-                                    <span style={{ display: 'block', width: '100%' }}>
-                                        <Button
-                                            variant="contained"
-                                            color="primary"
-                                            fullWidth
-                                            disabled={!canReschedule}
-                                            onClick={() => canReschedule && setRescheduleModalOpen(true)}
-                                            sx={{
-                                                py: 1.5,
-                                                fontSize: '1rem',
-                                                fontWeight: 600,
-                                                textTransform: 'none',
-                                                borderRadius: 2,
-                                                boxShadow: canReschedule ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                                                backgroundColor: canReschedule ? undefined : '#f3f4f6',
-                                                color: canReschedule ? undefined : '#9ca3af',
-                                                '&:hover': canReschedule ? {
-                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                                                } : {
-                                                    boxShadow: 'none',
-                                                    backgroundColor: '#f3f4f6',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    backgroundColor: '#f3f4f6 !important',
-                                                    color: '#9ca3af !important',
-                                                    opacity: 0.6,
-                                                    cursor: 'not-allowed',
-                                                }
-                                            }}
-                                        >
-                                            {isFlightVoucherSection ? 'Schedule Your Flight' : 'Reschedule Your Flight'}
-                                        </Button>
-                                    </span>
-                                </Tooltip>
+                                    {/* Reschedule Flight Button - Disabled if expired, cancelled, or within 120 hours */}
+                                    <Tooltip 
+                                        title={
+                                            isExpired 
+                                                ? "Voucher / Booking has expired"
+                                                : isFullyRefunded
+                                                    ? "Full refund has been processed. This booking cannot be rescheduled."
+                                                : (isVoucherRedeemed && shouldApplyRedeemedCheck)
+                                                    ? "Voucher has been redeemed and cannot be rescheduled"
+                                                    : (!canReschedule 
+                                                        ? (isCancelled 
+                                                            ? "Flight cancelled - pick a new date"
+                                                            : "Less than 120 hours remaining until your flight")
+                                                        : "")
+                                        }
+                                        arrow
+                                    >
+                                        <span style={{ display: 'block', width: '100%' }}>
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                fullWidth
+                                                disabled={!canReschedule}
+                                                onClick={() => canReschedule && setRescheduleModalOpen(true)}
+                                                sx={{
+                                                    py: 1.5,
+                                                    fontSize: '1rem',
+                                                    fontWeight: 600,
+                                                    textTransform: 'none',
+                                                    borderRadius: 2,
+                                                    boxShadow: canReschedule ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                                                    backgroundColor: canReschedule ? undefined : '#f3f4f6',
+                                                    color: canReschedule ? undefined : '#9ca3af',
+                                                    '&:hover': canReschedule ? {
+                                                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                                    } : {
+                                                        boxShadow: 'none',
+                                                        backgroundColor: '#f3f4f6',
+                                                    },
+                                                    '&.Mui-disabled': {
+                                                        backgroundColor: '#f3f4f6 !important',
+                                                        color: '#9ca3af !important',
+                                                        opacity: 0.6,
+                                                        cursor: 'not-allowed',
+                                                    }
+                                                }}
+                                            >
+                                                {isFlightVoucherSection ? 'Schedule Your Flight' : 'Reschedule Your Flight'}
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
 
 
-                                {/* Cancel Flight Button - Always visible, but disabled if cancelled or less than 120 hours */}
-                                <Tooltip
-                                    title={
-                                        isExpired
-                                            ? "Voucher / Booking has expired"
-                                            : isFullyRefunded
-                                                ? "Full refund has been processed. This booking cannot be cancelled."
-                                            : (isVoucherRedeemed && shouldApplyRedeemedCheck)
-                                                ? "Voucher has been redeemed and cannot be cancelled"
-                                            : (isCancelled
-                                                ? "Flight is cancelled"
-                                                : (!canCancel ? "Less than 120 hours remaining until your flight" : ""))
-                                    }
-                                    arrow
-                                >
-                                    <span style={{ display: 'block', width: '100%' }}>
-                                        <Button
-                                            variant="outlined"
-                                            color="error"
-                                            fullWidth
-                                            disabled={!canCancel}
-                                            onClick={() => canCancel && setCancelFlightDialogOpen(true)}
-                                            sx={{
-                                                mt: 1.5,
-                                                py: 1.5,
-                                                fontSize: '1rem',
-                                                fontWeight: 600,
-                                                textTransform: 'none',
-                                                borderRadius: 2,
-                                                borderWidth: 2,
-                                                borderColor: canCancel ? '#ef4444' : '#d1d5db',
-                                                color: canCancel ? '#ef4444' : '#9ca3af',
-                                                backgroundColor: canCancel ? 'transparent' : '#f3f4f6',
-                                                cursor: canCancel ? 'pointer' : 'not-allowed',
-                                                '&:hover': canCancel ? {
+                                    {/* Cancel Flight Button - Always visible, but disabled if cancelled or less than 120 hours */}
+                                    <Tooltip
+                                        title={
+                                            isExpired
+                                                ? "Voucher / Booking has expired"
+                                                : isFullyRefunded
+                                                    ? "Full refund has been processed. This booking cannot be cancelled."
+                                                : (isVoucherRedeemed && shouldApplyRedeemedCheck)
+                                                    ? "Voucher has been redeemed and cannot be cancelled"
+                                                : (isCancelled
+                                                    ? "Flight is cancelled"
+                                                    : (!canCancel ? "Less than 120 hours remaining until your flight" : ""))
+                                        }
+                                        arrow
+                                    >
+                                        <span style={{ display: 'block', width: '100%' }}>
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                fullWidth
+                                                disabled={!canCancel}
+                                                onClick={() => canCancel && setCancelFlightDialogOpen(true)}
+                                                sx={{
+                                                    py: 1.5,
+                                                    fontSize: '1rem',
+                                                    fontWeight: 600,
+                                                    textTransform: 'none',
+                                                    borderRadius: 2,
                                                     borderWidth: 2,
-                                                    borderColor: '#dc2626',
-                                                    backgroundColor: '#fef2f2',
-                                                } : {
-                                                    borderWidth: 2,
-                                                    borderColor: '#d1d5db',
-                                                    backgroundColor: '#f3f4f6',
-                                                },
-                                                '&.Mui-disabled': {
-                                                    borderColor: '#d1d5db',
-                                                    color: '#9ca3af',
-                                                    backgroundColor: '#f3f4f6',
-                                                }
-                                            }}
-                                        >
-                                            Cancel Flight
-                                        </Button>
-                                    </span>
-                                </Tooltip>
-
+                                                    borderColor: canCancel ? '#ef4444' : '#d1d5db',
+                                                    color: canCancel ? '#ef4444' : '#9ca3af',
+                                                    backgroundColor: canCancel ? 'transparent' : '#f3f4f6',
+                                                    cursor: canCancel ? 'pointer' : 'not-allowed',
+                                                    '&:hover': canCancel ? {
+                                                        borderWidth: 2,
+                                                        borderColor: '#dc2626',
+                                                        backgroundColor: '#fef2f2',
+                                                    } : {
+                                                        borderWidth: 2,
+                                                        borderColor: '#d1d5db',
+                                                        backgroundColor: '#f3f4f6',
+                                                    },
+                                                    '&.Mui-disabled': {
+                                                        borderColor: '#d1d5db',
+                                                        color: '#9ca3af',
+                                                        backgroundColor: '#f3f4f6',
+                                                    }
+                                                }}
+                                            >
+                                                Cancel Flight
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                </Box>
 
                             </Box>
                         );
