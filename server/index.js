@@ -3635,9 +3635,18 @@ function getEmptyMerchantFeedXml() {
 }
 
 function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
+    const isActive = (row) => {
+        if (row == null) return false;
+        const v = row.is_active;
+        if (v === undefined) return true;
+        return v === 1 || v === true || v === '1';
+    };
+    const shared = (sharedRows || []).filter(isActive);
+    const private_ = (privateRows || []).filter(isActive);
+    const activities = (activityRows || []).filter((row) => (row && (row.status === 'Live' || row.status === 'live')));
     const activitiesByLocation = {};
-    (activityRows || []).forEach((row) => {
-        const loc = (row.location || '').trim();
+    activities.forEach((row) => {
+        const loc = (row.location || '').toString().trim();
         if (!loc || activitiesByLocation[loc]) return;
         activitiesByLocation[loc] = row;
     });
@@ -3692,7 +3701,7 @@ function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
     const sharedProcessed = [];
     (locations.length ? locations : [null]).forEach((loc) => {
         const act = loc ? activitiesByLocation[loc] : null;
-        (sharedRows || []).forEach((vt) => {
+        shared.forEach((vt) => {
             let p = act ? null : vt.price_per_person;
             if (act) {
                 if (vt.title === 'Weekday Morning') p = act.weekday_morning_price;
@@ -3713,7 +3722,7 @@ function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
                 privateCharterPricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
             } catch (e) {}
         }
-        (privateRows || []).forEach((vt) => {
+        private_.forEach((vt) => {
             const price = resolvePrivatePriceForLocation(vt, privateCharterPricingMap);
             const item = toItem(vt, 'Private Charter', price, loc || null);
             if (item) privateProcessed.push(item);
@@ -3742,9 +3751,9 @@ function fetchMerchantFeed(callback) {
         }
         return;
     }
-    const sqlShared = `SELECT id, title, description, image_url, price_per_person FROM voucher_types WHERE is_active = 1 ORDER BY id ASC`;
-    const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY id ASC`;
-    const sqlActivities = `SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY id ASC`;
+    const sqlShared = `SELECT * FROM voucher_types LIMIT 100`;
+    const sqlPrivate = `SELECT * FROM private_charter_voucher_types LIMIT 100`;
+    const sqlActivities = `SELECT * FROM activity LIMIT 100`;
     let pending = 3;
     const results = { shared: [], private: [], activities: [] };
     const done = () => {
