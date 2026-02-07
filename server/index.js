@@ -3634,17 +3634,41 @@ function getEmptyMerchantFeedXml() {
         '</channel>\n</rss>';
 }
 
+function getFallbackMerchantFeedXml() {
+    const base = BOOK_SITE_BASE_URL;
+    const img = BACKEND_PUBLIC_URL + '/favicon.ico';
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
+    const channelLink = BOOK_SITE_BASE_URL;
+    const channelDesc = 'Hot air balloon flight vouchers and experiences - Shared Flight and Private Charter. Book at flyawayballooning-book.com';
+    const items = [
+        { id: 'shared-flight-weekday-morning', title: 'Weekday Morning - Shared Flight - Fly Away Ballooning', description: 'Catch sunrise savings', link: base + '/?startAt=voucher-type&voucherTitle=Weekday%20Morning', image_link: img, price: '180.00 GBP' },
+        { id: 'shared-flight-flexible-weekday', title: 'Flexible Weekday - Shared Flight - Fly Away Ballooning', description: 'More value, same magic', link: base + '/?startAt=voucher-type&voucherTitle=Flexible%20Weekday', image_link: img, price: '200.00 GBP' },
+        { id: 'shared-flight-any-day-flight', title: 'Any Day Flight - Shared Flight - Fly Away Ballooning', description: 'Freedom to fly', link: base + '/?startAt=voucher-type&voucherTitle=Any%20Day%20Flight', image_link: img, price: '220.00 GBP' },
+        { id: 'private-charter-private-charter', title: 'Private Charter - Private Charter - Fly Away Ballooning', description: 'Your sky, your moment', link: base + '/?startAt=voucher-type&voucherTitle=Private%20Charter', image_link: img, price: '900.00 GBP' },
+        { id: 'private-charter-proposal-flight', title: 'Proposal Flight - Private Charter - Fly Away Ballooning', description: 'Love rises here', link: base + '/?startAt=voucher-type&voucherTitle=Proposal%20Flight', image_link: img, price: '1000.00 GBP' }
+    ];
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n<channel>\n';
+    xml += '<title>' + esc(channelTitle) + '</title>\n<link>' + esc(channelLink) + '</link>\n<description>' + esc(channelDesc) + '</description>\n';
+    for (const it of items) {
+        xml += '<item>\n  <g:id>' + esc(it.id) + '</g:id>\n  <g:title>' + esc(it.title) + '</g:title>\n  <g:description>' + esc(it.description) + '</g:description>\n  <g:link>' + esc(it.link) + '</g:link>\n  <g:image_link>' + esc(it.image_link) + '</g:image_link>\n  <g:condition>new</g:condition>\n  <g:availability>in stock</g:availability>\n  <g:price>' + esc(it.price) + '</g:price>\n  <g:brand>Fly Away Ballooning</g:brand>\n</item>\n';
+    }
+    xml += '</channel>\n</rss>';
+    return xml;
+}
+
 function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
+    const asArray = (x) => (Array.isArray(x) ? x : (x != null ? [x] : []));
     const isActive = (row) => {
-        if (row == null) return false;
+        if (row == null || typeof row !== 'object') return false;
         const v = row.is_active !== undefined ? row.is_active : row.isActive;
         if (v === undefined) return true;
         return v === 1 || v === true || v === '1';
     };
-    const get = (row, ...keys) => { for (const k of keys) { if (row && row[k] !== undefined && row[k] !== null) return row[k]; } return undefined; };
-    const shared = (sharedRows || []).filter(isActive);
-    const private_ = (privateRows || []).filter(isActive);
-    const activities = (activityRows || []).filter((row) => (row && String(row.status || '').toLowerCase() === 'live'));
+    const get = (row, ...keys) => { if (!row || typeof row !== 'object') return undefined; for (const k of keys) { const v = row[k]; if (v !== undefined && v !== null) return v; } return undefined; };
+    const shared = asArray(sharedRows).filter(isActive);
+    const private_ = asArray(privateRows).filter(isActive);
+    const activities = asArray(activityRows).filter((row) => (row && typeof row === 'object' && String(get(row, 'status', 'Status') || '').toLowerCase() === 'live'));
     const activitiesByLocation = {};
     activities.forEach((row) => {
         const loc = (get(row, 'location', 'Location') || '').toString().trim();
@@ -3777,7 +3801,7 @@ function fetchMerchantFeed(callback) {
             xml = buildMerchantFeedXml(results.shared, results.private, results.activities);
         } catch (e) {
             console.error('Merchant feed build error:', e && e.message ? e.message : e);
-            xml = getEmptyMerchantFeedXml();
+            xml = getFallbackMerchantFeedXml();
         }
         callback(null, xml);
     };
@@ -3821,7 +3845,7 @@ const serveMerchantCenterFeed = (req, res) => {
     }
     fetchMerchantFeed((err, xml) => {
         setCorsForFeed();
-        const body = xml || getEmptyMerchantFeedXml();
+        const body = xml || getFallbackMerchantFeedXml();
         if (!err) merchantFeedCache = { xml: body, at: Date.now() };
         res.status(200).send(body);
     });
