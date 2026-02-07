@@ -3636,16 +3636,61 @@ const serveMerchantCenterFeed = (req, res) => {
         ORDER BY vt.sort_order ASC, vt.created_at DESC
     `;
     const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
+    const sqlActivityPricing = `SELECT private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY id ASC LIMIT 1`;
     con.query(sqlShared, [], (errShared, sharedRows) => {
         if (errShared) {
             setCorsForFeed();
             return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
         }
         con.query(sqlPrivate, [], (errPrivate, privateRows) => {
-            setCorsForFeed();
             if (errPrivate) {
+                setCorsForFeed();
                 return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
             }
+            con.query(sqlActivityPricing, [], (errAct, activityRows) => {
+                setCorsForFeed();
+                if (errAct) {
+                    return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
+                }
+                let privateCharterPricingMap = {};
+                if (activityRows && activityRows.length > 0 && activityRows[0].private_charter_pricing) {
+                    try {
+                        const raw = activityRows[0].private_charter_pricing;
+                        privateCharterPricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                    } catch (e) {
+                        privateCharterPricingMap = {};
+                    }
+                }
+                const defaultPrivatePrices = { 'Private Charter': 900, 'Proposal Flight': 1000 };
+                const resolvePrivatePrice = (vt) => {
+                    let p = parseFloat(vt.price_per_person);
+                    if (!Number.isNaN(p) && p > 0) return p;
+                    const title = (vt.title || '').trim();
+                    const norm = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+                    let val = privateCharterPricingMap[title] ?? privateCharterPricingMap[vt.title];
+                    if (val == null && typeof privateCharterPricingMap === 'object') {
+                        for (const k of Object.keys(privateCharterPricingMap)) {
+                            if (norm(k) === norm(title)) {
+                                val = privateCharterPricingMap[k];
+                                break;
+                            }
+                        }
+                    }
+                    if (val != null && val !== '') {
+                        if (typeof val === 'object') {
+                            const tier = val['2'] ?? val['3'] ?? val['4'] ?? val['8'];
+                            const parsed = parseFloat(tier);
+                            if (!Number.isNaN(parsed)) return parsed;
+                        } else {
+                            const parsed = parseFloat(val);
+                            if (!Number.isNaN(parsed)) return parsed;
+                        }
+                    }
+                    for (const [k, v] of Object.entries(defaultPrivatePrices)) {
+                        if (norm(k) === norm(title)) return v;
+                    }
+                    return 0;
+                };
             const escapeXml = (s) => {
                 if (s == null || s === undefined) return '';
                 const str = String(s);
@@ -3684,7 +3729,10 @@ const serveMerchantCenterFeed = (req, res) => {
                 else if (vt.title === 'Any Day Flight' && vt.any_day_flight_price != null) p = vt.any_day_flight_price;
                 return toItem(vt, 'Shared Flight', p);
             }).filter(Boolean);
-            const privateProcessed = (privateRows || []).map(vt => toItem(vt, 'Private Charter', vt.price_per_person)).filter(Boolean);
+            const privateProcessed = (privateRows || []).map(vt => {
+                const price = resolvePrivatePrice(vt);
+                return toItem(vt, 'Private Charter', price);
+            }).filter(Boolean);
             const items = [...sharedProcessed, ...privateProcessed];
             const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
             const channelLink = BOOK_SITE_BASE_URL;
@@ -3710,6 +3758,7 @@ const serveMerchantCenterFeed = (req, res) => {
             }
             xml += '</channel>\n</rss>';
             res.send(xml);
+            });
         });
     });
 };
