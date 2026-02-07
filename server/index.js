@@ -3722,25 +3722,30 @@ function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
 }
 
 function fetchMerchantFeed(callback) {
-    const sqlShared = `SELECT id, title, description, image_url, price_per_person FROM voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
-    const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
-    const sqlActivities = `SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY location ASC, id ASC`;
+    const sqlShared = `SELECT id, title, description, image_url, price_per_person FROM voucher_types WHERE is_active = 1 ORDER BY id ASC`;
+    const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY id ASC`;
+    const sqlActivities = `SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY id ASC`;
     let pending = 3;
-    const results = { shared: null, private: null, activities: null };
-    let firstError = null;
+    const results = { shared: null, private: null, activities: [] };
+    const errors = { shared: null, private: null, activities: null };
     const done = () => {
         if (--pending !== 0) return;
-        if (firstError) return callback(firstError);
+        if (errors.shared) console.error('Merchant feed voucher_types error:', errors.shared.message);
+        if (errors.private) console.error('Merchant feed private_charter_voucher_types error:', errors.private.message);
+        if (errors.activities) console.warn('Merchant feed activity query failed (using no locations):', errors.activities.message);
+        const criticalError = errors.shared || errors.private;
+        if (criticalError) return callback(criticalError);
         try {
-            const xml = buildMerchantFeedXml(results.shared, results.private, results.activities);
+            const xml = buildMerchantFeedXml(results.shared, results.private, results.activities || []);
             callback(null, xml);
         } catch (e) {
+            console.error('Merchant feed build error:', e);
             callback(e);
         }
     };
-    con.query(sqlShared, [], (err, rows) => { if (err) firstError = err; else results.shared = rows; done(); });
-    con.query(sqlPrivate, [], (err, rows) => { if (err) firstError = err; else results.private = rows; done(); });
-    con.query(sqlActivities, [], (err, rows) => { if (err) firstError = err; else results.activities = rows; done(); });
+    con.query(sqlShared, [], (err, rows) => { if (err) errors.shared = err; else results.shared = rows; done(); });
+    con.query(sqlPrivate, [], (err, rows) => { if (err) errors.private = err; else results.private = rows; done(); });
+    con.query(sqlActivities, [], (err, rows) => { if (err) { errors.activities = err; results.activities = []; } else results.activities = rows; done(); });
 }
 
 const serveMerchantCenterFeed = (req, res) => {
