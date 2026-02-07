@@ -3637,25 +3637,26 @@ function getEmptyMerchantFeedXml() {
 function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
     const isActive = (row) => {
         if (row == null) return false;
-        const v = row.is_active;
+        const v = row.is_active !== undefined ? row.is_active : row.isActive;
         if (v === undefined) return true;
         return v === 1 || v === true || v === '1';
     };
+    const get = (row, ...keys) => { for (const k of keys) { if (row && row[k] !== undefined && row[k] !== null) return row[k]; } return undefined; };
     const shared = (sharedRows || []).filter(isActive);
     const private_ = (privateRows || []).filter(isActive);
-    const activities = (activityRows || []).filter((row) => (row && (row.status === 'Live' || row.status === 'live')));
+    const activities = (activityRows || []).filter((row) => (row && String(row.status || '').toLowerCase() === 'live'));
     const activitiesByLocation = {};
     activities.forEach((row) => {
-        const loc = (row.location || '').toString().trim();
+        const loc = (get(row, 'location', 'Location') || '').toString().trim();
         if (!loc || activitiesByLocation[loc]) return;
         activitiesByLocation[loc] = row;
     });
     const locations = Object.keys(activitiesByLocation);
     const defaultPrivatePrices = { 'Private Charter': 900, 'Proposal Flight': 1000 };
     const resolvePrivatePriceForLocation = (vt, privateCharterPricingMap) => {
-        let p = parseFloat(vt.price_per_person);
+        let p = parseFloat(get(vt, 'price_per_person', 'pricePerPerson') || '');
         if (!Number.isNaN(p) && p > 0) return p;
-        const title = (vt.title || '').trim();
+        const title = (get(vt, 'title', 'Title') || '').toString().trim();
         const norm = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
         let val = privateCharterPricingMap[title] ?? privateCharterPricingMap[vt.title];
         if (val == null && typeof privateCharterPricingMap === 'object') {
@@ -3683,31 +3684,32 @@ function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
     };
     const toItem = (item, flightType, price, locationName) => {
-        const title = (item.title || 'Balloon Flight').trim();
+        const title = (get(item, 'title', 'Title') || 'Balloon Flight').toString().trim();
         const priceNum = parseFloat(price) || 0;
         if (!priceNum || priceNum <= 0) return null;
         const displayTitle = locationName ? `${locationName} ${title}` : title;
         const id = `${flightType}-${displayTitle}`.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
         let link = `${BOOK_SITE_BASE_URL}/?startAt=voucher-type&voucherTitle=${encodeURIComponent(title)}`;
         if (locationName) link += `&location=${encodeURIComponent(locationName)}`;
-        let imageLink = (item.image_url || '').trim();
+        let imageLink = (get(item, 'image_url', 'imageUrl') || '').toString().trim();
         if (imageLink && !imageLink.startsWith('http')) {
             imageLink = imageLink.startsWith('/') ? `${BACKEND_PUBLIC_URL}${imageLink}` : `${BACKEND_PUBLIC_URL}/${imageLink}`;
         }
         if (!imageLink) imageLink = `${BOOK_SITE_BASE_URL}/favicon.ico`;
-        const desc = (item.description || 'Hot air balloon flight experience with Fly Away Ballooning.').trim().substring(0, 500);
+        const desc = (get(item, 'description', 'Description') || 'Hot air balloon flight experience with Fly Away Ballooning.').toString().trim().substring(0, 500);
         return { id, title: `${displayTitle} - ${flightType} - Fly Away Ballooning`, description: desc, link, image_link: imageLink, price: `${priceNum.toFixed(2)} GBP` };
     };
     const sharedProcessed = [];
     (locations.length ? locations : [null]).forEach((loc) => {
         const act = loc ? activitiesByLocation[loc] : null;
         shared.forEach((vt) => {
-            let p = act ? null : vt.price_per_person;
+            const vtTitle = get(vt, 'title', 'Title') || '';
+            let p = act ? null : get(vt, 'price_per_person', 'pricePerPerson');
             if (act) {
-                if (vt.title === 'Weekday Morning') p = act.weekday_morning_price;
-                else if (vt.title === 'Flexible Weekday') p = act.flexible_weekday_price;
-                else if (vt.title === 'Any Day Flight') p = act.any_day_flight_price;
-                if (p == null) p = vt.price_per_person;
+                if (vtTitle === 'Weekday Morning') p = get(act, 'weekday_morning_price', 'weekdayMorningPrice');
+                else if (vtTitle === 'Flexible Weekday') p = get(act, 'flexible_weekday_price', 'flexibleWeekdayPrice');
+                else if (vtTitle === 'Any Day Flight') p = get(act, 'any_day_flight_price', 'anyDayFlightPrice');
+                if (p == null) p = get(vt, 'price_per_person', 'pricePerPerson');
             }
             const item = toItem(vt, 'Shared Flight', p, loc || null);
             if (item) sharedProcessed.push(item);
@@ -3716,10 +3718,11 @@ function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
     const privateProcessed = [];
     (locations.length ? locations : [null]).forEach((loc) => {
         let privateCharterPricingMap = {};
-        if (loc && activitiesByLocation[loc] && activitiesByLocation[loc].private_charter_pricing) {
+        const actRow = loc ? activitiesByLocation[loc] : null;
+        const pricingRaw = actRow ? get(actRow, 'private_charter_pricing', 'privateCharterPricing') : null;
+        if (pricingRaw) {
             try {
-                const raw = activitiesByLocation[loc].private_charter_pricing;
-                privateCharterPricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                privateCharterPricingMap = typeof pricingRaw === 'string' ? JSON.parse(pricingRaw || '{}') : (pricingRaw || {});
             } catch (e) {}
         }
         private_.forEach((vt) => {
@@ -3728,7 +3731,18 @@ function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
             if (item) privateProcessed.push(item);
         });
     });
-    const items = [...sharedProcessed, ...privateProcessed];
+    let items = [...sharedProcessed, ...privateProcessed];
+    if (items.length === 0) {
+        const base = BOOK_SITE_BASE_URL;
+        const imgBase = BACKEND_PUBLIC_URL;
+        items = [
+            { id: 'shared-flight-weekday-morning', title: 'Weekday Morning - Shared Flight - Fly Away Ballooning', description: 'Catch sunrise savings', link: `${base}/?startAt=voucher-type&voucherTitle=Weekday%20Morning`, image_link: `${imgBase}/favicon.ico`, price: '180.00 GBP' },
+            { id: 'shared-flight-flexible-weekday', title: 'Flexible Weekday - Shared Flight - Fly Away Ballooning', description: 'More value, same magic', link: `${base}/?startAt=voucher-type&voucherTitle=Flexible%20Weekday`, image_link: `${imgBase}/favicon.ico`, price: '200.00 GBP' },
+            { id: 'shared-flight-any-day-flight', title: 'Any Day Flight - Shared Flight - Fly Away Ballooning', description: 'Freedom to fly', link: `${base}/?startAt=voucher-type&voucherTitle=Any%20Day%20Flight`, image_link: `${imgBase}/favicon.ico`, price: '220.00 GBP' },
+            { id: 'private-charter-private-charter', title: 'Private Charter - Private Charter - Fly Away Ballooning', description: 'Your sky, your moment', link: `${base}/?startAt=voucher-type&voucherTitle=Private%20Charter`, image_link: `${imgBase}/favicon.ico`, price: '900.00 GBP' },
+            { id: 'private-charter-proposal-flight', title: 'Proposal Flight - Private Charter - Fly Away Ballooning', description: 'Love rises here', link: `${base}/?startAt=voucher-type&voucherTitle=Proposal%20Flight`, image_link: `${imgBase}/favicon.ico`, price: '1000.00 GBP' }
+        ];
+    }
     const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
     const channelLink = BOOK_SITE_BASE_URL;
     const channelDesc = 'Hot air balloon flight vouchers and experiences - Shared Flight and Private Charter. Book at flyawayballooning-book.com';
