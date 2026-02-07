@@ -3616,6 +3616,107 @@ app.get('/api/voucher-types', (req, res) => {
     });
 });
 
+// Google Merchant Center product feed (RSS 2.0) for flyawayballooning-book.com voucher products
+const BOOK_SITE_BASE_URL = process.env.BOOK_SITE_BASE_URL || 'https://flyawayballooning-book.com';
+const BACKEND_PUBLIC_URL = process.env.BACKEND_PUBLIC_URL || process.env.API_BASE_URL || 'https://flyawayballooning-system.com';
+
+const serveMerchantCenterFeed = (req, res) => {
+    const setCorsForFeed = () => {
+        setCorsHeaders(req, res);
+        res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
+    };
+    const sqlShared = `
+        SELECT vt.id, vt.title, vt.description, vt.image_url, vt.price_per_person,
+               COALESCE(a.weekday_morning_price, vt.price_per_person) as weekday_morning_price,
+               COALESCE(a.flexible_weekday_price, vt.price_per_person) as flexible_weekday_price,
+               COALESCE(a.any_day_flight_price, vt.price_per_person) as any_day_flight_price
+        FROM voucher_types vt
+        LEFT JOIN (SELECT * FROM activity WHERE status = 'Live' ORDER BY id ASC LIMIT 1) a ON 1=1
+        WHERE vt.is_active = 1
+        ORDER BY vt.sort_order ASC, vt.created_at DESC
+    `;
+    const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
+    con.query(sqlShared, [], (errShared, sharedRows) => {
+        if (errShared) {
+            setCorsForFeed();
+            return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
+        }
+        con.query(sqlPrivate, [], (errPrivate, privateRows) => {
+            setCorsForFeed();
+            if (errPrivate) {
+                return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
+            }
+            const escapeXml = (s) => {
+                if (s == null || s === undefined) return '';
+                const str = String(s);
+                return str
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&apos;');
+            };
+            const toItem = (item, flightType, price) => {
+                const title = (item.title || 'Balloon Flight').trim();
+                const priceNum = parseFloat(price) || 0;
+                if (!priceNum || priceNum <= 0) return null;
+                const id = `${flightType}-${title}`.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                const link = `${BOOK_SITE_BASE_URL}/?startAt=voucher-type&voucherTitle=${encodeURIComponent(title)}`;
+                let imageLink = (item.image_url || '').trim();
+                if (imageLink && !imageLink.startsWith('http')) {
+                    imageLink = imageLink.startsWith('/') ? `${BACKEND_PUBLIC_URL}${imageLink}` : `${BACKEND_PUBLIC_URL}/${imageLink}`;
+                }
+                if (!imageLink) imageLink = `${BOOK_SITE_BASE_URL}/favicon.ico`;
+                const desc = (item.description || 'Hot air balloon flight experience with Fly Away Ballooning.').trim().substring(0, 500);
+                return {
+                    id,
+                    title: `${title} - ${flightType} - Fly Away Ballooning`,
+                    description: desc,
+                    link,
+                    image_link: imageLink,
+                    price: `${priceNum.toFixed(2)} GBP`
+                };
+            };
+            const sharedProcessed = (sharedRows || []).map(vt => {
+                let p = vt.price_per_person;
+                if (vt.title === 'Weekday Morning' && vt.weekday_morning_price != null) p = vt.weekday_morning_price;
+                else if (vt.title === 'Flexible Weekday' && vt.flexible_weekday_price != null) p = vt.flexible_weekday_price;
+                else if (vt.title === 'Any Day Flight' && vt.any_day_flight_price != null) p = vt.any_day_flight_price;
+                return toItem(vt, 'Shared Flight', p);
+            }).filter(Boolean);
+            const privateProcessed = (privateRows || []).map(vt => toItem(vt, 'Private Charter', vt.price_per_person)).filter(Boolean);
+            const items = [...sharedProcessed, ...privateProcessed];
+            const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
+            const channelLink = BOOK_SITE_BASE_URL;
+            const channelDesc = 'Hot air balloon flight vouchers and experiences - Shared Flight and Private Charter. Book at flyawayballooning-book.com';
+            let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+            xml += '<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n';
+            xml += '<channel>\n';
+            xml += `<title>${escapeXml(channelTitle)}</title>\n`;
+            xml += `<link>${escapeXml(channelLink)}</link>\n`;
+            xml += `<description>${escapeXml(channelDesc)}</description>\n`;
+            for (const it of items) {
+                xml += '<item>\n';
+                xml += `  <g:id>${escapeXml(it.id)}</g:id>\n`;
+                xml += `  <g:title>${escapeXml(it.title)}</g:title>\n`;
+                xml += `  <g:description>${escapeXml(it.description)}</g:description>\n`;
+                xml += `  <g:link>${escapeXml(it.link)}</g:link>\n`;
+                xml += `  <g:image_link>${escapeXml(it.image_link)}</g:image_link>\n`;
+                xml += '  <g:condition>new</g:condition>\n';
+                xml += '  <g:availability>in stock</g:availability>\n';
+                xml += `  <g:price>${escapeXml(it.price)}</g:price>\n`;
+                xml += '  <g:brand>Fly Away Ballooning</g:brand>\n';
+                xml += '</item>\n';
+            }
+            xml += '</channel>\n</rss>';
+            res.send(xml);
+        });
+    });
+};
+
+app.get('/api/merchant-center-feed.xml', serveMerchantCenterFeed);
+app.get('/api/merchant-center-feed', serveMerchantCenterFeed);
+
 // Create new voucher type
 app.post('/api/voucher-types', experiencesUpload.single('voucher_type_image'), (req, res) => {
     const {
