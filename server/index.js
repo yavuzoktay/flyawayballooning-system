@@ -3625,18 +3625,9 @@ const serveMerchantCenterFeed = (req, res) => {
         setCorsHeaders(req, res);
         res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8');
     };
-    const sqlShared = `
-        SELECT vt.id, vt.title, vt.description, vt.image_url, vt.price_per_person,
-               COALESCE(a.weekday_morning_price, vt.price_per_person) as weekday_morning_price,
-               COALESCE(a.flexible_weekday_price, vt.price_per_person) as flexible_weekday_price,
-               COALESCE(a.any_day_flight_price, vt.price_per_person) as any_day_flight_price
-        FROM voucher_types vt
-        LEFT JOIN (SELECT * FROM activity WHERE status = 'Live' ORDER BY id ASC LIMIT 1) a ON 1=1
-        WHERE vt.is_active = 1
-        ORDER BY vt.sort_order ASC, vt.created_at DESC
-    `;
+    const sqlShared = `SELECT id, title, description, image_url, price_per_person FROM voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
     const sqlPrivate = `SELECT id, title, description, image_url, price_per_person FROM private_charter_voucher_types WHERE is_active = 1 ORDER BY sort_order ASC, created_at DESC`;
-    const sqlActivityPricing = `SELECT private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY id ASC LIMIT 1`;
+    const sqlActivities = `SELECT location, weekday_morning_price, flexible_weekday_price, any_day_flight_price, private_charter_pricing FROM activity WHERE status = 'Live' ORDER BY location ASC, id ASC`;
     con.query(sqlShared, [], (errShared, sharedRows) => {
         if (errShared) {
             setCorsForFeed();
@@ -3647,22 +3638,21 @@ const serveMerchantCenterFeed = (req, res) => {
                 setCorsForFeed();
                 return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
             }
-            con.query(sqlActivityPricing, [], (errAct, activityRows) => {
+            con.query(sqlActivities, [], (errAct, activityRows) => {
                 setCorsForFeed();
                 if (errAct) {
                     return res.status(500).send('<?xml version="1.0"?><error>Database error</error>');
                 }
-                let privateCharterPricingMap = {};
-                if (activityRows && activityRows.length > 0 && activityRows[0].private_charter_pricing) {
-                    try {
-                        const raw = activityRows[0].private_charter_pricing;
-                        privateCharterPricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
-                    } catch (e) {
-                        privateCharterPricingMap = {};
-                    }
-                }
+                const locationSlug = (loc) => (loc || '').toString().trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'location';
+                const activitiesByLocation = {};
+                (activityRows || []).forEach((row) => {
+                    const loc = (row.location || '').trim();
+                    if (!loc || activitiesByLocation[loc]) return;
+                    activitiesByLocation[loc] = row;
+                });
+                const locations = Object.keys(activitiesByLocation);
                 const defaultPrivatePrices = { 'Private Charter': 900, 'Proposal Flight': 1000 };
-                const resolvePrivatePrice = (vt) => {
+                const resolvePrivatePriceForLocation = (vt, privateCharterPricingMap) => {
                     let p = parseFloat(vt.price_per_person);
                     if (!Number.isNaN(p) && p > 0) return p;
                     const title = (vt.title || '').trim();
@@ -3701,12 +3691,15 @@ const serveMerchantCenterFeed = (req, res) => {
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&apos;');
             };
-            const toItem = (item, flightType, price) => {
+            const toItem = (item, flightType, price, locationName) => {
                 const title = (item.title || 'Balloon Flight').trim();
                 const priceNum = parseFloat(price) || 0;
                 if (!priceNum || priceNum <= 0) return null;
-                const id = `${flightType}-${title}`.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-                const link = `${BOOK_SITE_BASE_URL}/?startAt=voucher-type&voucherTitle=${encodeURIComponent(title)}`;
+                const displayTitle = locationName ? `${locationName} ${title}` : title;
+                const idBase = `${flightType}-${displayTitle}`.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                const id = locationName ? `${idBase}` : idBase;
+                let link = `${BOOK_SITE_BASE_URL}/?startAt=voucher-type&voucherTitle=${encodeURIComponent(title)}`;
+                if (locationName) link += `&location=${encodeURIComponent(locationName)}`;
                 let imageLink = (item.image_url || '').trim();
                 if (imageLink && !imageLink.startsWith('http')) {
                     imageLink = imageLink.startsWith('/') ? `${BACKEND_PUBLIC_URL}${imageLink}` : `${BACKEND_PUBLIC_URL}/${imageLink}`;
@@ -3715,24 +3708,45 @@ const serveMerchantCenterFeed = (req, res) => {
                 const desc = (item.description || 'Hot air balloon flight experience with Fly Away Ballooning.').trim().substring(0, 500);
                 return {
                     id,
-                    title: `${title} - ${flightType} - Fly Away Ballooning`,
+                    title: `${displayTitle} - ${flightType} - Fly Away Ballooning`,
                     description: desc,
                     link,
                     image_link: imageLink,
                     price: `${priceNum.toFixed(2)} GBP`
                 };
             };
-            const sharedProcessed = (sharedRows || []).map(vt => {
-                let p = vt.price_per_person;
-                if (vt.title === 'Weekday Morning' && vt.weekday_morning_price != null) p = vt.weekday_morning_price;
-                else if (vt.title === 'Flexible Weekday' && vt.flexible_weekday_price != null) p = vt.flexible_weekday_price;
-                else if (vt.title === 'Any Day Flight' && vt.any_day_flight_price != null) p = vt.any_day_flight_price;
-                return toItem(vt, 'Shared Flight', p);
-            }).filter(Boolean);
-            const privateProcessed = (privateRows || []).map(vt => {
-                const price = resolvePrivatePrice(vt);
-                return toItem(vt, 'Private Charter', price);
-            }).filter(Boolean);
+            const sharedProcessed = [];
+            (locations.length ? locations : [null]).forEach((loc) => {
+                const act = loc ? activitiesByLocation[loc] : null;
+                (sharedRows || []).forEach((vt) => {
+                    let p = act ? null : vt.price_per_person;
+                    if (act) {
+                        if (vt.title === 'Weekday Morning') p = act.weekday_morning_price;
+                        else if (vt.title === 'Flexible Weekday') p = act.flexible_weekday_price;
+                        else if (vt.title === 'Any Day Flight') p = act.any_day_flight_price;
+                        if (p == null) p = vt.price_per_person;
+                    }
+                    const item = toItem(vt, 'Shared Flight', p, loc || null);
+                    if (item) sharedProcessed.push(item);
+                });
+            });
+            const privateProcessed = [];
+            (locations.length ? locations : [null]).forEach((loc) => {
+                let privateCharterPricingMap = {};
+                if (loc && activitiesByLocation[loc] && activitiesByLocation[loc].private_charter_pricing) {
+                    try {
+                        const raw = activitiesByLocation[loc].private_charter_pricing;
+                        privateCharterPricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
+                    } catch (e) {
+                        privateCharterPricingMap = {};
+                    }
+                }
+                (privateRows || []).forEach((vt) => {
+                    const price = resolvePrivatePriceForLocation(vt, privateCharterPricingMap);
+                    const item = toItem(vt, 'Private Charter', price, loc || null);
+                    if (item) privateProcessed.push(item);
+                });
+            });
             const items = [...sharedProcessed, ...privateProcessed];
             const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
             const channelLink = BOOK_SITE_BASE_URL;
