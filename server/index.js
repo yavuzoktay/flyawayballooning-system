@@ -3634,6 +3634,8 @@ function getEmptyMerchantFeedXml() {
         '</channel>\n</rss>';
 }
 
+const MERCHANT_FEED_LOCATIONS = ['Bath', 'Bristol', 'Devon', 'Somerset'];
+
 function getFallbackMerchantFeedXml() {
     const base = BOOK_SITE_BASE_URL;
     const img = BACKEND_PUBLIC_URL + '/favicon.ico';
@@ -3641,13 +3643,23 @@ function getFallbackMerchantFeedXml() {
     const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
     const channelLink = BOOK_SITE_BASE_URL;
     const channelDesc = 'Hot air balloon flight vouchers and experiences - Shared Flight and Private Charter. Book at flyawayballooning-book.com';
-    const items = [
-        { id: 'shared-flight-weekday-morning', title: 'Weekday Morning - Shared Flight - Fly Away Ballooning', description: 'Catch sunrise savings', link: base + '/?startAt=voucher-type&voucherTitle=Weekday%20Morning', image_link: img, price: '180.00 GBP' },
-        { id: 'shared-flight-flexible-weekday', title: 'Flexible Weekday - Shared Flight - Fly Away Ballooning', description: 'More value, same magic', link: base + '/?startAt=voucher-type&voucherTitle=Flexible%20Weekday', image_link: img, price: '200.00 GBP' },
-        { id: 'shared-flight-any-day-flight', title: 'Any Day Flight - Shared Flight - Fly Away Ballooning', description: 'Freedom to fly', link: base + '/?startAt=voucher-type&voucherTitle=Any%20Day%20Flight', image_link: img, price: '220.00 GBP' },
-        { id: 'private-charter-private-charter', title: 'Private Charter - Private Charter - Fly Away Ballooning', description: 'Your sky, your moment', link: base + '/?startAt=voucher-type&voucherTitle=Private%20Charter', image_link: img, price: '900.00 GBP' },
-        { id: 'private-charter-proposal-flight', title: 'Proposal Flight - Private Charter - Fly Away Ballooning', description: 'Love rises here', link: base + '/?startAt=voucher-type&voucherTitle=Proposal%20Flight', image_link: img, price: '1000.00 GBP' }
+    const products = [
+        { voucherTitle: 'Weekday Morning', flightType: 'Shared Flight', description: 'Catch sunrise savings', price: '180.00 GBP' },
+        { voucherTitle: 'Flexible Weekday', flightType: 'Shared Flight', description: 'More value, same magic', price: '200.00 GBP' },
+        { voucherTitle: 'Any Day Flight', flightType: 'Shared Flight', description: 'Freedom to fly', price: '220.00 GBP' },
+        { voucherTitle: 'Private Charter', flightType: 'Private Charter', description: 'Your sky, your moment', price: '900.00 GBP' },
+        { voucherTitle: 'Proposal Flight', flightType: 'Private Charter', description: 'Love rises here', price: '1000.00 GBP' }
     ];
+    const items = [];
+    for (const loc of MERCHANT_FEED_LOCATIONS) {
+        for (const p of products) {
+            const displayTitle = loc + ' ' + p.voucherTitle;
+            const id = (p.flightType + '-' + displayTitle).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            const link = base + '/?startAt=voucher-type&voucherTitle=' + encodeURIComponent(p.voucherTitle) + '&location=' + encodeURIComponent(loc);
+            const title = displayTitle + ' - ' + p.flightType + ' - Fly Away Ballooning';
+            items.push({ id, title, description: p.description, link, image_link: img, price: p.price });
+        }
+    }
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<rss xmlns:g="http://base.google.com/ns/1.0" version="2.0">\n<channel>\n';
     xml += '<title>' + esc(channelTitle) + '</title>\n<link>' + esc(channelLink) + '</link>\n<description>' + esc(channelDesc) + '</description>\n';
     for (const it of items) {
@@ -3757,15 +3769,23 @@ function buildMerchantFeedXml(sharedRows, privateRows, activityRows) {
     });
     let items = [...sharedProcessed, ...privateProcessed];
     if (items.length === 0) {
-        const base = BOOK_SITE_BASE_URL;
-        const imgBase = BACKEND_PUBLIC_URL;
-        items = [
-            { id: 'shared-flight-weekday-morning', title: 'Weekday Morning - Shared Flight - Fly Away Ballooning', description: 'Catch sunrise savings', link: `${base}/?startAt=voucher-type&voucherTitle=Weekday%20Morning`, image_link: `${imgBase}/favicon.ico`, price: '180.00 GBP' },
-            { id: 'shared-flight-flexible-weekday', title: 'Flexible Weekday - Shared Flight - Fly Away Ballooning', description: 'More value, same magic', link: `${base}/?startAt=voucher-type&voucherTitle=Flexible%20Weekday`, image_link: `${imgBase}/favicon.ico`, price: '200.00 GBP' },
-            { id: 'shared-flight-any-day-flight', title: 'Any Day Flight - Shared Flight - Fly Away Ballooning', description: 'Freedom to fly', link: `${base}/?startAt=voucher-type&voucherTitle=Any%20Day%20Flight`, image_link: `${imgBase}/favicon.ico`, price: '220.00 GBP' },
-            { id: 'private-charter-private-charter', title: 'Private Charter - Private Charter - Fly Away Ballooning', description: 'Your sky, your moment', link: `${base}/?startAt=voucher-type&voucherTitle=Private%20Charter`, image_link: `${imgBase}/favicon.ico`, price: '900.00 GBP' },
-            { id: 'private-charter-proposal-flight', title: 'Proposal Flight - Private Charter - Fly Away Ballooning', description: 'Love rises here', link: `${base}/?startAt=voucher-type&voucherTitle=Proposal%20Flight`, image_link: `${imgBase}/favicon.ico`, price: '1000.00 GBP' }
+        const fallbackLocs = MERCHANT_FEED_LOCATIONS;
+        const fallbackProducts = [
+            { voucherTitle: 'Weekday Morning', flightType: 'Shared Flight', description: 'Catch sunrise savings', price: '180.00 GBP' },
+            { voucherTitle: 'Flexible Weekday', flightType: 'Shared Flight', description: 'More value, same magic', price: '200.00 GBP' },
+            { voucherTitle: 'Any Day Flight', flightType: 'Shared Flight', description: 'Freedom to fly', price: '220.00 GBP' },
+            { voucherTitle: 'Private Charter', flightType: 'Private Charter', description: 'Your sky, your moment', price: '900.00 GBP' },
+            { voucherTitle: 'Proposal Flight', flightType: 'Private Charter', description: 'Love rises here', price: '1000.00 GBP' }
         ];
+        const imgBase = BACKEND_PUBLIC_URL + '/favicon.ico';
+        for (const loc of fallbackLocs) {
+            for (const p of fallbackProducts) {
+                const displayTitle = loc + ' ' + p.voucherTitle;
+                const id = (p.flightType + '-' + displayTitle).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                const link = `${BOOK_SITE_BASE_URL}/?startAt=voucher-type&voucherTitle=${encodeURIComponent(p.voucherTitle)}&location=${encodeURIComponent(loc)}`;
+                items.push({ id, title: `${displayTitle} - ${p.flightType} - Fly Away Ballooning`, description: p.description, link, image_link: imgBase, price: p.price });
+            }
+        }
     }
     const channelTitle = 'Fly Away Ballooning - Balloon Flight Vouchers';
     const channelLink = BOOK_SITE_BASE_URL;
