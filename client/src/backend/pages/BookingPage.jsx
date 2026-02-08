@@ -6828,11 +6828,6 @@ setBookingDetail(finalVoucherDetail);
                                                                 </IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        {/* Weight field moved to Passenger Details section */}
-                                                        <Typography sx={{ 
-                                                            mb: isMobile ? 0 : 1,
-                                                            fontSize: isMobile ? '14px' : 'inherit'
-                                                        }}><b>Voucher ID:</b> {v.id || '-'}</Typography>
                                                         <Typography sx={{ 
                                                             mb: isMobile ? 0 : 1,
                                                             fontSize: isMobile ? '14px' : 'inherit'
@@ -7630,7 +7625,7 @@ setBookingDetail(finalVoucherDetail);
                                                     <Typography><b>Flight Date:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>
                                                     <Typography><b>Location:</b> {bookingDetail.booking.location || '-'}</Typography>
                                                     <Typography><b>Status:</b> {bookingDetail.booking.status || '-'}</Typography>
-                                                    <Typography><b>Voucher Code Used:</b> {bookingDetail.booking.voucher_code || '-'}</Typography>
+                                                    <Typography><b>Voucher Code Used:</b> {bookingDetail.booking.originalRedeemedVoucherCode || bookingDetail.booking.voucher_code || '-'}</Typography>
                                                 </Box>
                                             ) : null}
                                             
