@@ -853,10 +853,16 @@ const Manifest = () => {
                 return;
             }
 
-            // Validate SMS template selection
+            // Validate SMS content / template selection
+            const hasSmsBody =
+                (smsForm.message && smsForm.message.trim().length > 0) ||
+                (personalNote && personalNote.trim().length > 0);
+
+            // When using a custom SMS (or no explicit template), allow either
+            // a template message OR a personal note to be the body.
             if (!smsForm.template || smsForm.template === 'custom') {
-                if (!smsForm.message || smsForm.message.trim().length === 0) {
-                    alert('SMS message is required. Please select an SMS template or enter a custom message.');
+                if (!hasSmsBody) {
+                    alert('SMS message is required. Please select an SMS template or enter a custom message or personal note.');
                     return;
                 }
             }
@@ -1120,9 +1126,15 @@ const Manifest = () => {
 
         // Validate SMS requirements if SMS is checked
         if (groupMessageSmsChecked) {
+            const hasSmsBody =
+                (groupSmsForm.message && groupSmsForm.message.trim().length > 0) ||
+                (groupPersonalNote && groupPersonalNote.trim().length > 0);
+
+            // When using a custom SMS (or no explicit template), allow either
+            // a template message OR a personal note to be the body.
             if (!groupSmsForm.template || groupSmsForm.template === 'custom') {
-                if (!groupSmsForm.message || groupSmsForm.message.trim().length === 0) {
-                    alert('SMS message is required. Please select an SMS template or enter a custom message.');
+                if (!hasSmsBody) {
+                    alert('SMS message is required. Please select an SMS template or enter a custom message or personal note.');
                     return;
                 }
             }
@@ -7861,7 +7873,17 @@ const Manifest = () => {
                             groupMessageSending || 
                             (!groupMessageEmailChecked && !groupMessageSmsChecked) ||
                             (groupMessageEmailChecked && (groupMessageForm.to.length === 0 || !groupMessageForm.subject)) ||
-                            (groupMessageSmsChecked && (!groupSmsForm.template || groupSmsForm.template === 'custom') && (!groupSmsForm.message || groupSmsForm.message.trim().length === 0))
+                            // SMS disabled state – align with handleSendGroupEmail validation:
+                            //  - allow body to come from either groupSmsForm.message or groupPersonalNote when using custom template
+                            (groupMessageSmsChecked && (() => {
+                                const hasSmsBody =
+                                    (groupSmsForm.message && groupSmsForm.message.trim().length > 0) ||
+                                    (groupPersonalNote && groupPersonalNote.trim().length > 0);
+                                if (!groupSmsForm.template || groupSmsForm.template === 'custom') {
+                                    return !hasSmsBody;
+                                }
+                                return false;
+                            })())
                         }
                     >
                         {groupMessageSending ? 'Sending...' : 'Send'}
@@ -8365,7 +8387,23 @@ const Manifest = () => {
                                 backgroundColor: '#1565c0'
                             }
                         }}
-                        disabled={sendingEmail || (sendMessageEmailChecked && (!emailForm.to || !emailForm.subject)) || (sendMessageSmsChecked && (!smsForm.message || !smsForm.to))}
+                        disabled={
+                            sendingEmail ||
+                            // Email disabled state
+                            (sendMessageEmailChecked && (!emailForm.to || !emailForm.subject)) ||
+                            // SMS disabled state – align with handleSendEmail validation:
+                            //  - require valid phone (handled at send time)
+                            //  - allow body to come from either smsForm.message or personalNote when using custom template
+                            (sendMessageSmsChecked && (() => {
+                                const hasSmsBody =
+                                    (smsForm.message && smsForm.message.trim().length > 0) ||
+                                    (personalNote && personalNote.trim().length > 0);
+                                if (!smsForm.template || smsForm.template === 'custom') {
+                                    return !hasSmsBody;
+                                }
+                                return false;
+                            })())
+                        }
                     >
                         {sendingEmail ? 'Sending...' : 'Send'}
                     </Button>
