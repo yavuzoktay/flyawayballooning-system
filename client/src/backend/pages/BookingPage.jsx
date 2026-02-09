@@ -2899,8 +2899,11 @@ setBookingDetail(finalVoucherDetail);
                 
                 // For Gift Vouchers, also update purchaser fields when name or email is updated
                 const isGiftVoucher = bookingDetail?.voucher?.book_flight === 'Gift Voucher';
-                if (isGiftVoucher && (editField === 'name' || editField === 'email')) {
-                    const purchaserField = editField === 'name' ? 'purchaser_name' : 'purchaser_email';
+                if (isGiftVoucher && (editField === 'name' || editField === 'email' || editField === 'purchaser_phone')) {
+                    let purchaserField;
+                    if (editField === 'name') purchaserField = 'purchaser_name';
+                    else if (editField === 'email') purchaserField = 'purchaser_email';
+                    else purchaserField = 'purchaser_phone';
                     console.log('Gift Voucher: Also updating', purchaserField, 'to match', editField);
                     
                     try {
@@ -2929,7 +2932,8 @@ setBookingDetail(finalVoucherDetail);
                         [editField]: editValue,
                         // Also update purchaser fields in local state for Gift Vouchers
                         ...(isGiftVoucher && editField === 'name' ? { purchaser_name: editValue } : {}),
-                        ...(isGiftVoucher && editField === 'email' ? { purchaser_email: editValue } : {})
+                        ...(isGiftVoucher && editField === 'email' ? { purchaser_email: editValue } : {}),
+                        ...(isGiftVoucher && editField === 'purchaser_phone' ? { purchaser_phone: editValue } : {})
                     }
                 }));
                 // Tabloyu güncelle
@@ -2942,6 +2946,9 @@ setBookingDetail(finalVoucherDetail);
                         }
                         if (isGiftVoucher && editField === 'email') {
                             updated.purchaser_email = editValue;
+                        }
+                        if (isGiftVoucher && editField === 'purchaser_phone') {
+                            updated.purchaser_phone = editValue;
                         }
                         return updated;
                     }
@@ -2956,6 +2963,9 @@ setBookingDetail(finalVoucherDetail);
                         }
                         if (isGiftVoucher && editField === 'email') {
                             updated.purchaser_email = editValue;
+                        }
+                        if (isGiftVoucher && editField === 'purchaser_phone') {
+                            updated.purchaser_phone = editValue;
                         }
                         return updated;
                     }
@@ -6602,7 +6612,7 @@ setBookingDetail(finalVoucherDetail);
                                                         <Typography sx={{ 
                                                             mb: isMobile ? 0 : 1,
                                                             fontSize: isMobile ? '14px' : 'inherit'
-                                                        }}><b>Phone:</b> {editField === 'mobile' ? (
+                                                        }}><b>Phone:</b> {(editField === 'phone' || editField === 'purchaser_phone') ? (
                                                             <>
                                                                 <input 
                                                                     value={editValue} 
@@ -6653,13 +6663,16 @@ setBookingDetail(finalVoucherDetail);
                                                                     }
                                                                     return phoneValue;
                                                                 })()}
-                                                                <IconButton 
+                                                                    <IconButton 
                                                                     size="small" 
                                                                     onClick={() => {
-                                                                    const phoneValue = v.book_flight === "Gift Voucher" 
+                                                                    const isGiftVoucher = v.book_flight === "Gift Voucher" 
+                                                                        || (v.book_flight || '').toLowerCase().includes('gift');
+                                                                    const phoneValue = isGiftVoucher
                                                                         ? (v.purchaser_phone || v.phone) 
                                                                         : (v.booking_phone && v.booking_phone.trim() !== '' ? v.booking_phone : (v.phone || v.mobile));
-                                                                    handleEditClick('mobile', phoneValue);
+                                                                    const fieldName = isGiftVoucher ? 'purchaser_phone' : 'phone';
+                                                                    handleEditClick(fieldName, phoneValue);
                                                                     }}
                                                                     sx={{ 
                                                                         padding: isMobile ? '2px' : '8px',
