@@ -1236,101 +1236,109 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                 {selectedDate && selectedTime && (
                                                     <Box sx={{ mt: 4 }}>
                                                         <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>Passenger Information</Typography>
-                                                        {passengerData.map((passenger, index) => (
-                                                        <Box 
-                                                            key={index} 
-                                                            sx={{ 
-                                                                mb: 3, 
-                                                                p: 3, 
-                                                                border: '1px solid #e0e0e0', 
-                                                                borderRadius: 2, 
-                                                                backgroundColor: '#fafafa' 
-                                                            }}
-                                                        >
-                                                            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                                                                Passenger {index + 1}
-                                                            </Typography>
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                fullWidth
-                                                label="First Name"
-                                                placeholder="First Name"
-                                                                        value={passenger.firstName}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...passengerData];
-                                                                            updated[index].firstName = e.target.value;
-                                                                            setPassengerData(updated);
-                                                                        }}
-                                                required
-                                                variant="outlined"
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                fullWidth
-                                                label="Last Name"
-                                                placeholder="Last Name"
-                                                                        value={passenger.lastName}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...passengerData];
-                                                                            updated[index].lastName = e.target.value;
-                                                                            setPassengerData(updated);
-                                                                        }}
-                                                required
-                                                variant="outlined"
-                                            />
-                                        </Grid>
-                                                                <Grid item xs={12} sm={6}>
-                                                                    <TextField
-                                                                        fullWidth
-                                                                        label="Weight (Kg)"
-                                                                        placeholder="Max 18 Stone / 114Kg"
-                                                                        type="number"
-                                                                        value={passenger.weight}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...passengerData];
-                                                                            updated[index].weight = e.target.value;
-                                                                            setPassengerData(updated);
-                                                                        }}
-                                                                        variant="outlined"
-                                                                        inputProps={{ min: 0, max: 114 }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                fullWidth
-                                                label="Mobile Number"
-                                                placeholder="Mobile Number"
-                                                                        value={passenger.mobile}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...passengerData];
-                                                                            updated[index].mobile = e.target.value;
-                                                                            setPassengerData(updated);
-                                                                        }}
-                                                required
-                                                variant="outlined"
-                                            />
-                                        </Grid>
-                                                                <Grid item xs={12}>
-                                            <TextField
-                                                fullWidth
-                                                label="Email"
-                                                placeholder="Email"
-                                                type="email"
-                                                                        value={passenger.email}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...passengerData];
-                                                                            updated[index].email = e.target.value;
-                                                                            setPassengerData(updated);
-                                                                        }}
-                                                required
-                                                variant="outlined"
-                                            />
-                                        </Grid>
-                                    </Grid>
-                                </Box>
-                                                        ))}
+                                                        {passengerData.map((passenger, index) => {
+                                                            const isFirstPassenger = index === 0;
+                                                            return (
+                                                                <Box 
+                                                                    key={index} 
+                                                                    sx={{ 
+                                                                        mb: 3, 
+                                                                        p: 3, 
+                                                                        border: '1px solid #e0e0e0', 
+                                                                        borderRadius: 2, 
+                                                                        backgroundColor: '#fafafa' 
+                                                                    }}
+                                                                >
+                                                                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+                                                                        Passenger {index + 1}
+                                                                    </Typography>
+                                                                    <Grid container spacing={2}>
+                                                                        <Grid item xs={12} sm={6}>
+                                                                            <TextField
+                                                                                fullWidth
+                                                                                label="First Name"
+                                                                                placeholder="First Name"
+                                                                                value={passenger.firstName}
+                                                                                onChange={(e) => {
+                                                                                    const updated = [...passengerData];
+                                                                                    updated[index].firstName = e.target.value;
+                                                                                    setPassengerData(updated);
+                                                                                }}
+                                                                                required
+                                                                                variant="outlined"
+                                                                            />
+                                                                        </Grid>
+                                                                        <Grid item xs={12} sm={6}>
+                                                                            <TextField
+                                                                                fullWidth
+                                                                                label="Last Name"
+                                                                                placeholder="Last Name"
+                                                                                value={passenger.lastName}
+                                                                                onChange={(e) => {
+                                                                                    const updated = [...passengerData];
+                                                                                    updated[index].lastName = e.target.value;
+                                                                                    setPassengerData(updated);
+                                                                                }}
+                                                                                required
+                                                                                variant="outlined"
+                                                                            />
+                                                                        </Grid>
+                                                                        <Grid item xs={12} sm={6}>
+                                                                            <TextField
+                                                                                fullWidth
+                                                                                label="Weight (Kg)"
+                                                                                placeholder="Max 18 Stone / 114Kg"
+                                                                                type="number"
+                                                                                value={passenger.weight}
+                                                                                onChange={(e) => {
+                                                                                    const updated = [...passengerData];
+                                                                                    updated[index].weight = e.target.value;
+                                                                                    setPassengerData(updated);
+                                                                                }}
+                                                                                variant="outlined"
+                                                                                inputProps={{ min: 0, max: 114 }}
+                                                                            />
+                                                                        </Grid>
+                                                                        {/* Only Passenger 1 should have contact fields */}
+                                                                        {isFirstPassenger && (
+                                                                            <Grid item xs={12} sm={6}>
+                                                                                <TextField
+                                                                                    fullWidth
+                                                                                    label="Mobile Number"
+                                                                                    placeholder="Mobile Number"
+                                                                                    value={passenger.mobile}
+                                                                                    onChange={(e) => {
+                                                                                        const updated = [...passengerData];
+                                                                                        updated[index].mobile = e.target.value;
+                                                                                        setPassengerData(updated);
+                                                                                    }}
+                                                                                    required
+                                                                                    variant="outlined"
+                                                                                />
+                                                                            </Grid>
+                                                                        )}
+                                                                        {isFirstPassenger && (
+                                                                            <Grid item xs={12}>
+                                                                                <TextField
+                                                                                    fullWidth
+                                                                                    label="Email"
+                                                                                    placeholder="Email"
+                                                                                    type="email"
+                                                                                    value={passenger.email}
+                                                                                    onChange={(e) => {
+                                                                                        const updated = [...passengerData];
+                                                                                        updated[index].email = e.target.value;
+                                                                                        setPassengerData(updated);
+                                                                                    }}
+                                                                                    required
+                                                                                    variant="outlined"
+                                                                                />
+                                                                            </Grid>
+                                                                        )}
+                                                                    </Grid>
+                                                                </Box>
+                                                            );
+                                                        })}
                                                     </Box>
                                                 )}
                                             </>
@@ -1661,7 +1669,13 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                               !selectedTime ||
                               !passengerData || 
                               passengerData.length === 0 ||
-                              passengerData.some(p => !p.firstName || !p.lastName || !p.mobile || !p.email)
+                              passengerData.some((p, idx) => {
+                                  // All passengers must have first/last name
+                                  if (!p.firstName || !p.lastName) return true;
+                                  // Only Passenger 1 (index 0) must have mobile and email
+                                  if (idx === 0 && (!p.mobile || !p.email)) return true;
+                                  return false;
+                              })
                             : isFlightVoucherDetails
                             ? // Flight Voucher: Require at least one location, date, and time
                               flightVoucherSelectedLocations.length === 0 ||
