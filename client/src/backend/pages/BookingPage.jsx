@@ -3023,6 +3023,23 @@ setBookingDetail(finalVoucherDetail);
             // Tabloyu anında güncelle
             setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
             setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
+            
+            // Phone/email güncellemesi yapıldığında Manifest sayfasını bilgilendir
+            if (editField === 'phone' || editField === 'email') {
+                const payload = {
+                    bookingId: bookingDetail.booking.id,
+                    field: editField,
+                    value: editValue
+                };
+                // Persist so Manifest can apply when it mounts (user may be on Booking page when event fires)
+                if (typeof window !== 'undefined') {
+                    window.__bookingFieldUpdates = window.__bookingFieldUpdates || {};
+                    window.__bookingFieldUpdates[String(bookingDetail.booking.id)] = payload;
+                }
+                window.dispatchEvent(new CustomEvent('bookingFieldUpdated', {
+                    detail: payload
+                }));
+            }
             // Eğer aktif tab dateRequests ise, dateRequestedData ile tabloyu güncelle
             if (activeTab === 'dateRequests') {
                 await dateRequestedData();

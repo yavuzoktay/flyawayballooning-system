@@ -660,6 +660,21 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         }
     }, [availabilities.length, finalFilteredAvailabilities.length, selectedLocations.join(','), experience, voucherType]);
 
+    // Voucher / Booking expiry date (used to block reschedules after expiry)
+    // Apply same extension rules as Customer Portal header:
+    // After 6 attempts, every additional block of 3 attempts extends expiry by +6 months.
+    const expiryDate = React.useMemo(() => {
+        if (!bookingData?.expires) return null;
+        const baseExpiry = dayjs(bookingData.expires);
+        if (!baseExpiry.isValid()) return null;
+
+        const attempts = parseInt(bookingData.flight_attempts ?? 0, 10) || 0;
+        const extraBlocks = attempts > 6
+            ? Math.floor((attempts - 7) / 3) + 1
+            : 0;
+        return extraBlocks > 0 ? baseExpiry.add(extraBlocks * 6, 'month') : baseExpiry;
+    }, [bookingData?.expires, bookingData?.flight_attempts]);
+
     const getTimesForDate = (date) => {
         if (!date) return [];
         const dateStr = getLocalDateStr(date);
@@ -742,13 +757,15 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const inCurrentMonth = d.isSame(currentMonth, 'month');
             const isPast = d.isBefore(dayjs(), 'day');
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
+            const isAfterExpiry = expiryDate ? d.isAfter(expiryDate, 'day') : false;
             
             const { total, soldOut, slots, hasEnoughSpace } = getSpacesForDate(d.toDate());
             const hasAnySlots = slots.length > 0;
             
             // Date is selectable only if there's enough space for all passengers
             // Similar to Change Flight Location modal logic
-            const isSelectable = inCurrentMonth && !isPast && hasAnySlots && !soldOut && hasEnoughSpace;
+            // Additionally: do NOT allow selecting dates after the Voucher / Booking Expiry Date
+            const isSelectable = inCurrentMonth && !isPast && !isAfterExpiry && hasAnySlots && !soldOut && hasEnoughSpace;
             
             cells.push(
                 <div
@@ -778,6 +795,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             ? '#56C1FF'
                             : isPast
                                 ? '#f0f0f0'
+                                : isAfterExpiry
+                                    ? '#f0f0f0'
                                 : soldOut
                                     ? '#888'
                                     : '#22c55e',  // Green for available dates (like Change Flight Location)
@@ -785,6 +804,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             ? '#fff'
                             : isPast
                                 ? '#999'
+                                : isAfterExpiry
+                                    ? '#999'
                                 : soldOut
                                     ? '#fff'
                                     : '#fff',

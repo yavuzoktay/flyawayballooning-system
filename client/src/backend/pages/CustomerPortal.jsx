@@ -882,9 +882,27 @@ const CustomerPortal = () => {
                             <Typography variant="body2" color="text.secondary">Voucher / Booking Expiry Date</Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                    {bookingData.expires
-                                        ? dayjs(bookingData.expires).format('DD/MM/YYYY')
-                                        : 'No expiry date'}
+                                    {(() => {
+                                        if (!bookingData.expires) return 'No expiry date';
+                                        const baseExpiry = dayjs(bookingData.expires);
+                                        if (!baseExpiry.isValid()) return bookingData.expires;
+
+                                        const attempts = parseInt(bookingData.flight_attempts ?? 0, 10) || 0;
+                                        // After 6 attempts, every additional block of 3 attempts
+                                        // extends the expiry by +6 months:
+                                        // 0–6 => +0
+                                        // 7–9 => +6
+                                        // 10–12 => +12
+                                        // 13–15 => +18, etc.
+                                        const extraBlocks = attempts > 6
+                                            ? Math.floor((attempts - 7) / 3) + 1
+                                            : 0;
+                                        const effectiveExpiry = extraBlocks > 0
+                                            ? baseExpiry.add(extraBlocks * 6, 'month')
+                                            : baseExpiry;
+
+                                        return effectiveExpiry.format('DD/MM/YYYY');
+                                    })()}
                                 </Typography>
                                 {(() => {
                                     const hasFlightDate = Boolean(bookingData.flight_date);

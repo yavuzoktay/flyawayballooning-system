@@ -1884,9 +1884,120 @@ const Manifest = () => {
                     activity_id: activityId
                 };
             });
-            setFlights(normalized);
+            
+            // Apply any pending phone/email updates from Booking page (user may have updated while on Booking page; Manifest was unmounted so event was missed)
+            const pendingUpdates = (typeof window !== 'undefined' && window.__bookingFieldUpdates) ? window.__bookingFieldUpdates : {};
+            let merged = normalized;
+            if (Object.keys(pendingUpdates).length > 0) {
+                merged = normalized.map(f => {
+                    const id = String(f.id);
+                    const update = pendingUpdates[id];
+                    if (!update || (update.field !== 'phone' && update.field !== 'email')) return f;
+                    const updated = { ...f, [update.field]: update.value };
+                    if (Array.isArray(f.passengers) && f.passengers.length > 0) {
+                        updated.passengers = f.passengers.map((p, i) => {
+                            if (i !== 0) return p;
+                            if (update.field === 'phone') return { ...p, mobile: update.value };
+                            if (update.field === 'email') return { ...p, email: update.value };
+                            return p;
+                        });
+                    }
+                    delete window.__bookingFieldUpdates[id];
+                    return updated;
+                });
+            }
+            
+            // Preserve phone/mobile/email updates from handleEditSave by merging with existing flights state
+            setFlights(prevFlights => {
+                // Create a map of existing flights by ID for quick lookup (preserve manual updates)
+                const existingFlightsMap = new Map();
+                prevFlights.forEach(f => {
+                    const id = String(f.id);
+                    // Always preserve phone/mobile/email from current state if they exist (may have been manually updated)
+                    // Prioritize existing values over normalized values to preserve manual updates
+                    existingFlightsMap.set(id, {
+                        phone: f.phone,
+                        email: f.email,
+                        passengers: f.passengers
+                    });
+                });
+                
+                // Merge merged (normalized + pending Booking page updates) with preserved phone/mobile/email updates
+                return merged.map(f => {
+                    const id = String(f.id);
+                    const existing = existingFlightsMap.get(id);
+                    if (existing) {
+                        // Preserve manually updated phone/mobile/email from existing state
+                        // If existing has phone/email, use it; otherwise use normalized value
+                        const preservedPhone = existing.phone || f.phone;
+                        const preservedEmail = existing.email || f.email;
+                        
+                        // Merge passengers: preserve Passenger 1 mobile/email from existing if it exists
+                        let mergedPassengers = f.passengers;
+                        if (existing.passengers && existing.passengers.length > 0 && f.passengers && f.passengers.length > 0) {
+                            mergedPassengers = f.passengers.map((p, i) => {
+                                if (i === 0 && existing.passengers[0]) {
+                                    // Keep Passenger 1 mobile/email from existing state if it was manually updated
+                                    return { 
+                                        ...p, 
+                                        mobile: existing.passengers[0].mobile || p.mobile, 
+                                        email: existing.passengers[0].email || p.email 
+                                    };
+                                }
+                                return p;
+                            });
+                        } else if (existing.passengers && existing.passengers.length > 0) {
+                            // If normalized has no passengers but existing does, use existing
+                            mergedPassengers = existing.passengers;
+                        }
+                        
+                        return {
+                            ...f,
+                            phone: preservedPhone,
+                            email: preservedEmail,
+                            passengers: mergedPassengers
+                        };
+                    }
+                    return f;
+                });
+            });
         }
     }, [booking, passenger, bookingLoading, passengerLoading, locationToActivityId]);
+
+    // Listen for booking field updates from BookingPage (e.g., phone/email changes)
+    useEffect(() => {
+        const handleBookingFieldUpdate = async (event) => {
+            const { bookingId, field, value } = event.detail || {};
+            if (!bookingId || (field !== 'phone' && field !== 'email')) return;
+
+            const targetBookingId = String(bookingId);
+            setFlights(prevFlights => {
+                return prevFlights.map(f => {
+                    if (String(f.id) !== targetBookingId) return f;
+
+                    const updated = { ...f, [field]: value };
+                    if (Array.isArray(f.passengers) && f.passengers.length > 0) {
+                        updated.passengers = f.passengers.map((p, i) => {
+                            if (i !== 0) return p;
+                            if (field === 'phone') return { ...p, mobile: value };
+                            if (field === 'email') return { ...p, email: value };
+                            return p;
+                        });
+                    }
+                    return updated;
+                });
+            });
+
+            // Don't call bookingHook.refetch() here to prevent useEffect from overriding our immediate update
+            // The backend is already updated by BookingPage, and our immediate setFlights update ensures UI reflects the change instantly
+            // If refetch is needed later, it will happen naturally when the user navigates or refreshes
+        };
+
+        window.addEventListener('bookingFieldUpdated', handleBookingFieldUpdate);
+        return () => {
+            window.removeEventListener('bookingFieldUpdated', handleBookingFieldUpdate);
+        };
+    }, []); // Empty dependency array - event listener should only be set up once on mount
 
     const handleDateChange = (e) => {
         const newDate = e.target.value;
@@ -2707,25 +2818,57 @@ const Manifest = () => {
                     return f;
                 }));
             } else if (editField === 'phone' || editField === 'email') {
-                // Update bookingDetail state
-                setBookingDetail(prev => ({
-                    ...prev,
-                    booking: {
-                        ...prev.booking,
-                        [editField]: editValue
-                    }
-                }));
-                // Update flights state immediately for phone/email
-                setFlights(prevFlights => prevFlights.map(f => {
-                    if (f.id === bookingDetail.booking.id) {
-                        return {
-                            ...f,
+                // Update bookingDetail state (lead booking phone/email)
+                setBookingDetail(prev => {
+                    if (!prev) return prev;
+                    const updatedPassengers = Array.isArray(prev.passengers)
+                        ? prev.passengers.map((p, i) => {
+                            if (i !== 0) return p;
+                            // Keep Passenger 1 mobile/email in sync with booking-level contact
+                            if (editField === 'phone') {
+                                return { ...p, mobile: editValue };
+                            }
+                            if (editField === 'email') {
+                                return { ...p, email: editValue };
+                            }
+                            return p;
+                        })
+                        : prev.passengers;
+
+                    return {
+                        ...prev,
+                        booking: {
+                            ...prev.booking,
                             [editField]: editValue
-                        };
-                    }
-                    return f;
+                        },
+                        passengers: updatedPassengers
+                    };
+                });
+
+                const targetBookingId = String(bookingDetail.booking.id);
+                setFlights(prevFlights => prevFlights.map(f => {
+                    if (String(f.id) !== targetBookingId) return f;
+                    const updatedPassengers = Array.isArray(f.passengers) && f.passengers.length > 0
+                        ? f.passengers.map((p, i) => {
+                            if (i !== 0) return p;
+                            if (editField === 'phone') return { ...p, mobile: editValue };
+                            if (editField === 'email') return { ...p, email: editValue };
+                            return p;
+                        })
+                        : f.passengers;
+                    return {
+                        ...f,
+                        [editField]: editValue,
+                        passengers: updatedPassengers
+                    };
                 }));
-                // Don't call bookingHook.refetch() for phone/email updates to prevent useEffect from overwriting our flights state update
+                
+                // Refetch booking data to sync backend, but useEffect will preserve our manual phone/mobile updates
+                // Note: We don't await refetch here to allow UI to update immediately
+                // The useEffect will preserve our manual phone/mobile updates when it runs
+                if (typeof bookingHook.refetch === 'function') {
+                    bookingHook.refetch();
+                }
             } else {
             await fetchBookingDetail(bookingDetail.booking.id);
             if (typeof bookingHook.refetch === 'function') {
@@ -5205,7 +5348,17 @@ const Manifest = () => {
                                                                         firstPassenger ? firstPassenger.weight : ''
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell>{flight.phone || ''}</TableCell>
+                                                                <TableCell>
+                                                                    {(() => {
+                                                                        // Prefer booking-level phone (synced with Booking Details "Phone" field)
+                                                                        if (flight.phone) return flight.phone;
+                                                                        // Fallback: Passenger 1 mobile/phone if available
+                                                                        if (firstPassenger?.mobile) return firstPassenger.mobile;
+                                                                        if (firstPassenger?.phone) return firstPassenger.phone;
+                                                                        // Final fallback: any mobile field on flight row
+                                                                        return flight.mobile || '';
+                                                                    })()}
+                                                                </TableCell>
                                                                 <TableCell>{flight.email || ''}</TableCell>
                                                                 <TableCell>{hasWeatherRefund ? 'Yes' : 'No'}</TableCell>
                                                                 <TableCell>{(() => {
