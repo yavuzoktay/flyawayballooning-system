@@ -1686,7 +1686,6 @@ app.post('/api/createRedeemBooking', (req, res) => {
     const cleanVoucherCode = reqVoucherCode ? String(reqVoucherCode).trim() : 'no-voucher';
     const selectedDate = reqSelectedDate || 'no-date';
     const passengerEmail = passengerData?.[0]?.email || 'no-email';
-    
     // Prevent duplicate requests: use a request ID or combination of key fields
     // Store in-memory to prevent same request from being processed multiple times
     // Create a simpler key for duplicate detection (without timestamp)
