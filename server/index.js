@@ -2027,6 +2027,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
         console.log('selectedTime:', selectedTime);
         console.log('Final bookingDateTime:', bookingDateTime);
 
+
         // Get voucher information (created_at, voucher_type, experience_type) and price
         if (cleanVoucherCodeForValidation) {
             // First, get voucher info from all_vouchers table (including paid amount)
