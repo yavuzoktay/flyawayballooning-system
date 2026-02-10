@@ -5351,12 +5351,10 @@ const Manifest = () => {
                                                                 <TableCell>
                                                                     {(() => {
                                                                         // Prefer booking-level phone (synced with Booking Details "Phone" field)
-                                                                        if (flight.phone) return flight.phone;
-                                                                        // Fallback: Passenger 1 mobile/phone if available
-                                                                        if (firstPassenger?.mobile) return firstPassenger.mobile;
-                                                                        if (firstPassenger?.phone) return firstPassenger.phone;
-                                                                        // Final fallback: any mobile field on flight row
-                                                                        return flight.mobile || '';
+                                                                        const displayMobile =
+                                                                            flight.phone ||
+                                                                            (firstPassenger?.mobile || firstPassenger?.phone || flight.mobile || '');
+                                                                        return displayMobile;
                                                                     })()}
                                                                 </TableCell>
                                                                 <TableCell>{flight.email || ''}</TableCell>
