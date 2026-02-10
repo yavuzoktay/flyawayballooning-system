@@ -3026,7 +3026,9 @@ setBookingDetail(finalVoucherDetail);
             
             // Phone/email güncellemesi yapıldığında Manifest sayfasını bilgilendir
             if (editField === 'phone' || editField === 'email') {
+                const updateId = `bookingFieldUpdate_${bookingDetail.booking.id}_${Date.now()}`;
                 const payload = {
+                    id: updateId,
                     bookingId: bookingDetail.booking.id,
                     field: editField,
                     value: editValue
@@ -3035,6 +3037,19 @@ setBookingDetail(finalVoucherDetail);
                 if (typeof window !== 'undefined') {
                     window.__bookingFieldUpdates = window.__bookingFieldUpdates || {};
                     window.__bookingFieldUpdates[String(bookingDetail.booking.id)] = payload;
+
+                    // Persist to localStorage as a queue so other tabs / future Manifest mounts can apply updates
+                    try {
+                        const key = 'bookingFieldUpdates';
+                        const existingRaw = window.localStorage.getItem(key);
+                        const existing = existingRaw ? JSON.parse(existingRaw) : [];
+                        const next = Array.isArray(existing) ? existing : [];
+                        next.push(payload);
+                        // Limit queue size to last 100 updates
+                        window.localStorage.setItem(key, JSON.stringify(next.slice(-100)));
+                    } catch (err) {
+                        console.warn('bookingFieldUpdated: failed to persist to localStorage', err);
+                    }
                 }
                 window.dispatchEvent(new CustomEvent('bookingFieldUpdated', {
                     detail: payload

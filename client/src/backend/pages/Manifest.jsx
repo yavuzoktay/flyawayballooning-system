@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
     Box,
     Grid,
@@ -1965,39 +1965,78 @@ const Manifest = () => {
     }, [booking, passenger, bookingLoading, passengerLoading, locationToActivityId]);
 
     // Listen for booking field updates from BookingPage (e.g., phone/email changes)
-    useEffect(() => {
-        const handleBookingFieldUpdate = async (event) => {
-            const { bookingId, field, value } = event.detail || {};
-            if (!bookingId || (field !== 'phone' && field !== 'email')) return;
+    // Helper: Apply a single phone/email update to flights state
+    const applyBookingFieldUpdateToFlights = useCallback((update) => {
+        if (!update || !update.bookingId || (update.field !== 'phone' && update.field !== 'email')) return;
+        const { bookingId, field, value } = update;
+        const targetBookingId = String(bookingId);
+        setFlights(prevFlights => {
+            return prevFlights.map(f => {
+                if (String(f.id) !== targetBookingId) return f;
 
-            const targetBookingId = String(bookingId);
-            setFlights(prevFlights => {
-                return prevFlights.map(f => {
-                    if (String(f.id) !== targetBookingId) return f;
+                const updated = { ...f, [field]: value };
+                if (Array.isArray(f.passengers) && f.passengers.length > 0) {
+                    updated.passengers = f.passengers.map((p, i) => {
+                        if (i !== 0) return p;
+                        if (field === 'phone') return { ...p, mobile: value };
+                        if (field === 'email') return { ...p, email: value };
+                        return p;
+                    });
+                }
 
-                    const updated = { ...f, [field]: value };
-                    if (Array.isArray(f.passengers) && f.passengers.length > 0) {
-                        updated.passengers = f.passengers.map((p, i) => {
-                            if (i !== 0) return p;
-                            if (field === 'phone') return { ...p, mobile: value };
-                            if (field === 'email') return { ...p, email: value };
-                            return p;
-                        });
-                    }
-                    return updated;
-                });
+                return updated;
             });
+        });
+    }, []);
 
-            // Don't call bookingHook.refetch() here to prevent useEffect from overriding our immediate update
-            // The backend is already updated by BookingPage, and our immediate setFlights update ensures UI reflects the change instantly
-            // If refetch is needed later, it will happen naturally when the user navigates or refreshes
+    // Listen for booking field updates from BookingPage in the same tab
+    useEffect(() => {
+        const handleBookingFieldUpdate = (event) => {
+            applyBookingFieldUpdateToFlights(event.detail || {});
         };
 
         window.addEventListener('bookingFieldUpdated', handleBookingFieldUpdate);
         return () => {
             window.removeEventListener('bookingFieldUpdated', handleBookingFieldUpdate);
         };
-    }, []); // Empty dependency array - event listener should only be set up once on mount
+    }, [applyBookingFieldUpdateToFlights]);
+
+    // Listen for booking field updates from other tabs via localStorage
+    useEffect(() => {
+        const STORAGE_KEY = 'bookingFieldUpdates';
+
+        const applyFromStorage = () => {
+            try {
+                if (typeof window === 'undefined') return;
+                const raw = window.localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    return;
+                }
+                const updates = JSON.parse(raw);
+                if (!Array.isArray(updates) || updates.length === 0) {
+                    return;
+                }
+
+                updates.forEach(update => applyBookingFieldUpdateToFlights(update));
+            } catch (err) {
+                console.warn('Manifest: failed to apply booking field updates from storage', err);
+            }
+        };
+
+        // Apply any existing updates on mount (e.g., when navigating from Booking to Manifest)
+        applyFromStorage();
+
+        const handleStorage = (event) => {
+            if (event.key === STORAGE_KEY) {
+                applyFromStorage();
+            }
+        };
+
+        window.addEventListener('storage', handleStorage);
+        return () => {
+            window.removeEventListener('storage', handleStorage);
+        };
+    }, [applyBookingFieldUpdateToFlights]);
 
     const handleDateChange = (e) => {
         const newDate = e.target.value;
@@ -5351,7 +5390,45 @@ const Manifest = () => {
                                                                 <TableCell>
                                                                     {(() => {
                                                                         // Prefer booking-level phone (synced with Booking Details "Phone" field)
+                                                                        // but if there is a more recent bookingFieldUpdate in memory/localStorage,
+                                                                        // use that as the canonical source of truth to avoid later refetches
+                                                                        // overwriting the displayed Mobile value.
+
+                                                                        let latestUpdatedPhone = null;
+
+                                                                        if (typeof window !== 'undefined') {
+                                                                            // 1) In-memory updates (same tab)
+                                                                            const memUpdates = window.__bookingFieldUpdates || {};
+                                                                            const memUpdate = memUpdates[String(flight.id)];
+                                                                            if (memUpdate && memUpdate.field === 'phone' && memUpdate.value) {
+                                                                                latestUpdatedPhone = memUpdate.value;
+                                                                            }
+
+                                                                            // 2) Persistent queue in localStorage (other tabs / future mounts)
+                                                                            if (!latestUpdatedPhone) {
+                                                                                try {
+                                                                                    const raw = window.localStorage.getItem('bookingFieldUpdates');
+                                                                                    if (raw) {
+                                                                                        const updates = JSON.parse(raw);
+                                                                                        if (Array.isArray(updates)) {
+                                                                                            // Find the last phone update for this bookingId
+                                                                                            for (let i = updates.length - 1; i >= 0; i--) {
+                                                                                                const u = updates[i];
+                                                                                                if (u && String(u.bookingId) === String(flight.id) && u.field === 'phone' && u.value) {
+                                                                                                    latestUpdatedPhone = u.value;
+                                                                                                    break;
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                } catch (err) {
+                                                                                    console.warn('Manifest: failed to read bookingFieldUpdates from localStorage', err);
+                                                                                }
+                                                                            }
+                                                                        }
+
                                                                         const displayMobile =
+                                                                            latestUpdatedPhone ||
                                                                             flight.phone ||
                                                                             (firstPassenger?.mobile || firstPassenger?.phone || flight.mobile || '');
                                                                         return displayMobile;
