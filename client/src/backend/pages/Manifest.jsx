@@ -2901,6 +2901,35 @@ const Manifest = () => {
                         passengers: updatedPassengers
                     };
                 }));
+
+                // Keep BookingPage → Manifest sync helpers in sync:
+                // write this update into the shared in-memory/localStorage queue
+                // so Mobile column always prefers the latest manual phone/email.
+                try {
+                    const updateId = `bookingFieldUpdate_${bookingDetail.booking.id}_${Date.now()}`;
+                    const payload = {
+                        id: updateId,
+                        bookingId: bookingDetail.booking.id,
+                        field: editField,
+                        value: editValue
+                    };
+
+                    if (typeof window !== 'undefined') {
+                        // In-memory cache for this tab
+                        window.__bookingFieldUpdates = window.__bookingFieldUpdates || {};
+                        window.__bookingFieldUpdates[String(bookingDetail.booking.id)] = payload;
+
+                        // Persistent queue for other tabs / future Manifest mounts
+                        const key = 'bookingFieldUpdates';
+                        const existingRaw = window.localStorage.getItem(key);
+                        const existing = existingRaw ? JSON.parse(existingRaw) : [];
+                        const next = Array.isArray(existing) ? existing : [];
+                        next.push(payload);
+                        window.localStorage.setItem(key, JSON.stringify(next.slice(-100)));
+                    }
+                } catch (err) {
+                    console.warn('Manifest: failed to persist bookingFieldUpdate to localStorage', err);
+                }
                 
                 // Refetch booking data to sync backend, but useEffect will preserve our manual phone/mobile updates
                 // Note: We don't await refetch here to allow UI to update immediately
