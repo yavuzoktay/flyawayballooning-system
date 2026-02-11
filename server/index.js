@@ -16995,7 +16995,7 @@ app.patch('/api/updateBookingField', (req, res) => {
     // Debug: API çağrısını logla
     console.log('updateBookingField API çağrısı:', { booking_id, field, value });
 
-    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'activity_id', 'location', 'flight_type', 'flight_date', 'experience_types', 'pax', 'experience']; // Add new fields
+    const allowedFields = ['name', 'phone', 'email', 'expires', 'weight', 'status', 'flight_attempts', 'choose_add_on', 'additional_notes', 'preferred_day', 'preferred_location', 'preferred_time', 'paid', 'due', 'activity_id', 'location', 'flight_type', 'flight_date', 'experience_types', 'pax', 'experience']; // Add new fields
     if (!booking_id || !field || !allowedFields.includes(field)) {
         console.log('updateBookingField - Geçersiz istek:', { booking_id, field, value });
         return res.status(400).json({ success: false, message: 'Invalid request' });
@@ -20733,78 +20733,29 @@ app.get('/api/analytics', async (req, res) => {
                                                                 value
                                                             })).sort((a, b) => b.value - a.value);
                                                             // 9. Refundable Liability
-                                                            // Goal:
-                                                            // - Show the total *weather refundable* price (WX add-on)
-                                                            //   for bookings/vouchers that are still refundable.
-                                                            // Rules for bookings:
-                                                            // - Booking has NOT been marked as Flown
-                                                            // - Booking has NOT expired (expires is null or in the future)
-                                                            // - Booking has a non-zero weather_refund_total_price OR
-                                                            //   has the WX add-on in choose_add_on
-                                                            // We also continue to respect the analytics date filter, applied on the expires column
+                                                            // Goal: Sum WX Refundable price for bookings where WX Refundable = Yes
+                                                            // Rules: paid > 0, not Flown/Expired, not expired. Include only when WX = Yes.
+                                                            // Price: weather_refund_total_price (booking) OR passenger-level sum OR choose_add_on
                                                             const refundableSql = `
                                         SELECT 
-                                            COALESCE(weather_refund_total_price, 0) AS weather_refund_total_price,
-                                            choose_add_on,
-                                            paid,
-                                            status,
-                                            expires
-                                        FROM all_booking
-                                        WHERE paid IS NOT NULL
-                                          AND paid > 0
-                                          AND status NOT IN ('Expired', 'Flown')
-                                          AND (expires IS NULL OR expires > CURDATE())
-                                          ${dateFilter('expires')}
+                                            ab.id,
+                                            COALESCE(ab.weather_refund_total_price, 0) AS weather_refund_total_price,
+                                            ab.choose_add_on,
+                                            ab.paid,
+                                            ab.status,
+                                            ab.expires
+                                        FROM all_booking ab
+                                        WHERE ab.paid IS NOT NULL
+                                          AND ab.paid > 0
+                                          AND ab.status NOT IN ('Expired', 'Flown')
+                                          AND (ab.expires IS NULL OR ab.expires > CURDATE())
+                                          ${dateFilter('ab.expires')}
                                     `;
                                                             con.query(refundableSql, [], (err9, refRows) => {
                                                                 if (err9) return res.status(500).json({ error: 'Failed to fetch refundable liability' });
-                                                                let refundableLiability = 0;
-
-                                                                refRows.forEach(row => {
-                                                                    try {
-                                                                        // Primary source: dedicated weather_refund_total_price column
-                                                                        let rowLiability = Number(row.weather_refund_total_price) || 0;
-
-                                                                        // Fallback for legacy data where weather_refund_total_price is 0
-                                                                        // but WX information lives in choose_add_on
-                                                                        if (rowLiability === 0 && row.choose_add_on && typeof row.choose_add_on === 'string' && row.choose_add_on.trim() !== '') {
-                                                                            let wxTotal = 0;
-                                                                            let parsed = null;
-                                                                            const trimmed = row.choose_add_on.trim();
-
-                                                                            // Newer records may store JSON array of add-ons
-                                                                            if (trimmed.startsWith('[')) {
-                                                                                try {
-                                                                                    parsed = JSON.parse(trimmed);
-                                                                                } catch (e) {
-                                                                                    console.error('Refundable JSON parse error (booking JSON):', e);
-                                                                                }
-                                                                            }
-
-                                                                            if (Array.isArray(parsed)) {
-                                                                                parsed.forEach(a => {
-                                                                                    if (!a || !a.name) return;
-                                                                                    if (a.name.toLowerCase().includes('wx')) {
-                                                                                        const price = Number(a.price) || 47.5;
-                                                                                        wxTotal += price;
-                                                                                    }
-                                                                                });
-                                                                            } else {
-                                                                                // Very old records may only have a plain string like "WX Refundable"
-                                                                                if (trimmed.toLowerCase().includes('wx')) {
-                                                                                    // Use legacy default per-booking WX price if we can't see the exact value
-                                                                                    wxTotal += 47.5;
-                                                                                }
-                                                                            }
-
-                                                                            rowLiability += wxTotal;
-                                                                        }
-
-                                                                        refundableLiability += rowLiability;
-                                                                    } catch (e) {
-                                                                        console.error('Refundable liability calculation error:', e);
-                                                                    }
-                                                                });
+                                                                const REFUNDABLE_WEATHER_PRICE = 47.5;
+                                                                const bookingIds = refRows.map(r => r.id).filter(Boolean);
+                                                                const runWithRefundableLiability = (refundableLiabilityVal) => {
                                                                 // 10. Flown Flights by Location (only after manifest date and not cancelled)
                                                                 const flownSql = `
                                             SELECT location, COUNT(*) as count
@@ -20851,12 +20802,62 @@ app.get('/api/analytics', async (req, res) => {
                                                                         salesByBookingType,
                                                                         liabilityByLocation,
                                                                         liabilityByFlightType,
-                                                                        refundableLiability: Math.round(refundableLiability),
+                                                                        refundableLiability: Math.round(refundableLiabilityVal),
                                                                         flownFlightsByLocation,
                                                                         voucherLiability
                                                                     });
                                                                     });
                                                                 });
+                                                                };
+                                                                if (bookingIds.length === 0) {
+                                                                    runWithRefundableLiability(0);
+                                                                } else {
+                                                                    const passengerWxSql = `
+                                                                        SELECT booking_id, COUNT(*) as wx_count
+                                                                        FROM passenger
+                                                                        WHERE booking_id IN (${bookingIds.map(() => '?').join(',')})
+                                                                          AND (weather_refund = 1 OR weather_refund = '1')
+                                                                        GROUP BY booking_id
+                                                                    `;
+                                                                    con.query(passengerWxSql, bookingIds, (errPax, paxRows) => {
+                                                                        const wxByBooking = {};
+                                                                        (paxRows || []).forEach(r => {
+                                                                            wxByBooking[r.booking_id] = (Number(r.wx_count) || 0) * REFUNDABLE_WEATHER_PRICE;
+                                                                        });
+                                                                        let refundableLiability = 0;
+                                                                        refRows.forEach(row => {
+                                                                            try {
+                                                                                let rowLiability = Number(row.weather_refund_total_price) || 0;
+                                                                                if (rowLiability === 0 && row.choose_add_on && typeof row.choose_add_on === 'string' && row.choose_add_on.trim() !== '') {
+                                                                                    let wxTotal = 0;
+                                                                                    const trimmed = row.choose_add_on.trim();
+                                                                                    if (trimmed.startsWith('[')) {
+                                                                                        try {
+                                                                                            const parsed = JSON.parse(trimmed);
+                                                                                            if (Array.isArray(parsed)) {
+                                                                                                parsed.forEach(a => {
+                                                                                                    if (a && a.name && a.name.toLowerCase().includes('wx')) {
+                                                                                                        wxTotal += Number(a.price) || REFUNDABLE_WEATHER_PRICE;
+                                                                                                    }
+                                                                                                });
+                                                                                            }
+                                                                                        } catch (e) {}
+                                                                                    } else if (trimmed.toLowerCase().includes('wx')) {
+                                                                                        wxTotal += REFUNDABLE_WEATHER_PRICE;
+                                                                                    }
+                                                                                    rowLiability += wxTotal;
+                                                                                }
+                                                                                if (rowLiability === 0 && wxByBooking[row.id]) {
+                                                                                    rowLiability = wxByBooking[row.id];
+                                                                                }
+                                                                                refundableLiability += rowLiability;
+                                                                            } catch (e) {
+                                                                                console.error('Refundable liability calculation error:', e);
+                                                                            }
+                                                                        });
+                                                                        runWithRefundableLiability(refundableLiability);
+                                                                    });
+                                                                }
                                                             });
                                                         });
                                                     });
