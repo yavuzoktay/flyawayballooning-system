@@ -1722,6 +1722,14 @@ app.post('/api/createRedeemBooking', (req, res) => {
     // Use cleanVoucherCode for further processing (convert 'no-voucher' to null)
     const cleanVoucherCodeForValidation = cleanVoucherCode === 'no-voucher' ? null : cleanVoucherCode;
 
+    // Redeem Voucher REQUIRES a valid voucher code - reject if missing
+    if (!cleanVoucherCodeForValidation || (typeof cleanVoucherCodeForValidation === 'string' && cleanVoucherCodeForValidation.trim() === '')) {
+        if (global.redeemBookingRequests) {
+            global.redeemBookingRequests.delete(duplicateKey);
+        }
+        return res.status(400).json({ success: false, error: 'Voucher code is required for Redeem Voucher bookings. Please enter and validate your voucher code before booking.' });
+    }
+
     // Validate voucher code is not already used (check both voucher_codes and all_vouchers tables)
     if (cleanVoucherCodeForValidation) {
         // First check voucher_codes table
@@ -1956,9 +1964,6 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
         return; // Exit here and continue in callback
     }
-
-    // If no voucher code, proceed directly
-    createRedeemBookingLogic();
 
     function createRedeemBookingLogic() {
         // Ensure booking name uses the first passenger (Passenger 1) from passengerData
