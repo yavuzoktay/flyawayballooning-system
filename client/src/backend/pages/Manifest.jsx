@@ -921,97 +921,53 @@ const Manifest = () => {
 
             // Prepare SMS data if SMS is checked
             if (sendMessageSmsChecked) {
-                // Use SMS template if available, otherwise convert email template to SMS format
                 let smsMessage = '';
                 let smsTemplateId = null;
-                
-                // Check if we have an SMS template selected
-                if (smsForm.template && smsForm.template !== 'custom' && smsForm.message) {
-                    // Use SMS template message directly
-                    smsMessage = smsForm.message;
-                    smsTemplateId = smsForm.template;
-                    
-                    // Replace SMS prompts with booking data
-                    const bookingDataForSms = selectedBookingForEmail || {};
-                    smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
-                } else if (smsForm.message && smsForm.message.trim().length > 0) {
-                    // Custom SMS message
-                    smsMessage = smsForm.message;
-                    const bookingDataForSms = selectedBookingForEmail || {};
-                    smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
+                const isCustomSmsTemplate = !smsForm.template || smsForm.template === 'custom';
+                const SMS_MAX_LENGTH = 1600;
+
+                // Custom Message: use ONLY the personalized note as the full SMS body (match Send Message to Guests)
+                if (isCustomSmsTemplate) {
+                    smsMessage = (personalNote && personalNote.trim()) ? personalNote.trim() : '';
                 } else {
-                    // Fallback: Convert email template to SMS format (only if email template exists)
-                    if (emailForm.message && emailForm.message.trim().length > 0) {
-                        const dbTemplate = emailTemplates.find(
-                            (t) => t.id?.toString() === emailForm.template?.toString()
-                        );
-                        const templateName = resolveTemplateName(emailForm.template, dbTemplate);
-                        
-                        // Get SMS message from email template (strip HTML and convert to plain text)
-                        smsMessage = stripHtml(emailForm.message);
-                        
-                        // Remove common email-only content that's not suitable for SMS
-                        smsMessage = smsMessage
-                            .replace(/https?:\/\/[^\s]+/gi, '') // Remove URLs
-                            .replace(/Customer Portal Link:.*/gi, '') // Remove portal links
-                            .replace(/Receipt.*?All prices in GBP.*/gis, '') // Remove receipt sections
-                            .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '') // Remove footer
-                            .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
-                            .trim();
-                        
-                        // Replace SMS prompts with booking data
+                    // Template selected: use template message, optionally append personal note
+                    if (smsForm.message && smsForm.message.trim().length > 0) {
+                        smsMessage = smsForm.message;
+                        smsTemplateId = smsForm.template;
                         const bookingDataForSms = selectedBookingForEmail || {};
                         smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
-                    } else {
-                        console.warn('⚠️ No SMS message available - template not selected and no email template to convert');
-                        smsMessage = '';
+                    } else if (emailForm.message && emailForm.message.trim().length > 0) {
+                        // Fallback: Convert email template to SMS format (only when not Custom Message)
+                        smsMessage = stripHtml(emailForm.message);
+                        smsMessage = smsMessage
+                            .replace(/https?:\/\/[^\s]+/gi, '')
+                            .replace(/Customer Portal Link:.*/gi, '')
+                            .replace(/Receipt.*?All prices in GBP.*/gis, '')
+                            .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '')
+                            .replace(/\n{3,}/g, '\n\n')
+                            .trim();
+                        const bookingDataForSms = selectedBookingForEmail || {};
+                        smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
                     }
-                }
-                
-                // Calculate available space for personal note (SMS limit is 1600 characters)
-                const SMS_MAX_LENGTH = 1600;
-                const personalNoteText = personalNote ? `\n\n${personalNote}` : '';
-                
-                // If message is too long, truncate it
-                if (smsMessage.length + personalNoteText.length > SMS_MAX_LENGTH) {
-                    const maxMessageLength = Math.max(100, SMS_MAX_LENGTH - personalNoteText.length - 50);
-                    smsMessage = smsMessage.substring(0, maxMessageLength).trim();
-                    // Try to cut at a sentence or word boundary
-                    const lastPeriod = smsMessage.lastIndexOf('.');
-                    const lastSpace = smsMessage.lastIndexOf(' ');
-                    const cutPoint = lastPeriod > maxMessageLength * 0.8 ? lastPeriod + 1 : 
-                                    (lastSpace > maxMessageLength * 0.8 ? lastSpace : maxMessageLength);
-                    smsMessage = smsMessage.substring(0, cutPoint).trim();
-                    if (!smsMessage.endsWith('.') && !smsMessage.endsWith('!') && !smsMessage.endsWith('?')) {
-                        smsMessage += '...';
+
+                    if (personalNote && personalNote.trim()) {
+                        const note = personalNote.trim();
+                        smsMessage = smsMessage ? `${smsMessage}\n\n${note}` : note;
                     }
-                }
-                
-                // Combine template message with personal note for SMS (if there's space)
-                let finalSmsMessage = smsMessage;
-                if (personalNote) {
-                    const combinedLength = smsMessage.length + personalNote.length + 2; // +2 for \n\n
-                    if (combinedLength <= SMS_MAX_LENGTH) {
-                        finalSmsMessage = `${smsMessage}\n\n${personalNote}`;
-                    } else {
-                        // Personal note doesn't fit, truncate main message more to make room
-                        const spaceForNote = personalNote.length + 10; // +10 for \n\n and buffer
-                        const maxMainLength = SMS_MAX_LENGTH - spaceForNote;
-                        if (maxMainLength > 100) {
-                            smsMessage = smsMessage.substring(0, maxMainLength).trim();
-                            // Try to cut at a sentence boundary
-                            const lastPeriod = smsMessage.lastIndexOf('.');
-                            if (lastPeriod > maxMainLength * 0.7) {
-                                smsMessage = smsMessage.substring(0, lastPeriod + 1);
-                            }
-                            finalSmsMessage = `${smsMessage}\n\n${personalNote}`;
-                        } else {
-                            // Not enough space, skip personal note
-                            console.warn('⚠️ Personal note too long, skipping to fit SMS limit');
-                            finalSmsMessage = smsMessage;
+
+                    if (smsMessage.length > SMS_MAX_LENGTH) {
+                        const maxMessageLength = Math.max(100, SMS_MAX_LENGTH - 50);
+                        smsMessage = smsMessage.substring(0, maxMessageLength).trim();
+                        const lastPeriod = smsMessage.lastIndexOf('.');
+                        if (lastPeriod > maxMessageLength * 0.7) {
+                            smsMessage = smsMessage.substring(0, lastPeriod + 1);
+                        } else if (!smsMessage.endsWith('.') && !smsMessage.endsWith('!') && !smsMessage.endsWith('?')) {
+                            smsMessage += '...';
                         }
                     }
                 }
+
+                let finalSmsMessage = smsMessage;
                 
                 // Final check - ensure total length doesn't exceed limit
                 if (finalSmsMessage.length > SMS_MAX_LENGTH) {
@@ -1744,7 +1700,11 @@ const Manifest = () => {
     };
 
     const handleSendSms = async () => {
-        if (!smsForm.to || !smsForm.message) {
+        const isCustom = !smsForm.template || smsForm.template === 'custom';
+        const hasMessage = isCustom 
+            ? (smsPersonalNote && smsPersonalNote.trim().length > 0)
+            : (smsForm.message && smsForm.message.trim().length > 0);
+        if (!smsForm.to || !hasMessage) {
             alert('Please fill phone and message');
             return;
         }
@@ -1756,10 +1716,17 @@ const Manifest = () => {
             return;
         }
         
-        // Combine template message with personal note
-        const finalMessage = smsPersonalNote 
-            ? `${smsForm.message}${smsForm.message ? '\n\n' : ''}${smsPersonalNote}`
-            : smsForm.message;
+        // Custom Message: use only smsPersonalNote; otherwise template + optional note
+        let finalMessage;
+        if (isCustom) {
+            finalMessage = (smsPersonalNote && smsPersonalNote.trim()) ? smsPersonalNote.trim() : '';
+        } else {
+            const bookingData = selectedBookingForEmail || {};
+            const messageWithPrompts = replaceSmsPrompts(smsForm.message || '', bookingData);
+            finalMessage = (smsPersonalNote && smsPersonalNote.trim()) 
+                ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${smsPersonalNote.trim()}`
+                : messageWithPrompts;
+        }
         
         setSmsSending(true);
         try {
@@ -8572,6 +8539,10 @@ const Manifest = () => {
                                                 }}>
                                                     {(() => {
                                                         const booking = selectedBookingForEmail || {};
+                                                        const isCustom = !smsForm.template || smsForm.template === 'custom';
+                                                        if (isCustom) {
+                                                            return (personalNote && personalNote.trim()) ? personalNote.trim() : 'Your message will appear here...';
+                                                        }
                                                         const messageText = smsForm.message || '';
                                                         const messageWithPrompts = replaceSmsPrompts(messageText, booking);
                                                         const finalMessage = personalNote 
@@ -8874,6 +8845,10 @@ const Manifest = () => {
                                             }}>
                                                 {(() => {
                                                     const booking = selectedBookingForEmail || bookingDetail?.booking || {};
+                                                    const isCustom = !smsForm.template || smsForm.template === 'custom';
+                                                    if (isCustom) {
+                                                        return (smsPersonalNote && smsPersonalNote.trim()) ? smsPersonalNote.trim() : 'Your message will appear here...';
+                                                    }
                                                     const messageText = smsForm.message || '';
                                                     const messageWithPrompts = replaceSmsPrompts(messageText, booking);
                                                     const finalMessage = smsPersonalNote 
