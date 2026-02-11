@@ -467,10 +467,22 @@ const Manifest = () => {
                 if (matchingSmsTemplate) {
                     handleGroupSmsTemplateChange(String(matchingSmsTemplate.id));
                 } else {
-                    setGroupSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+                    // No matching SMS template - default to first template so user has content
+                    const firstSms = smsTemplates[0];
+                    if (firstSms) {
+                        handleGroupSmsTemplateChange(String(firstSms.id));
+                    } else {
+                        setGroupSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+                    }
                 }
             } else {
-                setGroupSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+                // Email has no SMS mapping (e.g. To Be Updated) - default to first SMS template
+                const firstSms = smsTemplates[0];
+                if (firstSms) {
+                    handleGroupSmsTemplateChange(String(firstSms.id));
+                } else {
+                    setGroupSmsForm(prev => ({ ...prev, template: 'custom', message: '' }));
+                }
             }
         }
     };
@@ -1189,23 +1201,71 @@ const Manifest = () => {
 
             // Send SMS if SMS checkbox is checked
             if (groupMessageSmsChecked) {
-                const phone = booking.phone || booking.mobile || '';
+                // Phone: use same sources as Mobile column - bookingFieldUpdates, booking.phone, then ALL passengers
+                // Same priority as Mobile column: manual updates > booking.phone > all passengers' mobile/phone
+                const getEffectivePhoneForBooking = (f) => {
+                    let latestUpdatedPhone = null;
+                    if (typeof window !== 'undefined') {
+                        const memUpdates = window.__bookingFieldUpdates || {};
+                        const memUpdate = memUpdates[String(f.id)];
+                        if (memUpdate?.field === 'phone' && memUpdate?.value) latestUpdatedPhone = memUpdate.value;
+                        if (!latestUpdatedPhone) {
+                            try {
+                                const raw = window.localStorage?.getItem('bookingFieldUpdates');
+                                if (raw) {
+                                    const updates = JSON.parse(raw);
+                                    if (Array.isArray(updates)) {
+                                        for (let i = updates.length - 1; i >= 0; i--) {
+                                            const u = updates[i];
+                                            if (u && String(u.bookingId) === String(f.id) && u.field === 'phone' && u.value) {
+                                                latestUpdatedPhone = u.value;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (_) {}
+                        }
+                    }
+                    if (latestUpdatedPhone) return latestUpdatedPhone;
+                    // Booking Details "Phone" field (synced with all_booking.phone)
+                    if (f.phone) return f.phone;
+                    if (f.mobile) return f.mobile;
+                    // Mobile column: check ALL passengers (correct number may be on passenger 2, e.g. 46 46)
+                    if (Array.isArray(f.passengers)) {
+                        for (const p of f.passengers) {
+                            const val = (p.mobile || p.phone || '').trim();
+                            if (val.length >= 10) return val;
+                        }
+                    }
+                    return '';
+                };
+                const phone = getEffectivePhoneForBooking(booking);
                 const normalizedPhone = normalizeUkPhone(phone);
-                
-                if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
-                    smsFailures.push({ booking, reason: 'Missing or invalid phone number' });
+                // UK E.164: +44 + 10 digits = min 12 chars; reject clearly invalid/short numbers
+                const isValidUkPhone = normalizedPhone && normalizedPhone.startsWith('+') && normalizedPhone.length >= 12 && /^\+44\d{10}$/.test(normalizedPhone);
+                if (!normalizedPhone || !normalizedPhone.startsWith('+') || !isValidUkPhone) {
+                    smsFailures.push({ booking, reason: 'Missing or invalid phone number (need full UK number, e.g. 07563035823)' });
                 } else {
                     // Use SMS template if available, otherwise convert email template to SMS format
                     let smsMessage = '';
                     let smsTemplateId = null;
                     
+                    // If template selected but message empty (e.g. async timing), fetch from smsTemplates
+                    let effectiveSmsMessage = groupSmsForm.message;
+                    if ((!effectiveSmsMessage || effectiveSmsMessage.trim().length === 0) &&
+                        groupSmsForm.template && groupSmsForm.template !== 'custom' && smsTemplates.length > 0) {
+                        const templateObj = smsTemplates.find(t => String(t.id) === String(groupSmsForm.template));
+                        effectiveSmsMessage = templateObj ? (templateObj.message || '') : '';
+                    }
+                    
                     // Check if we have an SMS template selected
-                    if (groupSmsForm.template && groupSmsForm.template !== 'custom' && groupSmsForm.message) {
-                        smsMessage = groupSmsForm.message;
+                    if (groupSmsForm.template && groupSmsForm.template !== 'custom' && effectiveSmsMessage && effectiveSmsMessage.trim().length > 0) {
+                        smsMessage = effectiveSmsMessage;
                         smsTemplateId = groupSmsForm.template;
                         smsMessage = replaceSmsPrompts(smsMessage, booking);
-                    } else if (groupSmsForm.message && groupSmsForm.message.trim().length > 0) {
-                        smsMessage = groupSmsForm.message;
+                    } else if (effectiveSmsMessage && effectiveSmsMessage.trim().length > 0) {
+                        smsMessage = effectiveSmsMessage;
                         smsMessage = replaceSmsPrompts(smsMessage, booking);
                     } else if (groupMessageForm.message && groupMessageForm.message.trim().length > 0) {
                         // Fallback: Convert email template to SMS format
@@ -1305,12 +1365,21 @@ const Manifest = () => {
         }
     };
 
-    // Normalize UK phone numbers to +44 format
+    // Normalize UK phone numbers to +44 format (E.164: +44 + 10 digits)
     const normalizeUkPhone = (raw) => {
         if (!raw) return '';
-        let s = String(raw).trim().replace(/[\s\-()]/g, '');
+        const str = typeof raw === 'object' ? (raw.number || raw.phone || raw.mobile || raw.value || '') : raw;
+        let s = String(str || '').trim().replace(/[\s\-()]/g, '');
         if (s.startsWith('00')) s = '+' + s.slice(2);
-        if (s.startsWith('+')) return s;
+        // 44... or 440... without + (e.g. from DB)
+        if (s.startsWith('44') && !s.startsWith('+')) s = '+' + s;
+        if (s.startsWith('+')) {
+            // +440XXXXXXXXX or +440XXXXXXXXXX -> +447XXXXXXXXX (UK E.164: drop redundant 0 after +44)
+            if (s.startsWith('+44') && s[3] === '0' && /^\+440[0-9]{9,10}$/.test(s)) {
+                return '+44' + s.slice(4).replace(/^0/, '');
+            }
+            return s;
+        }
         if (s.startsWith('0')) return '+44' + s.slice(1);
         if (/^7\d{8,9}$/.test(s)) return '+44' + s;
         return s;

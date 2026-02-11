@@ -33222,6 +33222,7 @@ app.post('/api/sendVoucherSms', async (req, res) => {
         if (!to || !body) {
             return res.status(400).json({ success: false, message: 'to and body required' });
         }
+        const effectiveTo = normalizeUkPhoneForTwilio(String(to).trim());
 
         // Fetch voucher data to replace placeholders
         let voucher = voucherData && typeof voucherData === 'object' ? voucherData : {};
@@ -33272,7 +33273,7 @@ app.post('/api/sendVoucherSms', async (req, res) => {
 
         const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
         const createParams = {
-            to,
+            to: effectiveTo,
             body: bodyWithPrompts,
             statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
         };
@@ -33299,7 +33300,7 @@ app.post('/api/sendVoucherSms', async (req, res) => {
         }
 
         console.log('📱 Sending voucher SMS via Twilio:', {
-            to,
+            to: effectiveTo,
             from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
             bodyLength: body.length
         });
@@ -33309,7 +33310,7 @@ app.post('/api/sendVoucherSms', async (req, res) => {
         ensureSmsLogsSchema(() => {
             const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
             // Reuse booking_id column to store voucherId for voucher messages
-            con.query(sql, [voucherId || null, to, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
+            con.query(sql, [voucherId || null, effectiveTo, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
                 if (err) console.error('Error logging voucher sms:', err);
             });
         });
@@ -33443,7 +33444,9 @@ function replaceSmsPrompts(text = '', booking = {}) {
 app.post('/api/sendBookingSms', async (req, res) => {
     try {
         const { bookingId, to, body } = req.body;
+        const toTrimmed = (to || '').toString().trim();
         if (!to || !body) return res.status(400).json({ success: false, message: 'to and body required' });
+        let effectiveTo = toTrimmed;
 
         // Fetch booking data to replace placeholders
         let booking = {};
@@ -33471,6 +33474,54 @@ app.post('/api/sendBookingSms', async (req, res) => {
             console.warn('⚠️ No bookingId provided for SMS placeholder replacement');
         }
         
+        // If client sent a truncated/invalid phone (e.g. +44464), try DB as fallback
+        if (effectiveTo.length < 12 && bookingId) {
+            let dbPhone = booking.phone || booking.mobile || null;
+            if (!dbPhone || String(dbPhone).length < 10) {
+                try {
+                    const [pRows] = await con.promise().query(
+                        'SELECT phone, mobile FROM passenger WHERE booking_id = ? AND (phone IS NOT NULL OR mobile IS NOT NULL) ORDER BY id ASC LIMIT 1',
+                        [bookingId]
+                    );
+                    if (pRows && pRows.length > 0) {
+                        const p = pRows[0];
+                        dbPhone = (p.phone || p.mobile || '').trim() || null;
+                    }
+                } catch (_) {}
+            }
+            if (dbPhone && String(dbPhone).trim().length >= 10) {
+                const ensureCc = (v) => {
+                    if (!v || !v.trim()) return v;
+                    v = String(v).trim();
+                    if (v.startsWith('+')) {
+                        // Normalize +440... -> +447... inside ensureCc too
+                        if (v.startsWith('+44') && v[3] === '0' && /^\+440[0-9]{9,10}$/.test(v)) {
+                            return '+44' + v.slice(4).replace(/^0/, '');
+                        }
+                        return v;
+                    }
+                    if (v.startsWith('0')) return '+44' + v.slice(1);
+                    if (/^7\d{9}$/.test(v)) return '+44' + v;
+                    return '+44' + v;
+                };
+                effectiveTo = ensureCc(dbPhone);
+                if (effectiveTo.length >= 12) {
+                    console.log('📱 [sendBookingSms] Using DB phone fallback (client to was too short)');
+                }
+            }
+        }
+        // Normalize +440XXXXXXXXX / +440XXXXXXXXXX -> +447XXXXXXXXX (UK E.164: drop redundant 0 after +44)
+        effectiveTo = (effectiveTo || '').trim();
+        if (effectiveTo && effectiveTo.startsWith('+44')) {
+            const after44 = effectiveTo.slice(3);
+            if (/^0[0-9]{9,10}$/.test(after44)) {
+                effectiveTo = '+44' + after44.replace(/^0/, '');
+            }
+        }
+        if (effectiveTo.length < 12) {
+            return res.status(400).json({ success: false, message: 'Invalid or incomplete phone number. Please update the booking with a full UK number (e.g. 07563035823).' });
+        }
+        
         // Replace placeholders in SMS body
         const bodyWithPrompts = replaceSmsPrompts(body, booking);
         console.log('📝 SMS body before replacement:', body.substring(0, 100));
@@ -33492,7 +33543,7 @@ app.post('/api/sendBookingSms', async (req, res) => {
 
         const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
         const createParams = {
-            to,
+            to: effectiveTo,
             body: bodyWithPrompts, // Use body with replaced placeholders
             statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
         };
@@ -33529,24 +33580,32 @@ app.post('/api/sendBookingSms', async (req, res) => {
         }
         
         console.log('📱 Sending SMS via Twilio:', {
-            to,
+            to: effectiveTo,
             from: createParams.from || `MessagingService:${createParams.messagingServiceSid}`,
             bodyLength: body.length
         });
-        
         const msg = await client.messages.create(createParams);
 
         ensureSmsLogsSchema(() => {
             const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
-            con.query(sql, [bookingId || null, to, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
-                if (err) console.error('Error logging sms:', err);
+            con.query(sql, [bookingId || null, effectiveTo, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
+                if (err) {
+                    console.error('Error logging sms (non-fatal):', err);
+                    // Do not fail the response - Twilio succeeded, logging failed
+                }
             });
         });
 
         res.json({ success: true, sid: msg.sid, status: msg.status });
     } catch (e) {
+        const twilioMsg = e.message || String(e);
+        const twilioCode = e.code || e.status || '';
         console.error('SMS send error:', e);
-        res.status(500).json({ success: false, message: e.message });
+        // Surface Twilio error code and message for debugging (e.g. 21211, 21614)
+        const userMessage = twilioCode
+            ? `SMS failed (${twilioCode}): ${twilioMsg}`
+            : twilioMsg;
+        res.status(500).json({ success: false, message: userMessage });
     }
 });
 
@@ -33580,7 +33639,9 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
         }
 
         const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-        const uniqueRecipients = Array.from(new Set(to.map(p => String(p || '').trim()).filter(Boolean)));
+        const uniqueRecipients = Array.from(new Set(
+            to.map(p => normalizeUkPhoneForTwilio(String(p || '').trim())).filter(Boolean)
+        ));
         
         if (uniqueRecipients.length === 0) {
             return res.status(400).json({
@@ -33634,9 +33695,9 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
                     for (const bookingId of bookingIds) {
                         const booking = bookingDataMap.get(bookingId);
                         if (booking) {
-                            // Clean phone number for comparison (remove whitespace, dashes, parentheses)
-                            const bookingPhone = cleanPhoneNumber(booking.phone || booking.mobile || '');
-                            if (bookingPhone === recipientPhone) {
+                            // Clean and normalize for comparison (booking may have +440... format)
+                            const bookingPhone = normalizeUkPhoneForTwilio(cleanPhoneNumber(booking.phone || booking.mobile || ''));
+                            if (bookingPhone && bookingPhone === recipientPhone) {
                                 bookingForThisPhone = booking;
                                 break;
                             }
@@ -33699,6 +33760,18 @@ function cleanPhoneNumber(raw) {
     // Convert leading 00 to +
     if (s.startsWith('00')) s = '+' + s.slice(2);
     return s; // Return cleaned phone number as-is (no country code assumption)
+}
+
+// Normalize UK +440... to +447... (E.164) for Twilio
+function normalizeUkPhoneForTwilio(phone) {
+    if (!phone) return phone;
+    let s = String(phone).trim().replace(/[\s\-()]/g, '');
+    if (s.startsWith('00')) s = '+' + s.slice(2);
+    if (s.startsWith('44') && !s.startsWith('+')) s = '+' + s;
+    if (s.startsWith('+44') && s[3] === '0' && /^\+440[0-9]{9,10}$/.test(s)) {
+        return '+44' + s.slice(4).replace(/^0/, '');
+    }
+    return s;
 }
 
 // Automatic SMS sending function (similar to sendAutomaticBookingConfirmationEmail)

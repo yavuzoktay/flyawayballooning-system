@@ -578,15 +578,21 @@ const BookingPage = () => {
         setSelectedVoucherIds(selectedIds);
     }, []);
 
-    // Clean phone numbers (remove whitespace, dashes, parentheses) but keep international format
+    // Clean and normalize UK phone numbers for SMS (E.164: +44 + 10 digits)
     const cleanPhoneNumber = (raw) => {
         if (!raw) return '';
-        let s = String(raw).trim();
-        // Replace whitespace, dashes, parentheses
-        s = s.replace(/[\s\-()]/g, '');
-        // Convert leading 00 to +
+        let s = String(raw).trim().replace(/[\s\-()]/g, '');
         if (s.startsWith('00')) s = '+' + s.slice(2);
-        return s; // Return cleaned phone number as-is (no country code assumption)
+        if (s.startsWith('44') && !s.startsWith('+')) s = '+' + s;
+        if (s.startsWith('+')) {
+            if (s.startsWith('+44') && s[3] === '0' && /^\+440[0-9]{9,10}$/.test(s)) {
+                return '+44' + s.slice(4).replace(/^0/, '');
+            }
+            return s;
+        }
+        if (s.startsWith('0')) return '+44' + s.slice(1);
+        if (/^7\d{8,9}$/.test(s)) return '+44' + s;
+        return s;
     };
 
     const stripHtml = (input = '') => {
