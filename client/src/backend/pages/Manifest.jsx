@@ -1250,58 +1250,47 @@ const Manifest = () => {
                     // Use SMS template if available, otherwise convert email template to SMS format
                     let smsMessage = '';
                     let smsTemplateId = null;
-                    
-                    // If template selected but message empty (e.g. async timing), fetch from smsTemplates
-                    let effectiveSmsMessage = groupSmsForm.message;
-                    if ((!effectiveSmsMessage || effectiveSmsMessage.trim().length === 0) &&
-                        groupSmsForm.template && groupSmsForm.template !== 'custom' && smsTemplates.length > 0) {
-                        const templateObj = smsTemplates.find(t => String(t.id) === String(groupSmsForm.template));
-                        effectiveSmsMessage = templateObj ? (templateObj.message || '') : '';
-                    }
-                    
-                    // Check if we have an SMS template selected
-                    if (groupSmsForm.template && groupSmsForm.template !== 'custom' && effectiveSmsMessage && effectiveSmsMessage.trim().length > 0) {
-                        smsMessage = effectiveSmsMessage;
-                        smsTemplateId = groupSmsForm.template;
-                        smsMessage = replaceSmsPrompts(smsMessage, booking);
-                    } else if (effectiveSmsMessage && effectiveSmsMessage.trim().length > 0) {
-                        smsMessage = effectiveSmsMessage;
-                        smsMessage = replaceSmsPrompts(smsMessage, booking);
-                    } else if (groupMessageForm.message && groupMessageForm.message.trim().length > 0) {
-                        // Fallback: Convert email template to SMS format
-                        smsMessage = stripHtml(groupMessageForm.message);
-                        smsMessage = smsMessage
-                            .replace(/https?:\/\/[^\s]+/gi, '')
-                            .replace(/Customer Portal Link:.*/gi, '')
-                            .replace(/Receipt.*?All prices in GBP.*/gis, '')
-                            .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '')
-                            .replace(/\n{3,}/g, '\n\n')
-                            .trim();
-                        smsMessage = replaceSmsPrompts(smsMessage, booking);
-                    }
+                    const isCustomSmsTemplate = !groupSmsForm.template || groupSmsForm.template === 'custom';
 
-                    // Add personal note if there's space
-                    const SMS_MAX_LENGTH = 1600;
-                    let finalSmsMessage = smsMessage;
-                    if (groupPersonalNote) {
-                        const combinedLength = smsMessage.length + groupPersonalNote.length + 2;
-                        if (combinedLength <= SMS_MAX_LENGTH) {
-                            finalSmsMessage = `${smsMessage}\n\n${groupPersonalNote}`;
-                        } else {
-                            const spaceForNote = groupPersonalNote.length + 10;
-                            const maxMainLength = SMS_MAX_LENGTH - spaceForNote;
-                            if (maxMainLength > 100) {
-                                smsMessage = smsMessage.substring(0, maxMainLength).trim();
-                                const lastPeriod = smsMessage.lastIndexOf('.');
-                                if (lastPeriod > maxMainLength * 0.7) {
-                                    smsMessage = smsMessage.substring(0, lastPeriod + 1);
-                                }
-                                finalSmsMessage = `${smsMessage}\n\n${groupPersonalNote}`;
+                    // Custom Message: use ONLY the personalized note as the full SMS body
+                    if (isCustomSmsTemplate) {
+                        smsMessage = (groupPersonalNote && groupPersonalNote.trim()) ? groupPersonalNote.trim() : '';
+                    } else {
+                        // Template selected: use template message, optionally append personal note
+                        let effectiveSmsMessage = groupSmsForm.message;
+                        if ((!effectiveSmsMessage || effectiveSmsMessage.trim().length === 0) && smsTemplates.length > 0) {
+                            const templateObj = smsTemplates.find(t => String(t.id) === String(groupSmsForm.template));
+                            effectiveSmsMessage = templateObj ? (templateObj.message || '') : '';
+                        }
+                        if (effectiveSmsMessage && effectiveSmsMessage.trim().length > 0) {
+                            smsMessage = replaceSmsPrompts(effectiveSmsMessage, booking);
+                            smsTemplateId = groupSmsForm.template;
+                        } else if (groupMessageForm.message && groupMessageForm.message.trim().length > 0) {
+                            // Fallback: Convert email template to SMS format (only when not Custom Message)
+                            smsMessage = stripHtml(groupMessageForm.message);
+                            smsMessage = smsMessage
+                                .replace(/https?:\/\/[^\s]+/gi, '')
+                                .replace(/Customer Portal Link:.*/gi, '')
+                                .replace(/Receipt.*?All prices in GBP.*/gis, '')
+                                .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '')
+                                .replace(/\n{3,}/g, '\n\n')
+                                .trim();
+                            smsMessage = replaceSmsPrompts(smsMessage, booking);
+                        }
+
+                        // Add personal note if there's space (only for non-Custom templates)
+                        if (groupPersonalNote && groupPersonalNote.trim()) {
+                            const note = groupPersonalNote.trim();
+                            if (smsMessage) {
+                                smsMessage = `${smsMessage}\n\n${note}`;
                             } else {
-                                finalSmsMessage = smsMessage;
+                                smsMessage = note;
                             }
                         }
                     }
+
+                    const SMS_MAX_LENGTH = 1600;
+                    let finalSmsMessage = smsMessage;
 
                     // Final check - ensure total length doesn't exceed limit
                     if (finalSmsMessage.length > SMS_MAX_LENGTH) {
@@ -8162,6 +8151,10 @@ const Manifest = () => {
                                                         const previewBooking = groupMessagePreviewBooking || (groupSelectedBookings.length > 0 ? groupSelectedBookings[0] : null);
                                                         if (!previewBooking) return 'Your message will appear here...';
                                                         
+                                                        const isCustomSms = !groupSmsForm.template || groupSmsForm.template === 'custom';
+                                                        if (isCustomSms) {
+                                                            return (groupPersonalNote && groupPersonalNote.trim()) ? groupPersonalNote.trim() : 'Your message will appear here...';
+                                                        }
                                                         const messageText = groupSmsForm.message || '';
                                                         const messageWithPrompts = replaceSmsPrompts(messageText, previewBooking);
                                                         const finalMessage = groupPersonalNote 
