@@ -2124,6 +2124,8 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.booking_id = voucherItem.booking_id || finalVoucherDetail.voucher.booking_id;
     // Copy booking_phone from getAllVoucherData (for Personal Details phone display)
     finalVoucherDetail.voucher.booking_phone = voucherItem.booking_phone || finalVoucherDetail.voucher.booking_phone;
+    // Copy booking_email from getAllVoucherData (for redeemed Gift Vouchers - Passenger 1 email = Booking Details email)
+    finalVoucherDetail.voucher.booking_email = voucherItem.booking_email || finalVoucherDetail.voucher.booking_email;
     
     // Copy additional information data from getAllVoucherData
     if (voucherItem.additional_information) {
@@ -3908,8 +3910,8 @@ setBookingDetail(finalVoucherDetail);
                             firstName: p.firstName || '',
                             lastName: p.lastName || '',
                             weight: p.weight || '',
-                            // Use recipient_email for first passenger if available, otherwise use passenger email
-                            email: (index === 0 && recipientEmail) ? recipientEmail : (p.email || ''),
+                            // Passenger 1 email takes priority - must match Booking Details email. Use recipient_email only as fallback when empty.
+                            email: (p.email && String(p.email).trim()) ? String(p.email).trim() : (index === 0 ? recipientEmail : ''),
                             phone: p.mobile || '',
                             ticketType: flightType
                         })),
@@ -6699,12 +6701,11 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : (
                                                             <>
                                                                 {(() => {
-                                                                    // For Gift Voucher Details popup, the Email field should show
-                                                                    // the purchaser contact email coming from getAllVoucherData.email.
-                                                                    // For Flight Vouchers, keep using v.email.
+                                                                    // For Gift Voucher Details: redeemed = booking_email (Passenger 1), unredeemed = purchaser_email.
+                                                                    // Ensures Passenger 1 email in Redeem modal = Email in Booking Details.
                                                                     const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
                                                                     const emailValue = isGiftVoucher
-                                                                        ? (v.email || v.purchaser_email || '-')
+                                                                        ? (v.booking_email || v.email || v.purchaser_email || '-')
                                                                         : (v.email || '-');
                                                                     // If email exists and is not '-', make it a clickable mailto link
                                                                     if (emailValue && emailValue !== '-') {
@@ -6725,7 +6726,11 @@ setBookingDetail(finalVoucherDetail);
                                                                 })()}
                                                                 <IconButton 
                                                                     size="small" 
-                                                                    onClick={() => handleEditClick('email', v.email)}
+                                                                    onClick={() => {
+                                                                    const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
+                                                                    const emailForEdit = isGiftVoucher ? (v.booking_email || v.email || v.purchaser_email || '') : (v.email || '');
+                                                                    handleEditClick('email', emailForEdit);
+                                                                    }}
                                                                     sx={{ 
                                                                         padding: isMobile ? '2px' : '8px',
                                                                         minWidth: isMobile ? '20px' : 'auto',
@@ -6969,7 +6974,9 @@ setBookingDetail(finalVoucherDetail);
                                             ) : (
                                                 <>
                                                     {(() => {
-                                                        const emailValue = bookingDetail.booking.email || '-';
+                                                        // Use Passenger 1 email when booking.email empty (e.g. redeemed Gift Voucher) - syncs with Redeem modal
+                                                        const passenger1Email = bookingDetail.passengers?.[0]?.email;
+                                                        const emailValue = bookingDetail.booking.email || passenger1Email || '-';
                                                         // If email exists and is not '-', make it a clickable link
                                                         if (emailValue && emailValue !== '-') {
                                                             return (
@@ -6989,7 +6996,11 @@ setBookingDetail(finalVoucherDetail);
                                                     })()}
                                                     <IconButton 
                                                         size="small" 
-                                                        onClick={() => handleEditClick('email', bookingDetail.booking.email)}
+                                                        onClick={() => {
+                                                        const passenger1Email = bookingDetail.passengers?.[0]?.email;
+                                                        const emailToEdit = bookingDetail.booking.email || passenger1Email || '';
+                                                        handleEditClick('email', emailToEdit);
+                                                        }}
                                                         sx={{ 
                                                             padding: isMobile ? '2px' : '8px',
                                                             '& .MuiSvgIcon-root': {

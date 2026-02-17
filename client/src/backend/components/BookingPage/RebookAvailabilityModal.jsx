@@ -197,21 +197,23 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     }, [open, location, bookingDetail]);
     
     // Initialize passenger data when modal opens. For Gift Voucher Redeem, create one slot per passenger.
+    // Pre-fill Passenger 1 email from recipient_email so it syncs with Gift Voucher Details / Booking Details.
     useEffect(() => {
         if (open && isGiftVoucherDetails && numberOfVouchers > 0) {
-            // Gift Voucher Redeem: create Passenger Information slots equal to Number of Passengers
+            const v = bookingDetail?.voucher || {};
+            const recipientEmail = (v.recipient_email || v.booking_email || '').trim();
             const passengerSlots = numberOfVouchers;
-            const initialPassengerData = Array.from({ length: passengerSlots }, () => ({
+            const initialPassengerData = Array.from({ length: passengerSlots }, (_, index) => ({
                 firstName: '',
                 lastName: '',
                 weight: '',
                 mobile: '',
-                email: ''
+                email: index === 0 ? recipientEmail : ''
             }));
             setPassengerData(initialPassengerData);
-            console.log('Initialized passenger data for Gift Voucher Redeem with slots:', passengerSlots);
+            console.log('Initialized passenger data for Gift Voucher Redeem with slots:', passengerSlots, 'Passenger 1 email pre-filled:', recipientEmail || '(empty)');
         }
-    }, [open, isGiftVoucherDetails, numberOfVouchers]);
+    }, [open, isGiftVoucherDetails, numberOfVouchers, bookingDetail?.voucher?.recipient_email, bookingDetail?.voucher?.booking_email]);
     
     // Gift Voucher: Fetch availabilities when location is selected
     useEffect(() => {

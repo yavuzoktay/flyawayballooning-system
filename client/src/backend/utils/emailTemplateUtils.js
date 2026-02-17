@@ -1084,24 +1084,14 @@ export const applyPersonalNote = (message, personalNote = '') => {
             return message.replace(PERSONAL_NOTE_PLACEHOLDER, noteHtml);
         }
 
-        const closingBodyIndex = message.indexOf('</div>');
-        if (closingBodyIndex !== -1) {
-            return (
-                message.slice(0, closingBodyIndex) +
-                noteHtml +
-                message.slice(closingBodyIndex)
-            );
+        // Insert note at the TOP of the body - right after the opening <body> tag
+        const bodyOpenMatch = message.match(/<body[^>]*>/i);
+        if (bodyOpenMatch) {
+            const insertPos = message.indexOf(bodyOpenMatch[0]) + bodyOpenMatch[0].length;
+            return message.slice(0, insertPos) + noteHtml + message.slice(insertPos);
         }
 
-        const bodyTagIndex = message.indexOf('</body>');
-        if (bodyTagIndex !== -1) {
-            return (
-                message.slice(0, bodyTagIndex) +
-                noteHtml +
-                message.slice(bodyTagIndex)
-            );
-        }
-
+        // No body tag (e.g. partial HTML) - prepend at top
         return noteHtml + message;
     }
 
