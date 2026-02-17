@@ -5912,7 +5912,6 @@ setBookingDetail(finalVoucherDetail);
                                             "pax",
                                             "status",
                                             "paid",
-                                            "voucher_code",
                                             "flight_attempts",
                                             "expires"
                                         ]}
