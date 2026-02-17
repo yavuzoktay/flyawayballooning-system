@@ -25804,6 +25804,16 @@ app.post('/api/create-checkout-session', async (req, res) => {
             wbraid: userSessionData?.wbraid || null,
             gbraid: userSessionData?.gbraid || null
         };
+        if (googleAdsIds.gclid || googleAdsIds.wbraid || googleAdsIds.gbraid) {
+            console.log('📊 [Google Ads] Create-checkout-session received click IDs:', {
+                hasGclid: !!googleAdsIds.gclid,
+                hasWbraid: !!googleAdsIds.wbraid,
+                hasGbraid: !!googleAdsIds.gbraid,
+                gbraidPreview: googleAdsIds.gbraid ? `${googleAdsIds.gbraid.substring(0, 12)}...` : null
+            });
+        } else {
+            console.log('📊 [Google Ads] Create-checkout-session: NO gclid/wbraid/gbraid in userSessionData');
+        }
 
         // Derive funnel_type, experience_type, product_type for Google Ads full-funnel tracking
         let funnelType = 'booking';
