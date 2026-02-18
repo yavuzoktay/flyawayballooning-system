@@ -348,7 +348,7 @@ const buildEmailLayout = ({
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
         <tr>
             <td align="center" style="padding:32px 16px;">
-                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 12px 35px rgba(20,23,38,0.12);">
                     <tr>
                         <td style="padding:0; margin:0; line-height:0; font-size:0; width:100%;">
                             <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="width:100%; border-collapse:collapse;">
@@ -363,7 +363,7 @@ const buildEmailLayout = ({
                                         </v:textbox>
                                         </v:rect>
                                         <![endif]-->
-                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:contain; object-position:center; border-radius:24px 24px 0 0;" />
+                                        <img src="${heroImage}" alt="Fly Away Ballooning" width="640" style="width:100%; max-width:600px; height:auto; min-height:200px; display:block; margin:0 auto; border:0; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; background-color:#ffffff; vertical-align:top; object-fit:contain; object-position:center; border-radius:24px 24px 0 0;" />
                                     </td>
                                 </tr>
                             </table>
