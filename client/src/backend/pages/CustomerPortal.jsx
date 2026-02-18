@@ -741,9 +741,10 @@ const CustomerPortal = () => {
                                     const hasFlightDate = Boolean(bookingData.flight_date);
                                     const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                                     const now = dayjs();
+                                    const isCancelled = bookingData.status && String(bookingData.status).toLowerCase() === 'cancelled';
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     
-                                    // Calculate hours until flight for 120-hour rule
+                                    // Calculate hours until flight for 120-hour rule (skip for cancelled - no active flight)
                                     const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
                                     
                                     // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
@@ -756,7 +757,9 @@ const CustomerPortal = () => {
                                     const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
                                     const shouldApplyRedeemedCheck = isFlightVoucherSection;
-                                    const isDisabled = changingLocation || isFlightDatePassed || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired || hoursUntilFlight <= 120;
+                                    // When cancelled, allow Change (bypass flight-date/120h rules - no active flight)
+                                    const flightRestrictions = isFlightDatePassed || hoursUntilFlight <= 120;
+                                    const isDisabled = changingLocation || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired || (!isCancelled && flightRestrictions);
                                     
                                     return (
                                         <Tooltip
@@ -767,9 +770,9 @@ const CustomerPortal = () => {
                                                         ? "Voucher has been redeemed. Location cannot be changed."
                                                         : isFullyRefunded
                                                             ? "Full refund has been processed. Location cannot be changed."
-                                                            : isFlightDatePassed
+                                                            : !isCancelled && isFlightDatePassed
                                                                 ? "Flight date has passed. Location cannot be changed."
-                                                                : hoursUntilFlight <= 120
+                                                                : !isCancelled && hoursUntilFlight <= 120
                                                                     ? "Less than 120 hours remaining until your flight"
                                                                     : ""
                                             }
@@ -777,9 +780,18 @@ const CustomerPortal = () => {
                                         >
                                             <Typography
                                                 component="span"
+                                                role="button"
+                                                tabIndex={isDisabled ? -1 : 0}
                                                 onClick={isDisabled ? undefined : () => {
                                                     setSelectedNewLocation(bookingData.location || '');
                                                     setChangeLocationModalOpen(true);
+                                                }}
+                                                onKeyDown={isDisabled ? undefined : (e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        setSelectedNewLocation(bookingData.location || '');
+                                                        setChangeLocationModalOpen(true);
+                                                    }
                                                 }}
                                                 sx={{
                                                     color: isDisabled ? '#9ca3af' : '#1d4ed8',
@@ -787,7 +799,12 @@ const CustomerPortal = () => {
                                                     fontSize: '0.9rem',
                                                     cursor: isDisabled ? 'default' : 'pointer',
                                                     textDecoration: 'underline',
+                                                    padding: '4px 0',
+                                                    WebkitTapHighlightColor: 'transparent',
                                                     '&:hover': isDisabled ? {} : {
+                                                        color: '#1e40af'
+                                                    },
+                                                    '&:active': isDisabled ? {} : {
                                                         color: '#1e40af'
                                                     }
                                                 }}
@@ -908,9 +925,10 @@ const CustomerPortal = () => {
                                     const hasFlightDate = Boolean(bookingData.flight_date);
                                     const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
                                     const now = dayjs();
+                                    const isCancelled = bookingData.status && String(bookingData.status).toLowerCase() === 'cancelled';
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     
-                                    // Calculate hours until flight for 120-hour rule
+                                    // Calculate hours until flight for 120-hour rule (skip for cancelled - no active flight)
                                     const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
                                     
                                     // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
@@ -923,7 +941,9 @@ const CustomerPortal = () => {
                                     const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
                                     const shouldApplyRedeemedCheck = isFlightVoucherSection;
-                                    const isDisabled = extendingVoucher || isFlightDatePassed || hoursUntilFlight <= 120;
+                                    // When cancelled, allow Extend (bypass flight-date/120h rules - no active flight)
+                                    const flightRestrictions = isFlightDatePassed || hoursUntilFlight <= 120;
+                                    const isDisabled = extendingVoucher || (!isCancelled && flightRestrictions);
                                     
                                     const isExtendDisabled = isDisabled || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired;
                                     
@@ -936,9 +956,9 @@ const CustomerPortal = () => {
                                                         ? "Voucher has been redeemed. Voucher cannot be extended."
                                                         : isFullyRefunded
                                                             ? "Full refund has been processed. Voucher cannot be extended."
-                                                            : isFlightDatePassed
+                                                            : !isCancelled && isFlightDatePassed
                                                                 ? "Flight date has passed. Voucher cannot be extended."
-                                                                : hoursUntilFlight <= 120
+                                                                : !isCancelled && hoursUntilFlight <= 120
                                                                     ? "Less than 120 hours remaining until your flight"
                                                                     : ""
                                             }
@@ -946,14 +966,27 @@ const CustomerPortal = () => {
                                         >
                                             <Typography
                                                 component="span"
+                                                role="button"
+                                                tabIndex={isExtendDisabled ? -1 : 0}
                                                 onClick={isExtendDisabled ? undefined : handleExtendVoucher}
+                                                onKeyDown={isExtendDisabled ? undefined : (e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        handleExtendVoucher();
+                                                    }
+                                                }}
                                                 sx={{
                                                     color: isExtendDisabled ? '#9ca3af' : '#1d4ed8',
                                                     fontWeight: 600,
                                                     fontSize: '0.9rem',
                                                     cursor: isExtendDisabled ? 'default' : 'pointer',
                                                     textDecoration: 'underline',
+                                                    padding: '4px 0',
+                                                    WebkitTapHighlightColor: 'transparent',
                                                     '&:hover': isExtendDisabled ? {} : {
+                                                        color: '#1e40af'
+                                                    },
+                                                    '&:active': isExtendDisabled ? {} : {
                                                         color: '#1e40af'
                                                     }
                                                 }}
