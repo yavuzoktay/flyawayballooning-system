@@ -267,7 +267,8 @@ const buildEmailLayout = ({
     customerName = 'Guest',
     signatureLines = [],
     footerLinks = [],
-    emoji = '🎈'
+    emoji = '🎈',
+    disableFormatDetection = false
 }) => {
     // Normalize body/highlight styles so all templates share the same typography
     // (font-size, font-family, line-height) as the Upcoming Flight Reminder.
@@ -336,11 +337,16 @@ const buildEmailLayout = ({
     </style>
     `;
 
+    const formatDetectionMeta = disableFormatDetection
+        ? '<meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />'
+        : '';
+    const bodyContentAttrs = disableFormatDetection ? ' x-apple-data-detectors="false"' : '';
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    ${formatDetectionMeta}
     <title>${escapeHtml(subject)}</title>
     ${responsiveStyles}
 </head>
@@ -374,7 +380,7 @@ const buildEmailLayout = ({
                             ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px;">${headline}</div>` : ''}
                             ${highlightSection}
                             ${PERSONAL_NOTE_PLACEHOLDER}
-                            <div style="font-size:16px; line-height:1.7; color:#1f2937;">
+                            <div style="font-size:16px; line-height:1.7; color:#1f2937;"${bodyContentAttrs}>
                                 ${normalizedBodyHtml}
                             </div>
                             <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px;">
@@ -457,7 +463,8 @@ const buildBookingConfirmationEmail = ({ template, booking }) => {
         footerLinks: [
             { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
             { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
-        ]
+        ],
+        disableFormatDetection: true
     });
 };
 

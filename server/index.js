@@ -30224,6 +30224,16 @@ function getBookingConfirmationMessageHtml(booking = {}) {
     ]);
 }
 
+// Helper function to generate upcoming flight reminder message HTML (matches frontend getUpcomingFlightReminderMessageHtml)
+function getUpcomingFlightReminderMessageHtml(booking = {}) {
+    const flightDate = escapeHtml(formatDateTime(booking.flight_date) || 'soon');
+    return wrapParagraphs([
+        `Just a quick reminder that your flight is scheduled for <strong>${flightDate}</strong>.`,
+        'Please arrive at least 30 minutes before your scheduled launch so we can complete check-in and the safety briefing.',
+        'Keep an eye on your inbox - we will notify you if weather conditions require any last-minute adjustments.'
+    ]);
+}
+
 // Helper function to generate flight voucher confirmation message HTML (matches frontend getFlightVoucherMessageHtml)
 function getFlightVoucherMessageHtml(voucher = {}) {
     const name = escapeHtml(voucher.name || voucher.customer_name || 'Guest');
@@ -30493,7 +30503,7 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
 }
 
 // Helper function to build email layout (matches frontend buildEmailLayout)
-function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '', bodyHtml = '', customerName = 'Guest', signatureLines = ['Fly Away Ballooning Team'], footerLinks = [] }) {
+function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '', bodyHtml = '', customerName = 'Guest', signatureLines = ['Fly Away Ballooning Team'], footerLinks = [], disableFormatDetection = false }) {
     const safeName = escapeHtml(customerName || 'Guest');
     const signatureHtml = signatureLines
         .map(line => `<div style="font-size:16px; line-height:1.6; color:#1f2937; margin:0;">${escapeHtml(line)}</div>`)
@@ -30719,6 +30729,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    ${disableFormatDetection ? '<meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />' : ''}
     <title>${escapeHtml(subject)}</title>
     ${responsiveStyles}
 </head>
@@ -30751,7 +30762,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                         <td style="padding:32px;">
                             ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px; word-wrap:break-word;">${escapeHtml(headline)}</div>` : ''}
                             ${highlightSection}
-                            <div style="font-size:16px; line-height:1.7; color:#1f2937; word-wrap:break-word;">
+                            <div style="font-size:16px; line-height:1.7; color:#1f2937; word-wrap:break-word;"${disableFormatDetection ? ' x-apple-data-detectors="false"' : ''}>
                                 ${bodyHtml}
                             </div>
                             <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px; word-wrap:break-word;">
@@ -31012,8 +31023,157 @@ function generateBookingConfirmationEmail(booking, template = null) {
         bodyHtml,
         customerName,
         signatureLines: [],
-        footerLinks: []
+        footerLinks: [],
+        disableFormatDetection: true
     });
+}
+
+// Helper function to generate upcoming flight reminder email HTML using database template
+function generateUpcomingFlightReminderEmail(booking, template = null) {
+    const customerName = booking.name || booking.customer_name || 'Guest';
+    const subject = template?.subject || '🚀 Your flight is coming up';
+
+    let messageHtml = '';
+    if (template && template.body && template.body.trim() !== '') {
+        const rawBody = String(template.body).trim();
+        messageHtml = sanitizeTemplateHtml(rawBody);
+        if (!messageHtml || messageHtml.trim() === '') messageHtml = rawBody;
+    }
+    if (!messageHtml || messageHtml.trim() === '') {
+        messageHtml = getUpcomingFlightReminderMessageHtml(booking);
+    }
+
+    const messageWithPrompts = replacePrompts(messageHtml, booking);
+    const bodyHtml = messageWithPrompts;
+
+    return buildEmailLayout({
+        subject,
+        headline: '',
+        bodyHtml,
+        customerName,
+        signatureLines: [],
+        footerLinks: [
+            { label: 'Manage booking', url: 'https://flyawayballooning.com/manage' },
+            { label: 'Weather FAQs', url: 'https://flyawayballooning.com/weather' }
+        ],
+        disableFormatDetection: true
+    });
+}
+
+// Send Upcoming Flight Reminder email for a single booking (3 days before flight_date)
+async function sendUpcomingFlightReminderEmail(bookingId) {
+    try {
+        const isAvailable = isEmailServiceAvailable();
+        if (!isAvailable) {
+            console.warn('⚠️ [sendUpcomingFlightReminderEmail] Email service not configured, skipping');
+            return;
+        }
+
+        const bookingRows = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM all_booking WHERE id = ? LIMIT 1', [bookingId], (err, rows) => {
+                if (err) return reject(err);
+                resolve(rows || []);
+            });
+        });
+        const booking = bookingRows && bookingRows[0] ? bookingRows[0] : null;
+        if (!booking) {
+            console.warn('[sendUpcomingFlightReminderEmail] Booking not found:', bookingId);
+            return;
+        }
+
+        const email = (booking.email || '').trim();
+        if (!email) {
+            console.warn('[sendUpcomingFlightReminderEmail] No email for booking:', bookingId);
+            return;
+        }
+
+        if (booking.status === 'Cancelled') {
+            console.log('[sendUpcomingFlightReminderEmail] Skipping cancelled booking:', bookingId);
+            return;
+        }
+
+        const existingLog = await new Promise((resolve) => {
+            con.query(
+                `SELECT id FROM email_logs WHERE booking_id = ? AND template_type = 'upcoming_flight_reminder_automatic' LIMIT 1`,
+                [bookingId],
+                (err, rows) => {
+                    if (err) return resolve(null);
+                    resolve(rows && rows.length > 0 ? rows[0] : null);
+                }
+            );
+        });
+        if (existingLog) {
+            console.log('[sendUpcomingFlightReminderEmail] Already sent for booking:', bookingId);
+            return;
+        }
+
+        const template = await new Promise((resolve) => {
+            con.query(`SELECT * FROM email_templates WHERE name = 'Upcoming Flight Reminder' LIMIT 1`, (err, rows) => {
+                if (err) return resolve(null);
+                resolve(rows && rows[0] ? rows[0] : null);
+            });
+        });
+
+        const htmlBody = generateUpcomingFlightReminderEmail(booking, template);
+        const subject = (template && template.subject) ? template.subject : '🚀 Your flight is coming up';
+
+        const emailPayload = {
+            to: email,
+            from: { email: 'info@flyawayballooning.com', name: 'Fly Away Ballooning' },
+            subject,
+            html: htmlBody,
+            text: (htmlBody || '').replace(/<[^>]+>/g, '').trim()
+        };
+
+        const { provider, messageId } = await sendEmailWithFallback(emailPayload, { context: 'upcoming_flight_reminder' });
+
+        con.query(
+            `INSERT INTO email_logs (booking_id, recipient_email, subject, template_type, context_type, context_id) VALUES (?, ?, ?, 'upcoming_flight_reminder_automatic', 'booking', ?)`,
+            [bookingId, email, subject, String(bookingId)],
+            (logErr) => {
+                if (logErr) console.warn('[sendUpcomingFlightReminderEmail] Could not log to email_logs:', logErr.message);
+            }
+        );
+
+        console.log(`✅ [sendUpcomingFlightReminderEmail] Sent Upcoming Flight Reminder to ${email} for booking ${bookingId} via ${provider}`);
+    } catch (err) {
+        console.error('[sendUpcomingFlightReminderEmail] Error:', err);
+    }
+}
+
+// Job: find bookings with flight_date 3 days from today and send Upcoming Flight Reminder
+async function runUpcomingFlightReminderJob() {
+    try {
+        const rows = await new Promise((resolve, reject) => {
+            con.query(
+                `SELECT id FROM all_booking 
+                 WHERE status = 'Scheduled' 
+                   AND flight_date IS NOT NULL 
+                   AND flight_date != '' 
+                   AND flight_date != '0000-00-00 00:00:00'
+                   AND DATE(flight_date) = DATE_ADD(CURDATE(), INTERVAL 3 DAY)
+                 ORDER BY id ASC`,
+                [],
+                (err, results) => {
+                    if (err) return reject(err);
+                    resolve(results || []);
+                }
+            );
+        });
+
+        if (rows.length === 0) {
+            console.log('[runUpcomingFlightReminderJob] No bookings found for 3 days ahead');
+            return;
+        }
+
+        console.log(`[runUpcomingFlightReminderJob] Found ${rows.length} booking(s) with flight in 3 days, sending reminders...`);
+        for (const row of rows) {
+            await sendUpcomingFlightReminderEmail(row.id);
+            await new Promise(r => setTimeout(r, 500));
+        }
+    } catch (err) {
+        console.error('[runUpcomingFlightReminderJob] Error:', err);
+    }
 }
 
 // Helper function to generate flight voucher confirmation email HTML
@@ -32645,6 +32805,17 @@ async function sendGiftVoucherEmailToCustomerAndOwner(voucher, voucherId) {
         // Don't throw error - email failure shouldn't break voucher creation
     }
 }
+
+// Test endpoint: manually trigger Upcoming Flight Reminder job (3 days before flight)
+app.post('/api/run-upcoming-flight-reminder', async (req, res) => {
+    try {
+        await runUpcomingFlightReminderJob();
+        res.json({ success: true, message: 'Upcoming Flight Reminder job completed' });
+    } catch (err) {
+        console.error('POST /api/run-upcoming-flight-reminder error:', err);
+        res.status(500).json({ success: false, message: err?.message || 'Job failed' });
+    }
+});
 
 // Send booking email via SendGrid
 app.post('/api/sendBookingEmail', async (req, res) => {
@@ -35221,6 +35392,16 @@ if (process.env.NODE_ENV === 'production' || process.env.FETCH_PRODUCTION_LOGS =
         fetchProductionLogs();
     }, 5 * 60 * 1000);
 }
+
+// Upcoming Flight Reminder: send 3 days before flight_date (runs daily at ~1 min after startup, then every 24h)
+function scheduleUpcomingFlightReminderJob() {
+    const runJob = () => {
+        runUpcomingFlightReminderJob().catch(err => console.error('[UpcomingFlightReminder] Job error:', err));
+    };
+    setTimeout(runJob, 60000);
+    setInterval(runJob, 24 * 60 * 60 * 1000);
+}
+scheduleUpcomingFlightReminderJob();
 
 // Global error handler to catch unhandled errors
 process.on('uncaughtException', (error) => {
