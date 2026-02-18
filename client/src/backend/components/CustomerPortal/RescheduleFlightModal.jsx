@@ -10,9 +10,9 @@ import {
     Box,
     IconButton,
     Alert,
-    Checkbox,
+    Radio,
+    RadioGroup,
     FormControlLabel,
-    FormGroup,
     useMediaQuery,
     useTheme
 } from '@mui/material';
@@ -1162,36 +1162,26 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     </Box>
                 ) : (
                     <>
-                        {/* Locations (Flight Voucher style) */}
+                        {/* Locations (Flight Voucher style) - single selection only */}
                         {availableLocations.length > 0 && (
                             <Box sx={{ mb: isMobile ? 2 : 3 }}>
                                 <Typography variant="h6" sx={{ mb: isMobile ? 1.5 : 2, fontSize: isMobile ? 14 : 16, fontWeight: 700 }}>
                                     Locations:
                                 </Typography>
-                                <FormGroup row>
+                                <RadioGroup
+                                    row
+                                    value={selectedLocations[0] || ''}
+                                    onChange={(e) => setSelectedLocations(e.target.value ? [e.target.value] : [])}
+                                >
                                     {availableLocations.map((loc) => (
                                         <FormControlLabel
                                             key={loc}
-                                            control={
-                                                <Checkbox
-                                                    checked={selectedLocations.includes(loc)}
-                                                    onChange={(e) => {
-                                                        const isChecked = e.target.checked;
-                                                        setSelectedLocations((prev) => {
-                                                            if (isChecked) {
-                                                                return [...prev, loc];
-                                                            }
-                                                            // Prevent empty selection (keep at least one)
-                                                            if (prev.length <= 1) return prev;
-                                                            return prev.filter((l) => l !== loc);
-                                                        });
-                                                    }}
-                                                />
-                                            }
+                                            value={loc}
+                                            control={<Radio />}
                                             label={loc}
                                         />
                                     ))}
-                                </FormGroup>
+                                </RadioGroup>
                             </Box>
                         )}
 
