@@ -30503,7 +30503,7 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
 }
 
 // Helper function to build email layout (matches frontend buildEmailLayout)
-function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '', bodyHtml = '', customerName = 'Guest', signatureLines = ['Fly Away Ballooning Team'], footerLinks = [], disableFormatDetection = false }) {
+function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '', bodyHtml = '', customerName = 'Guest', signatureLines = ['Fly Away Ballooning Team'], footerLinks = [], disableFormatDetection = true }) {
     const safeName = escapeHtml(customerName || 'Guest');
     const signatureHtml = signatureLines
         .map(line => `<div style="font-size:16px; line-height:1.6; color:#1f2937; margin:0;">${escapeHtml(line)}</div>`)
@@ -30554,6 +30554,12 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
 
     const responsiveStyles = `
     <style>
+        /* iOS: prevent auto-detected numbers/dates from appearing as blue underlined links */
+        a[x-apple-data-detectors] {
+            color: inherit !important;
+            text-decoration: none !important;
+            pointer-events: none !important;
+        }
         @media only screen and (max-width: 600px) {
             /* Main container adjustments */
             body {
@@ -30733,7 +30739,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
     <title>${escapeHtml(subject)}</title>
     ${responsiveStyles}
 </head>
-<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;">
+<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;"${disableFormatDetection ? ' x-apple-data-detectors="false"' : ''}>
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
         <tr>
             <td align="center" style="padding:32px 16px;">
@@ -30759,7 +30765,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding:32px;">
+                        <td style="padding:32px;"${disableFormatDetection ? ' x-apple-data-detectors="false"' : ''}>
                             ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px; word-wrap:break-word;">${escapeHtml(headline)}</div>` : ''}
                             ${highlightSection}
                             <div style="font-size:16px; line-height:1.7; color:#1f2937; word-wrap:break-word;"${disableFormatDetection ? ' x-apple-data-detectors="false"' : ''}>
@@ -31352,7 +31358,8 @@ function generateFlightVoucherConfirmationEmail(voucher, template = null) {
         bodyHtml,
         customerName,
         signatureLines: [],
-        footerLinks: []
+        footerLinks: [],
+        disableFormatDetection: true
     });
 }
 
@@ -31410,7 +31417,8 @@ function generateGiftVoucherConfirmationEmail(voucher, template = null) {
         bodyHtml,
         customerName,
         signatureLines: [],
-        footerLinks: []
+        footerLinks: [],
+        disableFormatDetection: true
     });
 }
 
@@ -31469,7 +31477,8 @@ async function scheduleReceivedGiftVoucherEmail(voucherId, recipientEmail, delay
             subject: template?.subject || defaultSubject,
             bodyHtml: messageWithPrompts,
             customerName: voucher.recipient_name || voucher.name || 'Guest',
-            signatureLines: ['Fly Away Ballooning Team']
+            signatureLines: ['Fly Away Ballooning Team'],
+            disableFormatDetection: true
         });
         const textBody = convertHtmlToText(bodyHtml);
 

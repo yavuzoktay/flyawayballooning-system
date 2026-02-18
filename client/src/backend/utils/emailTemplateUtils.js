@@ -268,7 +268,7 @@ const buildEmailLayout = ({
     signatureLines = [],
     footerLinks = [],
     emoji = '🎈',
-    disableFormatDetection = false
+    disableFormatDetection = true
 }) => {
     // Normalize body/highlight styles so all templates share the same typography
     // (font-size, font-family, line-height) as the Upcoming Flight Reminder.
@@ -308,6 +308,12 @@ const buildEmailLayout = ({
 
     const responsiveStyles = `
     <style>
+        /* iOS: prevent auto-detected numbers/dates from appearing as blue underlined links */
+        a[x-apple-data-detectors] {
+            color: inherit !important;
+            text-decoration: none !important;
+            pointer-events: none !important;
+        }
         @media only screen and (max-width: 600px) {
             /* Hero image - mobile optimized (preserve aspect ratio and quality) */
             img[alt="Fly Away Ballooning"] {
@@ -340,7 +346,7 @@ const buildEmailLayout = ({
     const formatDetectionMeta = disableFormatDetection
         ? '<meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />'
         : '';
-    const bodyContentAttrs = disableFormatDetection ? ' x-apple-data-detectors="false"' : '';
+    const formatDetectionAttrs = disableFormatDetection ? ' x-apple-data-detectors="false"' : '';
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -350,7 +356,7 @@ const buildEmailLayout = ({
     <title>${escapeHtml(subject)}</title>
     ${responsiveStyles}
 </head>
-<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;">
+<body style="margin:0; padding:0; background-color:#f5f5f5; font-family:'Helvetica Neue', Arial, sans-serif;"${formatDetectionAttrs}>
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
         <tr>
             <td align="center" style="padding:32px 16px;">
@@ -376,11 +382,11 @@ const buildEmailLayout = ({
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding:32px;">
+                        <td style="padding:32px;"${formatDetectionAttrs}>
                             ${headline ? `<div style="font-size:26px; line-height:1.35; font-weight:700; color:#111827; margin-bottom:20px;">${headline}</div>` : ''}
                             ${highlightSection}
                             ${PERSONAL_NOTE_PLACEHOLDER}
-                            <div style="font-size:16px; line-height:1.7; color:#1f2937;"${bodyContentAttrs}>
+                            <div style="font-size:16px; line-height:1.7; color:#1f2937;"${formatDetectionAttrs}>
                                 ${normalizedBodyHtml}
                             </div>
                             <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px;">
