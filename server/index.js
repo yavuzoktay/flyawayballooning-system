@@ -26890,17 +26890,32 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         console.log('storeData.voucherData?.generated_voucher_code:', storeData.voucherData?.generated_voucher_code);
         console.log('finalVoucherCode:', finalVoucherCode);
 
+        // Build user_data for Enhanced Conversions (in-page code)
+        const src = storeData.bookingData || storeData.voucherData || {};
+        let user_data = {};
+        if (src.passengerData && Array.isArray(src.passengerData) && src.passengerData[0]) {
+            const p = src.passengerData[0];
+            if (p.email && String(p.email).trim()) user_data.email = String(p.email).trim().toLowerCase();
+            if (p.phone && String(p.phone).trim()) user_data.phone_number = String(p.phone).trim().replace(/\s+/g, '');
+        } else if (src.purchaser_email || src.email) {
+            if (src.purchaser_email || src.email) user_data.email = String(src.purchaser_email || src.email).trim().toLowerCase();
+            if (src.purchaser_phone || src.phone || src.mobile) user_data.phone_number = String(src.purchaser_phone || src.phone || src.mobile || '').trim().replace(/\s+/g, '');
+        }
+
         res.json({
             success: true,
             id: result,
             message: `${type} created successfully`,
             voucher_code: finalVoucherCode,
             voucher_codes: storeData.voucherData?.generated_voucher_codes || null, // Array of multiple voucher codes
-            customer_name: storeData.voucherData?.name || storeData.bookingData?.passengerData?.[0]?.firstName + ' ' + storeData.bookingData?.passengerData?.[0]?.lastName || null,
+            customer_name: storeData.voucherData?.name || (storeData.bookingData?.passengerData?.[0] ? (storeData.bookingData.passengerData[0].firstName + ' ' + storeData.bookingData.passengerData[0].lastName) : null) || null,
             customer_email: storeData.voucherData?.email || storeData.bookingData?.passengerData?.[0]?.email || null,
+            customer_phone: storeData.voucherData?.phone || storeData.voucherData?.purchaser_phone || storeData.bookingData?.passengerData?.[0]?.phone || null,
             paid_amount: storeData.voucherData?.paid || storeData.bookingData?.totalPrice || null,
             voucher_type: storeData.voucherData?.voucher_type || (type === 'booking' ? 'Book Flight' : null),
-            voucher_type_detail: storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || null
+            voucher_type_detail: storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || null,
+            experience_type: (storeData.bookingData?.chooseFlightType?.type || storeData.voucherData?.flight_type || '').toLowerCase().includes('private') ? 'private' : 'shared',
+            user_data: Object.keys(user_data).length ? user_data : undefined
         });
     } catch (error) {
         console.error('Error creating from session:', error);
@@ -28526,13 +28541,24 @@ app.get('/api/session-status', (req, res) => {
         const experienceType = flightTypeStr.includes('private') ? 'private' : 'shared';
         const productType = (source.selectedVoucherType?.title || source.voucher_type || '').toString();
         const value = Number(data.totalPrice || 0);
+        // Build user_data for Enhanced Conversions (in-page code) - email required, phone improves match rate
+        let user_data = {};
+        if (source.passengerData && Array.isArray(source.passengerData) && source.passengerData[0]) {
+            const p = source.passengerData[0];
+            if (p.email && String(p.email).trim()) user_data.email = String(p.email).trim().toLowerCase();
+            if (p.phone && String(p.phone).trim()) user_data.phone_number = String(p.phone).trim().replace(/\s+/g, '');
+        } else if (source.purchaser_email || source.email) {
+            if (source.purchaser_email || source.email) user_data.email = String(source.purchaser_email || source.email).trim().toLowerCase();
+            if (source.purchaser_phone || source.phone || source.mobile) user_data.phone_number = String(source.purchaser_phone || source.phone || source.mobile || '').trim().replace(/\s+/g, '');
+        }
         result.conversion_data = {
             transaction_id: session_id,
             value,
             currency: 'GBP',
             funnel_type: funnelType,
             experience_type: experienceType,
-            product_type: productType
+            product_type: productType,
+            user_data: Object.keys(user_data).length ? user_data : undefined
         };
     }
     return res.json(result);
