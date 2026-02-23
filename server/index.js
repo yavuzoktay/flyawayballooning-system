@@ -11309,7 +11309,7 @@ app.get('/api/getAllVoucher', (req, res) => {
 app.get('/api/getDateRequestData', (req, res) => {
     console.log('GET /api/getDateRequestData called');
     // Only return actual date requests. Do NOT include bookings.
-    const sql = 'SELECT id, name, location, flight_type, requested_date AS date_requested, "" as voucher_code, phone, email, created_at, "date_request" as source FROM date_request ORDER BY created_at DESC';
+    const sql = 'SELECT id, name, location, flight_type, requested_date AS date_requested, preferred_time, "" as voucher_code, phone, email, created_at, "date_request" as source FROM date_request ORDER BY created_at DESC';
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Error fetching from date_request:', err);
@@ -22066,16 +22066,17 @@ app.get('/api/activity/:id/rebook-availabilities', (req, res) => {
 
 // Add Date Request (POST)
 app.post('/api/date-request', (req, res) => {
-    const { name, phone, email, location, flight_type, requested_date } = req.body;
-    console.log('POST /api/date-request called with:', { name, phone, email, location, flight_type, requested_date });
+    const { name, phone, email, location, flight_type, requested_date, preferred_time, requested_time } = req.body;
+    const preferredTime = preferred_time || requested_time || null;
+    console.log('POST /api/date-request called with:', { name, phone, email, location, flight_type, requested_date, preferred_time: preferredTime });
 
     if (!name || !email || !location || !flight_type || !requested_date) {
         console.log('Missing required fields');
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    const sql = 'INSERT INTO date_request (name, phone, email, location, flight_type, requested_date) VALUES (?, ?, ?, ?, ?, ?)';
-    con.query(sql, [name, phone, email, location, flight_type, requested_date], (err, result) => {
+    const sql = 'INSERT INTO date_request (name, phone, email, location, flight_type, requested_date, preferred_time) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    con.query(sql, [name, phone || '', email, location, flight_type, requested_date, preferredTime], (err, result) => {
         if (err) {
             console.error('Error inserting date request:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
@@ -28728,6 +28729,29 @@ const updateDateRequestTable = () => {
             });
         } else {
             console.log('✅ Updated at column already exists in date_request');
+        }
+    });
+
+    // Check if preferred_time column exists
+    const checkPreferredTimeColumn = "SHOW COLUMNS FROM date_request LIKE 'preferred_time'";
+    con.query(checkPreferredTimeColumn, (err, result) => {
+        if (err) {
+            console.error('Error checking preferred_time column:', err);
+            return;
+        }
+
+        if (result.length === 0) {
+            console.log('Adding preferred_time column to date_request...');
+            const addPreferredTimeColumn = "ALTER TABLE date_request ADD COLUMN preferred_time VARCHAR(50) DEFAULT NULL COMMENT 'Preferred time (Morning/Evening)' AFTER requested_date";
+            con.query(addPreferredTimeColumn, (err) => {
+                if (err) {
+                    console.error('Error adding preferred_time column:', err);
+                } else {
+                    console.log('✅ Preferred time column added to date_request');
+                }
+            });
+        } else {
+            console.log('✅ Preferred time column already exists in date_request');
         }
     });
 };

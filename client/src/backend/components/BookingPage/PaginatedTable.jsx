@@ -43,6 +43,7 @@ const PaginatedTable = ({
             if (col === 'created_at' || col === 'created' || col === 'created_at_display') return 'Created';
             if (col === 'voucher_booking_id') return 'Voucher/Booking ID';
             if (col === 'date_requested') return 'Date requested';
+            if (col === 'preferred_time') return 'Preferred Time';
             if (col === 'flight_type') return 'Experience';
             if (col === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
             if (col === 'actual_voucher_type') return 'Voucher Type';
@@ -78,6 +79,7 @@ const PaginatedTable = ({
         if (id === 'created_at' || id === 'created' || id === 'created_at_display') return 'Created';
         if (id === 'voucher_booking_id') return 'Voucher/Booking ID';
         if (id === 'date_requested') return 'Date requested';
+        if (id === 'preferred_time') return 'Preferred Time';
         if (id === 'flight_type') return 'Experience';
         if (id === 'voucher_type') return context === 'vouchers' ? 'Book Flight' : 'Voucher Type';
         if (id === 'actual_voucher_type') return 'Voucher Type';

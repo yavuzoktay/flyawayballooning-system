@@ -1745,6 +1745,7 @@ const BookingPage = () => {
                 email: item.email || "",
                 location: item.location || "",
                 date_requested: item.date_requested ? dayjs(item.date_requested).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
+                preferred_time: item.preferred_time || "-",
                 id: item.id || "",
                 _original: item
             }));
@@ -6474,7 +6475,7 @@ setBookingDetail(finalVoucherDetail);
                                 <PaginatedTable
                                     itemsPerPage={10}
                                     data={filteredDateRequestData}
-                                    columns={["name", "number", "flight_type", "email", "location", "date_requested"]}
+                                    columns={["name", "number", "flight_type", "email", "location", "date_requested", "preferred_time"]}
                                     onNameClick={handleDateRequestNameClick}
                                     selectable={true}
                                     onSelectionChange={setSelectedDateRequestIds}
