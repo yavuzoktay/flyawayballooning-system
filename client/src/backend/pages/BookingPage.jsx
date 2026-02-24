@@ -554,8 +554,10 @@ const BookingPage = () => {
     // Notification states for new entries
     const [hasNewBookings, setHasNewBookings] = useState(false);
     const [hasNewVouchers, setHasNewVouchers] = useState(false);
+    const [hasNewDateRequests, setHasNewDateRequests] = useState(false);
     const [lastViewedBookings, setLastViewedBookings] = useState([]);
     const [lastViewedVouchers, setLastViewedVouchers] = useState([]);
+    const [lastViewedDateRequestIds, setLastViewedDateRequestIds] = useState([]);
 
     // SMS state
     const [smsModalOpen, setSmsModalOpen] = useState(false);
@@ -1880,6 +1882,7 @@ const BookingPage = () => {
         // Load last viewed IDs from localStorage
         const savedBookingIds = localStorage.getItem('lastViewedBookingIds');
         const savedVoucherIds = localStorage.getItem('lastViewedVoucherIds');
+        const savedDateRequestIds = localStorage.getItem('lastViewedDateRequestIds');
         
         if (savedBookingIds) {
             try {
@@ -1895,6 +1898,14 @@ const BookingPage = () => {
             } catch (e) {
                 console.error('Error parsing saved voucher IDs:', e);
                 localStorage.removeItem('lastViewedVoucherIds');
+            }
+        }
+        if (savedDateRequestIds) {
+            try {
+                setLastViewedDateRequestIds(JSON.parse(savedDateRequestIds));
+            } catch (e) {
+                console.error('Error parsing saved date request IDs:', e);
+                localStorage.removeItem('lastViewedDateRequestIds');
             }
         }
     }, []);
@@ -1941,6 +1952,24 @@ const BookingPage = () => {
         }
     }, [voucher, lastViewedVouchers, activeTab]);
 
+    // Check for new date requests - show badge if there are new IDs not in lastViewed
+    useEffect(() => {
+        if (filteredDateRequestData.length > 0) {
+            const currentDateRequestIds = filteredDateRequestData.map(d => d.id).filter(id => id != null && id !== '');
+            
+            if (lastViewedDateRequestIds.length === 0) {
+                if (activeTab === "dateRequests") {
+                    setLastViewedDateRequestIds(currentDateRequestIds);
+                    localStorage.setItem('lastViewedDateRequestIds', JSON.stringify(currentDateRequestIds));
+                }
+                setHasNewDateRequests(false);
+            } else {
+                const newDateRequests = currentDateRequestIds.filter(id => !lastViewedDateRequestIds.includes(id));
+                setHasNewDateRequests(newDateRequests.length > 0);
+            }
+        }
+    }, [filteredDateRequestData, lastViewedDateRequestIds, activeTab]);
+
     // Handle tab change and mark as viewed
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -1956,6 +1985,11 @@ const BookingPage = () => {
             setLastViewedVouchers(voucherIds);
             localStorage.setItem('lastViewedVoucherIds', JSON.stringify(voucherIds));
             setHasNewVouchers(false);
+        } else if (tab === "dateRequests" && filteredDateRequestData.length > 0) {
+            const dateRequestIds = filteredDateRequestData.map(d => d.id);
+            setLastViewedDateRequestIds(dateRequestIds);
+            localStorage.setItem('lastViewedDateRequestIds', JSON.stringify(dateRequestIds));
+            setHasNewDateRequests(false);
         }
     };
 
@@ -5366,14 +5400,17 @@ setBookingDetail(finalVoucherDetail);
                         <button
                             onClick={() => handleTabChange("dateRequests")}
                             style={{
+                                marginRight: isMobile ? "0" : "10px",
                                 background: activeTab === "dateRequests" ? "#3274b4" : "#A6A6A6",
                                 color: "#FFF",
                                 padding: isMobile ? "6px 10px" : "8px 16px",
                                 border: "none",
                                 cursor: "pointer",
+                                position: "relative",
                                 display: "inline-flex",
                                 alignItems: "center",
                                 justifyContent: isMobile ? "center" : "flex-start",
+                                gap: "6px",
                                 borderRadius: "4px",
                                 fontSize: isMobile ? "12px" : "14px",
                                 fontWeight: "500",
@@ -5382,6 +5419,26 @@ setBookingDetail(finalVoucherDetail);
                             }}
                         >
                             DATE REQUESTS
+                            {hasNewDateRequests && (
+                                <span style={{
+                                    position: "absolute",
+                                    top: "-6px",
+                                    right: "-6px",
+                                    width: "16px",
+                                    height: "16px",
+                                    background: "#ff0000",
+                                    borderRadius: "50%",
+                                    border: "2px solid white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "10px",
+                                    fontWeight: "bold",
+                                    color: "white",
+                                    animation: "pulse 2s infinite"
+                                }}>
+                                </span>
+                            )}
                         </button>
                     </div>
                     
