@@ -21610,9 +21610,22 @@ app.get('/api/availabilities/filter', (req, res) => {
 
     const params = [activityId || location];
 
+    // Normalize flightType coming from frontend so different labels
+    // ("Private Charter", "Private", "Shared Flight", etc.) map to the
+    // values stored in the database ("Private", "Shared", or "All").
+    let normalizedFlightType = flightType;
     if (flightType && flightType !== 'All') {
+        const ft = String(flightType).toLowerCase();
+        if (ft.includes('private')) {
+            normalizedFlightType = 'Private';
+        } else if (ft.includes('shared')) {
+            normalizedFlightType = 'Shared';
+        }
+    }
+
+    if (normalizedFlightType && normalizedFlightType !== 'All') {
         sql += ` AND (aa.flight_types = 'All' OR aa.flight_types = ? OR FIND_IN_SET(?, aa.flight_types) > 0)`;
-        params.push(flightType, flightType);
+        params.push(normalizedFlightType, normalizedFlightType);
     } else {
         // If no flight type specified, show all flight types
         sql += ` AND (aa.flight_types = 'All' OR aa.flight_types IS NOT NULL)`;
