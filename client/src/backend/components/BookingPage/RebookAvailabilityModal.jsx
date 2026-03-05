@@ -1073,9 +1073,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         checked={flightVoucherSelectedLocations.includes(loc)}
                                                         onChange={(e) => {
                                                             if (e.target.checked) {
-                                                                setFlightVoucherSelectedLocations(prev => [...prev, loc]);
+                                                                // Allow ONLY one location at a time for Flight Voucher Details
+                                                                setFlightVoucherSelectedLocations([loc]);
                                                             } else {
-                                                                setFlightVoucherSelectedLocations(prev => prev.filter(l => l !== loc));
+                                                                setFlightVoucherSelectedLocations([]);
                                                             }
                                                         }}
                                                     />
@@ -1110,9 +1111,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         checked={selectedLocations.includes(loc)}
                                                         onChange={(e) => {
                                                             if (e.target.checked) {
-                                                                setSelectedLocations(prev => [...prev, loc]);
+                                                                // Allow ONLY one location at a time for Gift Voucher Details
+                                                                setSelectedLocations([loc]);
                                                             } else {
-                                                                setSelectedLocations(prev => prev.filter(l => l !== loc));
+                                                                setSelectedLocations([]);
                                                             }
                                                         }}
                                                     />
