@@ -659,7 +659,26 @@ const CustomerPortal = () => {
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                         <Box>
-                            <Typography variant="body2" color="text.secondary">Booking ID or Voucher Reference</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                {(() => {
+                                    const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
+                                    const voucherType = (bookingData.voucher_type || '').toString().trim().toLowerCase();
+                                    const isVoucherRedeemed =
+                                        bookingData.is_voucher_redeemed === true || bookingData.is_voucher_redeemed === 1;
+                                    const isFlightVoucherBase =
+                                        bookingData.is_flight_voucher ||
+                                        bookFlight === 'flight voucher' ||
+                                        voucherType === 'flight voucher';
+                                    const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
+                                    
+                                    // Flight Voucher view: show "Voucher Reference"
+                                    if (isFlightVoucherSection) {
+                                        return 'Voucher Reference';
+                                    }
+                                    // Regular booking view: show "Booking ID"
+                                    return 'Booking ID';
+                                })()}
+                            </Typography>
                             {(() => {
                                 const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
                                 const voucherType = (bookingData.voucher_type || '').toString().trim().toLowerCase();
@@ -669,26 +688,18 @@ const CustomerPortal = () => {
                                     bookingData.is_flight_voucher ||
                                     bookFlight === 'flight voucher' ||
                                     voucherType === 'flight voucher';
-                                // If voucher has been redeemed into a booking, treat as regular booking in Customer Portal
                                 const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
-                                
-                                // For Flight Vouchers (Your Booking Flight Voucher section), show both Booking ID and Voucher Ref (non-clickable)
-                                // For regular bookings (Your Booking section), show only Booking ID - NO Voucher Ref
-                                if (isFlightVoucherSection && bookingData.voucher_ref) {
-                                    const isRedeemed = isVoucherRedeemed;
+
+                                if (isFlightVoucherSection) {
+                                    // Only show voucher reference value under "Voucher Reference"
                                     return (
-                                        <Box sx={{ mb: 2 }}>
-                                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 0.5 }}>
-                                                {bookingData.booking_reference || bookingData.id || 'N/A'}
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#555' }}>
-                                                Voucher Ref: {bookingData.voucher_ref} {isRedeemed ? 'Yes' : ''}
-                                            </Typography>
-                                        </Box>
+                                        <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                            {bookingData.voucher_ref || bookingData.booking_reference || bookingData.id || 'N/A'}
+                                        </Typography>
                                     );
                                 }
-                                
-                                // For regular bookings (Your Booking section), show only Booking ID - Voucher Ref is NOT shown
+
+                                // Regular bookings: show booking reference under "Booking ID"
                                 return (
                                     <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                         {bookingData.booking_reference || bookingData.id || 'N/A'}
