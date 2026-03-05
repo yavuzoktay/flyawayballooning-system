@@ -315,6 +315,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         }
         if (locationToUse) {
             setSelectedLocation(locationToUse);
+            // For Flight Voucher Details, preselect this location in the radio group if nothing is chosen yet
+            if (isFlightVoucherDetails && flightVoucherSelectedLocations.length === 0) {
+                setFlightVoucherSelectedLocations([locationToUse]);
+            }
         }
 
         let existingActivity = null;
@@ -373,7 +377,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             voucherDefaults.push('weekday morning', 'flexible weekday', 'any day flight');
             }
         setSelectedVoucherTypes(Array.from(new Set(voucherDefaults)));
-    }, [activities, open, bookingDetail, location]);
+    }, [activities, open, bookingDetail, location, isFlightVoucherDetails, flightVoucherSelectedLocations.length]);
 
     // Set calendar to current month (not booking date) when modal opens
     useEffect(() => {
