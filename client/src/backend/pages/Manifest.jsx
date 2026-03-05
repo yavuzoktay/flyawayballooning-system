@@ -3422,13 +3422,59 @@ const Manifest = () => {
                         value: update.value
                     })
                 ));
+
+                // Reflect passenger edits in the dialog and manifest table immediately.
+                const normalizeFieldValue = (value) => {
+                    if (value === undefined) return undefined;
+                    if (value === null) return null;
+                    const trimmed = String(value).trim();
+                    return trimmed === '' ? null : trimmed;
+                };
+                const localPassengerPatch = {
+                    first_name: normalizeFieldValue(editPassengerFirstName),
+                    last_name: normalizeFieldValue(editPassengerLastName),
+                    weight: normalizeFieldValue(editPassengerWeight),
+                    price: normalizeFieldValue(editPassengerPrice)
+                };
+
+                setBookingDetail(prev => {
+                    if (!prev || !Array.isArray(prev.passengers)) return prev;
+                    return {
+                        ...prev,
+                        passengers: prev.passengers.map(existingPassenger => (
+                            existingPassenger.id === p.id
+                                ? { ...existingPassenger, ...localPassengerPatch }
+                                : existingPassenger
+                        ))
+                    };
+                });
+
+                setFlights(prevFlights => prevFlights.map(flight => {
+                    if (flight.id !== bookingDetail.booking.id || !Array.isArray(flight.passengers)) {
+                        return flight;
+                    }
+                    return {
+                        ...flight,
+                        passengers: flight.passengers.map(existingPassenger => (
+                            existingPassenger.id === p.id
+                                ? { ...existingPassenger, ...localPassengerPatch }
+                                : existingPassenger
+                        ))
+                    };
+                }));
             }
             
-            // Wait a bit to ensure database updates are committed
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Fetch updated booking detail
-            await fetchBookingDetail(bookingDetail.booking.id);
+            if (isPlaceholder) {
+                // Wait a bit to ensure database updates are committed
+                await new Promise(resolve => setTimeout(resolve, 100));
+                // Placeholder rows need a refetch to get the real passenger id.
+                await fetchBookingDetail(bookingDetail.booking.id);
+            } else {
+                // Keep backend and UI in sync without blocking immediate UI update.
+                setTimeout(() => {
+                    fetchBookingDetail(bookingDetail.booking.id);
+                }, 150);
+            }
             setEditingPassenger(null);
         } catch (e) {
             console.error('Failed to save passenger edit', e);
