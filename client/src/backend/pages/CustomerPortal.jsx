@@ -654,7 +654,11 @@ const CustomerPortal = () => {
                                 voucherType === 'flight voucher';
                             // If voucher has been redeemed into a booking, show standard "Your Booking" portal
                             const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
+<<<<<<< HEAD
                             return isFlightVoucherSection ? 'Your Booking Flight Voucher' : 'Your Booking';
+=======
+                            return isFlightVoucherSection ? 'Your Flight Voucher' : 'Your Booking';
+>>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                         })()}
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -722,10 +726,17 @@ const CustomerPortal = () => {
                                             }
                                         } catch (e) {
                                             console.error('⚠️ Customer Portal - Error formatting flight_date:', e, bookingData.flight_date);
+<<<<<<< HEAD
                                             return String(bookingData.flight_date || 'Date Not Scheduled');
                                         }
                                     }
                                     return bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'Not Scheduled';
+=======
+                                            return String(bookingData.flight_date || 'Experience Not Scheduled');
+                                        }
+                                    }
+                                    return bookingData.is_flight_voucher ? 'Experience Not Scheduled' : 'Not Scheduled';
+>>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                                 })()}
                             </Typography>
                         </Box>
@@ -735,7 +746,11 @@ const CustomerPortal = () => {
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                     {bookingData.location 
                                         ? bookingData.location 
+<<<<<<< HEAD
                                         : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'TBD')}
+=======
+                                        : (bookingData.is_flight_voucher ? 'Experience Not Scheduled' : 'TBD')}
+>>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                                 </Typography>
                                 {(() => {
                                     const hasFlightDate = Boolean(bookingData.flight_date);
@@ -817,6 +832,7 @@ const CustomerPortal = () => {
                             </Box>
                         </Box>
                         <Box>
+<<<<<<< HEAD
                             <Typography variant="body2" color="text.secondary">Booking Created Date</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {(() => {
@@ -859,6 +875,8 @@ const CustomerPortal = () => {
                             </Typography>
                         </Box>
                         <Box>
+=======
+>>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                             <Typography variant="body2" color="text.secondary">Number of Flight Attempts Made</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
