@@ -759,7 +759,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
             const isAfterExpiry = expiryDate ? d.isAfter(expiryDate, 'day') : false;
             
-            const { total, soldOut, slots, hasEnoughSpace } = getSpacesForDate(d.toDate());
+        const { total, soldOut, slots, hasEnoughSpace } = getSpacesForDate(d.toDate());
             const hasAnySlots = slots.length > 0;
             
             // Date is selectable only if there's enough space for all passengers
@@ -828,7 +828,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 >
                     <div style={{ fontSize: isMobile ? 11 : 13, lineHeight: 1.2, fontWeight: 700 }}>{d.date()}</div>
                     <div style={{ fontSize: isMobile ? 7 : 9, fontWeight: 600, lineHeight: 1.2, textAlign: 'center' }}>
-                        {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${total} Spaces`)}
+                        {slots.length === 0
+                            ? ''
+                            : soldOut
+                                ? 'Sold Out'
+                                : (isPrivateSelection ? '' : `${total} Spaces`)}
                     </div>
                 </div>
             );
@@ -1299,7 +1303,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                                         }
                                                     }}
                                                 >
-                                                    {slot.time} {isAvailable ? `(${availableForSelection} Spaces)` : `(${availableForSelection} Spaces - Insufficient for ${passengerCount} passenger${passengerCount > 1 ? 's' : ''})`}
+                                                    {slot.time}
+                                                    {!isPrivateSelection && (
+                                                        isAvailable
+                                                            ? ` (${availableForSelection} Spaces)`
+                                                            : ` (${availableForSelection} Spaces - Insufficient for ${passengerCount} passenger${passengerCount > 1 ? 's' : ''})`
+                                                    )}
                                                     </Button>
                                             );
                                         })

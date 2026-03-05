@@ -654,11 +654,7 @@ const CustomerPortal = () => {
                                 voucherType === 'flight voucher';
                             // If voucher has been redeemed into a booking, show standard "Your Booking" portal
                             const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
-<<<<<<< HEAD
-                            return isFlightVoucherSection ? 'Your Booking Flight Voucher' : 'Your Booking';
-=======
                             return isFlightVoucherSection ? 'Your Flight Voucher' : 'Your Booking';
->>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                         })()}
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -726,17 +722,10 @@ const CustomerPortal = () => {
                                             }
                                         } catch (e) {
                                             console.error('⚠️ Customer Portal - Error formatting flight_date:', e, bookingData.flight_date);
-<<<<<<< HEAD
-                                            return String(bookingData.flight_date || 'Date Not Scheduled');
-                                        }
-                                    }
-                                    return bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'Not Scheduled';
-=======
                                             return String(bookingData.flight_date || 'Experience Not Scheduled');
                                         }
                                     }
                                     return bookingData.is_flight_voucher ? 'Experience Not Scheduled' : 'Not Scheduled';
->>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                                 })()}
                             </Typography>
                         </Box>
@@ -746,11 +735,7 @@ const CustomerPortal = () => {
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                     {bookingData.location 
                                         ? bookingData.location 
-<<<<<<< HEAD
-                                        : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'TBD')}
-=======
                                         : (bookingData.is_flight_voucher ? 'Experience Not Scheduled' : 'TBD')}
->>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                                 </Typography>
                                 {(() => {
                                     const hasFlightDate = Boolean(bookingData.flight_date);
@@ -832,51 +817,6 @@ const CustomerPortal = () => {
                             </Box>
                         </Box>
                         <Box>
-<<<<<<< HEAD
-                            <Typography variant="body2" color="text.secondary">Booking Created Date</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
-                                {(() => {
-                                    if (!bookingData.created_at) {
-                                        return 'N/A';
-                                    }
-                                    
-                                    // Handle different date formats from backend
-                                    let dateToFormat = bookingData.created_at;
-                                    
-                                    // If it's already a formatted string (DD/MM/YYYY HH:mm), extract date part
-                                    if (typeof dateToFormat === 'string' && dateToFormat.includes('/')) {
-                                        // Extract date part (before space if time exists)
-                                        const datePart = dateToFormat.split(' ')[0];
-                                        // If it's already in DD/MM/YYYY format, return it directly
-                                        if (datePart.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-                                            return datePart;
-                                        }
-                                    }
-                                    
-                                    // Try to parse with dayjs
-                                    const parsedDate = dayjs(dateToFormat);
-                                    if (parsedDate.isValid()) {
-                                        return parsedDate.format('DD/MM/YYYY HH:mm');
-                                    }
-                                    
-                                    // If parsing fails, try to handle MySQL date format or other formats
-                                    try {
-                                        const dateObj = new Date(dateToFormat);
-                                        if (!isNaN(dateObj.getTime())) {
-                                            return dayjs(dateObj).format('DD/MM/YYYY HH:mm');
-                                        }
-                                    } catch (e) {
-                                        console.warn('Failed to parse created_at:', dateToFormat, e);
-                                    }
-                                    
-                                    // Fallback: return the original value or N/A
-                                    return 'N/A';
-                                })()}
-                            </Typography>
-                        </Box>
-                        <Box>
-=======
->>>>>>> 07ca10eab (Initial commit of flyawayballooning-system)
                             <Typography variant="body2" color="text.secondary">Number of Flight Attempts Made</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
