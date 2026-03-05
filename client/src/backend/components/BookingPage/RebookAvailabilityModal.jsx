@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup, IconButton, TextField, Grid, useMediaQuery, useTheme } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, CircularProgress, FormControl, InputLabel, Select, MenuItem, Box, Checkbox, FormControlLabel, FormGroup, IconButton, TextField, Grid, useMediaQuery, useTheme, Radio, RadioGroup } from '@mui/material';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -1054,7 +1054,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     <>
                         {isFlightVoucherDetails && (
                             <>
-                                {/* Locations Checkbox List */}
+                                {/* Locations - single selection (radio-style) */}
                                 <Box sx={{ mb: !isMobile ? 3 : 3 }}>
                                     <Typography variant="h6" sx={{ 
                                         mb: !isMobile ? 2 : 2,
@@ -1064,27 +1064,23 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                     }}>
                                         Locations:
                                     </Typography>
-                                    <FormGroup row>
+                                    <RadioGroup
+                                        row
+                                        value={flightVoucherSelectedLocations[0] || ''}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setFlightVoucherSelectedLocations(value ? [value] : []);
+                                        }}
+                                    >
                                         {availableLocations.map((loc) => (
                                             <FormControlLabel
                                                 key={loc}
-                                                control={
-                                                    <Checkbox
-                                                        checked={flightVoucherSelectedLocations.includes(loc)}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                // Allow ONLY one location at a time for Flight Voucher Details
-                                                                setFlightVoucherSelectedLocations([loc]);
-                                                            } else {
-                                                                setFlightVoucherSelectedLocations([]);
-                                                            }
-                                                        }}
-                                                    />
-                                                }
+                                                value={loc}
+                                                control={<Radio />}
                                                 label={loc}
                                             />
                                         ))}
-                                    </FormGroup>
+                                    </RadioGroup>
                                 </Box>
                             </>
                         )}
