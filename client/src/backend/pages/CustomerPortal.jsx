@@ -722,10 +722,10 @@ const CustomerPortal = () => {
                                             }
                                         } catch (e) {
                                             console.error('⚠️ Customer Portal - Error formatting flight_date:', e, bookingData.flight_date);
-                                            return String(bookingData.flight_date || 'Experience Not Scheduled');
+                                            return String(bookingData.flight_date || 'Date Not Scheduled');
                                         }
                                     }
-                                    return bookingData.is_flight_voucher ? 'Experience Not Scheduled' : 'Not Scheduled';
+                                    return bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'Not Scheduled';
                                 })()}
                             </Typography>
                         </Box>
