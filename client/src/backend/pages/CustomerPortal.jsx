@@ -735,7 +735,7 @@ const CustomerPortal = () => {
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                     {bookingData.location 
                                         ? bookingData.location 
-                                        : (bookingData.is_flight_voucher ? 'Experience Not Scheduled' : 'TBD')}
+                                        : (bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'TBD')}
                                 </Typography>
                                 {(() => {
                                     const hasFlightDate = Boolean(bookingData.flight_date);
