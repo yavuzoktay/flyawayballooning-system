@@ -1183,7 +1183,16 @@ const CustomerPortal = () => {
 
                 {bookingData.passengers && bookingData.passengers.length > 0 && (
                     <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-                        <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+                        <Typography
+                            variant="h5"
+                            sx={{
+                                fontWeight: 600,
+                                mb: 3,
+                                '@media (max-width:600px)': {
+                                    fontSize: '1rem'
+                                }
+                            }}
+                        >
                             Passengers
                         </Typography>
                         {bookingData.passengers.map((passenger, index) => {
@@ -1217,7 +1226,15 @@ const CustomerPortal = () => {
                                             </Box>
                                         ) : (
                                             <>
-                                                <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                                                <Typography
+                                                    variant="body1"
+                                                    sx={{
+                                                        fontWeight: 500,
+                                                        '@media (max-width:600px)': {
+                                                            fontSize: '0.875rem'
+                                                        }
+                                                    }}
+                                                >
                                                     {passenger.first_name} {passenger.last_name}
                                                 </Typography>
                                                 {!isFlightVoucherSection && (
@@ -1255,7 +1272,16 @@ const CustomerPortal = () => {
 
                                     {/* Phone (only for first passenger) */}
                                     {index === 0 && (bookingData.phone || passenger.phone) && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{
+                                                mb: 0.5,
+                                                '@media (max-width:600px)': {
+                                                    fontSize: '0.875rem'
+                                                }
+                                            }}
+                                        >
                                             Phone: {bookingData.phone || passenger.phone}
                                         </Typography>
                                     )}
@@ -1274,7 +1300,16 @@ const CustomerPortal = () => {
                                         ) : (
                                             <>
                                                 {passenger.weight && (
-                                                    <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                        sx={{
+                                                            flex: 1,
+                                                            '@media (max-width:600px)': {
+                                                                fontSize: '0.875rem'
+                                                            }
+                                                        }}
+                                                    >
                                                         Weight: {passenger.weight} kg
                                                     </Typography>
                                                 )}
@@ -1284,7 +1319,16 @@ const CustomerPortal = () => {
 
                                     {/* Email (only for first passenger) */}
                                     {index === 0 && passenger.email && (
-                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{
+                                                mb: 0.5,
+                                                '@media (max-width:600px)': {
+                                                    fontSize: '0.875rem'
+                                                }
+                                            }}
+                                        >
                                             Email: {passenger.email}
                                         </Typography>
                                     )}
