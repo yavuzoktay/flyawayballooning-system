@@ -121,24 +121,36 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             filterData(start, end);
         },
         quarter1: () => {
-            setStartDate("2025-01-01");
-            setEndDate("2025-03-31");
-            filterData("2025-01-01", "2025-03-31");
+            const year = new Date().getFullYear();
+            const start = `${year}-01-01`;
+            const end = `${year}-03-31`;
+            setStartDate(start);
+            setEndDate(end);
+            filterData(start, end);
         },
         quarter2: () => {
-            setStartDate("2025-04-01");
-            setEndDate("2025-06-30");
-            filterData("2025-04-01", "2025-06-30");
+            const year = new Date().getFullYear();
+            const start = `${year}-04-01`;
+            const end = `${year}-06-30`;
+            setStartDate(start);
+            setEndDate(end);
+            filterData(start, end);
         },
         quarter3: () => {
-            setStartDate("2025-07-01");
-            setEndDate("2025-09-30");
-            filterData("2025-07-01", "2025-09-30");
+            const year = new Date().getFullYear();
+            const start = `${year}-07-01`;
+            const end = `${year}-09-30`;
+            setStartDate(start);
+            setEndDate(end);
+            filterData(start, end);
         },
         quarter4: () => {
-            setStartDate("2025-10-01");
-            setEndDate("2025-12-31");
-            filterData("2025-10-01", "2025-12-31");
+            const year = new Date().getFullYear();
+            const start = `${year}-10-01`;
+            const end = `${year}-12-31`;
+            setStartDate(start);
+            setEndDate(end);
+            filterData(start, end);
         },
     };
 
