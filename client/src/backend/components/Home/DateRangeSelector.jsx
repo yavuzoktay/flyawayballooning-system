@@ -225,6 +225,11 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                 const status = (item.status || '').trim();
                 return status.toLowerCase() === 'flown';
             });
+
+            // Flights Completed (gross, includes VAT): sum of paid for flown bookings in selected date range
+            const completedFlightsGross = (completedFlightsData || []).reduce((sum, item) => {
+                return sum + parseMoney(item?.paid);
+            }, 0);
             
             // Total Sales:
             // Sum Paid from all bookings + all vouchers in the selected date range
@@ -235,14 +240,18 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             }, 0);
             const totalSales = bookingSales + voucherSales;
             const totalLiability = computeTotalLiabilityAllTime();
+
+            // VAT Portion: extract VAT from completed flights gross (paid includes VAT)
+            const VAT_RATE = 0.2;
+            const totalVAT = completedFlightsGross * VAT_RATE / (1 + VAT_RATE);
             
             const summary = {
                 totalFlights: flownFlights?.length || 0,
                 totalPax: flownFlights?.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0) || 0,
-                completedFlights: completedFlightsData?.reduce((sum, item) => sum + safeValue(parseInt((item.paid || "0").replace("£", ""), 10)), 0) || 0,
+                completedFlights: completedFlightsGross,
                 totalSales: totalSales,
                 totalLiability: totalLiability,
-                totalVAT: totalSales * 0.2, // VAT is 20% of total sales
+                totalVAT: totalVAT,
             };
             setSummary(summary);
         }
