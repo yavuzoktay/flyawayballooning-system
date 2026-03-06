@@ -7,6 +7,14 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
 
+    const parseMoney = (value) => {
+        if (value === null || value === undefined) return 0;
+        if (typeof value === 'number' && !Number.isNaN(value)) return value;
+        const cleaned = String(value).replace(/£/g, '').replace(/,/g, '').trim();
+        const n = Number.parseFloat(cleaned);
+        return Number.isNaN(n) ? 0 : n;
+    };
+
     const parseLooseDate = (raw) => {
         if (!raw) return null;
         if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw;
@@ -38,6 +46,43 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         // Fallback
         const d = new Date(dateStr);
         return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const isRedeemedLikeYes = (raw) => {
+        const v = raw === null || raw === undefined ? '' : String(raw).trim().toLowerCase();
+        return v === 'yes' || v === 'redeemed' || v === 'true' || v === '1';
+    };
+
+    const isExpired = (rawDate) => {
+        const d = parseLooseDate(rawDate);
+        if (!d) return false; // if we can't parse expiry, don't treat as expired
+        const endOfDay = new Date(d);
+        endOfDay.setHours(23, 59, 59, 999);
+        return endOfDay < new Date();
+    };
+
+    const computeTotalLiabilityAllTime = () => {
+        // Total Liability is all-time:
+        // sum paid for unflown bookings + unredeemed/unexpired vouchers
+        const bookingsLiability = (bookingData || []).reduce((sum, b) => {
+            if (!b || typeof b !== 'object') return sum;
+            const status = String(b.status || '').trim().toLowerCase();
+            if (status === 'flown') return sum;
+            if (status === 'cancelled' || status === 'canceled') return sum;
+            if (status === 'expired') return sum;
+            // If booking has an expires date and it's in the past, treat as expired
+            if (b.expires && isExpired(b.expires)) return sum;
+            return sum + parseMoney(b.paid);
+        }, 0);
+
+        const vouchersLiability = (voucherData || []).reduce((sum, v) => {
+            if (!v || typeof v !== 'object') return sum;
+            if (isRedeemedLikeYes(v.redeemed)) return sum;
+            if (v.expires && isExpired(v.expires)) return sum;
+            return sum + parseMoney(v.paid);
+        }, 0);
+
+        return bookingsLiability + vouchersLiability;
     };
 
     // Detect mobile device
@@ -181,31 +226,22 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                 return status.toLowerCase() === 'flown';
             });
             
-            // Filter non-flown bookings: all bookings where status is NOT "Flown" for Total Liability calculation
-            const nonFlownBookings = data?.filter(item => {
-                if (!item || typeof item !== 'object') return false;
-                
-                // Status must NOT be "Flown" (case-insensitive check)
-                const status = (item.status || '').trim();
-                return status.toLowerCase() !== 'flown';
-            });
-            
             // Total Sales:
             // Sum Paid from all bookings + all vouchers in the selected date range
             // Includes everything purchased, regardless of redeemed/flown status
-            const bookingSales = data?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", ""))), 0) || 0;
+            const bookingSales = data?.reduce((sum, item) => sum + parseMoney(item?.paid), 0) || 0;
             const voucherSales = (vouchers || []).reduce((sum, item) => {
-                const paidValue = safeValue(parseFloat((item.paid || "0").replace("£", "")));
-                return sum + paidValue;
+                return sum + parseMoney(item?.paid);
             }, 0);
             const totalSales = bookingSales + voucherSales;
+            const totalLiability = computeTotalLiabilityAllTime();
             
             const summary = {
                 totalFlights: flownFlights?.length || 0,
                 totalPax: flownFlights?.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0) || 0,
                 completedFlights: completedFlightsData?.reduce((sum, item) => sum + safeValue(parseInt((item.paid || "0").replace("£", ""), 10)), 0) || 0,
                 totalSales: totalSales,
-                totalLiability: nonFlownBookings?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", ""))), 0) || 0,
+                totalLiability: totalLiability,
                 totalVAT: totalSales * 0.2, // VAT is 20% of total sales
             };
             setSummary(summary);
