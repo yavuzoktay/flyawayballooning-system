@@ -199,32 +199,47 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         },
     };
 
+    const getFlightDateRange = () => {
+        const start = parseLooseDate(startDate);
+        const end = parseLooseDate(endDate);
+        if (!start || !end) return null;
+        const endInclusive = new Date(end);
+        endInclusive.setHours(23, 59, 59, 999);
+        return { start, end: endInclusive };
+    };
+
     // Add All Values Result
     const calculateSummary = (data, vouchers = []) => {
         const safeValue = (value) => isNaN(value) ? 0 : value;
         if(data){
-            // Filter flown flights: only count flights where status is exactly "Flown"
-            const flownFlights = data?.filter(item => {
+            const flightRange = getFlightDateRange();
+
+            const bookingsForFlights = (bookingData && bookingData.length > 0)
+                ? bookingData
+                : (data || []);
+
+            const isInFlightRange = (item) => {
+                if (!flightRange) return true; // all time
+                const raw = item?.flight_date || item?.flight_date_display || null;
+                if (!raw) return false;
+                const dateOnly = String(raw).split(' ')[0]; // strip AM/PM etc.
+                const d = parseLooseDate(dateOnly);
+                if (!d) return false;
+                return d >= flightRange.start && d <= flightRange.end;
+            };
+
+            // Filter flown flights: only count flights where status is exactly "Flown" (by flight_date range)
+            const flownFlights = bookingsForFlights?.filter(item => {
                 if (!item || typeof item !== 'object') return false;
                 
                 // Status must be exactly "Flown" (case-insensitive check)
                 const status = (item.status || '').trim();
                 if (status.toLowerCase() !== 'flown') return false;
-                
-                // Must have pax count to calculate total passengers
-                // (flight_date check removed as status "Flown" is sufficient)
-                
-                return true;
+                return isInFlightRange(item);
             });
             
-            // Filter completed flights: only count flights where status is exactly "Flown" for Flights Completed column
-            const completedFlightsData = data?.filter(item => {
-                if (!item || typeof item !== 'object') return false;
-                
-                // Status must be exactly "Flown" (case-insensitive check)
-                const status = (item.status || '').trim();
-                return status.toLowerCase() === 'flown';
-            });
+            // Completed flights for monetary totals use same flownFlights set
+            const completedFlightsData = flownFlights;
 
             // Flights Completed (gross, includes VAT): sum of paid for flown bookings in selected date range
             const completedFlightsGross = (completedFlightsData || []).reduce((sum, item) => {
