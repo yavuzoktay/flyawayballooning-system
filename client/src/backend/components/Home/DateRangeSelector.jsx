@@ -7,6 +7,39 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
 
+    const parseLooseDate = (raw) => {
+        if (!raw) return null;
+        if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw;
+        const dateStr = String(raw).trim();
+        if (!dateStr) return null;
+
+        // ISO-like (YYYY-MM-DD...) works with Date constructor
+        if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+            const d = new Date(dateStr);
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        // DD/MM/YYYY (common in API display fields)
+        const dmySlash = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (dmySlash) {
+            const [, dd, mm, yyyy] = dmySlash;
+            const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        // DD-MM-YYYY
+        const dmyDash = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+        if (dmyDash) {
+            const [, dd, mm, yyyy] = dmyDash;
+            const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+            return Number.isNaN(d.getTime()) ? null : d;
+        }
+
+        // Fallback
+        const d = new Date(dateStr);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
     // Detect mobile device
     useEffect(() => {
         const checkMobile = () => {
@@ -39,33 +72,32 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         if (onDateRangeChange) {
             onDateRangeChange({ start, end });
         }
-        const startDateObj = new Date(start);
-        const endDateObj = new Date(end);
+        const startDateObj = parseLooseDate(start);
+        const endDateObj = parseLooseDate(end);
+        if (!startDateObj || !endDateObj) {
+            calculateSummary(bookingData, voucherData);
+            return;
+        }
+
+        // Make end date inclusive for the whole day
+        endDateObj.setHours(23, 59, 59, 999);
 
         // Filter the data based on the date range
         const filtered = bookingData.filter((item) => {
-            // Güvenli şekilde tarih alanı seç
-            let dateStr = item.created || item.created_at || null;
-            if (!dateStr) return false;
-            // Tarih formatı: dd-mm-yyyy veya yyyy-mm-dd olabilir, otomatik algıla
-            let createdDate;
-            if (dateStr.includes("-")) {
-                const parts = dateStr.split("-");
-                if (parts[0].length === 4) {
-                    // yyyy-mm-dd
-                    createdDate = new Date(dateStr);
-                } else {
-                    // dd-mm-yyyy
-                    createdDate = new Date(parts.reverse().join("-"));
-                }
-            } else {
-                createdDate = new Date(dateStr);
-            }
-            if (isNaN(createdDate.getTime())) return false;
+            const dateStr = item?.created || item?.created_at || null;
+            const createdDate = parseLooseDate(dateStr);
+            if (!createdDate) return false;
             return createdDate >= startDateObj && createdDate <= endDateObj;
         });
 
-        calculateSummary(filtered, voucherData);
+        const filteredVouchers = (voucherData || []).filter((item) => {
+            const dateStr = item?.created || item?.created_at || null;
+            const createdDate = parseLooseDate(dateStr);
+            if (!createdDate) return false;
+            return createdDate >= startDateObj && createdDate <= endDateObj;
+        });
+
+        calculateSummary(filtered, filteredVouchers);
     };
 
     // Updated Quick Links
@@ -146,23 +178,14 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                 return status.toLowerCase() !== 'flown';
             });
             
-            // Calculate Sales: All Booking paid values + All Vouchers with "Redeemed: No" paid values
-            // 1. All Booking tablosundaki tüm paid değerleri
+            // Total Sales:
+            // Sum Paid from all bookings + all vouchers in the selected date range
+            // Includes everything purchased, regardless of redeemed/flown status
             const bookingSales = data?.reduce((sum, item) => sum + safeValue(parseFloat((item.paid || "0").replace("£", ""))), 0) || 0;
-            
-            // 2. All Vouchers tablosunda "Redeemed: No" olan tüm paid değerleri
-            const nonRedeemedVouchers = vouchers?.filter(voucher => {
-                if (!voucher || typeof voucher !== 'object') return false;
-                const redeemed = (voucher.redeemed || '').trim();
-                return redeemed.toLowerCase() !== 'yes';
-            }) || [];
-            
-            const voucherSales = nonRedeemedVouchers.reduce((sum, item) => {
+            const voucherSales = (vouchers || []).reduce((sum, item) => {
                 const paidValue = safeValue(parseFloat((item.paid || "0").replace("£", "")));
                 return sum + paidValue;
             }, 0);
-            
-            // Total Sales = Booking Sales + Voucher Sales
             const totalSales = bookingSales + voucherSales;
             
             const summary = {
