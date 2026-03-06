@@ -1205,8 +1205,14 @@ const CustomerPortal = () => {
                             const isEditing = !isFlightVoucherSection && editingPassenger === passenger.id;
                             return (
                                 <Box key={passenger.id || index} sx={{ mb: 2, p: 2, borderRadius: 1 }}>
-                                    {/* Name Section */}
-                                    <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {/* Name Section - title, edit icon and Resend Confirmation on same line */}
+                                    <Box sx={{
+                                        mb: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                        flexWrap: 'nowrap'
+                                    }}>
                                         {isEditing ? (
                                             <Box sx={{ display: 'flex', gap: 1, flex: 1, flexWrap: 'wrap' }}>
                                                 <TextField
@@ -1230,6 +1236,10 @@ const CustomerPortal = () => {
                                                     variant="body1"
                                                     sx={{
                                                         fontWeight: 500,
+                                                        minWidth: 0,
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
                                                         '@media (max-width:600px)': {
                                                             fontSize: '0.875rem'
                                                         }
@@ -1241,12 +1251,12 @@ const CustomerPortal = () => {
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleEditPassengerClick(passenger)}
-                                                        sx={{ color: '#3274b4', ml: 0.5 }}
+                                                        sx={{ color: '#3274b4', ml: 0.5, flexShrink: 0 }}
                                                     >
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
                                                 )}
-                                                {/* Resend Confirmation - only for first passenger */}
+                                                {/* Resend Confirmation - only for first passenger, same line as name and edit icon */}
                                                 {index === 0 && (
                                                     <Typography
                                                         component="span"
@@ -1258,6 +1268,8 @@ const CustomerPortal = () => {
                                                             cursor: resendingConfirmation ? 'default' : 'pointer',
                                                             textDecoration: 'underline',
                                                             ml: 1.5,
+                                                            whiteSpace: 'nowrap',
+                                                            flexShrink: 0,
                                                             '&:hover': resendingConfirmation ? {} : {
                                                                 color: '#1e40af'
                                                             }
