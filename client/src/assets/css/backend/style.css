@@ -322,7 +322,8 @@ body {
         margin-bottom: 8px !important;
     }
 
-    .MuiTypography-body1 {
+    /* Restrict mobile body1 override to home page only */
+    .home-page-wrap .MuiTypography-body1 {
         font-size: 12px !important;
     }
 }
