@@ -102,7 +102,11 @@ const AnalyticsDashboard = ({ dateRange }) => {
                             <Typography variant="h6" sx={{ mt: 2 }}>Refundable Liability</Typography>
                             <Typography><span style={{color:'#16a085'}}>£{analytics?.refundableLiability || 0}</span></Typography>
                             <Typography variant="h6" sx={{ mt: 2 }}>Voucher Liability</Typography>
-                            <Typography><span style={{color:'#2980b9'}}>{analytics?.voucherLiability || 0}</span></Typography>
+                            <Typography>
+                                <span style={{color:'#2980b9'}}>
+                                    £{Number(analytics?.voucherLiability || 0).toFixed(2)}
+                                </span>
+                            </Typography>
                         </CardContent>
                     </Card>
                 </Grid>

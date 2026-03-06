@@ -20777,25 +20777,20 @@ app.get('/api/analytics', async (req, res) => {
                                                                         location: r.location || 'Other',
                                                                         count: r.count
                                                                     }));
-                                                                    // 11. Voucher Liability (gift + flight vouchers not redeemed)
-                                                                    // Count outstanding vouchers (Gift/Flight) not redeemed
+                                                                    // 11. Voucher Liability (total value of unredeemed vouchers)
                                                                     const voucherLiabilitySql = `
-                                                                        SELECT COUNT(*) AS cnt
+                                                                        SELECT COALESCE(SUM(COALESCE(v.paid, 0)), 0) AS total
                                                                         FROM all_vouchers v
                                                                         WHERE
                                                                             (
-                                                                                COALESCE(v.voucher_type, v.book_flight, '') LIKE '%Gift%'
-                                                                                OR COALESCE(v.voucher_type, v.book_flight, '') LIKE '%Flight%'
-                                                                            )
-                                                                            AND (
                                                                                 v.redeemed IS NULL
                                                                                 OR TRIM(LOWER(v.redeemed)) NOT IN ('yes', 'redeemed', 'true', '1')
                                                                             )
-                                                                            ${dateFilter('v.created_at')}
                                                                     `;
                                                                     con.query(voucherLiabilitySql, [], (err11, voucherLiabilityRows) => {
                                                                         if (err11) return res.status(500).json({ error: 'Failed to fetch voucher liability' });
-                                                                        const voucherLiability = voucherLiabilityRows?.[0]?.cnt || 0;
+                                                                        const voucherLiabilityRaw = Number(voucherLiabilityRows?.[0]?.total || 0);
+                                                                        const voucherLiability = Math.round(voucherLiabilityRaw * 100) / 100;
                                                                     // Return all real analytics
                                                                     res.json({
                                                                         bookingAttempts,
