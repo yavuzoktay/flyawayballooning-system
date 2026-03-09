@@ -5787,6 +5787,84 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
     }
 }
 
+function getAuthoritativeStripeAmounts(session, fallbackValue = 0) {
+    const fallbackAmount = Number.isFinite(Number(fallbackValue)) ? Number(fallbackValue) : 0;
+    const totalCents = session?.amount_total;
+    const subtotalCents = session?.amount_subtotal;
+    const discountCents = session?.total_details?.amount_discount;
+
+    const paidAmount = Number.isFinite(Number(totalCents))
+        ? Number(totalCents) / 100
+        : fallbackAmount;
+    const subtotalAmount = Number.isFinite(Number(subtotalCents))
+        ? Number(subtotalCents) / 100
+        : paidAmount;
+    const discountAmount = Number.isFinite(Number(discountCents))
+        ? Number(discountCents) / 100
+        : Math.max(0, subtotalAmount - paidAmount);
+
+    return {
+        paidAmount,
+        subtotalAmount,
+        discountAmount
+    };
+}
+
+function syncAuthoritativeAmountsToSessionStore(storeData, amounts) {
+    if (!storeData || !amounts) return;
+
+    const paidAmount = Number.isFinite(Number(amounts.paidAmount)) ? Number(amounts.paidAmount) : 0;
+    const subtotalAmount = Number.isFinite(Number(amounts.subtotalAmount)) ? Number(amounts.subtotalAmount) : paidAmount;
+    const discountAmount = Number.isFinite(Number(amounts.discountAmount))
+        ? Number(amounts.discountAmount)
+        : Math.max(0, subtotalAmount - paidAmount);
+
+    storeData.actualPaidAmount = paidAmount;
+    storeData.actualSubtotalAmount = subtotalAmount;
+    storeData.discountAmount = discountAmount;
+
+    if (storeData.bookingData) {
+        storeData.bookingData = {
+            ...storeData.bookingData,
+            actualPaidAmount: paidAmount,
+            actualSubtotalAmount: subtotalAmount,
+            discountAmount
+        };
+    }
+
+    if (storeData.voucherData) {
+        storeData.voucherData = {
+            ...storeData.voucherData,
+            paid: paidAmount,
+            subtotal: subtotalAmount,
+            total: paidAmount,
+            original_amount: paidAmount,
+            amount: paidAmount,
+            discountAmount
+        };
+    }
+}
+
+function getAuthoritativePaidAmountFromSessionStore(storeData) {
+    if (!storeData) return 0;
+
+    const candidates = [
+        storeData.actualPaidAmount,
+        storeData.bookingData?.actualPaidAmount,
+        storeData.voucherData?.paid,
+        storeData.totalPrice
+    ];
+
+    for (const candidate of candidates) {
+        if (candidate === 0) return 0;
+        if (candidate !== null && candidate !== undefined && Number.isFinite(Number(candidate))) {
+            return Number(candidate);
+        }
+    }
+
+    return 0;
+}
+
 /**
  * Helper function to send Google Ads conversion after successful payment
  * This is called from the webhook after payment is confirmed
@@ -5826,16 +5904,13 @@ async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, cu
             fullMetadata: session.metadata
         });
 
-        // Send conversion even without gclid/wbraid/gbraid
-        // Google Ads API accepts conversions without click identifiers
-        // This allows tracking all conversions, not just those from Google Ads clicks
         if (!gclid && !wbraid && !gbraid) {
-            const infoMessage = `Sending Google Ads conversion without gclid/wbraid/gbraid. Transaction ID: ${transactionId}`;
+            const infoMessage = `Skipping Google Ads click conversion upload because no gclid/wbraid/gbraid was captured. Transaction ID: ${transactionId}`;
             console.log('ℹ️', infoMessage);
             
             // Log to database for visibility
             saveErrorLog('info', infoMessage, null, 'googleAds.sendConversionIfNeeded');
-            // Continue to send conversion (don't return)
+            return { success: false, reason: 'missing_click_id' };
         }
 
         console.log('📊 [Google Ads] Proceeding with conversion send...');
@@ -5984,6 +6059,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         storeData.bookingData = storeData.bookingData || {};
                         storeData.bookingData.userSessionData = storeData.userSessionData;
                     }
+                    const bookingAmounts = getAuthoritativeStripeAmounts(
+                        session,
+                        storeData.totalPrice || storeData.bookingData?.totalPrice || 0
+                    );
+                    syncAuthoritativeAmountsToSessionStore(storeData, bookingAmounts);
                     // Direct database insertion instead of HTTP call - pass session_id for payment tracking
                     const bookingId = await createBookingFromWebhook(storeData.bookingData, session_id);
                     console.log('Webhook booking creation completed, ID:', bookingId, 'Session ID:', session_id);
@@ -5995,7 +6075,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Use payment intent ID if available (string or expanded object), otherwise session ID
                     const pi = session.payment_intent;
                     const transactionId = (typeof pi === 'string' ? pi : pi?.id) || session.id;
-                    const conversionValue = session.amount_total ? Number(session.amount_total) / 100 : Number(storeData.totalPrice || 0);
+                    const conversionValue = bookingAmounts.paidAmount;
                     const conversionCurrency = session.currency?.toUpperCase() || 'GBP';
                     
                     // Send conversion asynchronously (don't block webhook response)
@@ -6060,12 +6140,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Webhook creates the voucher, voucher code generation will be done by createBookingFromSession
                     console.log('Creating voucher via webhook, voucher code generation will be done by createBookingFromSession');
 
-                    // Capture amount information from Stripe session as a reliable paid/total source
-                    const sessionAmountTotal = session?.amount_total ? Number(session.amount_total) / 100 : null;
-                    const sessionAmountSubtotal = session?.amount_subtotal ? Number(session.amount_subtotal) / 100 : null;
-                    const fallbackAmount = Number(storeData.totalPrice || storeData.voucherData?.paid || 0);
-                    const resolvedPaidAmount = sessionAmountTotal ?? fallbackAmount;
-                    const resolvedSubtotalAmount = sessionAmountSubtotal ?? resolvedPaidAmount;
+                    const voucherAmounts = getAuthoritativeStripeAmounts(
+                        session,
+                        storeData.totalPrice || storeData.voucherData?.paid || 0
+                    );
+                    syncAuthoritativeAmountsToSessionStore(storeData, voucherAmounts);
 
                     // Log the voucher data before creation
                     logToFile('Creating voucher from webhook with data:', {
@@ -6077,11 +6156,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Ensure paid/amount fields are persisted into voucherData before creation
                     storeData.voucherData = {
                         ...storeData.voucherData,
-                        paid: resolvedPaidAmount,
-                        subtotal: resolvedSubtotalAmount,
-                        total: resolvedPaidAmount,
-                        original_amount: resolvedPaidAmount,
-                        amount: resolvedPaidAmount
+                        paid: voucherAmounts.paidAmount,
+                        subtotal: voucherAmounts.subtotalAmount,
+                        total: voucherAmounts.paidAmount,
+                        original_amount: voucherAmounts.paidAmount,
+                        amount: voucherAmounts.paidAmount
                     };
 
                     // Direct database insertion instead of HTTP call
@@ -6095,7 +6174,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Use payment intent ID if available (string or expanded object), otherwise session ID
                     const piVoucher = session.payment_intent;
                     const transactionId = (typeof piVoucher === 'string' ? piVoucher : piVoucher?.id) || session.id;
-                    const conversionValue = resolvedPaidAmount || Number(storeData.totalPrice || 0);
+                    const conversionValue = voucherAmounts.paidAmount || Number(storeData.totalPrice || 0);
                     const conversionCurrency = session.currency?.toUpperCase() || 'GBP';
                     
                     // Send conversion asynchronously (don't block webhook response)
@@ -24587,6 +24666,7 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
             selectedDate,
             selectedTime,
             totalPrice,
+            actualPaidAmount,
             voucher_code,
             flight_attempts,
             preferred_location,
@@ -24622,6 +24702,10 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
         console.log('selectedTime:', selectedTime);
         console.log('chooseFlightType:', chooseFlightType);
         console.log('chooseLocation:', chooseLocation);
+
+        const resolvedPaidAmount = Number.isFinite(Number(actualPaidAmount))
+            ? Number(actualPaidAmount)
+            : (Number(totalPrice) || 0);
 
         // Determine actualVoucherType for expiry calculation
         let actualVoucherType = '';
@@ -24914,7 +24998,7 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 actualPaxCount, // Use actual passenger count with proper fallback
                 chooseLocation,
                 'Confirmed',
-                totalPrice,
+                resolvedPaidAmount,
                 0,
                 voucher_code || null,
                 nowDate,
@@ -26257,6 +26341,19 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 storeData.bookingData = storeData.bookingData || {};
                 storeData.bookingData.userSessionData = storeData.userSessionData;
             }
+            let stripeSession = null;
+            try {
+                stripeSession = await stripe.checkout.sessions.retrieve(session_id);
+                syncAuthoritativeAmountsToSessionStore(
+                    storeData,
+                    getAuthoritativeStripeAmounts(
+                        stripeSession,
+                        storeData.totalPrice || storeData.bookingData?.totalPrice || 0
+                    )
+                );
+            } catch (e) {
+                console.warn('Could not fetch Stripe session for booking amount inference:', e?.message);
+            }
             // Acquire a simple in-memory lock
             storeData.processing = true;
             try {
@@ -26266,7 +26363,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
 
                 // Save payment history from Stripe session
                 try {
-                    const session = await stripe.checkout.sessions.retrieve(session_id);
+                    const session = stripeSession || await stripe.checkout.sessions.retrieve(session_id);
                     await savePaymentHistory(session, result, null);
                 } catch (paymentHistoryError) {
                     console.error('Error saving payment history in createBookingFromSession:', paymentHistoryError);
@@ -26341,7 +26438,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     location: storeData.bookingData.chooseLocation || 'Somerset',
                     experience_type: storeData.bookingData.chooseFlightType?.type || 'Shared Flight',
                     voucher_type: 'Book Flight',
-                    paid_amount: storeData.bookingData.totalPrice || 0,
+                    paid_amount: getAuthoritativePaidAmountFromSessionStore(storeData),
                     expires_date: null // Will use default (1 year)
                 };
 
@@ -26920,7 +27017,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             customer_name: storeData.voucherData?.name || (storeData.bookingData?.passengerData?.[0] ? (storeData.bookingData.passengerData[0].firstName + ' ' + storeData.bookingData.passengerData[0].lastName) : null) || null,
             customer_email: storeData.voucherData?.email || storeData.bookingData?.passengerData?.[0]?.email || null,
             customer_phone: storeData.voucherData?.phone || storeData.voucherData?.purchaser_phone || storeData.bookingData?.passengerData?.[0]?.phone || null,
-            paid_amount: storeData.voucherData?.paid || storeData.bookingData?.totalPrice || null,
+            paid_amount: getAuthoritativePaidAmountFromSessionStore(storeData) || null,
             voucher_type: storeData.voucherData?.voucher_type || (type === 'booking' ? 'Book Flight' : null),
             voucher_type_detail: storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || null,
             experience_type: (storeData.bookingData?.chooseFlightType?.type || storeData.voucherData?.flight_type || '').toLowerCase().includes('private') ? 'private' : 'shared',
@@ -28549,7 +28646,7 @@ app.get('/api/session-status', (req, res) => {
         }
         const experienceType = flightTypeStr.includes('private') ? 'private' : 'shared';
         const productType = (source.selectedVoucherType?.title || source.voucher_type || '').toString();
-        const value = Number(data.totalPrice || 0);
+        const value = getAuthoritativePaidAmountFromSessionStore(data);
         // Build user_data for Enhanced Conversions (in-page code) - email required, phone improves match rate
         let user_data = {};
         if (source.passengerData && Array.isArray(source.passengerData) && source.passengerData[0]) {
