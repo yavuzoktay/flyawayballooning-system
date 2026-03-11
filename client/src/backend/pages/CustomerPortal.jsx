@@ -65,6 +65,11 @@ const CustomerPortal = () => {
     // Responsive helpers
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('768'));
+    const mobileHeaderOffset = 'calc(env(safe-area-inset-top, 0px) + 72px)';
+    const portalContainerSx = {
+        py: 4,
+        pt: isMobile ? mobileHeaderOffset : 4
+    };
 
     // Passenger edit states
     const [editingPassenger, setEditingPassenger] = useState(null);
@@ -583,7 +588,7 @@ const CustomerPortal = () => {
         return (
             <>
                 <CustomerPortalHeader />
-                <Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
+                <Container maxWidth="md" sx={{ ...portalContainerSx, textAlign: 'center' }}>
                     <CircularProgress />
                     <Typography variant="body1" sx={{ mt: 2 }}>Loading customer portal...</Typography>
                 </Container>
@@ -595,7 +600,7 @@ const CustomerPortal = () => {
         return (
             <>
                 <CustomerPortalHeader />
-                <Container maxWidth="md" sx={{ py: 4 }}>
+                <Container maxWidth="md" sx={portalContainerSx}>
                     <Alert severity="error">{error}</Alert>
                 </Container>
             </>
@@ -606,7 +611,7 @@ const CustomerPortal = () => {
         return (
             <>
                 <CustomerPortalHeader />
-                <Container maxWidth="md" sx={{ py: 4 }}>
+                <Container maxWidth="md" sx={portalContainerSx}>
                     <Alert severity="info">No booking data found.</Alert>
                 </Container>
             </>
@@ -614,9 +619,9 @@ const CustomerPortal = () => {
     }
 
     return (
-        <>
+            <>
             <CustomerPortalHeader />
-            <Container maxWidth="lg" sx={{ py: 4 }}>
+            <Container maxWidth="lg" sx={portalContainerSx}>
                 <Box id="portal-main" sx={{ mb: 4, scrollMarginTop: '100px' }}>
                     <Box sx={{ mb: 3, borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                         <img
@@ -657,7 +662,17 @@ const CustomerPortal = () => {
                             return isFlightVoucherSection ? 'Your Flight Voucher' : 'Your Booking';
                         })()}
                     </Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            columnGap: 2,
+                            rowGap: isMobile ? 1.5 : 2,
+                            '& > *': {
+                                minWidth: 0
+                            }
+                        }}
+                    >
                         <Box>
                             <Typography variant="body2" color="text.secondary">
                                 {(() => {
@@ -733,20 +748,20 @@ const CustomerPortal = () => {
                                             }
                                         } catch (e) {
                                             console.error('⚠️ Customer Portal - Error formatting flight_date:', e, bookingData.flight_date);
-                                            return String(bookingData.flight_date || 'Date Not Scheduled');
+                                            return String(bookingData.flight_date || 'Not Scheduled');
                                         }
                                     }
-                                    return bookingData.is_flight_voucher ? 'Date Not Scheduled' : 'Not Scheduled';
+                                    return 'Not Scheduled';
                                 })()}
                             </Typography>
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Location</Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                     {bookingData.location 
                                         ? bookingData.location 
-                                        : (bookingData.is_flight_voucher ? 'Experience Not Scheduled' : 'TBD')}
+                                        : (bookingData.is_flight_voucher ? 'Not Scheduled' : 'TBD')}
                                 </Typography>
                                 {(() => {
                                     const hasFlightDate = Boolean(bookingData.flight_date);
@@ -828,7 +843,7 @@ const CustomerPortal = () => {
                             </Box>
                         </Box>
                         <Box>
-                            <Typography variant="body2" color="text.secondary">Number of Flight Attempts Made</Typography>
+                            <Typography variant="body2" color="text.secondary">Flight Attempts</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
                                     ? bookingData.flight_attempts
@@ -836,7 +851,7 @@ const CustomerPortal = () => {
                             </Typography>
                         </Box>
                         <Box>
-                            <Typography variant="body2" color="text.secondary">Voucher Type Purchased</Typography>
+                            <Typography variant="body2" color="text.secondary">Voucher Type</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {(() => {
                                     const flightType = bookingData.flight_type || bookingData.experience || '';
@@ -865,8 +880,8 @@ const CustomerPortal = () => {
                             </Typography>
                         </Box>
                         <Box>
-                            <Typography variant="body2" color="text.secondary">Voucher / Booking Expiry Date</Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                            <Typography variant="body2" color="text.secondary">Expiry Date</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                     {(() => {
                                         if (!bookingData.expires) return 'No expiry date';

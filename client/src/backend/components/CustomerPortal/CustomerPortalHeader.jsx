@@ -23,7 +23,7 @@ const socialLinks = [
     },
     {
         label: 'TikTok',
-        href: 'https://www.tiktok.com/',
+        href: 'https://www.tiktok.com/@flyawayballooning',
         Icon: TikTokIcon
     },
     {

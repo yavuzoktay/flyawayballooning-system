@@ -1,9 +1,11 @@
 .customer-portal-header {
+    position: -webkit-sticky;
     position: sticky;
     top: 0;
     left: 0;
     right: 0;
     background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     z-index: 2500;
@@ -132,6 +134,16 @@
 }
 
 @media (max-width: 768px) {
+    .customer-portal-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        padding-top: env(safe-area-inset-top, 0px);
+        z-index: 3000;
+    }
+
     .customer-portal-header .cph-inner {
         padding: 10px 14px;
     }
