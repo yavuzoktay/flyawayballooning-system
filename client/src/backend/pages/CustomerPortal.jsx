@@ -2175,4 +2175,3 @@ const CustomerPortal = () => {
 };
 
 export default CustomerPortal;
-

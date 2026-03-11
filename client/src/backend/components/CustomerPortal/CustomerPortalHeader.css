@@ -32,6 +32,37 @@
     width: auto;
 }
 
+.customer-portal-header .cph-social {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.customer-portal-header .cph-social-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    color: #0f172a;
+    text-decoration: none;
+    background: rgba(15, 23, 42, 0.06);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.customer-portal-header .cph-social-link:hover {
+    background: #ff6937;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.customer-portal-header .cph-social-link svg {
+    font-size: 21px;
+}
+
 .customer-portal-header .cph-brand-text {
     display: flex;
     flex-direction: column;
@@ -101,6 +132,27 @@
 }
 
 @media (max-width: 768px) {
+    .customer-portal-header .cph-inner {
+        padding: 10px 14px;
+    }
+
+    .customer-portal-header .cph-brand img {
+        height: 34px;
+    }
+
+    .customer-portal-header .cph-social {
+        gap: 8px;
+    }
+
+    .customer-portal-header .cph-social-link {
+        width: 34px;
+        height: 34px;
+    }
+
+    .customer-portal-header .cph-social-link svg {
+        font-size: 18px;
+    }
+
     .customer-portal-header .cph-burger {
         display: flex;
     }
@@ -126,4 +178,3 @@
         transform: translateY(0);
     }
 }
-
