@@ -119,6 +119,19 @@ const CustomerPortal = () => {
     const isFlightVoucherSection = Boolean(
         bookingData && isFlightVoucherBase && (!bookingVoucherRedeemed || forceVoucherView)
     );
+    const inviteSectionPalette = {
+        background: '#f4f5fb',
+        border: '#e4e7f0',
+        heading: '#5f6368',
+        body: '#7b8088',
+        link: '#35a8f3',
+        linkHover: '#1d92df',
+        buttonText: '#35a8f3',
+        buttonBackground: '#ffffff',
+        buttonBorder: '#bfe8ff',
+        disabledBackground: '#eef1f5',
+        disabledText: '#a1a8b3'
+    };
 
     const fetchBookingData = async ({ silent = false, refreshPaymentHistory = true } = {}) => {
         if (!token) {
@@ -1580,12 +1593,13 @@ const CustomerPortal = () => {
                         sx={{
                             p: 3,
                             mb: 3,
-                            borderRadius: 3,
+                            borderRadius: 4,
                             border: '1px solid',
-                            borderColor: bookingData.invite_friends.enabled ? '#f2d5b4' : '#d1d5db',
-                            background: bookingData.invite_friends.enabled
-                                ? 'linear-gradient(135deg, rgba(255,248,238,0.98) 0%, rgba(252,234,210,0.98) 100%)'
-                                : 'linear-gradient(135deg, rgba(249,250,251,0.98) 0%, rgba(229,231,235,0.98) 100%)'
+                            borderColor: inviteSectionPalette.border,
+                            backgroundColor: bookingData.invite_friends.enabled
+                                ? inviteSectionPalette.background
+                                : inviteSectionPalette.disabledBackground,
+                            boxShadow: 'none'
                         }}
                     >
                         <Box
@@ -1598,13 +1612,38 @@ const CustomerPortal = () => {
                             }}
                         >
                             <Box sx={{ maxWidth: '760px' }}>
-                                <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#0f172a' }}>
+                                <Typography
+                                    variant="h5"
+                                    sx={{
+                                        fontWeight: 700,
+                                        mb: 1,
+                                        color: bookingData.invite_friends.enabled
+                                            ? inviteSectionPalette.heading
+                                            : '#818792'
+                                    }}
+                                >
                                     {bookingData.invite_friends.title}
                                 </Typography>
-                                <Typography variant="body1" sx={{ mb: 1, color: '#475569' }}>
+                                <Typography
+                                    variant="body1"
+                                    sx={{
+                                        mb: 1,
+                                        color: bookingData.invite_friends.enabled
+                                            ? inviteSectionPalette.body
+                                            : '#98a0ab'
+                                    }}
+                                >
                                     {bookingData.invite_friends.description}
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#9a3412' }}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        fontWeight: 700,
+                                        color: bookingData.invite_friends.enabled
+                                            ? inviteSectionPalette.link
+                                            : '#9da4af'
+                                    }}
+                                >
                                     Use code {bookingData.invite_friends.discountCode} to give your friends 10% off.
                                 </Typography>
                             </Box>
@@ -1624,15 +1663,25 @@ const CustomerPortal = () => {
                                     fontSize: '1rem',
                                     fontWeight: 700,
                                     boxShadow: 'none',
-                                    backgroundColor: bookingData.invite_friends.enabled ? '#0f172a' : '#94a3b8',
-                                    color: '#fff',
+                                    backgroundColor: bookingData.invite_friends.enabled
+                                        ? inviteSectionPalette.buttonBackground
+                                        : inviteSectionPalette.disabledBackground,
+                                    color: bookingData.invite_friends.enabled
+                                        ? inviteSectionPalette.buttonText
+                                        : inviteSectionPalette.disabledText,
+                                    border: '1px solid',
+                                    borderColor: bookingData.invite_friends.enabled
+                                        ? inviteSectionPalette.buttonBorder
+                                        : '#d9dde4',
                                     '&:hover': {
                                         boxShadow: 'none',
-                                        backgroundColor: bookingData.invite_friends.enabled ? '#1e293b' : '#94a3b8'
+                                        backgroundColor: bookingData.invite_friends.enabled ? '#edf8ff' : inviteSectionPalette.disabledBackground,
+                                        borderColor: bookingData.invite_friends.enabled ? inviteSectionPalette.link : '#d9dde4'
                                     },
                                     '&.Mui-disabled': {
-                                        backgroundColor: '#94a3b8',
-                                        color: '#f8fafc'
+                                        backgroundColor: inviteSectionPalette.disabledBackground,
+                                        color: inviteSectionPalette.disabledText,
+                                        borderColor: '#d9dde4'
                                     }
                                 }}
                             >
@@ -1648,11 +1697,18 @@ const CustomerPortal = () => {
                                         p: 2,
                                         mb: 2,
                                         borderRadius: 2,
-                                        border: '1px solid #e7c9a7',
-                                        backgroundColor: 'rgba(255,255,255,0.82)'
+                                        border: `1px solid ${inviteSectionPalette.buttonBorder}`,
+                                        backgroundColor: 'rgba(255,255,255,0.92)'
                                     }}
                                 >
-                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#334155' }}>
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            whiteSpace: 'pre-wrap',
+                                            color: inviteSectionPalette.body,
+                                            lineHeight: 1.7
+                                        }}
+                                    >
                                         {bookingData.invite_friends.shareMessage}
                                     </Typography>
                                 </Paper>
@@ -1679,12 +1735,21 @@ const CustomerPortal = () => {
                                                 borderRadius: 2,
                                                 ...(channel === 'copy'
                                                     ? {
-                                                        borderColor: '#0f172a',
-                                                        color: '#0f172a'
+                                                        borderColor: inviteSectionPalette.link,
+                                                        color: inviteSectionPalette.link,
+                                                        '&:hover': {
+                                                            borderColor: inviteSectionPalette.linkHover,
+                                                            backgroundColor: '#edf8ff'
+                                                        }
                                                     }
                                                     : {
-                                                        backgroundColor: '#0f172a',
-                                                        '&:hover': { backgroundColor: '#1e293b' }
+                                                        backgroundColor: inviteSectionPalette.buttonBackground,
+                                                        color: inviteSectionPalette.link,
+                                                        border: `1px solid ${inviteSectionPalette.buttonBorder}`,
+                                                        '&:hover': {
+                                                            backgroundColor: '#edf8ff',
+                                                            borderColor: inviteSectionPalette.link
+                                                        }
                                                     })
                                             }}
                                         >
