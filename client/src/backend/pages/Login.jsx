@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { ADMIN_LOGIN_PASSWORD, ADMIN_LOGIN_USERNAME } from '../auth/adminCredentials';
 
 const Login = () => {
     const navigate = useNavigate();
@@ -11,7 +12,7 @@ const Login = () => {
     const handleSubmit = (e) => {
         e.preventDefault();
         // Simple hardcoded credentials for now
-        if (username === 'Flyawayballooning' && password === 'cevcov-5FABys-kaafds') {
+        if (username === ADMIN_LOGIN_USERNAME && password === ADMIN_LOGIN_PASSWORD) {
             localStorage.setItem('fab_admin_auth', 'true');
             const redirectTo = location.state?.from || '/';
             navigate(redirectTo, { replace: true });
@@ -76,5 +77,4 @@ const Login = () => {
 };
 
 export default Login;
-
 

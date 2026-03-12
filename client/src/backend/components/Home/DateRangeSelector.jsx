@@ -1,11 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import axios from "axios";
+import config from "../../../config";
+import { ADMIN_MANUAL_BOOKING_AUTH } from "../../auth/adminCredentials";
 
 const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
+    const [isLaunchingManualBooking, setIsLaunchingManualBooking] = useState(false);
+    const API_BASE_URL = config.API_BASE_URL;
+
+    const getBookingBaseUrl = () => {
+        if (typeof window === 'undefined') {
+            return 'https://flyawayballooning-book.com';
+        }
+
+        const hostname = window.location.hostname;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3000';
+        }
+
+        return 'https://flyawayballooning-book.com';
+    };
 
     const parseMoney = (value) => {
         if (value === null || value === undefined) return 0;
@@ -278,6 +295,46 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         }
     };
 
+    const handleManualBookingClick = async () => {
+        if (isLaunchingManualBooking) {
+            return;
+        }
+
+        const popup = typeof window !== 'undefined'
+            ? window.open('', '_blank', 'noopener,noreferrer')
+            : null;
+
+        try {
+            setIsLaunchingManualBooking(true);
+            const response = await axios.post(
+                `${API_BASE_URL}/api/admin/manual-booking-token`,
+                ADMIN_MANUAL_BOOKING_AUTH
+            );
+
+            const token = response.data?.token;
+            if (!response.data?.success || !token) {
+                throw new Error(response.data?.message || 'Could not start manual booking.');
+            }
+
+            const bookingUrl = `${getBookingBaseUrl()}/?manualBooking=1&source=admin&manualBookingToken=${encodeURIComponent(token)}`;
+
+            if (popup && !popup.closed) {
+                popup.location.href = bookingUrl;
+            } else if (typeof window !== 'undefined') {
+                window.open(bookingUrl, '_blank', 'noopener,noreferrer');
+            }
+        } catch (error) {
+            if (popup && !popup.closed) {
+                popup.close();
+            }
+
+            console.error('Error starting manual booking:', error);
+            alert(error?.response?.data?.message || error.message || 'Could not start manual booking.');
+        } finally {
+            setIsLaunchingManualBooking(false);
+        }
+    };
+
     return (
         <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "20px" }} className="date-range-selector-container">
             {/* Date Inputs */}
@@ -455,10 +512,10 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                             )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
-                            <a
-                                href="https://flyawayballooning-book.com"
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <button
+                                type="button"
+                                onClick={handleManualBookingClick}
+                                disabled={isLaunchingManualBooking}
                                 style={{
                                     display: 'inline-block',
                                     background: '#3274b4',
@@ -470,14 +527,15 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                                     fontWeight: 600,
                                     textAlign: 'center',
                                     textDecoration: 'none',
-                                    cursor: 'pointer',
+                                    cursor: isLaunchingManualBooking ? 'wait' : 'pointer',
                                     boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
                                     width: '100%',
-                                    maxWidth: 200
+                                    maxWidth: 200,
+                                    opacity: isLaunchingManualBooking ? 0.75 : 1
                                 }}
                             >
-                                Manual Booking
-                            </a>
+                                {isLaunchingManualBooking ? 'Opening...' : 'Manual Booking'}
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -12,6 +12,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
+import CustomerPortalUpsellModal from '../components/CustomerPortal/CustomerPortalUpsellModal';
 
 const getApiBaseUrl = () => {
     if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim()) {
@@ -61,6 +62,10 @@ const CustomerPortal = () => {
     const [extendingVoucher, setExtendingVoucher] = useState(false);
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [isFullyRefunded, setIsFullyRefunded] = useState(false);
+    const [upsellModalOpen, setUpsellModalOpen] = useState(false);
+    const [submittingUpsell, setSubmittingUpsell] = useState(false);
+    const [inviteFriendsExpanded, setInviteFriendsExpanded] = useState(false);
+    const [inviteFriendsCopyMessage, setInviteFriendsCopyMessage] = useState('');
 
     // Responsive helpers
     const theme = useTheme();
@@ -102,22 +107,38 @@ const CustomerPortal = () => {
             return false;
         }
     })();
+    const bookingVoucherRedeemed =
+        bookingData?.is_voucher_redeemed === true || bookingData?.is_voucher_redeemed === 1;
+    const bookingBookFlight = (bookingData?.book_flight || '').toString().trim().toLowerCase();
+    const bookingVoucherType = (bookingData?.voucher_type || '').toString().trim().toLowerCase();
+    const isFlightVoucherBase = Boolean(
+        bookingData?.is_flight_voucher ||
+        bookingBookFlight === 'flight voucher' ||
+        bookingVoucherType === 'flight voucher'
+    );
+    const isFlightVoucherSection = Boolean(
+        bookingData && isFlightVoucherBase && (!bookingVoucherRedeemed || forceVoucherView)
+    );
 
-    const fetchBookingData = async () => {
+    const fetchBookingData = async ({ silent = false, refreshPaymentHistory = true } = {}) => {
         if (!token) {
-            setError('Invalid token');
-            setLoading(false);
-            return;
+            if (!silent) {
+                setError('Invalid token');
+                setLoading(false);
+            }
+            return { success: false, error: new Error('Invalid token') };
         }
 
         try {
-            setLoading(true);
-            setError(null);
+            if (!silent) {
+                setLoading(true);
+                setError(null);
+            }
             // URL encode the token to handle special characters like =
             const encodedToken = encodeURIComponent(token);
             console.log('🔍 Customer Portal - Fetching booking data with token:', token);
             console.log('🔍 Customer Portal - Encoded token:', encodedToken);
-            const response = await axios.get(`/api/customer-portal-booking/${encodedToken}`);
+            const response = await axios.get(buildApiUrl(`/api/customer-portal-booking/${encodedToken}`));
 
             console.log('✅ Customer Portal - Response received:', response.data);
             if (response.data.success) {
@@ -127,16 +148,23 @@ const CustomerPortal = () => {
                 // Only fetch if we have a valid booking_id (not just voucher ID for Flight Voucher)
                 // For Flight Voucher, payment history might not exist or might be linked differently
                 // We'll still try to fetch, but the endpoint should handle Flight Voucher cases gracefully
-                if (bookingDataResponse?.id) {
+                if (refreshPaymentHistory && bookingDataResponse?.id) {
                     // Pass bookingData to fetchPaymentHistory so it can check if it's a Flight Voucher
                     fetchPaymentHistory(bookingDataResponse.id, bookingDataResponse);
-                } else {
+                } else if (!bookingDataResponse?.id) {
                     // If no booking ID, ensure isFullyRefunded is false
                     setIsFullyRefunded(false);
                 }
+                return { success: true, data: bookingDataResponse };
             } else {
                 console.error('❌ Customer Portal - API returned error:', response.data);
-                setError(response.data.message || 'Failed to load booking data');
+                if (!silent) {
+                    setError(response.data.message || 'Failed to load booking data');
+                }
+                return {
+                    success: false,
+                    error: new Error(response.data.message || 'Failed to load booking data')
+                };
             }
         } catch (err) {
             console.error('❌ Customer Portal - Error fetching booking data:', err);
@@ -147,9 +175,14 @@ const CustomerPortal = () => {
                 (err.response?.status === 404 ? 'Booking not found. Please check your link.' :
                     err.response?.status === 500 ? 'Server error. Please try again later.' :
                         'Error loading booking data. Please try again later.');
-            setError(errorMessage);
+            if (!silent) {
+                setError(errorMessage);
+            }
+            return { success: false, error: err };
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
     };
 
@@ -306,6 +339,7 @@ const CustomerPortal = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const paymentSuccess = urlParams.get('payment') === 'success';
         const paymentType = urlParams.get('type');
+        const paymentSessionId = urlParams.get('session_id');
         
         if (paymentSuccess && paymentType === 'extend_voucher') {
             // Remove query parameters from URL
@@ -410,6 +444,8 @@ const CustomerPortal = () => {
             
             // Call the async function
             handlePaymentSuccess();
+        } else if (paymentSuccess && paymentType === 'customer_portal_upsell') {
+            handleCustomerPortalUpsellPaymentSuccess(paymentSessionId);
         } else {
             fetchBookingData();
         }
@@ -534,6 +570,181 @@ const CustomerPortal = () => {
         }
     };
 
+    const refreshBookingAfterPortalPayment = async (maxAttempts = 4) => {
+        let lastError = null;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            if (attempt > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+
+            const result = await fetchBookingData();
+            if (result?.success) {
+                return result.data;
+            }
+
+            lastError = result?.error || new Error('Booking refresh failed');
+        }
+
+        if (lastError) {
+            throw lastError;
+        }
+    };
+
+    const waitForUpsellSessionProcessing = async (sessionId, maxAttempts = 6) => {
+        if (!sessionId) {
+            return false;
+        }
+
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            if (attempt > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+
+            try {
+                const statusResponse = await axios.get(buildApiUrl('/api/session-status'), {
+                    params: { session_id: sessionId }
+                });
+
+                if (statusResponse.data?.processed) {
+                    return true;
+                }
+            } catch (statusError) {
+                console.warn('Customer Portal - Could not poll upsell session status:', statusError);
+            }
+        }
+
+        return false;
+    };
+
+    const handleSubmitUpsell = async (passengers) => {
+        if (!bookingData?.upsell_offer || !token) {
+            alert('This offer is no longer available. Please refresh the page and try again.');
+            return;
+        }
+
+        setSubmittingUpsell(true);
+        try {
+            const sessionRes = await axios.post(buildApiUrl('/api/customer-portal-upsell/create-session'), {
+                token,
+                offerMode: bookingData.upsell_offer.mode,
+                passengers
+            });
+
+            if (!sessionRes.data?.success) {
+                alert(sessionRes.data?.message || 'Payment could not be initiated.');
+                return;
+            }
+
+            if (sessionRes.data.sessionUrl) {
+                setUpsellModalOpen(false);
+                window.location.href = sessionRes.data.sessionUrl;
+                return;
+            }
+
+            if (sessionRes.data.sessionId) {
+                setUpsellModalOpen(false);
+                window.location.href = `https://checkout.stripe.com/c/pay/${sessionRes.data.sessionId}`;
+                return;
+            }
+
+            alert('Payment session could not be created. Please try again.');
+        } catch (error) {
+            console.error('Customer Portal - Error creating upsell session:', error);
+            alert(error.response?.data?.message || 'Failed to initiate payment. Please try again later.');
+        } finally {
+            setSubmittingUpsell(false);
+        }
+    };
+
+    const handleCustomerPortalUpsellPaymentSuccess = async (sessionId) => {
+        const processedKey = sessionId ? `fab_customer_portal_upsell_${sessionId}` : null;
+        const alreadyProcessed = processedKey && typeof window !== 'undefined'
+            ? window.localStorage.getItem(processedKey) === '1'
+            : false;
+
+        try {
+            if (sessionId && !alreadyProcessed) {
+                let sessionProcessed = await waitForUpsellSessionProcessing(sessionId, 1);
+
+                if (!sessionProcessed) {
+                    try {
+                        await axios.post(buildApiUrl('/api/createBookingFromSession'), {
+                            session_id: sessionId,
+                            type: 'customer_portal_upsell'
+                        });
+                    } catch (createError) {
+                        if (createError.response?.status !== 202) {
+                            throw createError;
+                        }
+                    }
+                }
+
+                if (!sessionProcessed) {
+                    sessionProcessed = await waitForUpsellSessionProcessing(sessionId, 6);
+                }
+
+                if (!sessionProcessed) {
+                    throw new Error('Your payment is still being processed. Please refresh the page in a moment.');
+                }
+
+                if (sessionProcessed && processedKey && typeof window !== 'undefined') {
+                    window.localStorage.setItem(processedKey, '1');
+                }
+            }
+
+            await refreshBookingAfterPortalPayment();
+            alert('Payment successful! Your booking has been updated.');
+        } catch (error) {
+            console.error('Customer Portal - Error finalising upsell payment:', error);
+
+            try {
+                await refreshBookingAfterPortalPayment(2);
+            } catch (refreshError) {
+                console.warn('Customer Portal - Booking refresh failed after upsell:', refreshError);
+            }
+
+            alert(error.response?.data?.message || 'Payment was received, but we could not refresh your booking automatically. Please reload the page in a few moments.');
+        } finally {
+            if (typeof window !== 'undefined') {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+    };
+
+    const handleInviteFriendsAction = async (channel, inviteData) => {
+        if (!inviteData?.enabled) {
+            return;
+        }
+
+        try {
+            if (channel === 'copy') {
+                if (!navigator?.clipboard?.writeText) {
+                    throw new Error('Clipboard is not available');
+                }
+
+                await navigator.clipboard.writeText(inviteData.bookingUrl || '');
+                setInviteFriendsCopyMessage('Booking link copied.');
+                return;
+            }
+
+            const shareUrl = inviteData?.shareLinks?.[channel];
+            if (!shareUrl) {
+                return;
+            }
+
+            if (channel === 'email' || channel === 'sms') {
+                window.location.href = shareUrl;
+                return;
+            }
+
+            window.open(shareUrl, '_blank', 'noopener,noreferrer');
+        } catch (error) {
+            console.error('Customer Portal - Invite Friends action failed:', error);
+            alert('We could not complete that share action. Please try again.');
+        }
+    };
+
     // Passenger edit handlers
     const handleEditPassengerClick = (passenger) => {
         setEditingPassenger(passenger.id);
@@ -583,6 +794,18 @@ const CustomerPortal = () => {
             setSavingPassengerEdit(false);
         }
     };
+
+    useEffect(() => {
+        if (!token || !bookingData?.invite_friends?.visible) {
+            return undefined;
+        }
+
+        const pollId = window.setInterval(() => {
+            fetchBookingData({ silent: true, refreshPaymentHistory: false });
+        }, 45000);
+
+        return () => window.clearInterval(pollId);
+    }, [token, bookingData?.id, bookingData?.invite_friends?.visible]);
 
     if (loading) {
         return (
@@ -645,6 +868,50 @@ const CustomerPortal = () => {
                         </Typography>
                     </Box>
                 </Box>
+
+                {bookingData?.flight_attempt_notification?.visible && !isFlightVoucherSection && !isFullyRefunded && (
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 3,
+                            borderRadius: 3,
+                            border: '1px solid #d8dee6',
+                            backgroundColor: '#eef2f6',
+                            boxShadow: 'none'
+                        }}
+                    >
+                        <Typography
+                            variant="overline"
+                            sx={{
+                                display: 'block',
+                                mb: 1,
+                                color: '#64748b',
+                                fontWeight: 700,
+                                letterSpacing: '0.08em'
+                            }}
+                        >
+                            {bookingData.flight_attempt_notification.label}
+                        </Typography>
+                        <Box
+                            sx={{
+                                color: '#334155',
+                                '& p': {
+                                    mb: 1.5,
+                                    lineHeight: 1.7
+                                },
+                                '& p:last-child': {
+                                    mb: 0
+                                },
+                                '& strong': {
+                                    color: '#0f172a',
+                                    fontWeight: 700
+                                }
+                            }}
+                            dangerouslySetInnerHTML={{ __html: bookingData.flight_attempt_notification.bodyHtml }}
+                        />
+                    </Paper>
+                )}
 
                 <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
                     <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
@@ -854,8 +1121,31 @@ const CustomerPortal = () => {
                             <Typography variant="body2" color="text.secondary">Voucher Type</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {(() => {
-                                    const flightType = bookingData.flight_type || bookingData.experience || '';
-                                    const voucherType = bookingData.voucher_type || '';
+                                    const normalizeDisplayValue = (value) => {
+                                        if (value === null || value === undefined) return '';
+                                        return String(value).trim();
+                                    };
+                                    const isGenericVoucherType = (value) => {
+                                        const normalized = normalizeDisplayValue(value).toLowerCase();
+                                        return !normalized || [
+                                            'shared',
+                                            'shared flight',
+                                            'private',
+                                            'private charter',
+                                            'book flight',
+                                            'flight voucher',
+                                            'gift voucher',
+                                            'buy gift',
+                                            'buy gift voucher'
+                                        ].includes(normalized);
+                                    };
+                                    const flightType = normalizeDisplayValue(bookingData.flight_type || bookingData.experience || '');
+                                    const voucherCandidates = [
+                                        normalizeDisplayValue(bookingData.voucher_type_detail),
+                                        normalizeDisplayValue(bookingData.voucher_type)
+                                    ].filter(Boolean);
+                                    const specificVoucherType = voucherCandidates.find((value) => !isGenericVoucherType(value));
+                                    const fallbackVoucherType = voucherCandidates[0] || '';
 
                                     // Normalize flight type (remove "Flight" or "Charter" if present)
                                     let normalizedFlightType = flightType;
@@ -866,13 +1156,18 @@ const CustomerPortal = () => {
                                             .trim();
                                     }
 
-                                    // Combine flight type and voucher type
-                                    if (normalizedFlightType && voucherType) {
-                                        return `${normalizedFlightType} - ${voucherType}`;
+                                    // Prefer specific voucher types like "Flexible Weekday" over generic labels
+                                    // such as "Shared Flight" or "Book Flight".
+                                    if (normalizedFlightType && specificVoucherType) {
+                                        return normalizedFlightType.toLowerCase() === specificVoucherType.toLowerCase()
+                                            ? normalizedFlightType
+                                            : `${normalizedFlightType} - ${specificVoucherType}`;
                                     } else if (normalizedFlightType) {
                                         return normalizedFlightType;
-                                    } else if (voucherType) {
-                                        return voucherType;
+                                    } else if (specificVoucherType) {
+                                        return specificVoucherType;
+                                    } else if (fallbackVoucherType) {
+                                        return fallbackVoucherType;
                                     } else {
                                         return 'Standard';
                                     }
@@ -1196,6 +1491,217 @@ const CustomerPortal = () => {
                     })()}
                 </Paper>
 
+                {bookingData?.upsell_offer && !isFullyRefunded && (
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 3,
+                            borderRadius: 3,
+                            border: '1px solid #d7e2f0',
+                            background: bookingData.upsell_offer.mode === 'private_upgrade'
+                                ? 'linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 100%)'
+                                : 'linear-gradient(135deg, rgba(255,247,237,0.98) 0%, rgba(255,237,213,0.98) 100%)'
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                flexDirection: { xs: 'column', md: 'row' },
+                                alignItems: { xs: 'flex-start', md: 'center' },
+                                justifyContent: 'space-between',
+                                gap: 2
+                            }}
+                        >
+                            <Box sx={{ maxWidth: '760px' }}>
+                                <Typography
+                                    variant="h5"
+                                    sx={{
+                                        fontWeight: 700,
+                                        mb: 1,
+                                        color: bookingData.upsell_offer.mode === 'private_upgrade' ? '#f8fafc' : '#111827'
+                                    }}
+                                >
+                                    {bookingData.upsell_offer.title}
+                                </Typography>
+                                <Typography
+                                    variant="body1"
+                                    sx={{
+                                        mb: 1.5,
+                                        color: bookingData.upsell_offer.mode === 'private_upgrade'
+                                            ? 'rgba(248,250,252,0.88)'
+                                            : '#475569'
+                                    }}
+                                >
+                                    {bookingData.upsell_offer.description}
+                                </Typography>
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        fontWeight: 700,
+                                        color: bookingData.upsell_offer.mode === 'private_upgrade' ? '#fbbf24' : '#9a3412'
+                                    }}
+                                >
+                                    {bookingData.upsell_offer.mode === 'private_upgrade'
+                                        ? `Private balloon upgrade for £${Number(bookingData.upsell_offer.totalCharge || 0).toFixed(2)}`
+                                        : `Save £${Number(bookingData.upsell_offer.discountAmount || 0).toFixed(2)} and add a seat for £${Number(bookingData.upsell_offer.totalCharge || 0).toFixed(2)}`}
+                                </Typography>
+                            </Box>
+                            <Button
+                                variant="contained"
+                                onClick={() => setUpsellModalOpen(true)}
+                                disabled={submittingUpsell}
+                                sx={{
+                                    minWidth: { xs: '100%', md: 220 },
+                                    py: 1.4,
+                                    px: 2.5,
+                                    borderRadius: 2.5,
+                                    textTransform: 'none',
+                                    fontSize: '1rem',
+                                    fontWeight: 700,
+                                    boxShadow: 'none',
+                                    backgroundColor: bookingData.upsell_offer.mode === 'private_upgrade' ? '#22c55e' : '#0f172a',
+                                    color: '#fff',
+                                    '&:hover': {
+                                        boxShadow: 'none',
+                                        backgroundColor: bookingData.upsell_offer.mode === 'private_upgrade' ? '#16a34a' : '#1e293b'
+                                    }
+                                }}
+                            >
+                                {submittingUpsell ? 'Redirecting...' : bookingData.upsell_offer.buttonLabel}
+                            </Button>
+                        </Box>
+                    </Paper>
+                )}
+
+                {bookingData?.invite_friends?.visible && !isFullyRefunded && (
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 3,
+                            borderRadius: 3,
+                            border: '1px solid',
+                            borderColor: bookingData.invite_friends.enabled ? '#f2d5b4' : '#d1d5db',
+                            background: bookingData.invite_friends.enabled
+                                ? 'linear-gradient(135deg, rgba(255,248,238,0.98) 0%, rgba(252,234,210,0.98) 100%)'
+                                : 'linear-gradient(135deg, rgba(249,250,251,0.98) 0%, rgba(229,231,235,0.98) 100%)'
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                flexDirection: { xs: 'column', md: 'row' },
+                                alignItems: { xs: 'flex-start', md: 'center' },
+                                justifyContent: 'space-between',
+                                gap: 2
+                            }}
+                        >
+                            <Box sx={{ maxWidth: '760px' }}>
+                                <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#0f172a' }}>
+                                    {bookingData.invite_friends.title}
+                                </Typography>
+                                <Typography variant="body1" sx={{ mb: 1, color: '#475569' }}>
+                                    {bookingData.invite_friends.description}
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#9a3412' }}>
+                                    Use code {bookingData.invite_friends.discountCode} to give your friends 10% off.
+                                </Typography>
+                            </Box>
+                            <Button
+                                variant="contained"
+                                onClick={() => {
+                                    setInviteFriendsExpanded((current) => !current);
+                                    setInviteFriendsCopyMessage('');
+                                }}
+                                disabled={!bookingData.invite_friends.enabled}
+                                sx={{
+                                    minWidth: { xs: '100%', md: 220 },
+                                    py: 1.4,
+                                    px: 2.5,
+                                    borderRadius: 2.5,
+                                    textTransform: 'none',
+                                    fontSize: '1rem',
+                                    fontWeight: 700,
+                                    boxShadow: 'none',
+                                    backgroundColor: bookingData.invite_friends.enabled ? '#0f172a' : '#94a3b8',
+                                    color: '#fff',
+                                    '&:hover': {
+                                        boxShadow: 'none',
+                                        backgroundColor: bookingData.invite_friends.enabled ? '#1e293b' : '#94a3b8'
+                                    },
+                                    '&.Mui-disabled': {
+                                        backgroundColor: '#94a3b8',
+                                        color: '#f8fafc'
+                                    }
+                                }}
+                            >
+                                {bookingData.invite_friends.buttonLabel}
+                            </Button>
+                        </Box>
+
+                        {inviteFriendsExpanded && bookingData.invite_friends.enabled && (
+                            <Box sx={{ mt: 2.5 }}>
+                                <Paper
+                                    elevation={0}
+                                    sx={{
+                                        p: 2,
+                                        mb: 2,
+                                        borderRadius: 2,
+                                        border: '1px solid #e7c9a7',
+                                        backgroundColor: 'rgba(255,255,255,0.82)'
+                                    }}
+                                >
+                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', color: '#334155' }}>
+                                        {bookingData.invite_friends.shareMessage}
+                                    </Typography>
+                                </Paper>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: 1.25
+                                    }}
+                                >
+                                    {[
+                                        ['whatsapp', 'WhatsApp'],
+                                        ['sms', 'SMS'],
+                                        ['email', 'Email'],
+                                        ['copy', 'Copy Link']
+                                    ].map(([channel, label]) => (
+                                        <Button
+                                            key={channel}
+                                            variant={channel === 'copy' ? 'outlined' : 'contained'}
+                                            onClick={() => handleInviteFriendsAction(channel, bookingData.invite_friends)}
+                                            sx={{
+                                                textTransform: 'none',
+                                                fontWeight: 700,
+                                                borderRadius: 2,
+                                                ...(channel === 'copy'
+                                                    ? {
+                                                        borderColor: '#0f172a',
+                                                        color: '#0f172a'
+                                                    }
+                                                    : {
+                                                        backgroundColor: '#0f172a',
+                                                        '&:hover': { backgroundColor: '#1e293b' }
+                                                    })
+                                            }}
+                                        >
+                                            {label}
+                                        </Button>
+                                    ))}
+                                </Box>
+                                {inviteFriendsCopyMessage && (
+                                    <Alert severity="success" sx={{ mt: 2 }}>
+                                        {inviteFriendsCopyMessage}
+                                    </Alert>
+                                )}
+                            </Box>
+                        )}
+                    </Paper>
+                )}
+
                 {bookingData.passengers && bookingData.passengers.length > 0 && (
                     <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
                         <Typography
@@ -1416,6 +1922,18 @@ const CustomerPortal = () => {
                     </Paper>
                 ))}
             </Container>
+
+            <CustomerPortalUpsellModal
+                open={upsellModalOpen}
+                offer={bookingData?.upsell_offer || null}
+                submitting={submittingUpsell}
+                onClose={() => {
+                    if (!submittingUpsell) {
+                        setUpsellModalOpen(false);
+                    }
+                }}
+                onSubmit={handleSubmitUpsell}
+            />
 
             {/* Reschedule Flight Modal */}
             <RescheduleFlightModal

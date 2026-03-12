@@ -6,6 +6,7 @@ console.log('FINAL_DEPLOYMENT_TEST_' + Math.random());
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
+const crypto = require("crypto");
 const app = express();
 const path = require("path");
 const fs = require("fs");
@@ -411,10 +412,129 @@ function logToFile(message, data = null) {
     }
 }
 
+const MANUAL_BOOKING_ADMIN_USERNAME = process.env.ADMIN_MANUAL_BOOKING_USERNAME || 'Flyawayballooning';
+const MANUAL_BOOKING_ADMIN_PASSWORD = process.env.ADMIN_MANUAL_BOOKING_PASSWORD || 'cevcov-5FABys-kaafds';
+const MANUAL_BOOKING_TOKEN_TTL_SECONDS = Math.max(
+    300,
+    Number(process.env.MANUAL_BOOKING_TOKEN_TTL_SECONDS || 7200)
+);
+
+function getManualBookingSigningSecret() {
+    return (
+        process.env.MANUAL_BOOKING_TOKEN_SECRET ||
+        process.env.STRIPE_WEBHOOK_SECRET ||
+        stripeSecretKey ||
+        process.env.DB_PASSWORD ||
+        'manual-booking-secret'
+    );
+}
+
+function safeTimingCompare(left, right) {
+    const leftBuffer = Buffer.from(String(left || ''), 'utf8');
+    const rightBuffer = Buffer.from(String(right || ''), 'utf8');
+
+    if (leftBuffer.length !== rightBuffer.length) {
+        return false;
+    }
+
+    return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function issueManualBookingToken() {
+    const payload = {
+        scope: 'manual-booking',
+        iat: Date.now(),
+        exp: Date.now() + (MANUAL_BOOKING_TOKEN_TTL_SECONDS * 1000)
+    };
+    const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    const signature = crypto
+        .createHmac('sha256', getManualBookingSigningSecret())
+        .update(encodedPayload)
+        .digest('base64url');
+
+    return `${encodedPayload}.${signature}`;
+}
+
+function verifyManualBookingToken(token) {
+    if (!token || typeof token !== 'string') {
+        return { valid: false, message: 'Manual booking token is required.' };
+    }
+
+    const [encodedPayload, signature] = token.split('.');
+    if (!encodedPayload || !signature) {
+        return { valid: false, message: 'Manual booking token format is invalid.' };
+    }
+
+    const expectedSignature = crypto
+        .createHmac('sha256', getManualBookingSigningSecret())
+        .update(encodedPayload)
+        .digest('base64url');
+
+    if (!safeTimingCompare(signature, expectedSignature)) {
+        return { valid: false, message: 'Manual booking token is invalid.' };
+    }
+
+    try {
+        const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+        if (payload.scope !== 'manual-booking') {
+            return { valid: false, message: 'Manual booking token scope is invalid.' };
+        }
+
+        if (!payload.exp || Number(payload.exp) < Date.now()) {
+            return { valid: false, message: 'Manual booking token has expired. Please reopen the flow from admin.' };
+        }
+
+        return { valid: true, payload };
+    } catch (error) {
+        return { valid: false, message: 'Manual booking token could not be decoded.' };
+    }
+}
+
+function getManualQuotedTotal(storeData) {
+    const candidates = [
+        storeData?.manualQuotedTotal,
+        storeData?.bookingData?.manualQuotedTotal,
+        storeData?.voucherData?.manualQuotedTotal
+    ];
+
+    for (const candidate of candidates) {
+        if (candidate === 0) {
+            return 0;
+        }
+
+        if (candidate !== null && candidate !== undefined && Number.isFinite(Number(candidate))) {
+            return Number(candidate);
+        }
+    }
+
+    return null;
+}
+
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.post('/api/admin/manual-booking-token', (req, res) => {
+    const { username, password } = req.body || {};
+
+    const usernameValid = safeTimingCompare(username, MANUAL_BOOKING_ADMIN_USERNAME);
+    const passwordValid = safeTimingCompare(password, MANUAL_BOOKING_ADMIN_PASSWORD);
+
+    if (!usernameValid || !passwordValid) {
+        return res.status(401).json({
+            success: false,
+            message: 'Admin authentication failed for manual booking.'
+        });
+    }
+
+    const token = issueManualBookingToken();
+    return res.json({
+        success: true,
+        token,
+        expires_at: new Date(Date.now() + (MANUAL_BOOKING_TOKEN_TTL_SECONDS * 1000)).toISOString()
+    });
 });
 
 // ===== VOUCHER CODE API ENDPOINTS =====
@@ -5847,6 +5967,7 @@ function syncAuthoritativeAmountsToSessionStore(storeData, amounts) {
 
 function getAuthoritativePaidAmountFromSessionStore(storeData) {
     if (!storeData) return 0;
+    if (storeData.manualBooking) return 0;
 
     const candidates = [
         storeData.actualPaidAmount,
@@ -6018,11 +6139,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
             // Session ID kontrolü - session data var mı kontrol et
             // For extend_voucher type, we don't need bookingData or voucherData
-            if (!storeData.bookingData && !storeData.voucherData && !storeData.extendVoucherData) {
-                console.log('❌ No booking/voucher/extendVoucher data found for session:', session_id);
+            if (!storeData.bookingData && !storeData.voucherData && !storeData.extendVoucherData && !storeData.customerPortalUpsellData) {
+                console.log('❌ No booking/voucher/extendVoucher/customerPortalUpsell data found for session:', session_id);
                 console.log('❌ Store data type:', storeData.type);
                 console.log('❌ Store data keys:', Object.keys(storeData));
-                return res.status(400).send('No booking/voucher/extendVoucher data found');
+                return res.status(400).send('No booking/voucher/extendVoucher/customerPortalUpsell data found');
             }
 
             console.log('🔄 Processing webhook for session:', session_id, 'Type:', storeData.type);
@@ -6357,6 +6478,16 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     console.log('Voucher code generation skipped in webhook - will be done by createBookingFromSession');
 
                     // Immediately return to prevent further processing
+                    return res.json({ received: true });
+                } else if (storeData.type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE) {
+                    if (storeData.customerPortalUpsellData?.applied) {
+                        console.log('Customer portal upsell already applied for session:', session_id);
+                        return res.json({ received: true });
+                    }
+
+                    const upsellResult = await applyCustomerPortalUpsell(session, storeData);
+                    console.log('✅ Webhook: Customer portal upsell applied:', upsellResult);
+                    storeData.processed = true;
                     return res.json({ received: true });
                 } else if (storeData.type === 'extend_voucher') {
                     console.log('🔄 Webhook: Extending voucher via webhook');
@@ -7090,6 +7221,759 @@ const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPri
 
     console.log(`[inferPrivateCharterPassengersFromPrice] No match found for price ${normalizedTotal} with title "${voucherTitle}"`);
     return null;
+};
+
+const CUSTOMER_PORTAL_UPSELL_SESSION_TYPE = 'customer_portal_upsell';
+const CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP = {
+    'weekday morning': 50,
+    'flexible weekday': 60,
+    'any day': 70
+};
+const INVITE_FRIENDS_DISCOUNT_CODE = 'FLYFAB10';
+const CUSTOMER_PORTAL_ATTEMPT_EXTENSION_THRESHOLD = 6;
+const CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULTS = [
+    {
+        attempt_bucket: 'attempt_3',
+        admin_label: 'Flight Attempt 3',
+        sort_order: 1,
+        body_html: [
+            '<p>🎈 It&rsquo;s normal for balloon flights to be rescheduled a few times. Our passengers consistently tell us the wait is absolutely worth it.</p>',
+            '<p><strong>Flight attempts remaining before voucher extension: {{attempts_remaining}}</strong></p>',
+            '<p>Thank you for your patience - as long as you keep making regular flight attempts, your voucher will never expire.</p>'
+        ].join('')
+    },
+    {
+        attempt_bucket: 'attempt_4',
+        admin_label: 'Flight Attempt 4',
+        sort_order: 2,
+        body_html: [
+            '<p>🎈 Thanks for your patience - balloon flights can take a few attempts to catch the perfect weather. Our passengers always say the experience is worth the wait.</p>',
+            '<p><strong>Flight attempts remaining before voucher extension: {{attempts_remaining}}</strong></p>',
+            '<p>Keep making flight attempts and your voucher will stay valid.</p>'
+        ].join('')
+    },
+    {
+        attempt_bucket: 'attempt_5',
+        admin_label: 'Flight Attempt 5',
+        sort_order: 3,
+        body_html: [
+            '<p>🎈 We understand multiple reschedules can be frustrating. Balloon flights rely on calm winds and perfect conditions, which is why the experience is so special.</p>',
+            '<p><strong>Flight attempts remaining before voucher extension: {{attempts_remaining}}</strong></p>',
+            '<p>Thank you for sticking with us - keep making flight attempts and your voucher will remain valid.</p>'
+        ].join('')
+    },
+    {
+        attempt_bucket: 'attempt_6_plus',
+        admin_label: 'Flight Attempt 6+',
+        sort_order: 4,
+        body_html: [
+            '<p>😬 We know... this is getting a little ridiculous.</p>',
+            '<p>You might be starting to wonder if we actually exist. We promise we do - and we want to get you in the air just as much as you want to be there.</p>',
+            '<p><strong>Flight attempts remaining before voucher extension: {{attempts_remaining}}</strong></p>',
+            '<p>Thank you for your patience - as long as you keep making flight attempts, your voucher will never expire.</p>'
+        ].join('')
+    }
+];
+const CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULT_MAP = CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULTS.reduce((accumulator, definition) => {
+    accumulator[definition.attempt_bucket] = definition;
+    return accumulator;
+}, {});
+
+const roundCurrency = (value) => {
+    const parsed = Number(value) || 0;
+    return Math.round(parsed * 100) / 100;
+};
+
+const runPoolQuery = (sql, params = []) => new Promise((resolve, reject) => {
+    con.query(sql, params, (err, rows) => {
+        if (err) {
+            reject(err);
+        } else {
+            resolve(rows);
+        }
+    });
+});
+
+const isCustomerPortalSharedBooking = (booking = {}) => {
+    const haystack = `${booking.flight_type || ''} ${booking.experience || ''}`.toLowerCase();
+    return !haystack.includes('private');
+};
+
+const getOrdinalSuffix = (dayNumber) => {
+    const normalizedDay = Number(dayNumber) || 0;
+    if (normalizedDay >= 11 && normalizedDay <= 13) {
+        return 'th';
+    }
+
+    switch (normalizedDay % 10) {
+        case 1:
+            return 'st';
+        case 2:
+            return 'nd';
+        case 3:
+            return 'rd';
+        default:
+            return 'th';
+    }
+};
+
+const formatInviteFriendsExperienceDate = (flightDate, timeSlot = null) => {
+    if (!flightDate || !dayjs(flightDate).isValid()) {
+        return null;
+    }
+
+    let formattedDate = dayjs(flightDate);
+    if (timeSlot) {
+        const parsedTime = dayjs(`2000-01-01 ${timeSlot}`);
+        if (parsedTime.isValid()) {
+            formattedDate = formattedDate
+                .hour(parsedTime.hour())
+                .minute(parsedTime.minute())
+                .second(parsedTime.second());
+        }
+    }
+
+    const dayOfMonth = formattedDate.date();
+    return `${formattedDate.format('dddd')} ${dayOfMonth}${getOrdinalSuffix(dayOfMonth)} ${formattedDate.format('MMMM h:mmA')}`;
+};
+
+const buildInviteFriendsShareMessage = ({ location, experienceDateTime, bookingUrl = BOOK_SITE_BASE_URL }) => {
+    return [
+        `Hello! We're booked on a shared balloon ride with Fly Away Ballooning in ${location || 'Somerset'} on ${experienceDateTime || 'our scheduled flight'}.`,
+        "There are still spaces left on our flight if you'd like to join us.",
+        'You can book here:',
+        bookingUrl,
+        `Use the discount code ${INVITE_FRIENDS_DISCOUNT_CODE} to get 10% off your booking.`
+    ].join('\n');
+};
+
+const buildInviteFriendsShareLinks = (shareMessage) => {
+    if (!shareMessage) {
+        return null;
+    }
+
+    const encodedMessage = encodeURIComponent(shareMessage);
+    const emailSubject = encodeURIComponent('Join us on our balloon flight');
+
+    return {
+        whatsapp: `https://wa.me/?text=${encodedMessage}`,
+        sms: `sms:?&body=${encodedMessage}`,
+        email: `mailto:?subject=${emailSubject}&body=${encodedMessage}`
+    };
+};
+
+const getCustomerPortalFlightAttemptBucket = (flightAttempts) => {
+    const attempts = Number.parseInt(flightAttempts, 10);
+    if (!Number.isFinite(attempts) || attempts < 3) {
+        return null;
+    }
+
+    if (attempts === 3) return 'attempt_3';
+    if (attempts === 4) return 'attempt_4';
+    if (attempts === 5) return 'attempt_5';
+    return 'attempt_6_plus';
+};
+
+const getCustomerPortalAttemptsRemainingBeforeExtension = (flightAttempts) => {
+    const attempts = Number.parseInt(flightAttempts, 10);
+    if (!Number.isFinite(attempts) || attempts <= 0) {
+        return CUSTOMER_PORTAL_ATTEMPT_EXTENSION_THRESHOLD;
+    }
+
+    return Math.max(0, CUSTOMER_PORTAL_ATTEMPT_EXTENSION_THRESHOLD - attempts);
+};
+
+const applyCustomerPortalFlightAttemptTemplate = (templateHtml, replacements = {}) => {
+    let nextTemplate = String(templateHtml || '');
+
+    Object.entries(replacements).forEach(([key, value]) => {
+        const placeholder = new RegExp(`{{\\s*${key}\\s*}}`, 'gi');
+        nextTemplate = nextTemplate.replace(placeholder, String(value ?? ''));
+    });
+
+    return nextTemplate;
+};
+
+const buildCustomerPortalFlightAttemptNotification = async ({
+    booking,
+    flightAttempts,
+    isFlightVoucher = false,
+    isVoucherRedeemed = false
+}) => {
+    if (!booking) {
+        return null;
+    }
+
+    if (isFlightVoucher && !isVoucherRedeemed) {
+        return null;
+    }
+
+    const attemptBucket = getCustomerPortalFlightAttemptBucket(flightAttempts);
+    if (!attemptBucket) {
+        return null;
+    }
+
+    const attempts = Number.parseInt(flightAttempts, 10);
+    const remainingAttempts = getCustomerPortalAttemptsRemainingBeforeExtension(attempts);
+    const fallbackDefinition = CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULT_MAP[attemptBucket];
+    let configRows = [];
+    try {
+        configRows = await runPoolQuery(
+            `
+                SELECT id, attempt_bucket, admin_label, body_html, is_active, sort_order, updated_at
+                FROM customer_portal_flight_attempt_notifications
+                WHERE attempt_bucket = ?
+                LIMIT 1
+            `,
+            [attemptBucket]
+        );
+    } catch (error) {
+        console.warn('Could not load customer portal flight attempt notification config, using defaults:', error?.message);
+    }
+    const config = configRows && configRows.length > 0
+        ? configRows[0]
+        : fallbackDefinition;
+
+    if (!config || Number(config.is_active) === 0) {
+        return null;
+    }
+
+    return {
+        visible: true,
+        attemptBucket,
+        attemptCount: attempts,
+        attemptsRemainingBeforeExtension: remainingAttempts,
+        label: config.admin_label || fallbackDefinition?.admin_label || 'Flight Attempt Notification',
+        bodyHtml: applyCustomerPortalFlightAttemptTemplate(
+            config.body_html || fallbackDefinition?.body_html || '',
+            {
+                attempts_remaining: remainingAttempts,
+                flight_attempts_remaining: remainingAttempts,
+                attempt_number: attempts
+            }
+        )
+    };
+};
+
+const getCustomerPortalUpsellDiscount = (voucherTitle) => {
+    const normalizedTitle = normalizeVoucherTitle(voucherTitle);
+    if (!normalizedTitle) return null;
+
+    if (normalizedTitle.includes('weekday morning')) {
+        return CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP['weekday morning'];
+    }
+
+    if (normalizedTitle.includes('flexible weekday')) {
+        return CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP['flexible weekday'];
+    }
+
+    if (normalizedTitle.includes('any day')) {
+        return CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP['any day'];
+    }
+
+    return null;
+};
+
+const resolveCustomerPortalPrivateEightPassengerPrice = (voucherTitle, location) => {
+    const directPricing = getPrivateCharterPricingFromCache(voucherTitle, location);
+    if (directPricing && directPricing['8']) {
+        return roundCurrency(directPricing['8']);
+    }
+
+    const locationKey = normalizeLocationKey(location);
+    const locationPricing = privateCharterPriceCache[locationKey] || privateCharterPriceCache[DEFAULT_LOCATION_KEY] || {};
+    const normalizedTitle = normalizeVoucherTitle(voucherTitle);
+
+    for (const [title, paxMap] of Object.entries(locationPricing)) {
+        if (!paxMap || typeof paxMap !== 'object') continue;
+        const priceForEight = toNumberOrNull(paxMap['8']);
+        if (!priceForEight) continue;
+
+        if (
+            normalizedTitle &&
+            (title === normalizedTitle || title.includes(normalizedTitle) || normalizedTitle.includes(title))
+        ) {
+            return roundCurrency(priceForEight);
+        }
+    }
+
+    for (const paxMap of Object.values(locationPricing)) {
+        if (!paxMap || typeof paxMap !== 'object') continue;
+        const fallbackEightPrice = toNumberOrNull(paxMap['8']);
+        if (fallbackEightPrice) {
+            return roundCurrency(fallbackEightPrice);
+        }
+    }
+
+    return null;
+};
+
+const getCustomerPortalCapacityForSlot = async () => {
+    return BALLOON_210_CAPACITY;
+};
+
+const getCustomerPortalSlotMetrics = async ({ booking, bookingPassengerCount, location, flightDate }) => {
+    const effectiveLocation = location || booking.location || null;
+    const bookingDate = flightDate && dayjs(flightDate).isValid()
+        ? dayjs(flightDate).format('YYYY-MM-DD')
+        : null;
+    const bookingTime = booking.time_slot
+        ? dayjs(`2000-01-01 ${booking.time_slot}`).format('HH:mm:ss')
+        : (flightDate && dayjs(flightDate).isValid() ? dayjs(flightDate).format('HH:mm:ss') : null);
+    const capacity = await getCustomerPortalCapacityForSlot({
+        activityId: booking.activity_id || null,
+        location: effectiveLocation,
+        bookingDate,
+        bookingTime
+    });
+
+    if (!bookingDate || !bookingTime || String(booking.status || '').toLowerCase() === 'cancelled') {
+        return {
+            capacity,
+            totalPassengers: bookingPassengerCount,
+            remainingSeats: Math.max(0, capacity - bookingPassengerCount),
+            totalBookings: 1,
+            hasOtherBookings: false,
+            isScheduled: false
+        };
+    }
+
+    const slotRows = await runPoolQuery(
+        `
+            SELECT
+                COALESCE(SUM(pax), 0) AS total_passengers,
+                COUNT(*) AS total_bookings
+            FROM all_booking
+            WHERE DATE(flight_date) = DATE(?)
+              AND location = ?
+              AND COALESCE(NULLIF(time_slot, ''), TIME_FORMAT(flight_date, '%H:%i:%s')) = ?
+              AND (status IS NULL OR TRIM(LOWER(status)) NOT IN ('cancelled'))
+              AND (manual_status_override IS NULL OR TRIM(LOWER(manual_status_override)) NOT IN ('cancelled'))
+              AND (? IS NULL OR activity_id = ?)
+        `,
+        [
+            bookingDate,
+            effectiveLocation,
+            bookingTime,
+            booking.activity_id || null,
+            booking.activity_id || null
+        ]
+    );
+
+    const totalPassengers = slotRows && slotRows.length > 0
+        ? Number(slotRows[0].total_passengers) || bookingPassengerCount
+        : bookingPassengerCount;
+    const totalBookings = slotRows && slotRows.length > 0
+        ? Number(slotRows[0].total_bookings) || 1
+        : 1;
+
+    return {
+        capacity,
+        totalPassengers,
+        remainingSeats: Math.max(0, capacity - totalPassengers),
+        totalBookings,
+        hasOtherBookings: Math.max(0, totalBookings - 1) > 0,
+        isScheduled: true
+    };
+};
+
+const buildInviteFriendsData = async ({
+    booking,
+    passengers,
+    location,
+    flightDate,
+    isFlightVoucher
+}) => {
+    if (!booking || isFlightVoucher || !isCustomerPortalSharedBooking(booking)) {
+        return null;
+    }
+
+    const bookingStatus = String(booking.status || '').toLowerCase();
+    if (bookingStatus === 'cancelled') {
+        return null;
+    }
+
+    if (flightDate && dayjs(flightDate).isValid() && dayjs(flightDate).isBefore(dayjs(), 'day')) {
+        return null;
+    }
+
+    const bookingPassengerCount = Array.isArray(passengers) && passengers.length > 0
+        ? passengers.length
+        : (parsePositiveInt(booking.pax) || 0);
+    const effectiveLocation = location || booking.location || null;
+    const slotMetrics = await getCustomerPortalSlotMetrics({
+        booking,
+        bookingPassengerCount,
+        location: effectiveLocation,
+        flightDate
+    });
+    const isScheduled = !!(flightDate && dayjs(flightDate).isValid());
+    const remainingSeats = isScheduled ? Math.max(0, slotMetrics.remainingSeats) : null;
+    const isEnabled = Boolean(isScheduled && remainingSeats > 0);
+    const formattedExperienceDateTime = isScheduled
+        ? formatInviteFriendsExperienceDate(flightDate, booking.time_slot || null)
+        : null;
+    const shareMessage = isEnabled
+        ? buildInviteFriendsShareMessage({
+            location: effectiveLocation,
+            experienceDateTime: formattedExperienceDateTime,
+            bookingUrl: BOOK_SITE_BASE_URL
+        })
+        : null;
+
+    return {
+        visible: true,
+        enabled: isEnabled,
+        disabled: !isEnabled,
+        availableSpaces: remainingSeats,
+        capacity: slotMetrics.capacity,
+        title: isScheduled
+            ? `Your balloon flight has ${remainingSeats} space${remainingSeats === 1 ? '' : 's'} left`
+            : 'Invite Friends',
+        description: !isScheduled
+            ? 'Invite Friends becomes available once your shared flight has been scheduled.'
+            : (remainingSeats > 0
+                ? 'Share a ready-made invite so your friends can join the same shared balloon flight.'
+                : 'This shared flight is currently full, so Invite Friends is unavailable right now.'),
+        buttonLabel: 'Invite Friends',
+        discountCode: INVITE_FRIENDS_DISCOUNT_CODE,
+        bookingUrl: BOOK_SITE_BASE_URL,
+        location: effectiveLocation,
+        experienceDateTime: formattedExperienceDateTime,
+        shareMessage,
+        shareLinks: buildInviteFriendsShareLinks(shareMessage)
+    };
+};
+
+const buildCustomerPortalUpsellOffer = async ({
+    booking,
+    passengers,
+    voucherType,
+    location,
+    flightDate,
+    isFlightVoucher
+}) => {
+    if (!booking || isFlightVoucher || !isCustomerPortalSharedBooking(booking)) {
+        return null;
+    }
+
+    const bookingStatus = String(booking.status || '').toLowerCase();
+    if (bookingStatus === 'cancelled') {
+        return null;
+    }
+
+    if (flightDate && dayjs(flightDate).isValid() && dayjs(flightDate).isBefore(dayjs(), 'day')) {
+        return null;
+    }
+
+    const bookingPassengerCount = Array.isArray(passengers) && passengers.length > 0
+        ? passengers.length
+        : (parsePositiveInt(booking.pax) || 0);
+
+    if (!bookingPassengerCount || bookingPassengerCount >= BALLOON_210_CAPACITY) {
+        return null;
+    }
+
+    const effectiveLocation = location || booking.location || null;
+    const slotMetrics = await getCustomerPortalSlotMetrics({
+        booking,
+        bookingPassengerCount,
+        location: effectiveLocation,
+        flightDate
+    });
+
+    if (slotMetrics.remainingSeats <= 0) {
+        return null;
+    }
+
+    const effectiveVoucherType = voucherType || booking.voucher_type_detail || booking.voucher_type || '';
+    const regularSeatPrice = getSharedVoucherPriceFromCache(effectiveVoucherType, effectiveLocation);
+    const discountAmount = getCustomerPortalUpsellDiscount(effectiveVoucherType);
+    const discountedSeatPrice = regularSeatPrice != null && discountAmount != null
+        ? roundCurrency(Math.max(regularSeatPrice - discountAmount, 0))
+        : null;
+    const currentBookingBaseTotal = roundCurrency(
+        Math.max(
+            0,
+            (Number(booking.paid) || 0) +
+            (Number(booking.due) || 0) -
+            (Number(booking.add_to_booking_items_total_price) || 0) -
+            (Number(booking.weather_refund_total_price) || 0)
+        )
+    );
+
+    const shouldShowPrivateUpgrade = slotMetrics.isScheduled &&
+        [6, 7].includes(bookingPassengerCount) &&
+        !slotMetrics.hasOtherBookings;
+
+    if (shouldShowPrivateUpgrade) {
+        const privateEightPrice = resolveCustomerPortalPrivateEightPassengerPrice(effectiveVoucherType, effectiveLocation);
+        const privateUpgradeDifference = privateEightPrice != null
+            ? roundCurrency(Math.max(privateEightPrice - currentBookingBaseTotal, 0))
+            : null;
+
+        if (privateEightPrice != null && privateUpgradeDifference && privateUpgradeDifference > 0) {
+            return {
+                eligible: true,
+                mode: 'private_upgrade',
+                title: 'Almost a private balloon',
+                description: `Your balloon currently has ${slotMetrics.remainingSeats} seat${slotMetrics.remainingSeats === 1 ? '' : 's'} left. Add ${slotMetrics.remainingSeats} passenger${slotMetrics.remainingSeats === 1 ? '' : 's'} now to enjoy a private balloon experience for an extra £${privateUpgradeDifference.toFixed(2)}.`,
+                buttonLabel: slotMetrics.remainingSeats === 1 ? 'Add Passenger' : 'Add Passengers',
+                requiredPassengerCount: slotMetrics.remainingSeats,
+                totalCharge: privateUpgradeDifference,
+                currentBookingBaseTotal,
+                privateEightPrice,
+                remainingSeats: slotMetrics.remainingSeats,
+                slotPassengerCount: slotMetrics.totalPassengers,
+                bookingPassengerCount,
+                capacity: slotMetrics.capacity,
+                hasOtherBookings: slotMetrics.hasOtherBookings,
+                scheduled: slotMetrics.isScheduled,
+                voucherType: effectiveVoucherType
+            };
+        }
+    }
+
+    const oddPassengerScenarios = [1, 3, 5, 7];
+    const shouldShowSingleDiscount = oddPassengerScenarios.includes(bookingPassengerCount) && (
+        !slotMetrics.isScheduled ||
+        bookingPassengerCount === 7 ||
+        slotMetrics.totalPassengers % 2 === 1
+    );
+
+    if (!shouldShowSingleDiscount || regularSeatPrice == null || discountAmount == null || discountedSeatPrice == null || discountedSeatPrice <= 0) {
+        return null;
+    }
+
+    return {
+        eligible: true,
+        mode: 'single_discount',
+        title: 'Bring a friend and save',
+        description: `Add another passenger to your flight and you’ll save £${discountAmount.toFixed(2)} on their ticket.`,
+        buttonLabel: 'Add Passenger',
+        requiredPassengerCount: 1,
+        totalCharge: discountedSeatPrice,
+        discountAmount,
+        regularSeatPrice,
+        discountedSeatPrice,
+        remainingSeats: slotMetrics.remainingSeats,
+        slotPassengerCount: slotMetrics.totalPassengers,
+        bookingPassengerCount,
+        capacity: slotMetrics.capacity,
+        hasOtherBookings: slotMetrics.hasOtherBookings,
+        scheduled: slotMetrics.isScheduled,
+        voucherType: effectiveVoucherType
+    };
+};
+
+const distributeAmountAcrossPassengers = (totalAmount, passengerCount) => {
+    const safePassengerCount = Math.max(1, passengerCount || 1);
+    const totalPennies = Math.round((Number(totalAmount) || 0) * 100);
+    const basePennies = Math.floor(totalPennies / safePassengerCount);
+    const remainder = totalPennies - (basePennies * safePassengerCount);
+
+    return Array.from({ length: safePassengerCount }, (_, index) => {
+        const amountInPennies = basePennies + (index < remainder ? 1 : 0);
+        return roundCurrency(amountInPennies / 100);
+    });
+};
+
+const applyCustomerPortalUpsell = async (session, storeData) => {
+    const upsellData = storeData?.customerPortalUpsellData;
+
+    if (!upsellData?.bookingId || !Array.isArray(upsellData.passengers) || upsellData.passengers.length === 0) {
+        throw new Error('Customer portal upsell data is incomplete');
+    }
+
+    const bookingRows = await runPoolQuery('SELECT * FROM all_booking WHERE id = ? LIMIT 1', [upsellData.bookingId]);
+    if (!bookingRows || bookingRows.length === 0) {
+        throw new Error('Booking not found for customer portal upsell');
+    }
+
+    const booking = bookingRows[0];
+    const existingPassengers = await runPoolQuery('SELECT * FROM passenger WHERE booking_id = ? ORDER BY id ASC', [upsellData.bookingId]);
+    const currentPassengerCount = existingPassengers.length > 0
+        ? existingPassengers.length
+        : (parsePositiveInt(booking.pax) || 0);
+
+    const slotMetrics = await getCustomerPortalSlotMetrics({
+        booking,
+        bookingPassengerCount: currentPassengerCount,
+        location: booking.location,
+        flightDate: booking.flight_date
+    });
+
+    if (slotMetrics.isScheduled && slotMetrics.remainingSeats < upsellData.passengers.length) {
+        throw new Error('This flight no longer has enough remaining seats for the requested passengers');
+    }
+
+    const authoritativeAmounts = getAuthoritativeStripeAmounts(
+        session,
+        upsellData.totalAmount || upsellData.offerSnapshot?.totalCharge || 0
+    );
+    const paidAmount = roundCurrency(
+        authoritativeAmounts.paidAmount || upsellData.totalAmount || upsellData.offerSnapshot?.totalCharge || 0
+    );
+
+    if (paidAmount <= 0) {
+        throw new Error('Invalid upsell payment amount');
+    }
+
+    const distributedPrices = distributeAmountAcrossPassengers(paidAmount, upsellData.passengers.length);
+    const ticketType = upsellData.offerSnapshot?.mode === 'private_upgrade'
+        ? 'Private Upgrade'
+        : (upsellData.voucherType || booking.voucher_type_detail || booking.voucher_type || 'Customer Portal Upsell');
+
+    const insertPassengerValues = upsellData.passengers.map((passenger, index) => [
+        upsellData.bookingId,
+        passenger.first_name,
+        passenger.last_name,
+        passenger.weight ? Number(passenger.weight) : null,
+        null,
+        null,
+        ticketType,
+        0,
+        distributedPrices[index]
+    ]);
+
+    await runPoolQuery(
+        `
+            INSERT INTO passenger (
+                booking_id, first_name, last_name, weight, email, phone, ticket_type, weather_refund, price
+            ) VALUES ?
+        `,
+        [insertPassengerValues]
+    );
+
+    const currentBaseTotal = roundCurrency(
+        Number(booking.original_amount) || Math.max(
+            0,
+            (Number(booking.paid) || 0) +
+            (Number(booking.due) || 0) -
+            (Number(booking.add_to_booking_items_total_price) || 0) -
+            (Number(booking.weather_refund_total_price) || 0)
+        )
+    );
+    const nextPassengerCount = currentPassengerCount + upsellData.passengers.length;
+    const nextPaidTotal = roundCurrency((Number(booking.paid) || 0) + paidAmount);
+    const nextDueTotal = roundCurrency(Number(booking.due) || 0);
+    const nextOriginalAmount = roundCurrency(currentBaseTotal + paidAmount);
+
+    await runPoolQuery(
+        `
+            UPDATE all_booking
+            SET pax = ?,
+                paid = ?,
+                due = ?,
+                original_amount = ?
+            WHERE id = ?
+        `,
+        [nextPassengerCount, nextPaidTotal, nextDueTotal, nextOriginalAmount, upsellData.bookingId]
+    );
+
+    const bookingDate = booking.flight_date && dayjs(booking.flight_date).isValid()
+        ? dayjs(booking.flight_date).format('YYYY-MM-DD')
+        : null;
+    const bookingTime = booking.time_slot
+        ? dayjs(`2000-01-01 ${booking.time_slot}`).format('HH:mm')
+        : (booking.flight_date && dayjs(booking.flight_date).isValid() ? dayjs(booking.flight_date).format('HH:mm') : null);
+
+    if (bookingDate && bookingTime && booking.activity_id) {
+        updateSpecificAvailability(bookingDate, bookingTime, booking.activity_id, upsellData.passengers.length);
+    } else if (bookingDate && bookingTime && booking.location) {
+        try {
+            const activityRows = await runPoolQuery(
+                'SELECT id FROM activity WHERE location = ? AND status = "Live" ORDER BY id DESC LIMIT 1',
+                [booking.location]
+            );
+            if (activityRows && activityRows.length > 0) {
+                updateSpecificAvailability(bookingDate, bookingTime, activityRows[0].id, upsellData.passengers.length);
+            }
+        } catch (error) {
+            console.warn('Customer Portal - Could not update availability after upsell:', error.message);
+        }
+    }
+
+    await savePaymentHistory(session, upsellData.bookingId, null, booking.voucher_code || null);
+
+    storeData.processed = true;
+    storeData.customerPortalUpsellData = {
+        ...upsellData,
+        applied: true,
+        booking_id: upsellData.bookingId
+    };
+
+    return {
+        bookingId: upsellData.bookingId,
+        addedPassengerCount: upsellData.passengers.length,
+        paidAmount
+    };
+};
+
+const getBookingInviteFriendsSnapshot = async (bookingId) => {
+    if (!bookingId) {
+        return null;
+    }
+
+    const bookingRows = await runPoolQuery('SELECT * FROM all_booking WHERE id = ? LIMIT 1', [bookingId]);
+    if (!bookingRows || bookingRows.length === 0) {
+        return null;
+    }
+
+    const booking = bookingRows[0];
+    const passengers = await runPoolQuery(
+        'SELECT id, booking_id, first_name, last_name, email, phone FROM passenger WHERE booking_id = ? ORDER BY id ASC',
+        [bookingId]
+    );
+    const inviteFriends = await buildInviteFriendsData({
+        booking,
+        passengers,
+        location: booking.location,
+        flightDate: booking.flight_date,
+        isFlightVoucher: booking.book_flight === 'Flight Voucher' || booking.is_flight_voucher
+    });
+
+    return {
+        booking,
+        passengers,
+        inviteFriends
+    };
+};
+
+const getBookingSessionResponseExtras = async ({ bookingId, storeData }) => {
+    const snapshot = await getBookingInviteFriendsSnapshot(bookingId);
+    const booking = snapshot?.booking || {};
+    const passengers = snapshot?.passengers || [];
+    const firstPassenger = passengers[0] || {};
+    const fallbackPassenger = storeData?.bookingData?.passengerData?.[0] || {};
+    const fallbackCustomerName = [fallbackPassenger.firstName, fallbackPassenger.lastName].filter(Boolean).join(' ').trim();
+    const customerName = [firstPassenger.first_name, firstPassenger.last_name].filter(Boolean).join(' ').trim() || booking.name || fallbackCustomerName || null;
+    const customerEmail = booking.email || fallbackPassenger.email || null;
+    const customerPhone = booking.phone || fallbackPassenger.phone || null;
+    const voucherTypeDetail = booking.voucher_type_detail || booking.voucher_type || storeData?.bookingData?.selectedVoucherType?.title || null;
+    const experienceRaw = booking.flight_type || booking.experience || storeData?.bookingData?.chooseFlightType?.type || '';
+    const userData = customerEmail
+        ? {
+            email: String(customerEmail).trim().toLowerCase(),
+            ...(customerPhone ? { phone_number: String(customerPhone).trim().replace(/\s+/g, '') } : {})
+        }
+        : undefined;
+
+    return {
+        voucher_code: booking.voucher_code || storeData?.bookingData?.voucher_code || null,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        paid_amount: getAuthoritativePaidAmountFromSessionStore(storeData) || (booking.paid != null ? Number(booking.paid) : null),
+        voucher_type: 'Book Flight',
+        voucher_type_detail: voucherTypeDetail,
+        experience_type: String(experienceRaw).toLowerCase().includes('private') ? 'private' : 'shared',
+        user_data: userData,
+        invite_friends: snapshot?.inviteFriends || null,
+        customer_portal_link: snapshot?.booking ? getCustomerPortalLink(snapshot.booking) : null,
+        location: booking.location || storeData?.bookingData?.chooseLocation || null,
+        flight_date: booking.flight_date || null
+    };
 };
 
 function derivePassengerCount(source = {}, options = {}) {
@@ -18232,6 +19116,40 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
         let voucherInfo = null;
         let finalVoucherType = booking.voucher_type;
         let finalVoucherTypeDetail = booking.voucher_type_detail || null;
+        const normalizeVoucherTypeValue = (value) => {
+            if (value === null || value === undefined) return null;
+            const trimmed = String(value).trim();
+            return trimmed || null;
+        };
+        const genericVoucherTypeValues = new Set([
+            'shared',
+            'shared flight',
+            'private',
+            'private charter',
+            'book flight',
+            'flight voucher',
+            'gift voucher',
+            'buy gift',
+            'buy gift voucher'
+        ]);
+        const isSpecificVoucherTypeValue = (value) => {
+            const normalized = normalizeVoucherTypeValue(value);
+            return Boolean(normalized) && !genericVoucherTypeValues.has(normalized.toLowerCase());
+        };
+        const applyResolvedVoucherType = (value, sourceLabel) => {
+            const normalized = normalizeVoucherTypeValue(value);
+            if (!normalized) return false;
+
+            if (!isSpecificVoucherTypeValue(finalVoucherTypeDetail)) {
+                finalVoucherTypeDetail = normalized;
+            }
+            if (!isSpecificVoucherTypeValue(finalVoucherType)) {
+                finalVoucherType = normalized;
+            }
+
+            console.log(`✅ Customer Portal - Resolved voucher type from ${sourceLabel}:`, normalized);
+            return true;
+        };
         // Use voucherInfoForLookup if available (from earlier lookup), otherwise will be set later
         let isFlightVoucher = voucherInfoForLookup ? (voucherInfoForLookup.book_flight === 'Flight Voucher') : false;
         
@@ -18353,8 +19271,57 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         }
         
-        // If voucher_type_detail is still null, try to extract from booking.voucher_type
-        if (!finalVoucherTypeDetail && finalVoucherType) {
+        // Redeem Voucher bookings often store only the generated "Book Flight" code on all_booking.
+        // Recover the original voucher type from voucher_code_usage so the portal can still show
+        // labels like "Shared - Flexible Weekday".
+        if (
+            booking.id &&
+            (booking.flight_type_source === 'Redeem Voucher' || booking.redeemed_voucher === 'Yes' || booking.redeemed_voucher === 1) &&
+            (!isSpecificVoucherTypeValue(finalVoucherTypeDetail) || !isSpecificVoucherTypeValue(finalVoucherType))
+        ) {
+            try {
+                const [usageRows] = await new Promise((resolve, reject) => {
+                    con.query(
+                        `
+                        SELECT
+                            vc.code,
+                            vc.title,
+                            vc.voucher_type AS code_voucher_type,
+                            av.voucher_type AS voucher_type,
+                            av.voucher_type_detail AS voucher_type_detail
+                        FROM voucher_code_usage vcu
+                        INNER JOIN voucher_codes vc
+                            ON vc.id = vcu.voucher_code_id
+                        LEFT JOIN all_vouchers av
+                            ON UPPER(av.voucher_ref) = UPPER(vc.code)
+                        WHERE vcu.booking_id = ?
+                        ORDER BY vcu.used_at DESC, vcu.id DESC
+                        LIMIT 5
+                        `,
+                        [booking.id],
+                        (err, rows) => {
+                            if (err) reject(err);
+                            else resolve([rows]);
+                        }
+                    );
+                });
+
+                if (usageRows && usageRows.length > 0) {
+                    const resolvedUsageType = usageRows
+                        .map((row) => row.voucher_type_detail || row.voucher_type || row.code_voucher_type || null)
+                        .find((value) => isSpecificVoucherTypeValue(value));
+
+                    if (resolvedUsageType) {
+                        applyResolvedVoucherType(resolvedUsageType, 'voucher_code_usage');
+                    }
+                }
+            } catch (usageErr) {
+                console.warn('⚠️ Customer Portal - Could not resolve voucher type via voucher_code_usage:', usageErr.message);
+            }
+        }
+
+        // If voucher_type_detail is still empty, fall back to the resolved voucher_type.
+        if (!finalVoucherTypeDetail && isSpecificVoucherTypeValue(finalVoucherType)) {
             finalVoucherTypeDetail = finalVoucherType;
         }
 
@@ -18878,6 +19845,28 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         }
 
+        const upsellOffer = await buildCustomerPortalUpsellOffer({
+            booking,
+            passengers: finalPassengerRows,
+            voucherType: finalVoucherTypeDetail || finalVoucherType || booking.voucher_type_detail || booking.voucher_type,
+            location: finalLocation || booking.location,
+            flightDate: finalFlightDate,
+            isFlightVoucher
+        });
+        const inviteFriends = await buildInviteFriendsData({
+            booking,
+            passengers: finalPassengerRows,
+            location: finalLocation || booking.location,
+            flightDate: finalFlightDate,
+            isFlightVoucher
+        });
+        const flightAttemptNotification = await buildCustomerPortalFlightAttemptNotification({
+            booking,
+            flightAttempts: finalFlightAttempts,
+            isFlightVoucher,
+            isVoucherRedeemed
+        });
+
         // Format the response
         const response = {
             success: true,
@@ -18912,7 +19901,10 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 activity_id: booking.activity_id || null,
                 book_flight: finalBookFlight, // Add book_flight to identify Flight Voucher
                 is_flight_voucher: isFlightVoucher, // Add flag to identify Flight Voucher
-                is_voucher_redeemed: isVoucherRedeemed // Add flag to indicate if voucher is redeemed
+                is_voucher_redeemed: isVoucherRedeemed, // Add flag to indicate if voucher is redeemed
+                flight_attempt_notification: flightAttemptNotification,
+                upsell_offer: upsellOffer,
+                invite_friends: inviteFriends
             }
         };
 
@@ -19087,6 +20079,154 @@ app.post('/api/customer-portal-extend-voucher', async (req, res) => {
             success: false,
             message: 'Error extending voucher',
             error: error.message
+        });
+    }
+});
+
+app.post('/api/customer-portal-upsell/create-session', async (req, res) => {
+    const { token, offerMode, passengers } = req.body || {};
+
+    if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, message: 'A valid customer portal token is required.' });
+    }
+
+    if (!Array.isArray(passengers) || passengers.length === 0) {
+        return res.status(400).json({ success: false, message: 'At least one passenger is required.' });
+    }
+
+    if (!stripeSecretKey) {
+        return res.status(500).json({ success: false, message: 'Stripe configuration error: Secret key not found' });
+    }
+
+    const normalizedPassengers = passengers.map((passenger) => ({
+        first_name: String(passenger?.first_name || '').trim(),
+        last_name: String(passenger?.last_name || '').trim(),
+        weight: String(passenger?.weight || '').trim()
+    }));
+
+    const hasInvalidPassenger = normalizedPassengers.some((passenger) => {
+        const parsedWeight = Number(passenger.weight);
+        return (
+            !passenger.first_name ||
+            !passenger.last_name ||
+            !passenger.weight ||
+            !Number.isFinite(parsedWeight) ||
+            parsedWeight <= 0
+        );
+    });
+
+    if (hasInvalidPassenger) {
+        return res.status(400).json({ success: false, message: 'Each passenger must include first name, last name and weight.' });
+    }
+
+    try {
+        const internalBaseUrl = process.env.INTERNAL_API_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3002}`;
+        const portalResponse = await axios.get(`${internalBaseUrl}/api/customer-portal-booking/${encodeURIComponent(token)}`);
+        const portalBooking = portalResponse?.data?.data || null;
+
+        if (!portalResponse?.data?.success || !portalBooking?.id) {
+            return res.status(404).json({ success: false, message: 'Booking not found for this customer portal session.' });
+        }
+
+        if (portalBooking.is_flight_voucher) {
+            return res.status(400).json({ success: false, message: 'Passenger upsell is only available on active bookings.' });
+        }
+
+        const offer = portalBooking.upsell_offer;
+        if (!offer || !offer.eligible) {
+            return res.status(400).json({ success: false, message: 'This upsell is no longer available for the booking.' });
+        }
+
+        if (offerMode && offer.mode !== offerMode) {
+            return res.status(400).json({ success: false, message: 'The selected offer no longer matches the latest booking state.' });
+        }
+
+        if (Number(offer.requiredPassengerCount || 1) !== normalizedPassengers.length) {
+            return res.status(400).json({
+                success: false,
+                message: `This offer currently requires ${offer.requiredPassengerCount || 1} passenger${Number(offer.requiredPassengerCount || 1) === 1 ? '' : 's'}.`
+            });
+        }
+
+        const totalPrice = roundCurrency(offer.totalCharge || 0);
+        const amount = Math.round(totalPrice * 100);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid upsell amount.' });
+        }
+
+        const isProd = process.env.NODE_ENV === 'production';
+        const reqOrigin = (req.headers && (req.headers.origin || req.headers.referer)) || '';
+        let derivedOrigin = '';
+
+        if (reqOrigin) {
+            const match = String(reqOrigin).match(/^https?:\/\/[^/]+/);
+            if (match) {
+                derivedOrigin = match[0];
+            }
+        }
+
+        const baseUrl = process.env.CHECKOUT_RETURN_BASE_URL || derivedOrigin || (isProd ? 'https://flyawayballooning-system.com' : 'http://localhost:3000');
+        const sessionMetadata = {
+            type: CUSTOMER_PORTAL_UPSELL_SESSION_TYPE,
+            offer_mode: offer.mode,
+            booking_id: String(portalBooking.id),
+            passenger_count: String(normalizedPassengers.length),
+            session_id: 'PLACEHOLDER'
+        };
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'GBP',
+                        product_data: {
+                            name: offer.mode === 'private_upgrade' ? 'Private Balloon Upgrade' : 'Add Passenger To Booking',
+                            description: offer.description
+                        },
+                        unit_amount: amount
+                    },
+                    quantity: 1
+                }
+            ],
+            mode: 'payment',
+            success_url: `${baseUrl}/customerPortal/${token}?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${CUSTOMER_PORTAL_UPSELL_SESSION_TYPE}`,
+            cancel_url: `${baseUrl}/customerPortal/${token}`,
+            allow_promotion_codes: false,
+            metadata: sessionMetadata
+        });
+
+        stripeSessionStore[session.id] = {
+            type: CUSTOMER_PORTAL_UPSELL_SESSION_TYPE,
+            totalPrice,
+            customerPortalUpsellData: {
+                bookingId: portalBooking.id,
+                token,
+                passengers: normalizedPassengers,
+                offerSnapshot: offer,
+                voucherType: portalBooking.voucher_type_detail || portalBooking.voucher_type || '',
+                totalAmount: totalPrice
+            }
+        };
+
+        await stripe.checkout.sessions.update(session.id, {
+            metadata: {
+                ...sessionMetadata,
+                session_id: session.id
+            }
+        });
+
+        return res.json({
+            success: true,
+            sessionId: session.id,
+            sessionUrl: session.url
+        });
+    } catch (error) {
+        console.error('Customer Portal - Error creating upsell checkout session:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.response?.data?.message || 'Failed to create payment session for the customer portal upsell.'
         });
     }
 });
@@ -23442,6 +24582,95 @@ app.delete('/api/sms-templates/:id', (req, res) => {
 });
 
 // Customer Portal Contents endpoints
+app.get('/api/customer-portal-flight-attempt-notifications', async (req, res) => {
+    try {
+        const rows = await runPoolQuery(
+            `
+                SELECT id, attempt_bucket, admin_label, body_html, is_active, sort_order, updated_at
+                FROM customer_portal_flight_attempt_notifications
+                ORDER BY sort_order ASC, attempt_bucket ASC
+            `
+        );
+
+        const data = CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULTS.map((definition) => {
+            const row = rows.find((item) => item.attempt_bucket === definition.attempt_bucket);
+            return {
+                id: row?.id || null,
+                attempt_bucket: definition.attempt_bucket,
+                admin_label: row?.admin_label || definition.admin_label,
+                body_html: row?.body_html || definition.body_html,
+                is_active: row?.is_active !== undefined ? Boolean(row.is_active) : true,
+                sort_order: row?.sort_order ?? definition.sort_order,
+                updated_at: row?.updated_at || null
+            };
+        });
+
+        res.json({
+            success: true,
+            data,
+            placeholders: ['{{attempts_remaining}}', '{{flight_attempts_remaining}}', '{{attempt_number}}']
+        });
+    } catch (error) {
+        console.error('Error fetching customer portal flight attempt notifications:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching customer portal flight attempt notifications'
+        });
+    }
+});
+
+app.put('/api/customer-portal-flight-attempt-notifications/:attemptBucket', async (req, res) => {
+    const { attemptBucket } = req.params;
+    const definition = CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULT_MAP[attemptBucket];
+
+    if (!definition) {
+        return res.status(404).json({
+            success: false,
+            message: 'Flight attempt notification template not found'
+        });
+    }
+
+    const { body_html, is_active } = req.body || {};
+
+    try {
+        await runPoolQuery(
+            `
+                INSERT INTO customer_portal_flight_attempt_notifications (
+                    attempt_bucket,
+                    admin_label,
+                    body_html,
+                    is_active,
+                    sort_order,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                    admin_label = VALUES(admin_label),
+                    body_html = VALUES(body_html),
+                    is_active = VALUES(is_active),
+                    sort_order = VALUES(sort_order),
+                    updated_at = NOW()
+            `,
+            [
+                definition.attempt_bucket,
+                definition.admin_label,
+                body_html || definition.body_html,
+                is_active !== undefined ? (is_active ? 1 : 0) : 1,
+                definition.sort_order
+            ]
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating customer portal flight attempt notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating customer portal flight attempt notification'
+        });
+    }
+});
+
 // Get all customer portal contents
 app.get('/api/customer-portal-contents', (req, res) => {
     con.query('SELECT * FROM customer_portal_contents ORDER BY sort_order ASC, created_at DESC', (err, contents) => {
@@ -24671,7 +25900,9 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
             flight_attempts,
             preferred_location,
             preferred_time,
-            preferred_day
+            preferred_day,
+            manualBooking = false,
+            manualQuotedTotal = null
         } = bookingData;
 
         // Unify add-on field
@@ -24703,9 +25934,16 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
         console.log('chooseFlightType:', chooseFlightType);
         console.log('chooseLocation:', chooseLocation);
 
-        const resolvedPaidAmount = Number.isFinite(Number(actualPaidAmount))
-            ? Number(actualPaidAmount)
-            : (Number(totalPrice) || 0);
+        const resolvedPaidAmount = manualBooking
+            ? 0
+            : (
+                Number.isFinite(Number(actualPaidAmount))
+                    ? Number(actualPaidAmount)
+                    : (Number(totalPrice) || 0)
+            );
+        const resolvedDueAmount = manualBooking && Number.isFinite(Number(manualQuotedTotal))
+            ? Number(manualQuotedTotal)
+            : 0;
 
         // Determine actualVoucherType for expiry calculation
         let actualVoucherType = '';
@@ -24999,7 +26237,7 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 chooseLocation,
                 'Confirmed',
                 resolvedPaidAmount,
-                0,
+                resolvedDueAmount,
                 voucher_code || null,
                 nowDate,
                 expiresDateFinal,
@@ -26038,6 +27276,106 @@ app.post('/api/create-checkout-session', async (req, res) => {
     }
 });
 
+app.post('/api/create-manual-session', async (req, res) => {
+    try {
+        const {
+            totalPrice,
+            bookingData,
+            voucherData,
+            type,
+            userSessionData,
+            manualBookingToken
+        } = req.body || {};
+
+        const tokenResult = verifyManualBookingToken(manualBookingToken);
+        if (!tokenResult.valid) {
+            return res.status(403).json({
+                success: false,
+                message: tokenResult.message
+            });
+        }
+
+        if (type !== 'booking' && type !== 'voucher') {
+            return res.status(400).json({
+                success: false,
+                message: 'Manual booking type must be booking or voucher.'
+            });
+        }
+
+        if (!bookingData && !voucherData) {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking or voucher data is required.'
+            });
+        }
+
+        const manualQuotedTotal = Number.isFinite(Number(totalPrice)) ? Number(totalPrice) : 0;
+        const session_id = `manual_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
+
+        if (userSessionData && userSessionData.session_id) {
+            const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection.remoteAddress || null;
+            const userSessionPayload = {
+                ...userSessionData,
+                ip_address: ipAddress || userSessionData.ip_address || null
+            };
+
+            axios.post(`${req.protocol}://${req.get('host')}/api/save-user-session`, userSessionPayload)
+                .then(() => {
+                    console.log('User session saved successfully for manual booking');
+                })
+                .catch((err) => {
+                    console.error('Error saving user session for manual booking:', err.message);
+                });
+        }
+
+        const normalizedBookingData = bookingData ? {
+            ...bookingData,
+            manualBooking: true,
+            manualQuotedTotal,
+            totalPrice: 0,
+            actualPaidAmount: 0
+        } : null;
+
+        const normalizedVoucherData = voucherData ? {
+            ...voucherData,
+            manualBooking: true,
+            manualQuotedTotal,
+            paid: 0,
+            subtotal: manualQuotedTotal,
+            total: manualQuotedTotal,
+            original_amount: manualQuotedTotal,
+            additional_information_json: voucherData.additional_information_json || voucherData.additionalInfo || null,
+            add_to_booking_items: voucherData.add_to_booking_items || voucherData.choose_add_on || null
+        } : null;
+
+        if (normalizedVoucherData) {
+            normalizedVoucherData.numberOfPassengers = derivePassengerCount(normalizedVoucherData);
+        }
+
+        stripeSessionStore[session_id] = {
+            type,
+            bookingData: normalizedBookingData,
+            voucherData: normalizedVoucherData,
+            userSessionData: userSessionData || null,
+            totalPrice: 0,
+            manualBooking: true,
+            manualQuotedTotal,
+            timestamp: Date.now()
+        };
+
+        return res.json({
+            success: true,
+            sessionId: session_id
+        });
+    } catch (error) {
+        console.error('Error creating manual session:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Could not prepare manual booking session.'
+        });
+    }
+});
+
 // Diagnostics endpoint to verify Stripe config in production (returns only non-sensitive info)
 app.get('/api/stripe/diagnostics', async (req, res) => {
     try {
@@ -26290,10 +27628,26 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         // If already processed by webhook or previous call, short-circuit
         if (storeData.processed) {
             if (type === 'booking' && storeData.bookingData?.booking_id) {
-                return res.json({ success: true, id: storeData.bookingData.booking_id, message: 'booking already created', voucher_code: storeData.bookingData.voucher_code || null });
+                const bookingExtras = await getBookingSessionResponseExtras({
+                    bookingId: storeData.bookingData.booking_id,
+                    storeData
+                });
+                return res.json({
+                    success: true,
+                    id: storeData.bookingData.booking_id,
+                    message: 'booking already created',
+                    ...bookingExtras
+                });
             }
             if (type === 'voucher' && storeData.voucherData?.voucher_id) {
                 return res.json({ success: true, id: storeData.voucherData.voucher_id, message: 'voucher already created', voucher_code: storeData.voucherData.generated_voucher_code || null });
+            }
+            if (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE && storeData.customerPortalUpsellData?.booking_id) {
+                return res.json({
+                    success: true,
+                    id: storeData.customerPortalUpsellData.booking_id,
+                    message: 'customer portal upsell already applied'
+                });
             }
         }
 
@@ -26307,14 +27661,32 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     await new Promise(r => setTimeout(r, 1000));
                 }
                 if (storeData.processed && storeData.bookingData?.booking_id) {
-                    return res.json({ success: true, id: storeData.bookingData.booking_id, message: 'booking already created' });
+                    const bookingExtras = await getBookingSessionResponseExtras({
+                        bookingId: storeData.bookingData.booking_id,
+                        storeData
+                    });
+                    return res.json({
+                        success: true,
+                        id: storeData.bookingData.booking_id,
+                        message: 'booking already created',
+                        ...bookingExtras
+                    });
                 }
                 if (storeData.processing) {
                     return res.status(202).json({ success: false, message: 'Booking creation already in progress' });
                 }
             }
             if (storeData.processed && storeData.bookingData?.booking_id) {
-                return res.json({ success: true, id: storeData.bookingData.booking_id, message: 'booking already created' });
+                const bookingExtras = await getBookingSessionResponseExtras({
+                    bookingId: storeData.bookingData.booking_id,
+                    storeData
+                });
+                return res.json({
+                    success: true,
+                    id: storeData.bookingData.booking_id,
+                    message: 'booking already created',
+                    ...bookingExtras
+                });
             }
             console.log('Creating booking from session data');
             console.log('=== BOOKING DATA BEFORE createBookingFromWebhook ===');
@@ -26342,17 +27714,19 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 storeData.bookingData.userSessionData = storeData.userSessionData;
             }
             let stripeSession = null;
-            try {
-                stripeSession = await stripe.checkout.sessions.retrieve(session_id);
-                syncAuthoritativeAmountsToSessionStore(
-                    storeData,
-                    getAuthoritativeStripeAmounts(
-                        stripeSession,
-                        storeData.totalPrice || storeData.bookingData?.totalPrice || 0
-                    )
-                );
-            } catch (e) {
-                console.warn('Could not fetch Stripe session for booking amount inference:', e?.message);
+            if (!storeData.manualBooking) {
+                try {
+                    stripeSession = await stripe.checkout.sessions.retrieve(session_id);
+                    syncAuthoritativeAmountsToSessionStore(
+                        storeData,
+                        getAuthoritativeStripeAmounts(
+                            stripeSession,
+                            storeData.totalPrice || storeData.bookingData?.totalPrice || 0
+                        )
+                    );
+                } catch (e) {
+                    console.warn('Could not fetch Stripe session for booking amount inference:', e?.message);
+                }
             }
             // Acquire a simple in-memory lock
             storeData.processing = true;
@@ -26362,12 +27736,14 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 console.log('Booking created successfully, ID:', result, 'Session ID:', session_id);
 
                 // Save payment history from Stripe session
-                try {
-                    const session = stripeSession || await stripe.checkout.sessions.retrieve(session_id);
-                    await savePaymentHistory(session, result, null);
-                } catch (paymentHistoryError) {
-                    console.error('Error saving payment history in createBookingFromSession:', paymentHistoryError);
-                    // Continue even if payment history fails - booking is still valid
+                if (!storeData.manualBooking) {
+                    try {
+                        const session = stripeSession || await stripe.checkout.sessions.retrieve(session_id);
+                        await savePaymentHistory(session, result, null);
+                    } catch (paymentHistoryError) {
+                        console.error('Error saving payment history in createBookingFromSession:', paymentHistoryError);
+                        // Continue even if payment history fails - booking is still valid
+                    }
                 }
 
                 // Save user session data if provided
@@ -26508,24 +27884,31 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 // Capture Stripe amounts (authoritative) as a fallback for receipts
                 let sessionAmountTotal = null;
                 let sessionAmountSubtotal = null;
-                try {
-                    const stripeSession = await stripe.checkout.sessions.retrieve(session_id);
-                    sessionAmountTotal = stripeSession?.amount_total ? Number(stripeSession.amount_total) / 100 : null;
-                    sessionAmountSubtotal = stripeSession?.amount_subtotal ? Number(stripeSession.amount_subtotal) / 100 : null;
-                } catch (e) {
-                    console.warn('Could not fetch Stripe session for voucher amount inference:', e?.message);
+                if (!storeData.manualBooking) {
+                    try {
+                        const stripeSession = await stripe.checkout.sessions.retrieve(session_id);
+                        sessionAmountTotal = stripeSession?.amount_total ? Number(stripeSession.amount_total) / 100 : null;
+                        sessionAmountSubtotal = stripeSession?.amount_subtotal ? Number(stripeSession.amount_subtotal) / 100 : null;
+                    } catch (e) {
+                        console.warn('Could not fetch Stripe session for voucher amount inference:', e?.message);
+                    }
                 }
                 const fallbackAmount = Number(storeData.totalPrice || storeData.voucherData?.paid || 0);
+                const resolvedQuotedAmount = storeData.manualBooking && Number.isFinite(Number(storeData.voucherData?.manualQuotedTotal ?? storeData.voucherData?.original_amount))
+                    ? Number(storeData.voucherData?.manualQuotedTotal ?? storeData.voucherData?.original_amount)
+                    : null;
                 const resolvedPaidAmount = sessionAmountTotal ?? fallbackAmount;
-                const resolvedSubtotalAmount = sessionAmountSubtotal ?? resolvedPaidAmount;
+                const resolvedSubtotalAmount = sessionAmountSubtotal ?? resolvedQuotedAmount ?? resolvedPaidAmount;
+                const resolvedTotalAmount = sessionAmountTotal ?? resolvedQuotedAmount ?? resolvedPaidAmount;
+                const resolvedOriginalAmount = resolvedQuotedAmount ?? resolvedTotalAmount;
                 // Inject amounts into voucherData before creation
                 storeData.voucherData = {
                     ...storeData.voucherData,
                     paid: resolvedPaidAmount,
                     subtotal: resolvedSubtotalAmount,
-                    total: resolvedPaidAmount,
-                    original_amount: resolvedPaidAmount,
-                    amount: resolvedPaidAmount
+                    total: resolvedTotalAmount,
+                    original_amount: resolvedOriginalAmount,
+                    amount: resolvedTotalAmount
                 };
 
                 // Additional check: look for existing voucher in database to prevent duplicates
@@ -26652,7 +28035,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                             SET paid = ?, subtotal = IFNULL(subtotal, ?), total = IFNULL(total, ?), original_amount = IFNULL(original_amount, ?)
                             WHERE id = ?
                         `;
-                        con.query(updateSql, [resolvedPaidAmount, resolvedSubtotalAmount, resolvedPaidAmount, resolvedPaidAmount, result], (err) => {
+                        con.query(updateSql, [resolvedPaidAmount, resolvedSubtotalAmount, resolvedTotalAmount, resolvedOriginalAmount, result], (err) => {
                             if (err) {
                                 // If columns don't exist, just update paid
                                 if (err.code === 'ER_BAD_FIELD_ERROR') {
@@ -26668,7 +28051,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                     console.error('Error updating voucher amounts from Stripe session (fallback):', err);
                                 }
                             } else {
-                                console.log('✅ Voucher amounts updated from Stripe session (fallback):', { voucherId: result, resolvedPaidAmount, resolvedSubtotalAmount });
+                                console.log('✅ Voucher amounts updated from Stripe session (fallback):', { voucherId: result, resolvedPaidAmount, resolvedSubtotalAmount, resolvedTotalAmount, resolvedOriginalAmount });
                             }
                         });
                     }
@@ -26974,6 +28357,42 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     storeData.processed = true;
                 }
             }
+        } else if (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE && storeData.customerPortalUpsellData) {
+            if (storeData.processing) {
+                for (let i = 0; i < 10; i++) {
+                    if (!storeData.processing) break;
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+
+                if (storeData.processed && storeData.customerPortalUpsellData?.booking_id) {
+                    return res.json({
+                        success: true,
+                        id: storeData.customerPortalUpsellData.booking_id,
+                        message: 'customer portal upsell already applied'
+                    });
+                }
+
+                if (storeData.processing) {
+                    return res.status(202).json({ success: false, message: 'Customer portal upsell is already being processed' });
+                }
+            }
+
+            let stripeSession = null;
+            try {
+                stripeSession = await stripe.checkout.sessions.retrieve(session_id);
+            } catch (error) {
+                console.warn('Could not fetch Stripe session for customer portal upsell fallback:', error?.message);
+            }
+
+            storeData.processing = true;
+            try {
+                const resolvedSession = stripeSession || await stripe.checkout.sessions.retrieve(session_id);
+                const upsellResult = await applyCustomerPortalUpsell(resolvedSession, storeData);
+                result = upsellResult.bookingId;
+                storeData.processed = true;
+            } finally {
+                storeData.processing = false;
+            }
         } else {
             return res.status(400).json({ success: false, message: 'Invalid type or missing data' });
         }
@@ -26987,6 +28406,8 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             finalVoucherCode = voucherCode || storeData.bookingData?.voucher_code || null;
         } else if (type === 'voucher') {
             finalVoucherCode = storeData.voucherData?.generated_voucher_code || null;
+        } else if (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE) {
+            finalVoucherCode = null;
         }
 
         console.log('=== FINAL RESPONSE DEBUG ===');
@@ -26997,7 +28418,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
         console.log('finalVoucherCode:', finalVoucherCode);
 
         // Build user_data for Enhanced Conversions (in-page code)
-        const src = storeData.bookingData || storeData.voucherData || {};
+        const src = storeData.bookingData || storeData.voucherData || storeData.customerPortalUpsellData || {};
         let user_data = {};
         if (src.passengerData && Array.isArray(src.passengerData) && src.passengerData[0]) {
             const p = src.passengerData[0];
@@ -27007,6 +28428,10 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             if (src.purchaser_email || src.email) user_data.email = String(src.purchaser_email || src.email).trim().toLowerCase();
             if (src.purchaser_phone || src.phone || src.mobile) user_data.phone_number = String(src.purchaser_phone || src.phone || src.mobile || '').trim().replace(/\s+/g, '');
         }
+        const bookingResponseExtras = type === 'booking' && result
+            ? await getBookingSessionResponseExtras({ bookingId: result, storeData })
+            : null;
+        const manualQuotedTotal = getManualQuotedTotal(storeData);
 
         res.json({
             success: true,
@@ -27014,14 +28439,26 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             message: `${type} created successfully`,
             voucher_code: finalVoucherCode,
             voucher_codes: storeData.voucherData?.generated_voucher_codes || null, // Array of multiple voucher codes
-            customer_name: storeData.voucherData?.name || (storeData.bookingData?.passengerData?.[0] ? (storeData.bookingData.passengerData[0].firstName + ' ' + storeData.bookingData.passengerData[0].lastName) : null) || null,
-            customer_email: storeData.voucherData?.email || storeData.bookingData?.passengerData?.[0]?.email || null,
-            customer_phone: storeData.voucherData?.phone || storeData.voucherData?.purchaser_phone || storeData.bookingData?.passengerData?.[0]?.phone || null,
-            paid_amount: getAuthoritativePaidAmountFromSessionStore(storeData) || null,
-            voucher_type: storeData.voucherData?.voucher_type || (type === 'booking' ? 'Book Flight' : null),
-            voucher_type_detail: storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || null,
-            experience_type: (storeData.bookingData?.chooseFlightType?.type || storeData.voucherData?.flight_type || '').toLowerCase().includes('private') ? 'private' : 'shared',
-            user_data: Object.keys(user_data).length ? user_data : undefined
+            customer_name: bookingResponseExtras?.customer_name ||
+                storeData.voucherData?.name ||
+                (storeData.bookingData?.passengerData?.[0] ? (storeData.bookingData.passengerData[0].firstName + ' ' + storeData.bookingData.passengerData[0].lastName) : null) ||
+                (storeData.customerPortalUpsellData?.passengers?.[0] ? `${storeData.customerPortalUpsellData.passengers[0].first_name} ${storeData.customerPortalUpsellData.passengers[0].last_name}` : null) ||
+                null,
+            customer_email: bookingResponseExtras?.customer_email || storeData.voucherData?.email || storeData.bookingData?.passengerData?.[0]?.email || null,
+            customer_phone: bookingResponseExtras?.customer_phone || storeData.voucherData?.phone || storeData.voucherData?.purchaser_phone || storeData.bookingData?.passengerData?.[0]?.phone || null,
+            paid_amount: bookingResponseExtras?.paid_amount ?? getAuthoritativePaidAmountFromSessionStore(storeData) ?? null,
+            voucher_type: storeData.voucherData?.voucher_type || (type === 'booking' ? 'Book Flight' : (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE ? 'Customer Portal Upsell' : null)),
+            voucher_type_detail: bookingResponseExtras?.voucher_type_detail || storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || storeData.customerPortalUpsellData?.voucherType || null,
+            experience_type: bookingResponseExtras?.experience_type || (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE
+                ? (storeData.customerPortalUpsellData?.offerSnapshot?.mode === 'private_upgrade' ? 'private' : 'shared')
+                : ((storeData.bookingData?.chooseFlightType?.type || storeData.voucherData?.flight_type || '').toLowerCase().includes('private') ? 'private' : 'shared')),
+            user_data: bookingResponseExtras?.user_data || (Object.keys(user_data).length ? user_data : undefined),
+            invite_friends: bookingResponseExtras?.invite_friends || null,
+            customer_portal_link: bookingResponseExtras?.customer_portal_link || null,
+            location: bookingResponseExtras?.location || null,
+            flight_date: bookingResponseExtras?.flight_date || null,
+            manual_booking: !!storeData.manualBooking,
+            quoted_total: manualQuotedTotal
         });
     } catch (error) {
         console.error('Error creating from session:', error);
@@ -28005,6 +29442,74 @@ const runDatabaseMigrations = () => {
         }
     });
 
+    // Create customer_portal_flight_attempt_notifications table if it doesn't exist
+    const createCustomerPortalFlightAttemptNotificationsTable = `
+        CREATE TABLE IF NOT EXISTS customer_portal_flight_attempt_notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            attempt_bucket VARCHAR(50) NOT NULL,
+            admin_label VARCHAR(150) NOT NULL,
+            body_html TEXT NOT NULL COMMENT 'Editable HTML body for the customer portal attempt banner',
+            sort_order INT DEFAULT 0,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_attempt_bucket (attempt_bucket),
+            INDEX idx_sort_order (sort_order),
+            INDEX idx_is_active (is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+
+    con.query(createCustomerPortalFlightAttemptNotificationsTable, (err) => {
+        if (err) {
+            console.error('Error creating customer_portal_flight_attempt_notifications table:', err);
+        } else {
+            console.log('✅ customer_portal_flight_attempt_notifications table ready');
+
+            CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULTS.forEach((definition) => {
+                con.query(
+                    `
+                        INSERT IGNORE INTO customer_portal_flight_attempt_notifications (
+                            attempt_bucket,
+                            admin_label,
+                            body_html,
+                            sort_order,
+                            is_active,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (?, ?, ?, ?, 1, NOW(), NOW())
+                    `,
+                    [
+                        definition.attempt_bucket,
+                        definition.admin_label,
+                        definition.body_html,
+                        definition.sort_order
+                    ],
+                    (insertErr) => {
+                        if (insertErr) {
+                            console.error(`Error seeding flight attempt notification ${definition.attempt_bucket}:`, insertErr);
+                            return;
+                        }
+
+                        con.query(
+                            `
+                                UPDATE customer_portal_flight_attempt_notifications
+                                SET admin_label = ?, sort_order = ?
+                                WHERE attempt_bucket = ?
+                            `,
+                            [definition.admin_label, definition.sort_order, definition.attempt_bucket],
+                            (updateErr) => {
+                                if (updateErr) {
+                                    console.error(`Error syncing flight attempt notification metadata for ${definition.attempt_bucket}:`, updateErr);
+                                }
+                            }
+                        );
+                    }
+                );
+            });
+        }
+    });
+
     // Create customer_portal_contents table if it doesn't exist
     const createCustomerPortalContentsTable = `
         CREATE TABLE IF NOT EXISTS customer_portal_contents (
@@ -28632,8 +30137,8 @@ app.get('/api/session-status', (req, res) => {
     const result = { processed, type: data?.type || null };
 
     // When processed, include conversion_data so frontend can fire gtag conversion (webhook may have run first)
-    // Skip extend_voucher - not a primary purchase conversion
-    if (processed && data && data.type !== 'extend_voucher') {
+    // Skip extend_voucher and customer portal upsell - not primary purchase conversions
+    if (processed && data && data.type !== 'extend_voucher' && data.type !== CUSTOMER_PORTAL_UPSELL_SESSION_TYPE) {
         const source = data.bookingData || data.voucherData || {};
         const chooseFlightType = source.chooseFlightType || {};
         const flightTypeStr = (chooseFlightType.type || '').toLowerCase();

@@ -257,6 +257,15 @@ const Settings = () => {
         sort_order: 0,
         is_active: true
     });
+    const [flightAttemptNotifications, setFlightAttemptNotifications] = useState([]);
+    const [flightAttemptNotificationsExpanded, setFlightAttemptNotificationsExpanded] = useState(false);
+    const [showEditFlightAttemptNotificationForm, setShowEditFlightAttemptNotificationForm] = useState(false);
+    const [selectedFlightAttemptNotification, setSelectedFlightAttemptNotification] = useState(null);
+    const [flightAttemptNotificationPlaceholders, setFlightAttemptNotificationPlaceholders] = useState([]);
+    const [flightAttemptNotificationFormData, setFlightAttemptNotificationFormData] = useState({
+        body_html: '',
+        is_active: true
+    });
 
     // Operational Selections state
     const [operationalSelections, setOperationalSelections] = useState([]);
@@ -1228,6 +1237,7 @@ const Settings = () => {
         fetchEmailTemplates();
         fetchSmsTemplates();
         fetchCustomerPortalContents();
+        fetchFlightAttemptNotifications();
         fetchOperationalSelections();
     }, []);
 
@@ -1425,6 +1435,20 @@ const Settings = () => {
         } catch (error) {
             console.error('Error fetching customer portal contents:', error);
             setCustomerPortalContents([]);
+        }
+    };
+
+    const fetchFlightAttemptNotifications = async () => {
+        try {
+            const response = await axios.get('/api/customer-portal-flight-attempt-notifications');
+            if (response.data?.success) {
+                setFlightAttemptNotifications(response.data.data || []);
+                setFlightAttemptNotificationPlaceholders(response.data.placeholders || []);
+            }
+        } catch (error) {
+            console.error('Error fetching flight attempt notifications:', error);
+            setFlightAttemptNotifications([]);
+            setFlightAttemptNotificationPlaceholders([]);
         }
     };
 
@@ -13027,6 +13051,128 @@ const Settings = () => {
                 </div>
             )}
 
+            {/* Flight Attempt Notifications Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div
+                    className="card-header"
+                    onClick={() => setFlightAttemptNotificationsExpanded(!flightAttemptNotificationsExpanded)}
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Flight Attempt Notifications</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage the grey customer portal banner shown for flight attempts 3, 4, 5 and 6+.
+                        </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {flightAttemptNotificationsExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                    </div>
+                </div>
+
+                {flightAttemptNotificationsExpanded && (
+                    <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '0 0 12px 12px' }}>
+                        <div style={{
+                            marginBottom: '16px',
+                            padding: '14px 16px',
+                            background: '#eef2f6',
+                            border: '1px solid #d8dee6',
+                            borderRadius: '10px',
+                            color: '#475569',
+                            fontSize: '14px'
+                        }}>
+                            Use placeholders like {flightAttemptNotificationPlaceholders.join(', ') || '{{attempts_remaining}}'} inside the message body.
+                        </div>
+
+                        {flightAttemptNotifications.length === 0 ? (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '40px 20px',
+                                color: '#6b7280',
+                                background: '#fff',
+                                borderRadius: '8px',
+                                border: '1px dashed #d1d5db'
+                            }}>
+                                <p style={{ margin: 0, fontSize: '15px' }}>No flight attempt notification templates found.</p>
+                            </div>
+                        ) : (
+                            <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ATTEMPT</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>BODY PREVIEW</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIVE</th>
+                                            <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ACTIONS</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {flightAttemptNotifications
+                                            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+                                            .map((notification) => (
+                                                <tr key={notification.attempt_bucket} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                                    <td style={{ padding: '16px' }}>
+                                                        <span style={{ fontWeight: 600, color: '#1f2937' }}>{notification.admin_label}</span>
+                                                    </td>
+                                                    <td style={{ padding: '16px' }}>
+                                                        <span style={{ color: '#475569' }}>
+                                                            {notification.body_html
+                                                                ? notification.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140) + (notification.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().length > 140 ? '...' : '')
+                                                                : 'N/A'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                        <div style={{
+                                                            width: '24px',
+                                                            height: '24px',
+                                                            borderRadius: '50%',
+                                                            border: '2px solid #d1d5db',
+                                                            margin: '0 auto',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            backgroundColor: notification.is_active ? '#10b981' : '#f3f4f6',
+                                                            borderColor: notification.is_active ? '#10b981' : '#d1d5db'
+                                                        }}>
+                                                            {notification.is_active ? <CheckCircle size={16} color="#fff" /> : <XCircle size={16} color="#9ca3af" />}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                                        <button
+                                                            className="btn btn-secondary"
+                                                            onClick={() => {
+                                                                setSelectedFlightAttemptNotification(notification);
+                                                                setFlightAttemptNotificationFormData({
+                                                                    body_html: notification.body_html || '',
+                                                                    is_active: notification.is_active !== undefined ? Boolean(notification.is_active) : true
+                                                                });
+                                                                setShowEditFlightAttemptNotificationForm(true);
+                                                            }}
+                                                            style={{ padding: '6px 12px', fontSize: '13px' }}
+                                                        >
+                                                            <Edit size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {/* Customer Portal Section */}
             <div className="settings-card" style={{ marginBottom: '24px' }}>
                 <div 
@@ -13465,6 +13611,234 @@ const Settings = () => {
                                 Create Field
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Flight Attempt Notification Modal */}
+            {showEditFlightAttemptNotificationForm && selectedFlightAttemptNotification && (
+                <div className="modal-overlay" style={isMobile ? {
+                    padding: '8px',
+                    alignItems: 'flex-start',
+                    overflowY: 'auto'
+                } : {}}>
+                    <div className="modal-content" style={isMobile ? {
+                        maxWidth: 'calc(100vw - 16px)',
+                        width: '100%',
+                        maxHeight: 'calc(100vh - 16px)',
+                        margin: '0',
+                        borderRadius: '8px'
+                    } : {
+                        maxWidth: '800px',
+                        width: '95%',
+                        maxHeight: '90vh',
+                        overflow: 'auto'
+                    }}>
+                        <div className="modal-header" style={isMobile ? {
+                            padding: '10px 12px',
+                            borderBottom: '1px solid #e5e7eb'
+                        } : {}}>
+                            <h3 style={isMobile ? {
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 600
+                            } : {
+                                margin: 0,
+                                fontSize: '24px',
+                                fontWeight: 600
+                            }}>
+                                Edit {selectedFlightAttemptNotification.admin_label}
+                            </h3>
+                            <button
+                                className="close-btn"
+                                onClick={() => {
+                                    setShowEditFlightAttemptNotificationForm(false);
+                                    setSelectedFlightAttemptNotification(null);
+                                    setFlightAttemptNotificationFormData({
+                                        body_html: '',
+                                        is_active: true
+                                    });
+                                }}
+                                style={isMobile ? {
+                                    fontSize: '18px',
+                                    width: '24px',
+                                    height: '24px'
+                                } : {}}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            try {
+                                const response = await axios.put(
+                                    `/api/customer-portal-flight-attempt-notifications/${selectedFlightAttemptNotification.attempt_bucket}`,
+                                    flightAttemptNotificationFormData
+                                );
+
+                                if (response.data?.success) {
+                                    fetchFlightAttemptNotifications();
+                                    setShowEditFlightAttemptNotificationForm(false);
+                                    setSelectedFlightAttemptNotification(null);
+                                    setFlightAttemptNotificationFormData({
+                                        body_html: '',
+                                        is_active: true
+                                    });
+                                    alert('Flight attempt notification updated successfully!');
+                                }
+                            } catch (error) {
+                                alert('Error updating flight attempt notification: ' + (error.response?.data?.message || error.message));
+                            }
+                        }}>
+                            <div style={isMobile ? {
+                                padding: '12px'
+                            } : {
+                                padding: '24px'
+                            }}>
+                                <div style={{
+                                    marginBottom: '16px',
+                                    padding: '14px 16px',
+                                    background: '#eef2f6',
+                                    border: '1px solid #d8dee6',
+                                    borderRadius: '10px',
+                                    color: '#475569',
+                                    fontSize: isMobile ? '12px' : '14px'
+                                }}>
+                                    Placeholders: {flightAttemptNotificationPlaceholders.join(', ') || '{{attempts_remaining}}'}
+                                </div>
+
+                                <div style={isMobile ? {
+                                    marginBottom: '12px'
+                                } : {
+                                    marginBottom: '20px'
+                                }}>
+                                    <label style={isMobile ? {
+                                        display: 'block',
+                                        marginBottom: '4px',
+                                        fontWeight: 600,
+                                        color: '#374151',
+                                        fontSize: '11px'
+                                    } : {
+                                        display: 'block',
+                                        marginBottom: '8px',
+                                        fontWeight: 500,
+                                        color: '#374151',
+                                        fontSize: '14px'
+                                    }}>
+                                        Notification Body <span style={{ color: '#ef4444' }}>*</span>
+                                    </label>
+                                    <div style={isMobile ? { fontSize: '13px' } : { fontSize: '14px' }}>
+                                        <RichTextEditor
+                                            value={flightAttemptNotificationFormData.body_html}
+                                            onChange={(html) => setFlightAttemptNotificationFormData({
+                                                ...flightAttemptNotificationFormData,
+                                                body_html: html
+                                            })}
+                                            placeholder="Enter the banner body content..."
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center'
+                                }}>
+                                    <label style={isMobile ? {
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        cursor: 'pointer'
+                                    } : {
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer'
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={flightAttemptNotificationFormData.is_active}
+                                            onChange={(e) => setFlightAttemptNotificationFormData({
+                                                ...flightAttemptNotificationFormData,
+                                                is_active: e.target.checked
+                                            })}
+                                            style={isMobile ? {
+                                                width: '14px',
+                                                height: '14px',
+                                                cursor: 'pointer'
+                                            } : {
+                                                width: '18px',
+                                                height: '18px',
+                                                cursor: 'pointer'
+                                            }}
+                                        />
+                                        <span style={isMobile ? {
+                                            color: '#374151',
+                                            fontSize: '11px'
+                                        } : {
+                                            color: '#374151',
+                                            fontSize: '14px'
+                                        }}>Active</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="form-actions" style={isMobile ? {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                            } : {
+                                borderTop: '1px solid #e5e7eb',
+                                padding: '16px 24px',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '12px'
+                            }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    onClick={() => {
+                                        setShowEditFlightAttemptNotificationForm(false);
+                                        setSelectedFlightAttemptNotification(null);
+                                        setFlightAttemptNotificationFormData({
+                                            body_html: '',
+                                            is_active: true
+                                        });
+                                    }}
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {
+                                        padding: '8px 20px',
+                                        fontSize: '14px',
+                                        borderRadius: '6px'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary"
+                                    style={isMobile ? {
+                                        padding: '8px 12px',
+                                        fontSize: '12px',
+                                        width: '100%',
+                                        borderRadius: '4px',
+                                        height: '36px'
+                                    } : {
+                                        padding: '8px 20px',
+                                        fontSize: '14px',
+                                        borderRadius: '6px'
+                                    }}
+                                >
+                                    Save Notification
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

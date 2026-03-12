@@ -23,6 +23,101 @@ const columns = [
     { key: 'channels', label: 'Channels' },
 ];
 
+const MONTH_OPTIONS = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+];
+
+const DAY_OPTIONS = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+];
+
+const MERIDIEM_OPTIONS = ['AM', 'PM'];
+
+const EXPERIENCE_TYPE_ORDER = ['Shared', 'Private', 'Private Charter', 'Proposal'];
+
+const parseAvailabilityDate = (dateValue) => {
+    if (!dateValue) return null;
+    const parsedDate = dayjs(dateValue);
+    return parsedDate.isValid() ? parsedDate : null;
+};
+
+const getAvailabilityMonthLabel = (availability) => {
+    const parsedDate = parseAvailabilityDate(availability?.date);
+    return parsedDate ? MONTH_OPTIONS[parsedDate.month()] : '';
+};
+
+const getAvailabilityDayLabel = (availability) => {
+    const parsedDate = parseAvailabilityDate(availability?.date);
+    return parsedDate ? parsedDate.format('dddd') : '';
+};
+
+const getAvailabilityMeridiem = (availability) => {
+    const timeValue = String(availability?.time || '').trim();
+    if (!timeValue) return '';
+
+    const hour = Number.parseInt(timeValue.split(':')[0], 10);
+    if (Number.isNaN(hour)) return '';
+
+    return hour >= 12 ? 'PM' : 'AM';
+};
+
+const getAvailabilityExperienceTypes = (availability) => {
+    const experienceTypes = new Set();
+
+    if (availability?.flight_types && availability.flight_types !== 'All') {
+        availability.flight_types
+            .split(',')
+            .map((type) => type.trim())
+            .filter(Boolean)
+            .forEach((type) => experienceTypes.add(type));
+    }
+
+    if (availability?.voucher_types) {
+        const voucherTypes = typeof availability.voucher_types === 'string'
+            ? availability.voucher_types.split(',').map((type) => type.trim()).filter(Boolean)
+            : availability.voucher_types;
+
+        voucherTypes.forEach((voucherType) => {
+            const lowerVoucherType = voucherType.toLowerCase();
+            if (lowerVoucherType.includes('private charter')) {
+                experienceTypes.add('Private Charter');
+            }
+            if (lowerVoucherType.includes('proposal')) {
+                experienceTypes.add('Proposal');
+            }
+        });
+    }
+
+    return Array.from(experienceTypes).sort((first, second) => {
+        const firstIndex = EXPERIENCE_TYPE_ORDER.indexOf(first);
+        const secondIndex = EXPERIENCE_TYPE_ORDER.indexOf(second);
+
+        if (firstIndex === -1 && secondIndex === -1) {
+            return first.localeCompare(second);
+        }
+        if (firstIndex === -1) return 1;
+        if (secondIndex === -1) return -1;
+        return firstIndex - secondIndex;
+    });
+};
+
 const ActivityAvailabilitiesPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -35,7 +130,9 @@ const ActivityAvailabilitiesPage = () => {
     const [selectedFlightTypesForDelete, setSelectedFlightTypesForDelete] = useState([]);
     const [loading, setLoading] = useState(false);
     const [filters, setFilters] = useState({
-        timeMulti: [],
+        monthMulti: [],
+        dayOfWeekMulti: [],
+        meridiemMulti: [],
         experienceMulti: [],
     });
 
@@ -106,97 +203,113 @@ const ActivityAvailabilitiesPage = () => {
         setSelectedRows(prev => prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]);
     };
 
-    // Get unique time values from availabilities
-    const uniqueTimes = useMemo(() => {
-        const times = new Set();
-        availabilities.forEach(avail => {
-            if (avail.time) {
-                const timeStr = avail.time.slice(0, 5); // Get HH:mm format
-                times.add(timeStr);
+    const uniqueMonths = useMemo(() => {
+        const months = new Set();
+        availabilities.forEach((availability) => {
+            const monthLabel = getAvailabilityMonthLabel(availability);
+            if (monthLabel) {
+                months.add(monthLabel);
             }
         });
-        return Array.from(times).sort();
+
+        return MONTH_OPTIONS.filter((month) => months.has(month));
     }, [availabilities]);
 
-    // Get unique experience values from availabilities
+    const uniqueDaysOfWeek = useMemo(() => {
+        const days = new Set();
+        availabilities.forEach((availability) => {
+            const dayLabel = getAvailabilityDayLabel(availability);
+            if (dayLabel) {
+                days.add(dayLabel);
+            }
+        });
+
+        return DAY_OPTIONS.filter((day) => days.has(day));
+    }, [availabilities]);
+
+    const uniqueMeridiems = useMemo(() => {
+        const meridiems = new Set();
+        availabilities.forEach((availability) => {
+            const meridiem = getAvailabilityMeridiem(availability);
+            if (meridiem) {
+                meridiems.add(meridiem);
+            }
+        });
+
+        return MERIDIEM_OPTIONS.filter((meridiem) => meridiems.has(meridiem));
+    }, [availabilities]);
+
     const uniqueExperiences = useMemo(() => {
         const experiences = new Set();
-        availabilities.forEach(avail => {
-            // Check flight_types
-            if (avail.flight_types && avail.flight_types !== 'All') {
-                const types = avail.flight_types.split(',').map(t => t.trim()).filter(Boolean);
-                types.forEach(type => experiences.add(type));
-            }
-            // Check voucher_types for Private Charter and Proposal
-            if (avail.voucher_types) {
-                const voucherTypes = typeof avail.voucher_types === 'string' 
-                    ? avail.voucher_types.split(',').map(t => t.trim()) 
-                    : avail.voucher_types;
-                voucherTypes.forEach(vt => {
-                    if (vt.toLowerCase().includes('private charter')) {
-                        experiences.add('Private Charter');
-                    }
-                    if (vt.toLowerCase().includes('proposal')) {
-                        experiences.add('Proposal');
-                    }
-                });
-            }
+        availabilities.forEach((availability) => {
+            getAvailabilityExperienceTypes(availability).forEach((experienceType) => {
+                experiences.add(experienceType);
+            });
         });
-        return Array.from(experiences).sort();
+
+        return Array.from(experiences).sort((first, second) => {
+            const firstIndex = EXPERIENCE_TYPE_ORDER.indexOf(first);
+            const secondIndex = EXPERIENCE_TYPE_ORDER.indexOf(second);
+
+            if (firstIndex === -1 && secondIndex === -1) {
+                return first.localeCompare(second);
+            }
+            if (firstIndex === -1) return 1;
+            if (secondIndex === -1) return -1;
+            return firstIndex - secondIndex;
+        });
     }, [availabilities]);
 
-    // Filter availabilities based on selected filters
     const filteredAvailabilities = useMemo(() => {
-        // If no filters are selected, return all availabilities
-        if (filters.timeMulti.length === 0 && filters.experienceMulti.length === 0) {
-            return availabilities;
-        }
+        const today = dayjs().startOf('day');
+        const currentMonthIndex = today.month();
+        const selectedPastMonths = new Set(
+            filters.monthMulti.filter((monthLabel) => MONTH_OPTIONS.indexOf(monthLabel) !== -1 && MONTH_OPTIONS.indexOf(monthLabel) < currentMonthIndex)
+        );
 
-        return availabilities.filter(avail => {
-            // Time filter
-            if (filters.timeMulti.length > 0) {
-                const availTime = avail.time ? avail.time.slice(0, 5) : '';
-                if (!filters.timeMulti.includes(availTime)) {
+        return availabilities.filter((availability) => {
+            const availabilityDate = parseAvailabilityDate(availability.date);
+            const availabilityMonth = getAvailabilityMonthLabel(availability);
+            const availabilityDay = getAvailabilityDayLabel(availability);
+            const availabilityMeridiem = getAvailabilityMeridiem(availability);
+            const availabilityExperienceTypes = getAvailabilityExperienceTypes(availability);
+
+            if (availabilityDate && availabilityDate.isBefore(today, 'day')) {
+                const monthOverridesTodayCutoff = availabilityMonth && selectedPastMonths.has(availabilityMonth);
+                if (!monthOverridesTodayCutoff) {
                     return false;
                 }
             }
 
-            // Experience filter
-            if (filters.experienceMulti.length > 0) {
-                let matchesExperience = false;
+            if (filters.monthMulti.length > 0 && !filters.monthMulti.includes(availabilityMonth)) {
+                return false;
+            }
 
-                // Check flight_types
-                if (avail.flight_types && avail.flight_types !== 'All') {
-                    const types = avail.flight_types.split(',').map(t => t.trim()).filter(Boolean);
-                    if (types.some(type => filters.experienceMulti.includes(type))) {
-                        matchesExperience = true;
-                    }
-                }
+            if (filters.dayOfWeekMulti.length > 0 && !filters.dayOfWeekMulti.includes(availabilityDay)) {
+                return false;
+            }
 
-                // Check voucher_types for Private Charter and Proposal
-                if (!matchesExperience && avail.voucher_types) {
-                    const voucherTypes = typeof avail.voucher_types === 'string' 
-                        ? avail.voucher_types.split(',').map(t => t.trim()) 
-                        : avail.voucher_types;
-                    
-                    if (filters.experienceMulti.includes('Private Charter') && 
-                        voucherTypes.some(vt => vt.toLowerCase().includes('private charter'))) {
-                        matchesExperience = true;
-                    }
-                    if (filters.experienceMulti.includes('Proposal') && 
-                        voucherTypes.some(vt => vt.toLowerCase().includes('proposal'))) {
-                        matchesExperience = true;
-                    }
-                }
+            if (filters.meridiemMulti.length > 0 && !filters.meridiemMulti.includes(availabilityMeridiem)) {
+                return false;
+            }
 
-                if (!matchesExperience) {
-                    return false;
-                }
+            if (
+                filters.experienceMulti.length > 0 &&
+                !availabilityExperienceTypes.some((experienceType) => filters.experienceMulti.includes(experienceType))
+            ) {
+                return false;
             }
 
             return true;
         });
     }, [availabilities, filters]);
+
+    const activeFilterCount = useMemo(() => (
+        filters.monthMulti.length +
+        filters.dayOfWeekMulti.length +
+        filters.meridiemMulti.length +
+        filters.experienceMulti.length
+    ), [filters]);
 
     const handleCheckboxFilterChange = (field, value) => {
         setFilters(prev => {
@@ -212,7 +325,9 @@ const ActivityAvailabilitiesPage = () => {
 
     const handleClearFilters = () => {
         setFilters({
-            timeMulti: [],
+            monthMulti: [],
+            dayOfWeekMulti: [],
+            meridiemMulti: [],
             experienceMulti: [],
         });
     };
@@ -396,38 +511,58 @@ const ActivityAvailabilitiesPage = () => {
                         variant="outlined"
                         onClick={() => setFilterDialogOpen(true)}
                         sx={{ 
-                            borderColor: (filters.timeMulti.length > 0 || filters.experienceMulti.length > 0) ? 'primary.main' : 'grey.400',
-                            color: (filters.timeMulti.length > 0 || filters.experienceMulti.length > 0) ? 'primary.main' : 'inherit'
+                            borderColor: activeFilterCount > 0 ? 'primary.main' : 'grey.400',
+                            color: activeFilterCount > 0 ? 'primary.main' : 'inherit'
                         }}
                     >
                         Filter
-                        {(filters.timeMulti.length > 0 || filters.experienceMulti.length > 0) && (
+                        {activeFilterCount > 0 && (
                             <Chip 
-                                label={filters.timeMulti.length + filters.experienceMulti.length} 
+                                label={activeFilterCount} 
                                 size="small" 
                                 sx={{ ml: 1, height: 20, minWidth: 20 }}
                             />
                         )}
                     </Button>
                     {/* Show active filters as chips */}
-                    {(filters.timeMulti.length > 0 || filters.experienceMulti.length > 0) && (
+                    {activeFilterCount > 0 && (
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {filters.timeMulti.map(time => (
+                            {filters.monthMulti.map((month) => (
                                 <Chip
-                                    key={`time-${time}`}
+                                    key={`month-${month}`}
                                     size="small"
-                                    label={`Time: ${time}`}
-                                    onDelete={() => handleCheckboxFilterChange('timeMulti', time)}
+                                    label={`Month: ${month}`}
+                                    onDelete={() => handleCheckboxFilterChange('monthMulti', month)}
                                     color="primary"
                                     variant="outlined"
                                 />
                             ))}
-                            {filters.experienceMulti.map(exp => (
+                            {filters.dayOfWeekMulti.map((day) => (
                                 <Chip
-                                    key={`exp-${exp}`}
+                                    key={`day-${day}`}
                                     size="small"
-                                    label={`Experience: ${exp}`}
-                                    onDelete={() => handleCheckboxFilterChange('experienceMulti', exp)}
+                                    label={`Day: ${day}`}
+                                    onDelete={() => handleCheckboxFilterChange('dayOfWeekMulti', day)}
+                                    color="primary"
+                                    variant="outlined"
+                                />
+                            ))}
+                            {filters.meridiemMulti.map((meridiem) => (
+                                <Chip
+                                    key={`meridiem-${meridiem}`}
+                                    size="small"
+                                    label={`AM/PM: ${meridiem}`}
+                                    onDelete={() => handleCheckboxFilterChange('meridiemMulti', meridiem)}
+                                    color="primary"
+                                    variant="outlined"
+                                />
+                            ))}
+                            {filters.experienceMulti.map((experience) => (
+                                <Chip
+                                    key={`exp-${experience}`}
+                                    size="small"
+                                    label={`Experience: ${experience}`}
+                                    onDelete={() => handleCheckboxFilterChange('experienceMulti', experience)}
                                     color="primary"
                                     variant="outlined"
                                 />
@@ -493,60 +628,9 @@ const ActivityAvailabilitiesPage = () => {
                             <TableCell>{row.total_booked}</TableCell>
                             <TableCell>
                                 {(() => {
-                                    // Check voucher_types to determine which chips to show
-                                    const voucherTypes = row.voucher_types ? (typeof row.voucher_types === 'string' ? row.voucher_types.split(',').map(t => t.trim()) : row.voucher_types) : [];
-                                    const hasProposalFlight = voucherTypes.some(vt => vt.toLowerCase().includes('proposal flight'));
-                                    const hasPrivateCharter = voucherTypes.some(vt => vt.toLowerCase().includes('private charter'));
-                                    
-                                    // Parse flight_types
-                                    const flightTypes = row.flight_types && row.flight_types !== 'All' 
-                                        ? row.flight_types.split(',').map(t => t.trim()).filter(Boolean)
-                                        : [];
-                                    
-                                    // Build chips array - show both voucher types AND flight types
-                                    const chips = [];
-                                    
-                                    // Add Private Charter chip if exists
-                                    if (hasPrivateCharter) {
-                                        chips.push(
-                                                <Chip 
-                                                    key="private-charter"
-                                                    label="Private Charter" 
-                                                    size="small" 
-                                                    color="primary" 
-                                                    variant="outlined"
-                                                />
-                                        );
-                                    }
-                                    
-                                    // Add Proposal chip if exists
-                                    if (hasProposalFlight) {
-                                        chips.push(
-                                            <Chip 
-                                                key="proposal"
-                                                label="Proposal" 
-                                                size="small" 
-                                                color="primary" 
-                                                variant="outlined"
-                                            />
-                                        );
-                                    }
-                                    
-                                    // Add flight types chips (Shared, Private, etc.)
-                                    flightTypes.forEach((type, index) => {
-                                        chips.push(
-                                            <Chip 
-                                                key={`flight-type-${index}`}
-                                                label={type.trim()} 
-                                                size="small" 
-                                                color="primary" 
-                                                variant="outlined"
-                                            />
-                                        );
-                                    });
-                                    
-                                    // If no chips, show "All"
-                                    if (chips.length === 0) {
+                                    const experienceTypes = getAvailabilityExperienceTypes(row);
+
+                                    if (experienceTypes.length === 0) {
                                         return (
                                             <Chip 
                                                 label="All" 
@@ -556,11 +640,18 @@ const ActivityAvailabilitiesPage = () => {
                                             />
                                         );
                                     }
-                                    
-                                    // Return chips in a flex container
+
                                     return (
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                            {chips}
+                                            {experienceTypes.map((experienceType) => (
+                                                <Chip
+                                                    key={`${row.id}-${experienceType}`}
+                                                    label={experienceType}
+                                                    size="small"
+                                                    color="primary"
+                                                    variant="outlined"
+                                                />
+                                            ))}
                                         </div>
                                     );
                                 })()}
@@ -595,10 +686,6 @@ const ActivityAvailabilitiesPage = () => {
             </div>
             )}
             <CreateAvailabilitiesModal open={modalOpen} onClose={() => setModalOpen(false)} activityName={activityName} activityId={id} onCreated={() => {
-                axios.get(`/api/activity/${id}/availabilities`).then(res => {
-                    if (res.data.success) setAvailabilities(res.data.data);
-                });
-            }} onCreated={() => {
                 setLoading(true);
                 axios.get(`/api/activity/${id}/availabilities`, { timeout: 60000 }).then(res => {
                     if (res.data.success) setAvailabilities(res.data.data);
@@ -620,37 +707,73 @@ const ActivityAvailabilitiesPage = () => {
                 </DialogTitle>
                 <DialogContent dividers>
                     <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                        Time
+                        Month
                     </Typography>
                     <FormGroup sx={{ mb: 2 }}>
-                        {uniqueTimes.map(time => (
+                        {uniqueMonths.map((month) => (
                             <FormControlLabel
-                                key={time}
+                                key={month}
                                 control={
                                     <Checkbox
-                                        checked={filters.timeMulti.includes(time)}
-                                        onChange={() => handleCheckboxFilterChange('timeMulti', time)}
+                                        checked={filters.monthMulti.includes(month)}
+                                        onChange={() => handleCheckboxFilterChange('monthMulti', month)}
                                     />
                                 }
-                                label={time}
+                                label={month}
                             />
                         ))}
                     </FormGroup>
 
                     <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                        Experience
+                        Day of Week
                     </Typography>
-                    <FormGroup>
-                        {uniqueExperiences.map(exp => (
+                    <FormGroup sx={{ mb: 2 }}>
+                        {uniqueDaysOfWeek.map((day) => (
                             <FormControlLabel
-                                key={exp}
+                                key={day}
                                 control={
                                     <Checkbox
-                                        checked={filters.experienceMulti.includes(exp)}
-                                        onChange={() => handleCheckboxFilterChange('experienceMulti', exp)}
+                                        checked={filters.dayOfWeekMulti.includes(day)}
+                                        onChange={() => handleCheckboxFilterChange('dayOfWeekMulti', day)}
                                     />
                                 }
-                                label={exp}
+                                label={day}
+                            />
+                        ))}
+                    </FormGroup>
+
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                        AM / PM
+                    </Typography>
+                    <FormGroup sx={{ mb: 2 }}>
+                        {uniqueMeridiems.map((meridiem) => (
+                            <FormControlLabel
+                                key={meridiem}
+                                control={
+                                    <Checkbox
+                                        checked={filters.meridiemMulti.includes(meridiem)}
+                                        onChange={() => handleCheckboxFilterChange('meridiemMulti', meridiem)}
+                                    />
+                                }
+                                label={meridiem}
+                            />
+                        ))}
+                    </FormGroup>
+
+                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                        Experience Type
+                    </Typography>
+                    <FormGroup>
+                        {uniqueExperiences.map((experience) => (
+                            <FormControlLabel
+                                key={experience}
+                                control={
+                                    <Checkbox
+                                        checked={filters.experienceMulti.includes(experience)}
+                                        onChange={() => handleCheckboxFilterChange('experienceMulti', experience)}
+                                    />
+                                }
+                                label={experience}
                             />
                         ))}
                     </FormGroup>
