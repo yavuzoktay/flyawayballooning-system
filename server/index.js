@@ -7717,7 +7717,7 @@ const buildCustomerPortalUpsellOffer = async ({
                 eligible: true,
                 mode: 'private_upgrade',
                 title: '🎈Make it Private',
-                description: `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional £${privateUpgradeDifference.toFixed(2)}.`,
+                description: '',
                 buttonLabel: 'Upgrade',
                 requiredPassengerCount: slotMetrics.remainingSeats,
                 totalCharge: privateUpgradeDifference,

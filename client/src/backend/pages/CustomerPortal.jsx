@@ -85,6 +85,22 @@ const normalizeUpsellOfferTitle = (offer) => {
     return String(offer.title || '').trim();
 };
 
+const normalizeUpsellOfferButtonLabel = (offer) => {
+    if (!offer) {
+        return '';
+    }
+
+    if (offer.mode === 'private_upgrade') {
+        return 'Upgrade';
+    }
+
+    if (offer.mode === 'single_discount') {
+        return 'Add Passenger';
+    }
+
+    return String(offer.buttonLabel || '').trim();
+};
+
 const normalizeUpsellOfferDescription = (offer) => {
     if (!offer) {
         return '';
@@ -95,7 +111,7 @@ const normalizeUpsellOfferDescription = (offer) => {
     }
 
     if (offer.mode === 'private_upgrade') {
-        return `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional ${formatPounds(offer.totalCharge)}.`;
+        return '';
     }
 
     return String(offer.description || '').trim();
@@ -231,6 +247,12 @@ const CustomerPortal = () => {
             cursor: 'not-allowed'
         }
     };
+    const mobileBookingDetailSx = (order, extraMobileSx = {}) => ({
+        '@media (max-width:768px)': {
+            order,
+            ...extraMobileSx
+        }
+    });
 
     const fetchBookingData = async ({ silent = false, refreshPaymentHistory = true } = {}) => {
         if (!token) {
@@ -960,6 +982,7 @@ const CustomerPortal = () => {
     const upsellOffer = bookingData?.upsell_offer || null;
     const isPrivateUpgradeOffer = upsellOffer?.mode === 'private_upgrade';
     const upsellOfferTitle = normalizeUpsellOfferTitle(upsellOffer);
+    const upsellOfferButtonLabel = normalizeUpsellOfferButtonLabel(upsellOffer);
     const upsellOfferDescription = normalizeUpsellOfferDescription(upsellOffer);
     const inviteFriendsDescription = bookingData?.invite_friends?.description === 'Share a ready-made invite so your friends can join the same shared balloon flight.'
         ? 'Share an invite and give your friends 10% off their balloon flight.'
@@ -981,9 +1004,11 @@ const CustomerPortal = () => {
         !isFlightVoucherSection &&
         !isFullyRefunded
     );
+    const shouldHideInviteFriendsForSingleDiscount = upsellOffer?.mode === 'single_discount';
     const shouldShowInviteFriends = Boolean(
         bookingData?.invite_friends?.visible &&
         bookingData?.invite_friends?.availableSpaces !== 0 &&
+        !shouldHideInviteFriendsForSingleDiscount &&
         !isFullyRefunded
     );
 
@@ -1042,7 +1067,7 @@ const CustomerPortal = () => {
                             }
                         }}
                     >
-                        <Box>
+                        <Box sx={mobileBookingDetailSx(1)}>
                             <Typography variant="body2" color="text.secondary">
                                 {(() => {
                                     const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
@@ -1091,13 +1116,13 @@ const CustomerPortal = () => {
                                 );
                             })()}
                         </Box>
-                        <Box>
+                        <Box sx={mobileBookingDetailSx(2)}>
                             <Typography variant="body2" color="text.secondary">Status</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {bookingData.status || 'Open'}
                             </Typography>
                         </Box>
-                        <Box>
+                        <Box sx={mobileBookingDetailSx(3)}>
                             <Typography variant="body2" color="text.secondary">Flight Date</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {(() => {
@@ -1124,7 +1149,7 @@ const CustomerPortal = () => {
                                 })()}
                             </Typography>
                         </Box>
-                        <Box>
+                        <Box sx={mobileBookingDetailSx(4)}>
                             <Typography variant="body2" color="text.secondary">Location</Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
@@ -1211,7 +1236,7 @@ const CustomerPortal = () => {
                                 })()}
                             </Box>
                         </Box>
-                        <Box>
+                        <Box sx={mobileBookingDetailSx(7, { gridColumn: '1 / -1' })}>
                             <Typography variant="body2" color="text.secondary">Flight Attempts</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: shouldInlineFlightAttemptMessage ? 0.35 : 2 }}>
                                 {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
@@ -1240,7 +1265,7 @@ const CustomerPortal = () => {
                                 />
                             )}
                         </Box>
-                        <Box>
+                        <Box sx={mobileBookingDetailSx(6)}>
                             <Typography variant="body2" color="text.secondary">Voucher Type</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {(() => {
@@ -1297,7 +1322,7 @@ const CustomerPortal = () => {
                                 })()}
                             </Typography>
                         </Box>
-                        <Box>
+                        <Box sx={mobileBookingDetailSx(5)}>
                             <Typography variant="body2" color="text.secondary">Expiry Date</Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
@@ -1628,17 +1653,19 @@ const CustomerPortal = () => {
                                 >
                                     {upsellOfferTitle}
                                 </Typography>
-                                <Typography
-                                    variant="body1"
-                                    sx={{
-                                        mb: 1.5,
-                                        color: isPrivateUpgradeOffer
-                                            ? 'rgba(248,250,252,0.88)'
-                                            : inviteSectionPalette.body
-                                    }}
-                                >
-                                    {upsellOfferDescription}
-                                </Typography>
+                                {Boolean(upsellOfferDescription) && (
+                                    <Typography
+                                        variant="body1"
+                                        sx={{
+                                            mb: 1.5,
+                                            color: isPrivateUpgradeOffer
+                                                ? 'rgba(248,250,252,0.88)'
+                                                : inviteSectionPalette.body
+                                        }}
+                                    >
+                                        {upsellOfferDescription}
+                                    </Typography>
+                                )}
                             </Box>
                             <Button
                                 variant="contained"
@@ -1658,7 +1685,7 @@ const CustomerPortal = () => {
                                     }
                                 }}
                             >
-                                {submittingUpsell ? 'Redirecting...' : upsellOffer.buttonLabel}
+                                {submittingUpsell ? 'Redirecting...' : upsellOfferButtonLabel}
                             </Button>
                         </Box>
                     </Paper>
