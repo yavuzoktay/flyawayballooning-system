@@ -1004,11 +1004,11 @@ const CustomerPortal = () => {
         !isFlightVoucherSection &&
         !isFullyRefunded
     );
-    const shouldHideInviteFriendsForSingleDiscount = upsellOffer?.mode === 'single_discount';
+    const shouldHideInviteFriends = ['single_discount', 'private_upgrade'].includes(upsellOffer?.mode);
     const shouldShowInviteFriends = Boolean(
         bookingData?.invite_friends?.visible &&
         bookingData?.invite_friends?.availableSpaces !== 0 &&
-        !shouldHideInviteFriendsForSingleDiscount &&
+        !shouldHideInviteFriends &&
         !isFullyRefunded
     );
 
@@ -2065,6 +2065,25 @@ const CustomerPortal = () => {
                         )}
                     </Paper>
                 ))}
+
+                <Box
+                    sx={{
+                        py: 1,
+                        textAlign: 'center',
+                        color: inviteSectionPalette.heading
+                    }}
+                >
+                    <Typography
+                        variant="body1"
+                        sx={{
+                            fontSize: { xs: '1rem', sm: '1.05rem' },
+                            fontWeight: 500,
+                            letterSpacing: '0.01em'
+                        }}
+                    >
+                        Powered by Fly Away Ballooning 🎈
+                    </Typography>
+                </Box>
             </Container>
 
             <CustomerPortalUpsellModal
