@@ -7622,13 +7622,13 @@ const buildInviteFriendsData = async ({
         : null;
 
     return {
-        visible: true,
+        visible: !isScheduled || remainingSeats > 0,
         enabled: isEnabled,
         disabled: !isEnabled,
         availableSpaces: remainingSeats,
         capacity: slotMetrics.capacity,
         title: isScheduled
-            ? `🎈 Your balloon flight has ${remainingSeats} space${remainingSeats === 1 ? '' : 's'} left`
+            ? `🎈 ${remainingSeats} Space${remainingSeats === 1 ? '' : 's'} Left on Your Flight`
             : 'Invite Friends',
         description: !isScheduled
             ? 'Invite Friends becomes available once your shared flight has been scheduled.'

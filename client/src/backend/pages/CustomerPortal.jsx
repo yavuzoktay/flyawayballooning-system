@@ -856,9 +856,7 @@ const CustomerPortal = () => {
         );
     }
 
-    const inviteFriendsTitle = bookingData?.invite_friends?.title?.startsWith('Your balloon flight')
-        ? `🎈 ${bookingData.invite_friends.title}`
-        : bookingData?.invite_friends?.title;
+    const inviteFriendsTitle = bookingData?.invite_friends?.title;
     const inviteFriendsDescription = bookingData?.invite_friends?.description === 'Share a ready-made invite so your friends can join the same shared balloon flight.'
         ? 'Share an invite and give your friends 10% off their balloon flight.'
         : bookingData?.invite_friends?.description;
@@ -874,6 +872,17 @@ const CustomerPortal = () => {
             icon: <SmsIcon fontSize="small" />
         }
     ];
+    const shouldInlineAttemptSixPlusMessage = Boolean(
+        bookingData?.flight_attempt_notification?.visible &&
+        bookingData?.flight_attempt_notification?.attemptBucket === 'attempt_6_plus' &&
+        !isFlightVoucherSection &&
+        !isFullyRefunded
+    );
+    const shouldShowInviteFriends = Boolean(
+        bookingData?.invite_friends?.visible &&
+        bookingData?.invite_friends?.availableSpaces !== 0 &&
+        !isFullyRefunded
+    );
 
     return (
             <>
@@ -903,7 +912,7 @@ const CustomerPortal = () => {
                     </Box>
                 </Box>
 
-                {bookingData?.flight_attempt_notification?.visible && !isFlightVoucherSection && !isFullyRefunded && (
+                {bookingData?.flight_attempt_notification?.visible && !isFlightVoucherSection && !isFullyRefunded && !shouldInlineAttemptSixPlusMessage && (
                     <Paper
                         elevation={0}
                         sx={{
@@ -1145,11 +1154,32 @@ const CustomerPortal = () => {
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Flight Attempts</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: shouldInlineAttemptSixPlusMessage ? 0.35 : 2 }}>
                                 {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
                                     ? bookingData.flight_attempts
                                     : 0}
                             </Typography>
+                            {shouldInlineAttemptSixPlusMessage && (
+                                <Box
+                                    sx={{
+                                        mb: 2,
+                                        color: '#475569',
+                                        '& p': {
+                                            mt: 0,
+                                            mb: 1,
+                                            lineHeight: 1.6
+                                        },
+                                        '& p:last-child': {
+                                            mb: 0
+                                        },
+                                        '& strong': {
+                                            color: '#0f172a',
+                                            fontWeight: 700
+                                        }
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: bookingData.flight_attempt_notification.bodyHtml }}
+                                />
+                            )}
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Voucher Type</Typography>
@@ -1608,7 +1638,7 @@ const CustomerPortal = () => {
                     </Paper>
                 )}
 
-                {bookingData?.invite_friends?.visible && !isFullyRefunded && (
+                {shouldShowInviteFriends && (
                     <Paper
                         elevation={0}
                         sx={{
