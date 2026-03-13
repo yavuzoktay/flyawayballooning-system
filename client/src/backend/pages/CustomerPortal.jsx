@@ -1569,17 +1569,17 @@ const CustomerPortal = () => {
                                 >
                                     {bookingData.upsell_offer.description}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        fontWeight: 700,
-                                        color: bookingData.upsell_offer.mode === 'private_upgrade' ? '#fbbf24' : '#9a3412'
-                                    }}
-                                >
-                                    {bookingData.upsell_offer.mode === 'private_upgrade'
-                                        ? `Private balloon upgrade for £${Number(bookingData.upsell_offer.totalCharge || 0).toFixed(2)}`
-                                        : `Save £${Number(bookingData.upsell_offer.discountAmount || 0).toFixed(2)} and add a seat for £${Number(bookingData.upsell_offer.totalCharge || 0).toFixed(2)}`}
-                                </Typography>
+                                {bookingData.upsell_offer.mode === 'private_upgrade' && (
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            fontWeight: 700,
+                                            color: '#fbbf24'
+                                        }}
+                                    >
+                                        {`Private balloon upgrade for £${Number(bookingData.upsell_offer.totalCharge || 0).toFixed(2)}`}
+                                    </Typography>
+                                )}
                             </Box>
                             <Button
                                 variant="contained"

@@ -7748,8 +7748,8 @@ const buildCustomerPortalUpsellOffer = async ({
     return {
         eligible: true,
         mode: 'single_discount',
-        title: 'Bring a friend and save',
-        description: `Add another passenger to your flight and you’ll save £${discountAmount.toFixed(2)} on their ticket.`,
+        title: '🎈Bring a Friend & Save',
+        description: `Add another passenger to your flight for £${discountedSeatPrice.toFixed(2)} and save £${discountAmount.toFixed(2)}.`,
         buttonLabel: 'Add Passenger',
         requiredPassengerCount: 1,
         totalCharge: discountedSeatPrice,
