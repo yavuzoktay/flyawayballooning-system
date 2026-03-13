@@ -50,9 +50,9 @@ const CustomerPortalUpsellModal = ({
         }
 
         return [
-            { label: 'Standard seat price', value: `£${Number(offer.regularSeatPrice || 0).toFixed(2)}` },
-            { label: 'Portal saving', value: `-£${Number(offer.discountAmount || 0).toFixed(2)}` },
-            { label: 'Amount to pay now', value: `£${Number(offer.totalCharge || 0).toFixed(2)}` }
+            { label: 'Standard price', value: `£${Number(offer.regularSeatPrice || 0).toFixed(2)}` },
+            { label: 'Saving', value: `-£${Number(offer.discountAmount || 0).toFixed(2)}` },
+            { label: 'Amount', value: `£${Number(offer.totalCharge || 0).toFixed(2)}` }
         ];
     }, [offer, requiredPassengerCount]);
 
@@ -210,7 +210,7 @@ const CustomerPortalUpsellModal = ({
                     disabled={submitting}
                     sx={{ textTransform: 'none', fontWeight: 700 }}
                 >
-                    {submitting ? 'Redirecting...' : `Pay £${Number(offer?.totalCharge || 0).toFixed(2)}`}
+                    {submitting ? 'Redirecting...' : (offer?.mode === 'private_upgrade' ? `Pay £${Number(offer?.totalCharge || 0).toFixed(2)}` : 'Add')}
                 </Button>
             </DialogActions>
         </Dialog>
