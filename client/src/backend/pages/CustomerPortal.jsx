@@ -69,6 +69,9 @@ const normalizeInviteFriendsTitle = (title, availableSpaces) => {
 
 const formatPounds = (value) => `£${Number(value || 0).toFixed(2)}`;
 
+const getPrivateUpgradeDescription = (offer) =>
+    `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional ${formatPounds(offer?.totalCharge || 0)}.`;
+
 const normalizeUpsellOfferTitle = (offer) => {
     if (!offer) {
         return '';
@@ -111,7 +114,7 @@ const normalizeUpsellOfferDescription = (offer) => {
     }
 
     if (offer.mode === 'private_upgrade') {
-        return '';
+        return String(offer.description || getPrivateUpgradeDescription(offer)).trim();
     }
 
     return String(offer.description || '').trim();

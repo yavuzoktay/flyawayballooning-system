@@ -6983,6 +6983,17 @@ const SHARED_VOUCHER_ALIAS_MAP = {
     'any day flight': 'any_day_flight_price',
     'any day': 'any_day_flight_price'
 };
+const CUSTOMER_PORTAL_SHARED_PRICE_FALLBACK_MAP = {
+    'weekday morning': 180,
+    'weekday morning flight': 180,
+    'weekday morning voucher': 180,
+    'flexible weekday': 200,
+    'flexible weekday flight': 200,
+    'flexible weekday voucher': 200,
+    'flexible weekday (shared flight)': 200,
+    'any day flight': 220,
+    'any day': 220
+};
 
 let sharedVoucherPriceCache = {};
 let privateCharterPriceCache = {};
@@ -7161,6 +7172,83 @@ const getSharedVoucherPriceFromCache = (voucherTitle, location) => {
     }
     const fallback = sharedVoucherPriceCache[DEFAULT_LOCATION_KEY];
     return fallback ? fallback[normalizedTitle] || null : null;
+};
+
+const resolveCustomerPortalSharedSeatPrice = async (voucherTitle, location) => {
+    const normalizedTitle = normalizeVoucherTitle(voucherTitle);
+    if (!normalizedTitle) return null;
+
+    let resolvedPrice = getSharedVoucherPriceFromCache(normalizedTitle, location);
+    if (resolvedPrice != null) {
+        return roundCurrency(resolvedPrice);
+    }
+
+    try {
+        await refreshActivityPricingCache(true);
+        resolvedPrice = getSharedVoucherPriceFromCache(normalizedTitle, location);
+        if (resolvedPrice != null) {
+            return roundCurrency(resolvedPrice);
+        }
+    } catch (error) {
+        console.warn('Customer Portal - Shared pricing cache refresh failed:', error?.message || error);
+    }
+
+    const activityQueries = location
+        ? [
+            {
+                sql: `
+                    SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price
+                    FROM activity
+                    WHERE status = 'Live' AND location = ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                `,
+                params: [location]
+            },
+            {
+                sql: `
+                    SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price
+                    FROM activity
+                    WHERE status = 'Live'
+                    ORDER BY id DESC
+                    LIMIT 1
+                `,
+                params: []
+            }
+        ]
+        : [
+            {
+                sql: `
+                    SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price
+                    FROM activity
+                    WHERE status = 'Live'
+                    ORDER BY id DESC
+                    LIMIT 1
+                `,
+                params: []
+            }
+        ];
+
+    for (const query of activityQueries) {
+        try {
+            const rows = await runPoolQuery(query.sql, query.params);
+            if (!rows || rows.length === 0) continue;
+            const rowPricing = buildSharedPricingEntry(rows[0]);
+            const rowPrice = rowPricing[normalizedTitle];
+            if (rowPrice != null) {
+                return roundCurrency(rowPrice);
+            }
+        } catch (error) {
+            console.warn('Customer Portal - Shared pricing lookup query failed:', error?.message || error);
+        }
+    }
+
+    const staticFallbackPrice = CUSTOMER_PORTAL_SHARED_PRICE_FALLBACK_MAP[normalizedTitle];
+    if (staticFallbackPrice != null) {
+        return roundCurrency(staticFallbackPrice);
+    }
+
+    return null;
 };
 
 const getPrivateCharterPricingFromCache = (voucherTitle, location) => {
@@ -7474,6 +7562,9 @@ const getCustomerPortalUpsellDiscount = (voucherTitle) => {
     return null;
 };
 
+const buildCustomerPortalPrivateUpgradeDescription = (amount) =>
+    `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional £${roundCurrency(amount).toFixed(2)}.`;
+
 const resolveCustomerPortalPrivateEightPassengerPrice = (voucherTitle, location) => {
     const directPricing = getPrivateCharterPricingFromCache(voucherTitle, location);
     if (directPricing && directPricing['8']) {
@@ -7687,7 +7778,7 @@ const buildCustomerPortalUpsellOffer = async ({
     }
 
     const effectiveVoucherType = voucherType || booking.voucher_type_detail || booking.voucher_type || '';
-    const regularSeatPrice = getSharedVoucherPriceFromCache(effectiveVoucherType, effectiveLocation);
+    const regularSeatPrice = await resolveCustomerPortalSharedSeatPrice(effectiveVoucherType, effectiveLocation);
     const discountAmount = getCustomerPortalUpsellDiscount(effectiveVoucherType);
     const discountedSeatPrice = regularSeatPrice != null && discountAmount != null
         ? roundCurrency(Math.max(regularSeatPrice - discountAmount, 0))
@@ -7727,7 +7818,7 @@ const buildCustomerPortalUpsellOffer = async ({
                 eligible: true,
                 mode: 'private_upgrade',
                 title: '🎈Make it Private',
-                description: '',
+                description: buildCustomerPortalPrivateUpgradeDescription(privateUpgradeDifference),
                 buttonLabel: 'Upgrade',
                 requiredPassengerCount: slotMetrics.remainingSeats,
                 totalCharge: privateUpgradeDifference,
