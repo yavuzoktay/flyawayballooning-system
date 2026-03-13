@@ -300,10 +300,6 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             return;
         }
 
-        const popup = typeof window !== 'undefined'
-            ? window.open('', '_blank', 'noopener,noreferrer')
-            : null;
-
         try {
             setIsLaunchingManualBooking(true);
             const response = await axios.post(
@@ -317,17 +313,10 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             }
 
             const bookingUrl = `${getBookingBaseUrl()}/?manualBooking=1&source=admin&manualBookingToken=${encodeURIComponent(token)}`;
-
-            if (popup && !popup.closed) {
-                popup.location.href = bookingUrl;
-            } else if (typeof window !== 'undefined') {
-                window.open(bookingUrl, '_blank', 'noopener,noreferrer');
+            if (typeof window !== 'undefined') {
+                window.location.assign(bookingUrl);
             }
         } catch (error) {
-            if (popup && !popup.closed) {
-                popup.close();
-            }
-
             console.error('Error starting manual booking:', error);
             alert(error?.response?.data?.message || error.message || 'Could not start manual booking.');
         } finally {

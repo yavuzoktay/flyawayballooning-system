@@ -872,10 +872,6 @@ const CustomerPortal = () => {
             channel: 'sms',
             label: 'SMS',
             icon: <SmsIcon fontSize="small" />
-        },
-        {
-            channel: 'copy',
-            label: 'Copy Link'
         }
     ];
 
