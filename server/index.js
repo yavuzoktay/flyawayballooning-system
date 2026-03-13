@@ -7628,12 +7628,12 @@ const buildInviteFriendsData = async ({
         availableSpaces: remainingSeats,
         capacity: slotMetrics.capacity,
         title: isScheduled
-            ? `Your balloon flight has ${remainingSeats} space${remainingSeats === 1 ? '' : 's'} left`
+            ? `🎈 Your balloon flight has ${remainingSeats} space${remainingSeats === 1 ? '' : 's'} left`
             : 'Invite Friends',
         description: !isScheduled
             ? 'Invite Friends becomes available once your shared flight has been scheduled.'
             : (remainingSeats > 0
-                ? 'Share a ready-made invite so your friends can join the same shared balloon flight.'
+                ? 'Share an invite and give your friends 10% off their balloon flight.'
                 : 'This shared flight is currently full, so Invite Friends is unavailable right now.'),
         buttonLabel: 'Invite Friends',
         discountCode: INVITE_FRIENDS_DISCOUNT_CODE,

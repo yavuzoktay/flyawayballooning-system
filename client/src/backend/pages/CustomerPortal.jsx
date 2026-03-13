@@ -11,6 +11,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import SmsIcon from '@mui/icons-material/Sms';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
 import CustomerPortalUpsellModal from '../components/CustomerPortal/CustomerPortalUpsellModal';
 
@@ -854,6 +856,29 @@ const CustomerPortal = () => {
         );
     }
 
+    const inviteFriendsTitle = bookingData?.invite_friends?.title?.startsWith('Your balloon flight')
+        ? `🎈 ${bookingData.invite_friends.title}`
+        : bookingData?.invite_friends?.title;
+    const inviteFriendsDescription = bookingData?.invite_friends?.description === 'Share a ready-made invite so your friends can join the same shared balloon flight.'
+        ? 'Share an invite and give your friends 10% off their balloon flight.'
+        : bookingData?.invite_friends?.description;
+    const inviteFriendsActions = [
+        {
+            channel: 'whatsapp',
+            label: 'WhatsApp',
+            icon: <WhatsAppIcon fontSize="small" />
+        },
+        {
+            channel: 'sms',
+            label: 'SMS',
+            icon: <SmsIcon fontSize="small" />
+        },
+        {
+            channel: 'copy',
+            label: 'Copy Link'
+        }
+    ];
+
     return (
             <>
             <CustomerPortalHeader />
@@ -1622,7 +1647,7 @@ const CustomerPortal = () => {
                                             : '#818792'
                                     }}
                                 >
-                                    {bookingData.invite_friends.title}
+                                    {inviteFriendsTitle}
                                 </Typography>
                                 <Typography
                                     variant="body1"
@@ -1633,18 +1658,7 @@ const CustomerPortal = () => {
                                             : '#98a0ab'
                                     }}
                                 >
-                                    {bookingData.invite_friends.description}
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        fontWeight: 700,
-                                        color: bookingData.invite_friends.enabled
-                                            ? inviteSectionPalette.link
-                                            : '#9da4af'
-                                    }}
-                                >
-                                    Use code {bookingData.invite_friends.discountCode} to give your friends 10% off.
+                                    {inviteFriendsDescription}
                                 </Typography>
                             </Box>
                             <Button
@@ -1719,20 +1733,18 @@ const CustomerPortal = () => {
                                         gap: 1.25
                                     }}
                                 >
-                                    {[
-                                        ['whatsapp', 'WhatsApp'],
-                                        ['sms', 'SMS'],
-                                        ['email', 'Email'],
-                                        ['copy', 'Copy Link']
-                                    ].map(([channel, label]) => (
+                                    {inviteFriendsActions.map(({ channel, label, icon }) => (
                                         <Button
                                             key={channel}
                                             variant={channel === 'copy' ? 'outlined' : 'contained'}
                                             onClick={() => handleInviteFriendsAction(channel, bookingData.invite_friends)}
+                                            aria-label={label}
                                             sx={{
                                                 textTransform: 'none',
                                                 fontWeight: 700,
                                                 borderRadius: 2,
+                                                minWidth: icon ? 56 : undefined,
+                                                px: icon ? 0 : undefined,
                                                 ...(channel === 'copy'
                                                     ? {
                                                         borderColor: inviteSectionPalette.link,
@@ -1753,7 +1765,7 @@ const CustomerPortal = () => {
                                                     })
                                             }}
                                         >
-                                            {label}
+                                            {icon || label}
                                         </Button>
                                     ))}
                                 </Box>
@@ -1775,7 +1787,7 @@ const CustomerPortal = () => {
                                 fontWeight: 600,
                                 mb: 3,
                                 '@media (max-width:600px)': {
-                                    fontSize: '1rem'
+                                    fontSize: '1.5rem'
                                 }
                             }}
                         >
