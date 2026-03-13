@@ -21,9 +21,6 @@ const createEmptyPassengers = (count) =>
 
 const formatCurrency = (amount) => `£${Number(amount || 0).toFixed(2)}`;
 
-const getPrivateUpgradeDescription = (offer) =>
-    `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional ${formatCurrency(offer?.totalCharge || 0)}.`;
-
 const getUpsellModalTitle = (offer) => {
     if (offer?.mode === 'private_upgrade') {
         return '🎈Make it Private';
@@ -38,7 +35,7 @@ const getUpsellDescription = (offer) => {
     }
 
     if (offer.mode === 'private_upgrade') {
-        return String(offer.description || getPrivateUpgradeDescription(offer)).trim();
+        return '';
     }
 
     if (offer.mode === 'single_discount') {
