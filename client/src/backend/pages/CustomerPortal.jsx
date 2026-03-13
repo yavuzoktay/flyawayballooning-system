@@ -41,6 +41,32 @@ const buildApiUrl = (path) => {
     return `${base}/${path}`;
 };
 
+const normalizeInviteFriendsTitle = (title, availableSpaces) => {
+    const numericSpaces = Number(availableSpaces);
+    const formatTitle = (count) => `🎈 ${count} Space${count === 1 ? '' : 's'} Left on Your Flight`;
+
+    if (Number.isFinite(numericSpaces) && numericSpaces > 0) {
+        return formatTitle(numericSpaces);
+    }
+
+    const trimmedTitle = typeof title === 'string' ? title.trim() : '';
+    if (!trimmedTitle) {
+        return trimmedTitle;
+    }
+
+    const legacyTitleMatch = trimmedTitle.match(/^🎈?\s*Your balloon flight has\s+(\d+)\s+space(?:s)?\s+left$/i);
+    if (legacyTitleMatch) {
+        return formatTitle(Number(legacyTitleMatch[1]));
+    }
+
+    const currentTitleMatch = trimmedTitle.match(/^🎈?\s*(\d+)\s+space(?:s)?\s+left on your flight$/i);
+    if (currentTitleMatch) {
+        return formatTitle(Number(currentTitleMatch[1]));
+    }
+
+    return trimmedTitle;
+};
+
 const CustomerPortal = () => {
     const { token: tokenParam } = useParams();
     const [bookingData, setBookingData] = useState(null);
@@ -856,7 +882,10 @@ const CustomerPortal = () => {
         );
     }
 
-    const inviteFriendsTitle = bookingData?.invite_friends?.title;
+    const inviteFriendsTitle = normalizeInviteFriendsTitle(
+        bookingData?.invite_friends?.title,
+        bookingData?.invite_friends?.availableSpaces
+    );
     const inviteFriendsDescription = bookingData?.invite_friends?.description === 'Share a ready-made invite so your friends can join the same shared balloon flight.'
         ? 'Share an invite and give your friends 10% off their balloon flight.'
         : bookingData?.invite_friends?.description;
