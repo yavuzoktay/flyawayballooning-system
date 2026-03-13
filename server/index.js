@@ -7692,6 +7692,14 @@ const buildCustomerPortalUpsellOffer = async ({
     const discountedSeatPrice = regularSeatPrice != null && discountAmount != null
         ? roundCurrency(Math.max(regularSeatPrice - discountAmount, 0))
         : null;
+    const currentBookingPaidTotal = roundCurrency(
+        Math.max(
+            0,
+            (Number(booking.paid) || 0) -
+            (Number(booking.add_to_booking_items_total_price) || 0) -
+            (Number(booking.weather_refund_total_price) || 0)
+        )
+    );
     const currentBookingBaseTotal = roundCurrency(
         Math.max(
             0,
@@ -7707,9 +7715,11 @@ const buildCustomerPortalUpsellOffer = async ({
         !slotMetrics.hasOtherBookings;
 
     if (shouldShowPrivateUpgrade) {
-        const privateEightPrice = resolveCustomerPortalPrivateEightPassengerPrice(effectiveVoucherType, effectiveLocation);
+        const privateEightPrice = regularSeatPrice != null
+            ? roundCurrency(regularSeatPrice * BALLOON_210_CAPACITY)
+            : resolveCustomerPortalPrivateEightPassengerPrice(effectiveVoucherType, effectiveLocation);
         const privateUpgradeDifference = privateEightPrice != null
-            ? roundCurrency(Math.max(privateEightPrice - currentBookingBaseTotal, 0))
+            ? roundCurrency(Math.max(privateEightPrice - currentBookingPaidTotal, 0))
             : null;
 
         if (privateEightPrice != null && privateUpgradeDifference && privateUpgradeDifference > 0) {
@@ -7721,7 +7731,7 @@ const buildCustomerPortalUpsellOffer = async ({
                 buttonLabel: 'Upgrade',
                 requiredPassengerCount: slotMetrics.remainingSeats,
                 totalCharge: privateUpgradeDifference,
-                currentBookingBaseTotal,
+                currentBookingBaseTotal: currentBookingPaidTotal,
                 privateEightPrice,
                 remainingSeats: slotMetrics.remainingSeats,
                 slotPassengerCount: slotMetrics.totalPassengers,
@@ -7820,6 +7830,10 @@ const applyCustomerPortalUpsell = async (session, storeData) => {
     }
 
     const distributedPrices = distributeAmountAcrossPassengers(paidAmount, upsellData.passengers.length);
+    const isPrivateUpgrade = upsellData.offerSnapshot?.mode === 'private_upgrade';
+    const targetBookingTotal = isPrivateUpgrade && Number.isFinite(Number(upsellData.offerSnapshot?.privateEightPrice))
+        ? roundCurrency(Number(upsellData.offerSnapshot.privateEightPrice))
+        : null;
     const ticketType = upsellData.offerSnapshot?.mode === 'private_upgrade'
         ? 'Private Upgrade'
         : (upsellData.voucherType || booking.voucher_type_detail || booking.voucher_type || 'Customer Portal Upsell');
@@ -7846,18 +7860,35 @@ const applyCustomerPortalUpsell = async (session, storeData) => {
     );
 
     const currentBaseTotal = roundCurrency(
-        Number(booking.original_amount) || Math.max(
-            0,
-            (Number(booking.paid) || 0) +
-            (Number(booking.due) || 0) -
-            (Number(booking.add_to_booking_items_total_price) || 0) -
-            (Number(booking.weather_refund_total_price) || 0)
-        )
+        isPrivateUpgrade
+            ? Math.max(
+                0,
+                (Number(booking.paid) || 0) -
+                (Number(booking.add_to_booking_items_total_price) || 0) -
+                (Number(booking.weather_refund_total_price) || 0)
+            )
+            : (
+                Number(booking.original_amount) || Math.max(
+                    0,
+                    (Number(booking.paid) || 0) +
+                    (Number(booking.due) || 0) -
+                    (Number(booking.add_to_booking_items_total_price) || 0) -
+                    (Number(booking.weather_refund_total_price) || 0)
+                )
+            )
     );
     const nextPassengerCount = currentPassengerCount + upsellData.passengers.length;
     const nextPaidTotal = roundCurrency((Number(booking.paid) || 0) + paidAmount);
-    const nextDueTotal = roundCurrency(Number(booking.due) || 0);
-    const nextOriginalAmount = roundCurrency(currentBaseTotal + paidAmount);
+    const nextDueTotal = roundCurrency(
+        targetBookingTotal != null
+            ? Math.max(0, targetBookingTotal - nextPaidTotal)
+            : (Number(booking.due) || 0)
+    );
+    const nextOriginalAmount = roundCurrency(
+        targetBookingTotal != null
+            ? targetBookingTotal
+            : (currentBaseTotal + paidAmount)
+    );
 
     await runPoolQuery(
         `
