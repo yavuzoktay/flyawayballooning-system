@@ -95,7 +95,7 @@ const normalizeUpsellOfferDescription = (offer) => {
     }
 
     if (offer.mode === 'private_upgrade') {
-        return `Your flight is eligible for a private upgrade. Add the remaining passengers to enjoy your own private balloon charter for an additional ${formatPounds(offer.totalCharge)}.`;
+        return `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional ${formatPounds(offer.totalCharge)}.`;
     }
 
     return String(offer.description || '').trim();
@@ -976,9 +976,8 @@ const CustomerPortal = () => {
             icon: <SmsIcon fontSize="small" />
         }
     ];
-    const shouldInlineAttemptSixPlusMessage = Boolean(
+    const shouldInlineFlightAttemptMessage = Boolean(
         bookingData?.flight_attempt_notification?.visible &&
-        bookingData?.flight_attempt_notification?.attemptBucket === 'attempt_6_plus' &&
         !isFlightVoucherSection &&
         !isFullyRefunded
     );
@@ -1015,50 +1014,6 @@ const CustomerPortal = () => {
                         </Typography>
                     </Box>
                 </Box>
-
-                {bookingData?.flight_attempt_notification?.visible && !isFlightVoucherSection && !isFullyRefunded && !shouldInlineAttemptSixPlusMessage && (
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            p: 3,
-                            mb: 3,
-                            borderRadius: 3,
-                            border: '1px solid #d8dee6',
-                            backgroundColor: '#eef2f6',
-                            boxShadow: 'none'
-                        }}
-                    >
-                        <Typography
-                            variant="overline"
-                            sx={{
-                                display: 'block',
-                                mb: 1,
-                                color: '#64748b',
-                                fontWeight: 700,
-                                letterSpacing: '0.08em'
-                            }}
-                        >
-                            {bookingData.flight_attempt_notification.label}
-                        </Typography>
-                        <Box
-                            sx={{
-                                color: '#334155',
-                                '& p': {
-                                    mb: 1.5,
-                                    lineHeight: 1.7
-                                },
-                                '& p:last-child': {
-                                    mb: 0
-                                },
-                                '& strong': {
-                                    color: '#0f172a',
-                                    fontWeight: 700
-                                }
-                            }}
-                            dangerouslySetInnerHTML={{ __html: bookingData.flight_attempt_notification.bodyHtml }}
-                        />
-                    </Paper>
-                )}
 
                 <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
                     <Typography variant="h5" sx={{ ...pageTitleSx, mb: 3 }}>
@@ -1258,12 +1213,12 @@ const CustomerPortal = () => {
                         </Box>
                         <Box>
                             <Typography variant="body2" color="text.secondary">Flight Attempts</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500, mb: shouldInlineAttemptSixPlusMessage ? 0.35 : 2 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: shouldInlineFlightAttemptMessage ? 0.35 : 2 }}>
                                 {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
                                     ? bookingData.flight_attempts
                                     : 0}
                             </Typography>
-                            {shouldInlineAttemptSixPlusMessage && (
+                            {shouldInlineFlightAttemptMessage && (
                                 <Box
                                     sx={{
                                         mb: 2,
@@ -1597,12 +1552,35 @@ const CustomerPortal = () => {
                                     >
                                         <span style={{ display: 'block', width: '100%' }}>
                                             <Button
-                                                variant="contained"
+                                                variant="outlined"
                                                 fullWidth
                                                 disabled={!canCancel}
                                                 onClick={() => canCancel && setCancelFlightDialogOpen(true)}
                                                 sx={{
-                                                    ...primaryActionButtonSx
+                                                    py: 1.5,
+                                                    fontSize: '1rem',
+                                                    fontWeight: 600,
+                                                    textTransform: 'none',
+                                                    borderRadius: 2,
+                                                    borderWidth: 2,
+                                                    borderColor: canCancel ? '#ef4444' : '#d1d5db',
+                                                    color: canCancel ? '#ef4444' : '#9ca3af',
+                                                    backgroundColor: canCancel ? 'transparent' : '#f3f4f6',
+                                                    cursor: canCancel ? 'pointer' : 'not-allowed',
+                                                    '&:hover': canCancel ? {
+                                                        borderWidth: 2,
+                                                        borderColor: '#dc2626',
+                                                        backgroundColor: '#fef2f2',
+                                                    } : {
+                                                        borderWidth: 2,
+                                                        borderColor: '#d1d5db',
+                                                        backgroundColor: '#f3f4f6',
+                                                    },
+                                                    '&.Mui-disabled': {
+                                                        borderColor: '#d1d5db',
+                                                        color: '#9ca3af',
+                                                        backgroundColor: '#f3f4f6',
+                                                    }
                                                 }}
                                             >
                                                 Cancel Flight
@@ -1624,10 +1602,10 @@ const CustomerPortal = () => {
                             mb: 3,
                             borderRadius: 4,
                             border: '1px solid',
-                            borderColor: isPrivateUpgradeOffer ? '#243244' : '#bbf7d0',
+                            borderColor: isPrivateUpgradeOffer ? '#243244' : inviteSectionPalette.border,
                             background: isPrivateUpgradeOffer
                                 ? 'linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 100%)'
-                                : 'linear-gradient(135deg, rgba(240,253,244,0.98) 0%, rgba(220,252,231,0.98) 100%)'
+                                : inviteSectionPalette.background
                         }}
                     >
                         <Box
@@ -1812,12 +1790,12 @@ const CustomerPortal = () => {
                                                         }
                                                     }
                                                     : {
-                                                        backgroundColor: inviteSectionPalette.buttonBackground,
-                                                        color: inviteSectionPalette.link,
-                                                        border: `1px solid ${inviteSectionPalette.buttonBorder}`,
+                                                        backgroundColor: actionGreenPalette.background,
+                                                        color: '#fff',
+                                                        border: `1px solid ${actionGreenPalette.border}`,
                                                         '&:hover': {
-                                                            backgroundColor: '#edf8ff',
-                                                            borderColor: inviteSectionPalette.link
+                                                            backgroundColor: actionGreenPalette.hover,
+                                                            borderColor: actionGreenPalette.hover
                                                         }
                                                     })
                                             }}

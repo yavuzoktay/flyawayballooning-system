@@ -35,7 +35,7 @@ const getUpsellDescription = (offer) => {
     }
 
     if (offer.mode === 'private_upgrade') {
-        return `Your flight is eligible for a private upgrade. Add the remaining passengers to enjoy your own private balloon charter for an additional ${formatCurrency(offer.totalCharge)}.`;
+        return `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional ${formatCurrency(offer.totalCharge)}.`;
     }
 
     if (offer.mode === 'single_discount') {
