@@ -7716,9 +7716,9 @@ const buildCustomerPortalUpsellOffer = async ({
             return {
                 eligible: true,
                 mode: 'private_upgrade',
-                title: 'Almost a private balloon',
-                description: `Your balloon currently has ${slotMetrics.remainingSeats} seat${slotMetrics.remainingSeats === 1 ? '' : 's'} left. Add ${slotMetrics.remainingSeats} passenger${slotMetrics.remainingSeats === 1 ? '' : 's'} now to enjoy a private balloon experience for an extra £${privateUpgradeDifference.toFixed(2)}.`,
-                buttonLabel: slotMetrics.remainingSeats === 1 ? 'Add Passenger' : 'Add Passengers',
+                title: '🎈Make it Private',
+                description: `Your flight is eligible for a private upgrade. Add the remaining passengers to enjoy your own private balloon charter for an additional £${privateUpgradeDifference.toFixed(2)}.`,
+                buttonLabel: 'Upgrade',
                 requiredPassengerCount: slotMetrics.remainingSeats,
                 totalCharge: privateUpgradeDifference,
                 currentBookingBaseTotal,

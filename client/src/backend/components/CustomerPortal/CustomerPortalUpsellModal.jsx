@@ -19,6 +19,32 @@ const createEmptyPassengers = (count) =>
         weight: ''
     }));
 
+const formatCurrency = (amount) => `£${Number(amount || 0).toFixed(2)}`;
+
+const getUpsellModalTitle = (offer) => {
+    if (offer?.mode === 'private_upgrade') {
+        return '🎈Make it Private';
+    }
+
+    return 'Add Passenger';
+};
+
+const getUpsellDescription = (offer) => {
+    if (!offer) {
+        return '';
+    }
+
+    if (offer.mode === 'private_upgrade') {
+        return `Your flight is eligible for a private upgrade. Add the remaining passengers to enjoy your own private balloon charter for an additional ${formatCurrency(offer.totalCharge)}.`;
+    }
+
+    if (offer.mode === 'single_discount') {
+        return `Add another passenger to your flight for ${formatCurrency(offer.discountedSeatPrice || offer.totalCharge)} and save ${formatCurrency(offer.discountAmount)}.`;
+    }
+
+    return String(offer.description || '').trim();
+};
+
 const CustomerPortalUpsellModal = ({
     open,
     offer,
@@ -41,18 +67,20 @@ const CustomerPortalUpsellModal = ({
         if (!offer) return [];
 
         if (offer.mode === 'private_upgrade') {
+            const upgradeSupplement = Number(offer.totalCharge || 0);
+
             return [
-                { label: 'Seats to fill', value: String(offer.requiredPassengerCount || requiredPassengerCount) },
-                { label: 'Current booking total', value: `£${Number(offer.currentBookingBaseTotal || 0).toFixed(2)}` },
-                { label: 'Private balloon total', value: `£${Number(offer.privateEightPrice || 0).toFixed(2)}` },
-                { label: 'Amount to pay now', value: `£${Number(offer.totalCharge || 0).toFixed(2)}` }
+                { label: 'Available Spaces', value: String(offer.requiredPassengerCount || requiredPassengerCount) },
+                { label: 'Current Booking', value: formatCurrency(offer.currentBookingBaseTotal || 0) },
+                { label: 'Upgrade Supplement', value: formatCurrency(upgradeSupplement) },
+                { label: 'Amount', value: formatCurrency(offer.totalCharge || 0) }
             ];
         }
 
         return [
-            { label: 'Standard price', value: `£${Number(offer.regularSeatPrice || 0).toFixed(2)}` },
-            { label: 'Saving', value: `-£${Number(offer.discountAmount || 0).toFixed(2)}` },
-            { label: 'Amount', value: `£${Number(offer.totalCharge || 0).toFixed(2)}` }
+            { label: 'Standard Price', value: formatCurrency(offer.regularSeatPrice || 0) },
+            { label: 'Saving', value: `-${formatCurrency(offer.discountAmount || 0)}` },
+            { label: 'Amount', value: formatCurrency(offer.totalCharge || 0) }
         ];
     }, [offer, requiredPassengerCount]);
 
@@ -104,12 +132,12 @@ const CustomerPortalUpsellModal = ({
             maxWidth="sm"
         >
             <DialogTitle sx={{ fontWeight: 700 }}>
-                {offer?.mode === 'private_upgrade' ? 'Upgrade Your Balloon' : 'Add Passenger'}
+                {getUpsellModalTitle(offer)}
             </DialogTitle>
             <DialogContent dividers>
-                {offer?.description && (
+                {getUpsellDescription(offer) && (
                     <Typography variant="body1" sx={{ mb: 2, color: '#334155' }}>
-                        {offer.description}
+                        {getUpsellDescription(offer)}
                     </Typography>
                 )}
 
@@ -210,7 +238,7 @@ const CustomerPortalUpsellModal = ({
                     disabled={submitting}
                     sx={{ textTransform: 'none', fontWeight: 700 }}
                 >
-                    {submitting ? 'Redirecting...' : (offer?.mode === 'private_upgrade' ? `Pay £${Number(offer?.totalCharge || 0).toFixed(2)}` : 'Add')}
+                    {submitting ? 'Redirecting...' : (offer?.mode === 'private_upgrade' ? 'Upgrade' : 'Add')}
                 </Button>
             </DialogActions>
         </Dialog>

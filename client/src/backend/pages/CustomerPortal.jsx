@@ -67,6 +67,40 @@ const normalizeInviteFriendsTitle = (title, availableSpaces) => {
     return trimmedTitle;
 };
 
+const formatPounds = (value) => `£${Number(value || 0).toFixed(2)}`;
+
+const normalizeUpsellOfferTitle = (offer) => {
+    if (!offer) {
+        return '';
+    }
+
+    if (offer.mode === 'single_discount') {
+        return '🎈Bring a Friend & Save';
+    }
+
+    if (offer.mode === 'private_upgrade') {
+        return '🎈Make it Private';
+    }
+
+    return String(offer.title || '').trim();
+};
+
+const normalizeUpsellOfferDescription = (offer) => {
+    if (!offer) {
+        return '';
+    }
+
+    if (offer.mode === 'single_discount') {
+        return `Add another passenger to your flight for ${formatPounds(offer.discountedSeatPrice || offer.totalCharge)} and save ${formatPounds(offer.discountAmount)}.`;
+    }
+
+    if (offer.mode === 'private_upgrade') {
+        return `Your flight is eligible for a private upgrade. Add the remaining passengers to enjoy your own private balloon charter for an additional ${formatPounds(offer.totalCharge)}.`;
+    }
+
+    return String(offer.description || '').trim();
+};
+
 const CustomerPortal = () => {
     const { token: tokenParam } = useParams();
     const [bookingData, setBookingData] = useState(null);
@@ -159,6 +193,43 @@ const CustomerPortal = () => {
         buttonBorder: '#bfe8ff',
         disabledBackground: '#eef1f5',
         disabledText: '#a1a8b3'
+    };
+    const actionGreenPalette = {
+        background: '#22c55e',
+        hover: '#16a34a',
+        border: '#22c55e',
+        disabledBackground: '#f3f4f6',
+        disabledBorder: '#d1d5db',
+        disabledText: '#9ca3af'
+    };
+    const pageTitleSx = {
+        fontWeight: 600,
+        color: inviteSectionPalette.heading
+    };
+    const primaryActionButtonSx = {
+        py: 1.5,
+        fontSize: '1rem',
+        fontWeight: 600,
+        textTransform: 'none',
+        borderRadius: 2,
+        border: '1px solid',
+        borderColor: actionGreenPalette.border,
+        boxShadow: 'none',
+        backgroundColor: actionGreenPalette.background,
+        color: '#fff',
+        '&:hover': {
+            boxShadow: 'none',
+            backgroundColor: actionGreenPalette.hover,
+            borderColor: actionGreenPalette.hover
+        },
+        '&.Mui-disabled': {
+            backgroundColor: `${actionGreenPalette.disabledBackground} !important`,
+            color: `${actionGreenPalette.disabledText} !important`,
+            borderColor: `${actionGreenPalette.disabledBorder} !important`,
+            boxShadow: 'none',
+            opacity: 0.6,
+            cursor: 'not-allowed'
+        }
     };
 
     const fetchBookingData = async ({ silent = false, refreshPaymentHistory = true } = {}) => {
@@ -886,6 +957,10 @@ const CustomerPortal = () => {
         bookingData?.invite_friends?.title,
         bookingData?.invite_friends?.availableSpaces
     );
+    const upsellOffer = bookingData?.upsell_offer || null;
+    const isPrivateUpgradeOffer = upsellOffer?.mode === 'private_upgrade';
+    const upsellOfferTitle = normalizeUpsellOfferTitle(upsellOffer);
+    const upsellOfferDescription = normalizeUpsellOfferDescription(upsellOffer);
     const inviteFriendsDescription = bookingData?.invite_friends?.description === 'Share a ready-made invite so your friends can join the same shared balloon flight.'
         ? 'Share an invite and give your friends 10% off their balloon flight.'
         : bookingData?.invite_friends?.description;
@@ -932,11 +1007,11 @@ const CustomerPortal = () => {
                         />
                     </Box>
                     <Box sx={{ textAlign: 'left' }}>
-                        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 1, color: '#0f172a' }}>
+                        <Typography variant="h5" component="h2" sx={{ ...pageTitleSx, mb: 1 }}>
                             Welcome, {bookingData.name ? bookingData.name.split(' ')[0] : 'Guest'}
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
-                            You can manage your booking with us here.
+                            We look forward to flying you.
                         </Typography>
                     </Box>
                 </Box>
@@ -986,7 +1061,7 @@ const CustomerPortal = () => {
                 )}
 
                 <Paper id="scroll-target-booking" elevation={2} sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+                    <Typography variant="h5" sx={{ ...pageTitleSx, mb: 3 }}>
                         {(() => {
                             const bookFlight = (bookingData.book_flight || '').toString().trim().toLowerCase();
                             const voucherType = (bookingData.voucher_type || '').toString().trim().toLowerCase();
@@ -1496,26 +1571,7 @@ const CustomerPortal = () => {
                                                 disabled={!canReschedule}
                                                 onClick={() => canReschedule && setRescheduleModalOpen(true)}
                                                 sx={{
-                                                    py: 1.5,
-                                                    fontSize: '1rem',
-                                                    fontWeight: 600,
-                                                    textTransform: 'none',
-                                                    borderRadius: 2,
-                                                    boxShadow: canReschedule ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                                                    backgroundColor: canReschedule ? undefined : '#f3f4f6',
-                                                    color: canReschedule ? undefined : '#9ca3af',
-                                                    '&:hover': canReschedule ? {
-                                                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                                                    } : {
-                                                        boxShadow: 'none',
-                                                        backgroundColor: '#f3f4f6',
-                                                    },
-                                                    '&.Mui-disabled': {
-                                                        backgroundColor: '#f3f4f6 !important',
-                                                        color: '#9ca3af !important',
-                                                        opacity: 0.6,
-                                                        cursor: 'not-allowed',
-                                                    }
+                                                    ...primaryActionButtonSx
                                                 }}
                                             >
                                                 {isFlightVoucherSection ? 'Schedule Your Flight' : 'Reschedule Your Flight'}
@@ -1541,36 +1597,12 @@ const CustomerPortal = () => {
                                     >
                                         <span style={{ display: 'block', width: '100%' }}>
                                             <Button
-                                                variant="outlined"
-                                                color="error"
+                                                variant="contained"
                                                 fullWidth
                                                 disabled={!canCancel}
                                                 onClick={() => canCancel && setCancelFlightDialogOpen(true)}
                                                 sx={{
-                                                    py: 1.5,
-                                                    fontSize: '1rem',
-                                                    fontWeight: 600,
-                                                    textTransform: 'none',
-                                                    borderRadius: 2,
-                                                    borderWidth: 2,
-                                                    borderColor: canCancel ? '#ef4444' : '#d1d5db',
-                                                    color: canCancel ? '#ef4444' : '#9ca3af',
-                                                    backgroundColor: canCancel ? 'transparent' : '#f3f4f6',
-                                                    cursor: canCancel ? 'pointer' : 'not-allowed',
-                                                    '&:hover': canCancel ? {
-                                                        borderWidth: 2,
-                                                        borderColor: '#dc2626',
-                                                        backgroundColor: '#fef2f2',
-                                                    } : {
-                                                        borderWidth: 2,
-                                                        borderColor: '#d1d5db',
-                                                        backgroundColor: '#f3f4f6',
-                                                    },
-                                                    '&.Mui-disabled': {
-                                                        borderColor: '#d1d5db',
-                                                        color: '#9ca3af',
-                                                        backgroundColor: '#f3f4f6',
-                                                    }
+                                                    ...primaryActionButtonSx
                                                 }}
                                             >
                                                 Cancel Flight
@@ -1584,17 +1616,18 @@ const CustomerPortal = () => {
                     })()}
                 </Paper>
 
-                {bookingData?.upsell_offer && !isFullyRefunded && (
+                {upsellOffer && !isFullyRefunded && (
                     <Paper
                         elevation={0}
                         sx={{
                             p: 3,
                             mb: 3,
-                            borderRadius: 3,
-                            border: '1px solid #d7e2f0',
-                            background: bookingData.upsell_offer.mode === 'private_upgrade'
+                            borderRadius: 4,
+                            border: '1px solid',
+                            borderColor: isPrivateUpgradeOffer ? '#243244' : '#bbf7d0',
+                            background: isPrivateUpgradeOffer
                                 ? 'linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 100%)'
-                                : 'linear-gradient(135deg, rgba(255,247,237,0.98) 0%, rgba(255,237,213,0.98) 100%)'
+                                : 'linear-gradient(135deg, rgba(240,253,244,0.98) 0%, rgba(220,252,231,0.98) 100%)'
                         }}
                     >
                         <Box
@@ -1612,33 +1645,22 @@ const CustomerPortal = () => {
                                     sx={{
                                         fontWeight: 700,
                                         mb: 1,
-                                        color: bookingData.upsell_offer.mode === 'private_upgrade' ? '#f8fafc' : '#111827'
+                                        color: isPrivateUpgradeOffer ? '#f8fafc' : inviteSectionPalette.heading
                                     }}
                                 >
-                                    {bookingData.upsell_offer.title}
+                                    {upsellOfferTitle}
                                 </Typography>
                                 <Typography
                                     variant="body1"
                                     sx={{
                                         mb: 1.5,
-                                        color: bookingData.upsell_offer.mode === 'private_upgrade'
+                                        color: isPrivateUpgradeOffer
                                             ? 'rgba(248,250,252,0.88)'
-                                            : '#475569'
+                                            : inviteSectionPalette.body
                                     }}
                                 >
-                                    {bookingData.upsell_offer.description}
+                                    {upsellOfferDescription}
                                 </Typography>
-                                {bookingData.upsell_offer.mode === 'private_upgrade' && (
-                                    <Typography
-                                        variant="body2"
-                                        sx={{
-                                            fontWeight: 700,
-                                            color: '#fbbf24'
-                                        }}
-                                    >
-                                        {`Private balloon upgrade for £${Number(bookingData.upsell_offer.totalCharge || 0).toFixed(2)}`}
-                                    </Typography>
-                                )}
                             </Box>
                             <Button
                                 variant="contained"
@@ -1646,22 +1668,19 @@ const CustomerPortal = () => {
                                 disabled={submittingUpsell}
                                 sx={{
                                     minWidth: { xs: '100%', md: 220 },
+                                    ...primaryActionButtonSx,
                                     py: 1.4,
                                     px: 2.5,
                                     borderRadius: 2.5,
-                                    textTransform: 'none',
-                                    fontSize: '1rem',
                                     fontWeight: 700,
-                                    boxShadow: 'none',
-                                    backgroundColor: bookingData.upsell_offer.mode === 'private_upgrade' ? '#22c55e' : '#0f172a',
-                                    color: '#fff',
                                     '&:hover': {
                                         boxShadow: 'none',
-                                        backgroundColor: bookingData.upsell_offer.mode === 'private_upgrade' ? '#16a34a' : '#1e293b'
+                                        backgroundColor: actionGreenPalette.hover,
+                                        borderColor: actionGreenPalette.hover
                                     }
                                 }}
                             >
-                                {submittingUpsell ? 'Redirecting...' : bookingData.upsell_offer.buttonLabel}
+                                {submittingUpsell ? 'Redirecting...' : upsellOffer.buttonLabel}
                             </Button>
                         </Box>
                     </Paper>
@@ -1725,32 +1744,15 @@ const CustomerPortal = () => {
                                 disabled={!bookingData.invite_friends.enabled}
                                 sx={{
                                     minWidth: { xs: '100%', md: 220 },
+                                    ...primaryActionButtonSx,
                                     py: 1.4,
                                     px: 2.5,
                                     borderRadius: 2.5,
-                                    textTransform: 'none',
-                                    fontSize: '1rem',
                                     fontWeight: 700,
-                                    boxShadow: 'none',
-                                    backgroundColor: bookingData.invite_friends.enabled
-                                        ? inviteSectionPalette.buttonBackground
-                                        : inviteSectionPalette.disabledBackground,
-                                    color: bookingData.invite_friends.enabled
-                                        ? inviteSectionPalette.buttonText
-                                        : inviteSectionPalette.disabledText,
-                                    border: '1px solid',
-                                    borderColor: bookingData.invite_friends.enabled
-                                        ? inviteSectionPalette.buttonBorder
-                                        : '#d9dde4',
                                     '&:hover': {
                                         boxShadow: 'none',
-                                        backgroundColor: bookingData.invite_friends.enabled ? '#edf8ff' : inviteSectionPalette.disabledBackground,
-                                        borderColor: bookingData.invite_friends.enabled ? inviteSectionPalette.link : '#d9dde4'
-                                    },
-                                    '&.Mui-disabled': {
-                                        backgroundColor: inviteSectionPalette.disabledBackground,
-                                        color: inviteSectionPalette.disabledText,
-                                        borderColor: '#d9dde4'
+                                        backgroundColor: bookingData.invite_friends.enabled ? actionGreenPalette.hover : actionGreenPalette.disabledBackground,
+                                        borderColor: bookingData.invite_friends.enabled ? actionGreenPalette.hover : actionGreenPalette.disabledBorder
                                     }
                                 }}
                             >
@@ -1839,7 +1841,7 @@ const CustomerPortal = () => {
                         <Typography
                             variant="h5"
                             sx={{
-                                fontWeight: 600,
+                                ...pageTitleSx,
                                 mb: 3,
                                 '@media (max-width:600px)': {
                                     fontSize: '1.5rem'
@@ -2036,7 +2038,7 @@ const CustomerPortal = () => {
                         sx={{ p: 3, mb: 3, scrollMarginTop: '100px' }}
                     >
                         {content.header && (
-                            <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
+                            <Typography variant="h5" sx={{ ...pageTitleSx, mb: 2 }}>
                                 {content.header}
                             </Typography>
                         )}
@@ -2044,6 +2046,11 @@ const CustomerPortal = () => {
                             <Box
                                 sx={{
                                     color: 'text.secondary',
+                                    '& h1, & h2, & h3, & h4, & h5, & h6': {
+                                        color: inviteSectionPalette.heading,
+                                        fontWeight: 600,
+                                        mb: 1.5
+                                    },
                                     '& p': { mb: 1.5 },
                                     '& ul, & ol': { pl: 2, mb: 1.5 },
                                     '& li': { mb: 0.5 }
