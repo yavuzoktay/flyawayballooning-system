@@ -7043,7 +7043,23 @@ const normalizeLocationKey = (location) => {
 
 const normalizeVoucherTitle = (title) => {
     if (!title) return '';
-    return String(title).trim().toLowerCase();
+    let normalized = String(title).trim().toLowerCase();
+
+    // Customer portal bookings can surface labels like
+    // "Shared - Any Day Voucher"; map these to pricing aliases.
+    normalized = normalized.replace(/^shared\s*-\s*/i, '').trim();
+
+    if (normalized.includes('any day') && normalized.includes('voucher')) {
+        return 'any day flight';
+    }
+    if (normalized.includes('weekday morning') && normalized.includes('voucher')) {
+        return 'weekday morning';
+    }
+    if (normalized.includes('flexible weekday') && normalized.includes('voucher')) {
+        return 'flexible weekday';
+    }
+
+    return normalized;
 };
 
 const buildSharedPricingEntry = (row) => {
