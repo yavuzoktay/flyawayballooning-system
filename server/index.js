@@ -19558,19 +19558,33 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             finalVoucherTypeDetail = finalVoucherType;
         }
 
-        // Get passengers for this booking
-        // For Flight Voucher, prioritize voucher_passenger_details from all_vouchers
-        // BUT if voucher is already redeemed into a booking, use passenger table (latest data)
-        // For other types, use passenger table
+        // Get passengers for this booking.
+        // If a real booking already has passenger rows, always prefer those so the
+        // customer portal matches Booking Details exactly.
+        const [passengerRows] = await new Promise((resolve, reject) => {
+            con.query('SELECT * FROM passenger WHERE booking_id = ? ORDER BY id ASC', [booking.id], (err, rows) => {
+                if (err) reject(err);
+                else resolve([rows]);
+            });
+        });
+
         let finalPassengerRows = [];
+        const hasRealBookingPassengers = Array.isArray(passengerRows) && passengerRows.length > 0;
+        const voucherIsRedeemed = Boolean(
+            booking.redeemed_voucher === 'Yes' ||
+            booking.redeemed_voucher === 1 ||
+            booking.flight_type_source === 'Redeem Voucher' ||
+            (voucherInfo && (
+                voucherInfo.redeemed === 'Yes' ||
+                voucherInfo.status === 'Used' ||
+                voucherInfo.redeemed === 1
+            ))
+        );
         
-        const voucherIsRedeemed =
-            voucherInfo &&
-            (voucherInfo.redeemed === 'Yes' ||
-             voucherInfo.status === 'Used' ||
-             voucherInfo.redeemed === 1);
-        
-        if (isFlightVoucher && voucherInfo && voucherInfo.voucher_passenger_details && !voucherIsRedeemed) {
+        if (hasRealBookingPassengers) {
+            finalPassengerRows = passengerRows;
+            console.log('✅ Customer Portal - Using booking passenger rows:', finalPassengerRows.length, 'passengers');
+        } else if (isFlightVoucher && voucherInfo && voucherInfo.voucher_passenger_details && !voucherIsRedeemed) {
             // Flight Voucher: parse passenger details from voucher_passenger_details JSON
             try {
                 const voucherPassengerList = parsePassengerList(voucherInfo.voucher_passenger_details);
@@ -19609,13 +19623,6 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             }
         } else {
             // For non-Flight Voucher or if voucher_passenger_details not available, use passenger table
-            // Order by id ASC to preserve the original insertion order (passenger sequence)
-            const [passengerRows] = await new Promise((resolve, reject) => {
-                con.query('SELECT * FROM passenger WHERE booking_id = ? ORDER BY id ASC', [booking.id], (err, rows) => {
-                    if (err) reject(err);
-                    else resolve([rows]);
-                });
-            });
             finalPassengerRows = passengerRows || [];
         }
 
