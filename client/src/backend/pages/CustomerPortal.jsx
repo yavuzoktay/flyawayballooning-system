@@ -1349,24 +1349,9 @@ const CustomerPortal = () => {
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
                                     {(() => {
                                         if (!bookingData.expires) return 'No expiry date';
-                                        const baseExpiry = dayjs(bookingData.expires);
-                                        if (!baseExpiry.isValid()) return bookingData.expires;
-
-                                        const attempts = parseInt(bookingData.flight_attempts ?? 0, 10) || 0;
-                                        // After 6 attempts, every additional block of 3 attempts
-                                        // extends the expiry by +6 months:
-                                        // 0–6 => +0
-                                        // 7–9 => +6
-                                        // 10–12 => +12
-                                        // 13–15 => +18, etc.
-                                        const extraBlocks = attempts > 6
-                                            ? Math.floor((attempts - 7) / 3) + 1
-                                            : 0;
-                                        const effectiveExpiry = extraBlocks > 0
-                                            ? baseExpiry.add(extraBlocks * 6, 'month')
-                                            : baseExpiry;
-
-                                        return effectiveExpiry.format('DD/MM/YYYY');
+                                        const persistedExpiry = dayjs(bookingData.expires);
+                                        if (!persistedExpiry.isValid()) return bookingData.expires;
+                                        return persistedExpiry.format('DD/MM/YYYY');
                                     })()}
                                 </Typography>
                                 {(() => {
