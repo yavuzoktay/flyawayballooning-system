@@ -701,6 +701,7 @@ const BookingPage = () => {
             // This ensures we get the voucher's own payment info (all_vouchers.paid)
             // This is especially important for Gift Vouchers where payment is tied to the voucher itself
             let hasVoucherPayments = false;
+            let hasRefundableVoucherPayments = false;
             if (voucherIdOrRef) {
                 try {
                     console.log(`[PaymentHistory] Fetching voucher payment history for: ${voucherIdOrRef}`);
@@ -710,6 +711,11 @@ const BookingPage = () => {
                         console.log(`[PaymentHistory] Found ${voucherPaymentData.length} records via voucher endpoint`);
                         paymentData = voucherPaymentData;
                         hasVoucherPayments = true;
+                        hasRefundableVoucherPayments = voucherPaymentData.some((payment) =>
+                            payment?.payment_status === 'succeeded' &&
+                            !String(payment?.id || '').startsWith('voucher_') &&
+                            Boolean(payment?.stripe_charge_id || payment?.stripe_payment_intent_id)
+                        );
                         // Track existing IDs to avoid duplicates
                         voucherPaymentData.forEach(p => {
                             if (p.id) existingIds.add(p.id);
@@ -722,10 +728,14 @@ const BookingPage = () => {
                 }
             }
             
-            // If we have a bookingId AND no voucher payments found, try booking-based payment history
-            // IMPORTANT: If voucher payments exist, we should NOT fetch booking payments
-            // to avoid showing payments from other transactions or duplicate entries
-            if (bookingId && !hasVoucherPayments) {
+            // If voucher history has no real refundable charge, also fetch the linked booking
+            // payment history so voucher/gift voucher popups can use the same refund flow as
+            // Booking Details.
+            const shouldFetchBookingPayments = bookingId && (!hasVoucherPayments || !hasRefundableVoucherPayments);
+
+            // If we have a bookingId and voucher-side history is missing or non-refundable only,
+            // try booking-based payment history and merge it in without duplicates.
+            if (shouldFetchBookingPayments) {
                 try {
                     const response = await axios.get(`/api/booking-payment-history/${bookingId}`);
                     const bookingPaymentData = response.data?.data || [];
@@ -769,7 +779,7 @@ const BookingPage = () => {
                             // Don't fail the entire fetch if sync fails - we still have existing payment data
                         }
                     } else {
-                        console.log(`[PaymentHistory] Payment history already exists (${paymentData.length} records), skipping sync to improve performance`);
+                        console.log(`[PaymentHistory] Payment history available (${paymentData.length} records), skipping sync to improve performance`);
                     }
                 } catch (bookingError) {
                     console.log('[PaymentHistory] Booking payment history fetch failed:', bookingError?.message);
@@ -873,6 +883,7 @@ const BookingPage = () => {
             
             if (response.data.success) {
                 alert('Refund processed successfully');
+                const refundedAmount = parseFloat(response.data?.data?.amount || amount);
                 setRefundModalOpen(false);
                 setSelectedPaymentForRefund(null);
                 setRefundAmount('');
@@ -882,8 +893,33 @@ const BookingPage = () => {
                 const refreshVoucherRef = bookingDetail?.voucher?.voucher_ref || bookingDetail?.voucher?.id;
                 if (refreshBookingId || refreshVoucherRef) {
                     fetchPaymentHistory(refreshBookingId, refreshVoucherRef);
-                    // Refresh booking detail to update paid amount
-                    if (refreshBookingId) {
+                    // Keep voucher detail dialogs in voucher context; only use booking refresh
+                    // for true booking dialogs.
+                    if (bookingDetail?.voucher) {
+                        setBookingDetail(prev => {
+                            if (!prev) return prev;
+
+                            const nextDetail = { ...prev };
+
+                            if ((voucherId || voucherRef) && nextDetail.voucher) {
+                                const currentVoucherPaid = parseFloat(nextDetail.voucher.paid || 0);
+                                nextDetail.voucher = {
+                                    ...nextDetail.voucher,
+                                    paid: Math.max(0, currentVoucherPaid - refundedAmount)
+                                };
+                            }
+
+                            if (bookingId && nextDetail.booking && Number(nextDetail.booking.id) === Number(bookingId)) {
+                                const currentBookingPaid = parseFloat(nextDetail.booking.paid || 0);
+                                nextDetail.booking = {
+                                    ...nextDetail.booking,
+                                    paid: Math.max(0, currentBookingPaid - refundedAmount)
+                                };
+                            }
+
+                            return nextDetail;
+                        });
+                    } else if (refreshBookingId) {
                         fetchPassengers(refreshBookingId);
                     }
                 }

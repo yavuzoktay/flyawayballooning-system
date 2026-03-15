@@ -5778,9 +5778,23 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
                 const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
                 paymentStatus = paymentIntent.status === 'succeeded' ? 'succeeded' : paymentIntent.status;
 
-                // Get charges from payment intent
-                if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
+                // Get charge data from payment intent. In newer Stripe API responses the
+                // charge may only be exposed via latest_charge rather than charges.data.
+                if (paymentIntent.latest_charge) {
+                    try {
+                        charge = typeof paymentIntent.latest_charge === 'string'
+                            ? await stripe.charges.retrieve(paymentIntent.latest_charge)
+                            : paymentIntent.latest_charge;
+                    } catch (latestChargeError) {
+                        console.warn('Could not retrieve latest charge from payment intent:', latestChargeError.message);
+                    }
+                }
+
+                if (!charge && paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
                     charge = paymentIntent.charges.data[0];
+                }
+
+                if (charge) {
                     chargeId = charge.id;
 
                     // Get payment method details
@@ -5848,70 +5862,77 @@ async function savePaymentHistory(session, bookingId, voucherId, voucherRef = nu
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
+        const paymentHistoryBookingId = bookingId || ((voucherId || voucherRef) ? 0 : null);
+
         // Try inserting with voucher_id and voucher_ref first
-        con.query(
-            insertPaymentHistoryWithVoucher,
-            [
-                bookingId || null,
-                voucherId || null,
-                voucherRef || null,
-                sessionId,
-                chargeId,
-                paymentIntentId,
-                amountTotal,
-                currency,
-                cardLast4,
-                cardBrand,
-                walletType,
-                chargeId, // transaction_id
-                payoutId,
-                paymentStatus,
-                fingerprint,
-                origin,
-                cardPresent ? 1 : 0,
-                arrivingOn
-            ],
-            (err, result) => {
-                if (err) {
-                    // If voucher_id/voucher_ref columns don't exist, try without them
-                    if (err.code === 'ER_BAD_FIELD_ERROR') {
-                        console.log('ℹ️ voucher_id/voucher_ref columns not found in payment_history, inserting without them');
-                        con.query(
-                            insertPaymentHistoryWithoutVoucher,
-                            [
-                                bookingId || null,
-                                sessionId,
-                                chargeId,
-                                paymentIntentId,
-                                amountTotal,
-                                currency,
-                                cardLast4,
-                                cardBrand,
-                                walletType,
-                                chargeId, // transaction_id
-                                payoutId,
-                                paymentStatus,
-                                fingerprint,
-                                origin,
-                                cardPresent ? 1 : 0,
-                                arrivingOn
-                            ],
-                            (err2, result2) => {
-                                if (err2) {
-                                    console.error('Error saving payment history (fallback):', err2);
-                                } else {
-                                    console.log('✅ Payment history saved successfully (without voucher_id/voucher_ref), ID:', result2.insertId);
+        await new Promise((resolve) => {
+            con.query(
+                insertPaymentHistoryWithVoucher,
+                [
+                    paymentHistoryBookingId,
+                    voucherId || null,
+                    voucherRef || null,
+                    sessionId,
+                    chargeId,
+                    paymentIntentId,
+                    amountTotal,
+                    currency,
+                    cardLast4,
+                    cardBrand,
+                    walletType,
+                    chargeId, // transaction_id
+                    payoutId,
+                    paymentStatus,
+                    fingerprint,
+                    origin,
+                    cardPresent ? 1 : 0,
+                    arrivingOn
+                ],
+                (err, result) => {
+                    if (err) {
+                        // If voucher_id/voucher_ref columns don't exist, try without them
+                        if (err.code === 'ER_BAD_FIELD_ERROR') {
+                            console.log('ℹ️ voucher_id/voucher_ref columns not found in payment_history, inserting without them');
+                            con.query(
+                                insertPaymentHistoryWithoutVoucher,
+                                [
+                                    paymentHistoryBookingId,
+                                    sessionId,
+                                    chargeId,
+                                    paymentIntentId,
+                                    amountTotal,
+                                    currency,
+                                    cardLast4,
+                                    cardBrand,
+                                    walletType,
+                                    chargeId, // transaction_id
+                                    payoutId,
+                                    paymentStatus,
+                                    fingerprint,
+                                    origin,
+                                    cardPresent ? 1 : 0,
+                                    arrivingOn
+                                ],
+                                (err2, result2) => {
+                                    if (err2) {
+                                        console.error('Error saving payment history (fallback):', err2);
+                                    } else {
+                                        console.log('✅ Payment history saved successfully (without voucher_id/voucher_ref), ID:', result2.insertId);
+                                    }
+                                    resolve();
                                 }
-                            }
-                        );
+                            );
+                        } else {
+                            console.error('Error saving payment history:', err);
+                            resolve();
+                        }
                     } else {
-                    console.error('Error saving payment history:', err);
+                        console.log('✅ Payment history saved successfully, ID:', result.insertId);
+                        resolve();
                     }
-                } else {
-                    console.log('✅ Payment history saved successfully, ID:', result.insertId);
                 }
-            }
-        );
+            );
+        });
     } catch (error) {
         console.error('Error in savePaymentHistory:', error);
     }
@@ -10506,13 +10527,38 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                 
                 if (matchingIntent && matchingIntent.status === 'succeeded') {
                     console.log('✅ Found matching Stripe payment intent:', matchingIntent.id);
-                    
-                    // Get the charge from payment intent
-                    const charges = matchingIntent.charges?.data || [];
-                    if (charges.length > 0) {
-                        const charge = charges[0];
-                        console.log('✅ Found Stripe charge:', charge.id);
-                        
+
+                    const matchingChargeId = typeof matchingIntent.latest_charge === 'string'
+                        ? matchingIntent.latest_charge
+                        : matchingIntent.latest_charge?.id || null;
+
+                    if (matchingChargeId) {
+                        console.log('✅ Found Stripe charge:', matchingChargeId);
+                    }
+
+                    const stripeLookupParams = [matchingIntent.id];
+                    let stripeLookupSql = `
+                        SELECT * FROM payment_history
+                        WHERE stripe_payment_intent_id = ?
+                    `;
+
+                    if (matchingChargeId) {
+                        stripeLookupSql += ` OR stripe_charge_id = ?`;
+                        stripeLookupParams.push(matchingChargeId);
+                    }
+
+                    stripeLookupSql += ` ORDER BY created_at DESC LIMIT 5`;
+
+                    const [existingStripeLinkedResults] = await con.promise().query(stripeLookupSql, stripeLookupParams);
+
+                    if (existingStripeLinkedResults && existingStripeLinkedResults.length > 0) {
+                        console.log('✅ Found existing payment history via Stripe IDs:', existingStripeLinkedResults.length, 'records');
+                        paymentHistory = existingStripeLinkedResults.map(p => ({
+                            ...p,
+                            voucher_id: p.voucher_id || voucher.id,
+                            voucher_ref: p.voucher_ref || voucher.voucher_ref
+                        }));
+                    } else {
                         // Save payment history from Stripe data
                         const sessionData = {
                             id: matchingIntent.id, // Use payment intent ID as session ID
@@ -10524,12 +10570,28 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                         // Save payment history with voucher info
                         await savePaymentHistory(sessionData, null, voucher.id, voucher.voucher_ref);
                         
-                        // Re-fetch payment history after sync
+                        // Re-fetch payment history after sync. Some local schemas do not have
+                        // voucher_id/voucher_ref columns, so fall back to Stripe IDs.
                         try {
-                            const [syncedResults] = await con.promise().query(
-                                `SELECT * FROM payment_history WHERE voucher_id = ? OR voucher_ref = ? ORDER BY created_at DESC LIMIT 5`,
-                                [voucher.id, voucher.voucher_ref]
-                            );
+                            let syncedResults = [];
+
+                            try {
+                                const [voucherLinkedResults] = await con.promise().query(
+                                    `SELECT * FROM payment_history WHERE voucher_id = ? OR voucher_ref = ? ORDER BY created_at DESC LIMIT 5`,
+                                    [voucher.id, voucher.voucher_ref]
+                                );
+                                syncedResults = voucherLinkedResults || [];
+                            } catch (voucherRefetchErr) {
+                                if (voucherRefetchErr.code !== 'ER_BAD_FIELD_ERROR') {
+                                    throw voucherRefetchErr;
+                                }
+                            }
+
+                            if (syncedResults.length === 0) {
+                                const [stripeLinkedResults] = await con.promise().query(stripeLookupSql, stripeLookupParams);
+                                syncedResults = stripeLinkedResults || [];
+                            }
+
                             if (syncedResults && syncedResults.length > 0) {
                                 console.log('✅ Found payment history after Stripe sync:', syncedResults.length, 'records');
                                 paymentHistory = syncedResults.map(p => ({
@@ -10539,7 +10601,7 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                                 }));
                             }
                         } catch (refetchErr) {
-                            console.warn('Error re-fetching payment history after sync:', refetchErr.message);
+                            console.warn('Error re-fetching payment history after Stripe sync:', refetchErr.message);
                         }
                     }
                 }
@@ -10636,7 +10698,11 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                         if (!charge && payment.stripe_payment_intent_id) {
                             try {
                                 const paymentIntent = await stripe.paymentIntents.retrieve(payment.stripe_payment_intent_id);
-                                if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
+                                if (paymentIntent.latest_charge) {
+                                    charge = typeof paymentIntent.latest_charge === 'string'
+                                        ? await stripe.charges.retrieve(paymentIntent.latest_charge)
+                                        : paymentIntent.latest_charge;
+                                } else if (paymentIntent.charges && paymentIntent.charges.data && paymentIntent.charges.data.length > 0) {
                                     charge = paymentIntent.charges.data[0];
                                 }
                             } catch (piErr) {
@@ -10674,6 +10740,9 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                                 if (!payment.transaction_id && charge.id) {
                                     payment.transaction_id = charge.id;
                                 }
+                                if (!payment.stripe_charge_id && charge.id) {
+                                    payment.stripe_charge_id = charge.id;
+                                }
                                 
                                 // Update database with enriched data (async, don't wait)
                                 const updateFields = [];
@@ -10707,6 +10776,10 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
                                     updateFields.push('transaction_id = ?');
                                     updateValues.push(charge.id);
                                 }
+                                if (charge.id && !payment.stripe_charge_id) {
+                                    updateFields.push('stripe_charge_id = ?');
+                                    updateValues.push(charge.id);
+                                }
                                 
                                 if (updateFields.length > 0) {
                                     updateValues.push(payment.id);
@@ -10730,11 +10803,32 @@ app.get('/api/voucher-payment-history/:voucherIdentifier', async (req, res) => {
             })
         );
         
-        console.log('📋 Final payment history count:', enrichedPaymentHistory.length);
+        const dedupedPaymentHistory = [];
+        const seenPaymentKeys = new Set();
+
+        for (const payment of enrichedPaymentHistory) {
+            const dedupeKey = [
+                payment.payment_status || '',
+                payment.origin || '',
+                payment.stripe_charge_id || '',
+                payment.stripe_payment_intent_id || '',
+                payment.refunded_payment_id || '',
+                payment.amount || ''
+            ].join('|');
+
+            if (seenPaymentKeys.has(dedupeKey)) {
+                continue;
+            }
+
+            seenPaymentKeys.add(dedupeKey);
+            dedupedPaymentHistory.push(payment);
+        }
+
+        console.log('📋 Final payment history count:', dedupedPaymentHistory.length);
         
         res.json({
             success: true,
-            data: enrichedPaymentHistory,
+            data: dedupedPaymentHistory,
             voucher: {
                 id: voucher.id,
                 voucher_ref: voucher.voucher_ref
@@ -11089,6 +11183,8 @@ app.post('/api/refund-payment', async (req, res) => {
             });
         }
 
+        const refundPaymentHistoryBookingId = bookingId || ((voucherId || voucherRef) ? 0 : null);
+
         // Build query based on whether this is a booking or voucher payment
         let paymentQuery = 'SELECT * FROM payment_history WHERE id = ?';
         let queryParams = [paymentId];
@@ -11105,11 +11201,17 @@ app.post('/api/refund-payment', async (req, res) => {
         }
 
         // Get payment details from database
-        con.query(
-            paymentQuery,
-            queryParams,
-            async (err, results) => {
+        const handlePaymentLookupResults = async (err, results) => {
                 if (err) {
+                    if (err.code === 'ER_BAD_FIELD_ERROR' && (voucherId || voucherRef)) {
+                        console.warn('Voucher columns missing in payment_history, retrying refund lookup by payment id only');
+                        return con.query(
+                            'SELECT * FROM payment_history WHERE id = ?',
+                            [paymentId],
+                            handlePaymentLookupResults
+                        );
+                    }
+
                     console.error('Error fetching payment:', err);
                     return res.status(500).json({
                         success: false,
@@ -11137,8 +11239,7 @@ app.post('/api/refund-payment', async (req, res) => {
 
                 // Process refund through Stripe
                 try {
-                    const refund = await stripe.refunds.create({
-                        charge: stripeChargeId,
+                    const refundRequest = {
                         amount: refundAmount,
                         metadata: {
                             payment_id: paymentId.toString(),
@@ -11148,7 +11249,15 @@ app.post('/api/refund-payment', async (req, res) => {
                             comment: comment || '',
                             refunded_by: 'admin'
                         }
-                    });
+                    };
+
+                    if (String(stripeChargeId).startsWith('pi_')) {
+                        refundRequest.payment_intent = stripeChargeId;
+                    } else {
+                        refundRequest.charge = stripeChargeId;
+                    }
+
+                    const refund = await stripe.refunds.create(refundRequest);
 
                     // Save refund record to database
                     // Check if payment_history table has voucher_id and voucher_ref columns
@@ -11178,7 +11287,7 @@ app.post('/api/refund-payment', async (req, res) => {
                         con.query(
                             refundSql,
                             [
-                                bookingId || null,
+                                refundPaymentHistoryBookingId,
                                 voucherId || null,
                                 voucherRef || null,
                                 payment.stripe_session_id,
@@ -11212,7 +11321,7 @@ app.post('/api/refund-payment', async (req, res) => {
                                         con.query(
                                             refundSqlWithoutVoucher,
                                             [
-                                                bookingId || null,
+                                                refundPaymentHistoryBookingId,
                                                 payment.stripe_session_id,
                                                 refund.id,
                                                 refund.payment_intent,
@@ -11329,7 +11438,12 @@ app.post('/api/refund-payment', async (req, res) => {
                         error: stripeError.message
                     });
                 }
-            }
+            };
+
+        con.query(
+            paymentQuery,
+            queryParams,
+            handlePaymentLookupResults
         );
     } catch (error) {
         console.error('Error in refund-payment:', error);
