@@ -1174,8 +1174,8 @@ const CustomerPortal = () => {
                             <Typography variant="body2" color="text.secondary">Location</Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                                 <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                    {bookingData.location 
-                                        ? bookingData.location 
+                                    {bookingData.location
+                                        ? bookingData.location
                                         : (bookingData.is_flight_voucher ? 'Not Scheduled' : 'TBD')}
                                 </Typography>
                                 {(() => {
@@ -1185,7 +1185,7 @@ const CustomerPortal = () => {
                                     const isCancelled = bookingData.status && String(bookingData.status).toLowerCase() === 'cancelled';
                                     const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
                                     
-                                    // Calculate hours until flight for 120-hour rule (skip for cancelled - no active flight)
+                                    // When cancelled, allow location changes because there is no active flight slot anymore.
                                     const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
                                     
                                     // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
@@ -1198,7 +1198,6 @@ const CustomerPortal = () => {
                                     const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
                                     const shouldApplyRedeemedCheck = isFlightVoucherSection;
-                                    // When cancelled, allow Change (bypass flight-date/120h rules - no active flight)
                                     const flightRestrictions = isFlightDatePassed || hoursUntilFlight <= 120;
                                     const isDisabled = changingLocation || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired || (!isCancelled && flightRestrictions);
                                     

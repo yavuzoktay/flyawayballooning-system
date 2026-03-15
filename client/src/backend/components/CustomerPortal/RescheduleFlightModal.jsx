@@ -50,6 +50,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     // Get activity ID, location, and voucher type from booking data
     const activityId = bookingData?.activity_id || bookingData?.activityId;
     const location = bookingData?.location;
+    const hasFixedLocation = Boolean(String(location || '').trim());
     // Get real voucher type - check multiple fields and exclude book_flight values
     let voucherType = bookingData?.voucher_type || bookingData?.voucher_type_detail;
     // If voucherType is "Flight Voucher" or "Gift Voucher", try to find real voucher type
@@ -385,9 +386,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             return;
         }
 
-        // For non-flight voucher, use existing booking location but still load activities
-        // This is needed for cancelled bookings where activityId might be missing
-        if (!isFlightVoucher) {
+        // If booking already has a known location, keep using it and skip
+        // the voucher-style location picker. This matches the cancelled
+        // booking flow already used by bookings like 1502.
+        if (hasFixedLocation || !isFlightVoucher) {
             const loc = bookingData?.location ? [bookingData.location] : [];
             setAvailableLocations([]);
             setSelectedLocations(loc);
@@ -411,7 +413,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             return;
         }
 
-        // For Flight Voucher, always load activities to show available locations
+        // For Flight Voucher without a known location, load activities to show available locations
         const loadActivities = async () => {
             try {
                 setLoading(true);
@@ -450,7 +452,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         };
 
         loadActivities();
-    }, [open, isFlightVoucher, bookingData?.book_flight, bookingData?.is_flight_voucher]);
+    }, [open, isFlightVoucher, hasFixedLocation, bookingData?.book_flight, bookingData?.is_flight_voucher, bookingData?.location]);
 
     // Fetch availabilities when modal opens or selected locations change
     useEffect(() => {
@@ -463,10 +465,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         }
 
         const fetchAvailabilitiesForLocations = async () => {
-            const targetLocations = isFlightVoucher ? selectedLocations : (bookingData?.location ? [bookingData.location] : []);
+            const targetLocations = (isFlightVoucher && !hasFixedLocation)
+                ? selectedLocations
+                : (bookingData?.location ? [bookingData.location] : selectedLocations);
             
             // For Flight Voucher, show helpful message if no locations selected
-            if (isFlightVoucher && targetLocations.length === 0) {
+            if (isFlightVoucher && !hasFixedLocation && targetLocations.length === 0) {
                 setAvailabilities([]);
                 setError(null);
                 setLoading(false);
@@ -474,7 +478,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }
             
             // For non-Flight Voucher, if no location, don't fetch
-            if (!isFlightVoucher && targetLocations.length === 0) {
+            if ((!isFlightVoucher || hasFixedLocation) && targetLocations.length === 0) {
                 setAvailabilities([]);
                 setError(null);
                 setLoading(false);
@@ -557,7 +561,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         };
 
         fetchAvailabilitiesForLocations();
-    }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData, isFlightVoucher]);
+    }, [open, selectedLocations, activities, activityId, voucherType, experience, bookingData, isFlightVoucher, hasFixedLocation]);
 
     // Filtered availabilities - similar to Change Flight Location modal
     // Filter by location, experience, voucher type, and past slots
@@ -1167,7 +1171,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 ) : (
                     <>
                         {/* Locations (Flight Voucher style) - single selection only */}
-                        {availableLocations.length > 0 && (
+                        {availableLocations.length > 0 && !hasFixedLocation && (
                             <Box sx={{ mb: isMobile ? 2 : 3 }}>
                                 <Typography variant="h6" sx={{ mb: isMobile ? 1.5 : 2, fontSize: isMobile ? 14 : 16, fontWeight: 700 }}>
                                     Locations:

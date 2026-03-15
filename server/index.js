@@ -113,6 +113,16 @@ const giftVoucherEmailCache = new Map();   // voucherId -> timestamp
 
 const isEmailServiceAvailable = () => sendgridReady || !!smtpTransporter;
 
+// Google Calendar shared-flight aggregation must match slot time even when
+// all_booking.time_slot is null and only flight_date carries the time.
+const GOOGLE_CALENDAR_SLOT_MATCH_SQL = `
+    COALESCE(
+        TIME_FORMAT(STR_TO_DATE(NULLIF(time_slot, ''), '%H:%i:%s'), '%H:%i:%s'),
+        TIME_FORMAT(STR_TO_DATE(NULLIF(time_slot, ''), '%H:%i'), '%H:%i:%s'),
+        TIME_FORMAT(flight_date, '%H:%i:%s')
+    )
+`;
+
 const shouldFallbackToSmtp = (error) => {
     if (!error) return false;
     const code = Number(error.code || error.statusCode || error?.response?.statusCode || error?.response?.status);
@@ -13936,12 +13946,12 @@ app.post('/api/createBooking', (req, res) => {
                                     WHERE flight_date = ? 
                                     AND location = ? 
                                     AND flight_type = ? 
-                                    AND time_slot = ? 
+                                    AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                     AND status != 'Cancelled'
                                     AND id != ?
                                 `;
                                 
-                                con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null, bookingId], (checkErr, checkResult) => {
+                                con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime, bookingId], (checkErr, checkResult) => {
                                     if (!checkErr && checkResult.length > 0) {
                                         const existingBookings = checkResult[0].booking_count || 0;
                                         // Create event if this is the first booking (existingBookings === 0)
@@ -13981,12 +13991,12 @@ app.post('/api/createBooking', (req, res) => {
                                     WHERE flight_date = ? 
                                     AND location = ? 
                                     AND flight_type = ? 
-                                    AND time_slot = ? 
+                                    AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                     AND status != 'Cancelled'
                                     AND id != ?
                                 `;
                                 
-                                con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null, bookingId], (checkErr, checkResult) => {
+                                con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime, bookingId], (checkErr, checkResult) => {
                                     if (!checkErr && checkResult.length > 0) {
                                         const existingBookings = checkResult[0].booking_count || 0;
                                         if (existingBookings === 0) {
@@ -14036,7 +14046,7 @@ app.post('/api/createBooking', (req, res) => {
                             WHERE flight_date = ? 
                             AND location = ? 
                             AND flight_type = ? 
-                            AND time_slot = ?
+                            AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                             AND status != 'Cancelled'
                         `;
                         
@@ -14047,7 +14057,7 @@ app.post('/api/createBooking', (req, res) => {
                             timeSlot: selectedTime || null
                         });
                         
-                        con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                        con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime], async (paxErr, paxResult) => {
                             if (paxErr) {
                                 console.error('❌ [createGoogleCalendarEvent] Error querying total passengers:', paxErr);
                                 saveErrorLog('error', `Error querying total passengers for booking ${bookingId}: ${paxErr.message}`, paxErr.stack, 'createBooking.createGoogleCalendarEvent.queryPassengers');
@@ -14170,12 +14180,12 @@ app.post('/api/createBooking', (req, res) => {
                                         WHERE flight_date = ? 
                                         AND location = ? 
                                         AND flight_type = ? 
-                                        AND time_slot = ?
+                                        AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                         AND status != 'Cancelled'
                                     `;
                                     con.query(
                                         updateAllBookingsSql,
-                                        [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null],
+                                        [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime],
                                         (updateErr, updateResult) => {
                                             if (updateErr) {
                                                 console.error('❌ Error updating bookings with Google Calendar event ID:', updateErr);
@@ -14256,12 +14266,12 @@ app.post('/api/createBooking', (req, res) => {
                                                 WHERE flight_date = ? 
                                                 AND location = ? 
                                                 AND flight_type = ? 
-                                                AND time_slot = ?
+                                                AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                                 AND status != 'Cancelled'
                                             `;
                                             con.query(
                                                 updateAllBookingsSql,
-                                                [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null],
+                                                [eventId, bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime],
                                                 (updateErr, updateResult) => {
                                                     if (updateErr) {
                                                         console.error('❌ Error updating bookings with Google Calendar event ID:', updateErr);
@@ -14365,13 +14375,13 @@ app.post('/api/createBooking', (req, res) => {
                             WHERE flight_date = ? 
                             AND location = ? 
                             AND flight_type = ? 
-                            AND time_slot = ?
+                            AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                             AND status != 'Cancelled'
                             AND google_calendar_event_id IS NOT NULL
                             LIMIT 1
                         `;
                         
-                        con.query(getEventIdSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (eventErr, eventResult) => {
+                        con.query(getEventIdSql, [bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime], async (eventErr, eventResult) => {
                             // Handle rebook calendar update first
                             const rebookEventId = await handleRebookCalendarUpdate();
                             
@@ -14394,11 +14404,11 @@ app.post('/api/createBooking', (req, res) => {
                                 WHERE flight_date = ? 
                                 AND location = ? 
                                 AND flight_type = ? 
-                                AND time_slot = ?
+                                AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                 AND status != 'Cancelled'
                             `;
                             
-                            con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null], async (paxErr, paxResult) => {
+                            con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime], async (paxErr, paxResult) => {
                                 const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
                                     ? parseInt(paxResult[0].total_passengers) 
                                     : actualPaxCount;
@@ -14457,7 +14467,7 @@ app.post('/api/createBooking', (req, res) => {
                     WHERE flight_date = ? 
                     AND location = ? 
                     AND flight_type = ? 
-                    AND time_slot = ?
+                    AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                     AND status != 'Cancelled'
                 `;
                 
@@ -14468,7 +14478,7 @@ app.post('/api/createBooking', (req, res) => {
                     timeSlot: selectedTime || null
                 });
                 
-                con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, selectedTime || null], async (paxErr, paxResult) => {
+                con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, bookingDateTime], async (paxErr, paxResult) => {
                     if (paxErr) {
                         console.error('❌ [createGoogleCalendarEventForWebhook] Error querying total passengers:', paxErr);
                         saveErrorLog('error', `Error querying total passengers for webhook booking ${bookingId}: ${paxErr.message}`, paxErr.stack, 'createBookingFromWebhook.createGoogleCalendarEventForWebhook.queryPassengers');
@@ -14521,12 +14531,12 @@ app.post('/api/createBooking', (req, res) => {
                                 WHERE flight_date = ? 
                                 AND location = ? 
                                 AND flight_type = ? 
-                                AND time_slot = ?
+                                AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                 AND status != 'Cancelled'
                             `;
                             con.query(
                                 updateAllBookingsSql,
-                                [eventId, bookingDateTime, chooseLocation, flightType, selectedTime || null],
+                                [eventId, bookingDateTime, chooseLocation, flightType, bookingDateTime],
                                 (updateErr, updateResult) => {
                                     if (updateErr) {
                                         console.error('❌ [createGoogleCalendarEventForWebhook] Error updating bookings with Google Calendar event ID:', updateErr);
@@ -14566,13 +14576,13 @@ app.post('/api/createBooking', (req, res) => {
                     WHERE flight_date = ? 
                     AND location = ? 
                     AND flight_type = ? 
-                    AND time_slot = ?
+                    AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                     AND status != 'Cancelled'
                     AND google_calendar_event_id IS NOT NULL
                     LIMIT 1
                 `;
                 
-                con.query(getEventIdSql, [bookingDateTime, chooseLocation, flightType, selectedTime || null], async (eventErr, eventResult) => {
+                con.query(getEventIdSql, [bookingDateTime, chooseLocation, flightType, bookingDateTime], async (eventErr, eventResult) => {
                     if (eventErr || !eventResult || eventResult.length === 0) {
                         // No existing event, create new one
                         console.log('📅 [updateGoogleCalendarEventForSharedFlightWebhook] No existing event found, creating new one');
@@ -14594,11 +14604,11 @@ app.post('/api/createBooking', (req, res) => {
                         WHERE flight_date = ? 
                         AND location = ? 
                         AND flight_type = ? 
-                        AND time_slot = ?
+                        AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                         AND status != 'Cancelled'
                     `;
                     
-                    con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, selectedTime || null], async (paxErr, paxResult) => {
+                    con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, bookingDateTime], async (paxErr, paxResult) => {
                         const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
                             ? parseInt(paxResult[0].total_passengers) 
                             : 1;
@@ -17213,11 +17223,11 @@ app.post('/api/addPassenger', (req, res) => {
                             WHERE flight_date = ? 
                             AND location = ? 
                             AND flight_type = ? 
-                            AND time_slot = ?
+                            AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                             AND status != 'Cancelled'
                         `;
                         
-                        con.query(getTotalPassengersSql, [flightDate, location, flightType, timeSlot || null], async (paxErr, paxResult) => {
+                        con.query(getTotalPassengersSql, [flightDate, location, flightType, flightDate], async (paxErr, paxResult) => {
                             if (!paxErr && paxResult && paxResult.length > 0) {
                                 totalPassengers = parseInt(paxResult[0].total_passengers) || newPax;
                             }
@@ -17724,11 +17734,11 @@ app.delete('/api/deletePassenger', (req, res) => {
                                     WHERE flight_date = ? 
                                     AND location = ? 
                                     AND flight_type = ? 
-                                    AND time_slot = ?
+                                    AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                     AND status != 'Cancelled'
                                 `;
                                 
-                                con.query(getTotalPassengersSql, [flightDate, location, flightType, timeSlot || null], async (paxErr, paxResult) => {
+                                con.query(getTotalPassengersSql, [flightDate, location, flightType, flightDate], async (paxErr, paxResult) => {
                                     if (!paxErr && paxResult && paxResult.length > 0) {
                                         totalPassengers = parseInt(paxResult[0].total_passengers) || newPax;
                                     }
@@ -19828,12 +19838,13 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                 if (redeemedBooking.flight_date) {
                     finalFlightDate = redeemedBooking.flight_date;
                     finalLocation = redeemedBooking.location || null;
-                    // If flight_date exists, status should be 'Scheduled'
-                    // Use redeemedBooking.status if it's 'Scheduled', otherwise set to 'Scheduled'
-                    if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
+                    // Preserve terminal/meaningful statuses like Cancelled/Flown.
+                    // Only coerce to Scheduled for open-ish statuses.
+                    const redeemedStatus = String(redeemedBooking.status || '').trim().toLowerCase();
+                    if (!redeemedStatus || redeemedStatus === 'open' || redeemedStatus === 'not scheduled') {
                         booking.status = 'Scheduled';
                     } else {
-                        booking.status = 'Scheduled'; // Set to Scheduled when flight_date exists
+                        booking.status = redeemedBooking.status;
                     }
                     console.log('✅ Customer Portal - Current booking is redeemed, using its flight_date, location, and status');
                 } else {
@@ -19868,9 +19879,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                         if (booking.flight_date) {
                             finalFlightDate = booking.flight_date;
                             finalLocation = booking.location || null;
-                            if (booking.status && booking.status.toLowerCase() !== 'scheduled') {
-                                booking.status = 'Scheduled';
-                            } else if (!booking.status || booking.status === 'Open' || booking.status === 'Not Scheduled') {
+                            const redeemedStatus = String(booking.status || '').trim().toLowerCase();
+                            if (!redeemedStatus || redeemedStatus === 'open' || redeemedStatus === 'not scheduled') {
                                 booking.status = 'Scheduled';
                             }
                             isVoucherRedeemed = true; // Mark as redeemed since we're using the redeemed booking
@@ -19892,10 +19902,11 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                         if (redeemedBooking.flight_date) {
                             finalFlightDate = redeemedBooking.flight_date;
                             finalLocation = redeemedBooking.location || null;
-                            if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
+                            const redeemedStatus = String(redeemedBooking.status || '').trim().toLowerCase();
+                            if (!redeemedStatus || redeemedStatus === 'open' || redeemedStatus === 'not scheduled') {
                                 booking.status = 'Scheduled';
                             } else {
-                                booking.status = 'Scheduled';
+                                booking.status = redeemedBooking.status;
                             }
                         } else {
                             finalFlightDate = null;
@@ -19908,10 +19919,11 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     if (redeemedBooking.flight_date) {
                         finalFlightDate = redeemedBooking.flight_date;
                         finalLocation = redeemedBooking.location || null;
-                        if (redeemedBooking.status && redeemedBooking.status.toLowerCase() === 'scheduled') {
+                        const redeemedStatus = String(redeemedBooking.status || '').trim().toLowerCase();
+                        if (!redeemedStatus || redeemedStatus === 'open' || redeemedStatus === 'not scheduled') {
                             booking.status = 'Scheduled';
                         } else {
-                            booking.status = 'Scheduled';
+                            booking.status = redeemedBooking.status;
                         }
                     } else {
                         finalFlightDate = null;
@@ -20066,6 +20078,11 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             if (!finalStatus || finalStatus === 'Open' || finalStatus === 'Not Scheduled' || finalStatus.toLowerCase() === 'open' || finalStatus.toLowerCase() === 'not scheduled') {
                 finalStatus = 'Scheduled';
             }
+        }
+
+        if (String(finalStatus || '').trim().toLowerCase() === 'cancelled') {
+            finalFlightDate = null;
+            finalLocation = finalLocation || booking.location || null;
         }
 
         const upsellOffer = await buildCustomerPortalUpsellOffer({
@@ -20547,7 +20564,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
                     WHERE flight_date = ? 
                       AND location = ? 
                       AND flight_type = ? 
-                      AND time_slot = ?
+                      AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                       AND status != 'Cancelled'
                 `;
 
@@ -20557,7 +20574,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
                         bookingDateTime,
                         newLocation,
                         flightType,
-                        timeSlot || null
+                        bookingDateTime
                     ]);
                     if (paxResult && paxResult.length > 0 && paxResult[0].total_passengers != null) {
                         totalPassengers = parseInt(paxResult[0].total_passengers, 10);
@@ -20622,7 +20639,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
                         WHERE flight_date = ? 
                           AND location = ? 
                           AND flight_type = ? 
-                          AND time_slot = ?
+                          AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                           AND status != 'Cancelled'
                     `;
 
@@ -20632,7 +20649,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
                             bookingDateTime,
                             newLocation,
                             flightType,
-                            timeSlot || null
+                            bookingDateTime
                         ]);
                         if (paxResult && paxResult.length > 0 && paxResult[0].total_passengers != null) {
                             totalPassengers = parseInt(paxResult[0].total_passengers, 10);
@@ -24479,11 +24496,11 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                         WHERE flight_date = ? 
                         AND location = ? 
                         AND flight_type = ? 
-                        AND time_slot = ?
+                        AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                         AND status != 'Cancelled'
                     `;
                     
-                    con.query(getFlightBookingsSql, [flight_date, location, booking.flight_type, booking.time_slot || formattedTime], async (flightErr, flightResult) => {
+                    con.query(getFlightBookingsSql, [flight_date, location, booking.flight_type, flight_date], async (flightErr, flightResult) => {
                         if (!flightErr && flightResult && flightResult.length > 0) {
                             const flightData = flightResult[0];
                             const totalPassengers = parseInt(flightData.total_passengers) || pax;
@@ -26221,7 +26238,7 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 WHERE flight_date = ? 
                 AND location = ? 
                 AND flight_type = ? 
-                AND time_slot = ?
+                AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                 AND status != 'Cancelled'
             `;
             
@@ -26232,7 +26249,7 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 timeSlot: selectedTime || null
             });
             
-            con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, selectedTime || null], async (paxErr, paxResult) => {
+            con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, bookingDateTime], async (paxErr, paxResult) => {
                 if (paxErr) {
                     console.error('❌ [createGoogleCalendarEventForWebhook] Error querying total passengers:', paxErr);
                     saveErrorLog('error', `Error querying total passengers for webhook booking ${bookingId}: ${paxErr.message}`, paxErr.stack, 'createBookingFromWebhook.createGoogleCalendarEventForWebhook.queryPassengers');
@@ -26284,12 +26301,12 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                             WHERE flight_date = ? 
                             AND location = ? 
                             AND flight_type = ? 
-                            AND time_slot = ?
+                            AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                             AND status != 'Cancelled'
                         `;
                         con.query(
                             updateAllBookingsSql,
-                            [eventId, bookingDateTime, chooseLocation, flightType, selectedTime || null],
+                            [eventId, bookingDateTime, chooseLocation, flightType, bookingDateTime],
                             (updateErr, updateResult) => {
                                 if (updateErr) {
                                     console.error('❌ [createGoogleCalendarEventForWebhook] Error updating bookings with Google Calendar event ID:', updateErr);
@@ -26329,13 +26346,13 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 WHERE flight_date = ? 
                 AND location = ? 
                 AND flight_type = ? 
-                AND time_slot = ?
+                AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                 AND status != 'Cancelled'
                 AND google_calendar_event_id IS NOT NULL
                 LIMIT 1
             `;
             
-            con.query(getEventIdSql, [bookingDateTime, chooseLocation, flightType, selectedTime || null], async (eventErr, eventResult) => {
+            con.query(getEventIdSql, [bookingDateTime, chooseLocation, flightType, bookingDateTime], async (eventErr, eventResult) => {
                 if (eventErr || !eventResult || eventResult.length === 0) {
                     // No existing event, create new one
                     console.log('📅 [updateGoogleCalendarEventForSharedFlightWebhook] No existing event found, creating new one');
@@ -26357,11 +26374,11 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                     WHERE flight_date = ? 
                     AND location = ? 
                     AND flight_type = ? 
-                    AND time_slot = ?
+                    AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                     AND status != 'Cancelled'
                 `;
                 
-                con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, selectedTime || null], async (paxErr, paxResult) => {
+                con.query(getTotalPassengersSql, [bookingDateTime, chooseLocation, flightType, bookingDateTime], async (paxErr, paxResult) => {
                     const totalPassengers = (paxResult && paxResult.length > 0 && paxResult[0].total_passengers) 
                         ? parseInt(paxResult[0].total_passengers) 
                         : 1;
@@ -26770,12 +26787,12 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                                     WHERE flight_date = ? 
                                     AND location = ? 
                                     AND flight_type = ? 
-                                    AND time_slot = ? 
+                                    AND ${GOOGLE_CALENDAR_SLOT_MATCH_SQL} = TIME_FORMAT(?, '%H:%i:%s')
                                     AND status != 'Cancelled'
                                     AND id != ?
                                 `;
                                 
-                                con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, selectedTime || null, bookingId], (checkErr, checkResult) => {
+                                con.query(checkSharedFlightSql, [bookingDateTime, chooseLocation, chooseFlightType.type, bookingDateTime, bookingId], (checkErr, checkResult) => {
                                     if (!checkErr && checkResult.length > 0) {
                                         const existingBookings = checkResult[0].booking_count || 0;
                                         // Create event if this is the first booking (existingBookings === 0)
