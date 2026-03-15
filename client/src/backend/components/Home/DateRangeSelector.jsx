@@ -112,17 +112,6 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // Set default dates for mobile on mount
-    useEffect(() => {
-        if (isMobile && !startDate && !endDate) {
-            const today = new Date();
-            const todayStr = today.toISOString().split('T')[0];
-            setStartDate(todayStr);
-            setEndDate(todayStr);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isMobile]);
-
     useEffect(() => {
         // Calculate summary for all data on page load
         calculateSummary(bookingData, voucherData);
