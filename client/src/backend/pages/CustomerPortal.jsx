@@ -944,6 +944,20 @@ const CustomerPortal = () => {
         return () => window.clearInterval(pollId);
     }, [token, bookingData?.id, bookingData?.invite_friends?.visible]);
 
+    const hasScheduledFlightDate = Boolean(
+        bookingData?.status &&
+        String(bookingData.status).toLowerCase() !== 'cancelled' &&
+        bookingData?.flight_date
+    );
+    const inviteFriendsEnabled = Boolean(bookingData?.invite_friends?.enabled && hasScheduledFlightDate);
+
+    useEffect(() => {
+        if (!inviteFriendsEnabled && inviteFriendsExpanded) {
+            setInviteFriendsExpanded(false);
+            setInviteFriendsCopyMessage('');
+        }
+    }, [inviteFriendsEnabled, inviteFriendsExpanded]);
+
     if (loading) {
         return (
             <>
@@ -987,9 +1001,12 @@ const CustomerPortal = () => {
     const upsellOfferTitle = normalizeUpsellOfferTitle(upsellOffer);
     const upsellOfferButtonLabel = normalizeUpsellOfferButtonLabel(upsellOffer);
     const upsellOfferDescription = normalizeUpsellOfferDescription(upsellOffer);
-    const inviteFriendsDescription = bookingData?.invite_friends?.description === 'Share a ready-made invite so your friends can join the same shared balloon flight.'
+    const baseInviteFriendsDescription = bookingData?.invite_friends?.description === 'Share a ready-made invite so your friends can join the same shared balloon flight.'
         ? 'Share an invite and give your friends 10% off their balloon flight.'
         : bookingData?.invite_friends?.description;
+    const inviteFriendsDescription = hasScheduledFlightDate
+        ? baseInviteFriendsDescription
+        : 'Invite Friends becomes available once your shared flight has been scheduled.';
     const inviteFriendsActions = [
         {
             channel: 'whatsapp',
@@ -1012,7 +1029,8 @@ const CustomerPortal = () => {
         bookingData?.invite_friends?.visible &&
         bookingData?.invite_friends?.availableSpaces !== 0 &&
         !shouldHideInviteFriends &&
-        !isFullyRefunded
+        !isFullyRefunded &&
+        hasScheduledFlightDate
     );
 
     return (
@@ -1703,7 +1721,7 @@ const CustomerPortal = () => {
                             borderRadius: 4,
                             border: '1px solid',
                             borderColor: inviteSectionPalette.border,
-                            backgroundColor: bookingData.invite_friends.enabled
+                            backgroundColor: inviteFriendsEnabled
                                 ? inviteSectionPalette.background
                                 : inviteSectionPalette.disabledBackground,
                             boxShadow: 'none'
@@ -1724,7 +1742,7 @@ const CustomerPortal = () => {
                                     sx={{
                                         fontWeight: 700,
                                         mb: 1,
-                                        color: bookingData.invite_friends.enabled
+                                        color: inviteFriendsEnabled
                                             ? inviteSectionPalette.heading
                                             : '#818792'
                                     }}
@@ -1735,7 +1753,7 @@ const CustomerPortal = () => {
                                     variant="body1"
                                     sx={{
                                         mb: 1,
-                                        color: bookingData.invite_friends.enabled
+                                        color: inviteFriendsEnabled
                                             ? inviteSectionPalette.body
                                             : '#98a0ab'
                                     }}
@@ -1749,7 +1767,7 @@ const CustomerPortal = () => {
                                     setInviteFriendsExpanded((current) => !current);
                                     setInviteFriendsCopyMessage('');
                                 }}
-                                disabled={!bookingData.invite_friends.enabled}
+                                disabled={!inviteFriendsEnabled}
                                 sx={{
                                     minWidth: { xs: '100%', md: 220 },
                                     ...primaryActionButtonSx,
@@ -1759,8 +1777,8 @@ const CustomerPortal = () => {
                                     fontWeight: 700,
                                     '&:hover': {
                                         boxShadow: 'none',
-                                        backgroundColor: bookingData.invite_friends.enabled ? actionGreenPalette.hover : actionGreenPalette.disabledBackground,
-                                        borderColor: bookingData.invite_friends.enabled ? actionGreenPalette.hover : actionGreenPalette.disabledBorder
+                                        backgroundColor: inviteFriendsEnabled ? actionGreenPalette.hover : actionGreenPalette.disabledBackground,
+                                        borderColor: inviteFriendsEnabled ? actionGreenPalette.hover : actionGreenPalette.disabledBorder
                                     }
                                 }}
                             >
@@ -1768,7 +1786,7 @@ const CustomerPortal = () => {
                             </Button>
                         </Box>
 
-                        {inviteFriendsExpanded && bookingData.invite_friends.enabled && (
+                        {inviteFriendsExpanded && inviteFriendsEnabled && (
                             <Box sx={{ mt: 2.5 }}>
                                 <Paper
                                     elevation={0}

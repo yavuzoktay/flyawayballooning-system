@@ -5782,12 +5782,11 @@ const Manifest = () => {
   <>
     {bookingDetail.booking.expires ? (
       (() => {
-        // Helper function to calculate expires date based on flight_attempts
-        // If flight_attempts is a multiple of 3, add 6 months to expires date
-        const calculateExpiresDate = (expiresDate, flightAttempts) => {
+        // Format the persisted expires date for display.
+        // Any 6-month extension must already be written by the backend.
+        const formatExpiresDate = (expiresDate) => {
           if (!expiresDate) return expiresDate;
           const formatOut = 'DD/MM/YY';
-          const attempts = parseInt(flightAttempts, 10) || 0;
           
           const parseDate = (val) => {
             if (typeof val === 'string' && val.includes('/')) {
@@ -5802,17 +5801,10 @@ const Manifest = () => {
           let parsedDate = parseDate(expiresDate);
           if (!parsedDate.isValid()) return expiresDate;
 
-          // Add 6 months if flight_attempts is a multiple of 3
-          if (attempts > 0 && attempts % 3 === 0) {
-            parsedDate = parsedDate.add(6, 'month');
-          }
-
           return parsedDate.isValid() ? parsedDate.format(formatOut) : expiresDate;
         };
-        
-        // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
-        const flightAttempts = bookingDetail.booking.flight_attempts ?? 0;
-        return calculateExpiresDate(bookingDetail.booking.expires, flightAttempts);
+
+        return formatExpiresDate(bookingDetail.booking.expires);
       })()
     ) : '-'}
     <IconButton 

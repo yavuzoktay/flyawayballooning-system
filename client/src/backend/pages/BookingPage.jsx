@@ -228,13 +228,12 @@ const BookingPage = () => {
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [detailError, setDetailError] = useState(null);
     const [bookingHistory, setBookingHistory] = useState([]);
-    // Helper function to calculate expires date based on flight_attempts
-    // If flight_attempts is a multiple of 3, add 6 months to expires date
-    const calculateExpiresDate = (expiresDate, flightAttempts) => {
+    // Format the persisted expires date for display.
+    // Any 6-month extension must already be written by the backend.
+    const formatExpiresDate = (expiresDate) => {
         if (!expiresDate) return expiresDate;
 
         const formatOut = 'DD/MM/YY';
-        const attempts = parseInt(flightAttempts, 10) || 0;
 
         const parseDate = (val) => {
             if (typeof val === 'string' && val.includes('/')) {
@@ -248,11 +247,6 @@ const BookingPage = () => {
 
         let parsedDate = parseDate(expiresDate);
         if (!parsedDate.isValid()) return expiresDate;
-
-        // Add 6 months if flight_attempts is a multiple of 3
-        if (attempts > 0 && attempts % 3 === 0) {
-            parsedDate = parsedDate.add(6, 'month');
-        }
 
         return parsedDate.isValid() ? parsedDate.format(formatOut) : expiresDate;
     };
@@ -2915,30 +2909,32 @@ setBookingDetail(finalVoucherDetail);
                 }
                 
                 // Local state güncelle
+                const updatedFieldValue = response?.data?.updatedValue ?? editValue;
+
                 setBookingDetail(prev => ({
                     ...prev,
                     voucher: {
                         ...prev.voucher,
-                        [editField]: editValue,
+                        [editField]: updatedFieldValue,
                         // Also update purchaser fields in local state for Gift Vouchers
-                        ...(isGiftVoucher && editField === 'name' ? { purchaser_name: editValue } : {}),
-                        ...(isGiftVoucher && editField === 'email' ? { purchaser_email: editValue } : {}),
-                        ...(isGiftVoucher && editField === 'purchaser_phone' ? { purchaser_phone: editValue } : {})
+                        ...(isGiftVoucher && editField === 'name' ? { purchaser_name: updatedFieldValue } : {}),
+                        ...(isGiftVoucher && editField === 'email' ? { purchaser_email: updatedFieldValue } : {}),
+                        ...(isGiftVoucher && editField === 'purchaser_phone' ? { purchaser_phone: updatedFieldValue } : {})
                     }
                 }));
                 // Tabloyu güncelle
                 setVoucher(prev => prev.map(v => {
                     if (v.id === voucherId) {
-                        const updated = { ...v, [editField]: editValue };
+                        const updated = { ...v, [editField]: updatedFieldValue };
                         // Also update purchaser fields in table for Gift Vouchers
                         if (isGiftVoucher && editField === 'name') {
-                            updated.purchaser_name = editValue;
+                            updated.purchaser_name = updatedFieldValue;
                         }
                         if (isGiftVoucher && editField === 'email') {
-                            updated.purchaser_email = editValue;
+                            updated.purchaser_email = updatedFieldValue;
                         }
                         if (isGiftVoucher && editField === 'purchaser_phone') {
-                            updated.purchaser_phone = editValue;
+                            updated.purchaser_phone = updatedFieldValue;
                         }
                         return updated;
                     }
@@ -2946,16 +2942,16 @@ setBookingDetail(finalVoucherDetail);
                 }));
                 setFilteredData(prev => prev.map(v => {
                     if (v.id === voucherId) {
-                        const updated = { ...v, [editField]: editValue };
+                        const updated = { ...v, [editField]: updatedFieldValue };
                         // Also update purchaser fields in filtered data for Gift Vouchers
                         if (isGiftVoucher && editField === 'name') {
-                            updated.purchaser_name = editValue;
+                            updated.purchaser_name = updatedFieldValue;
                         }
                         if (isGiftVoucher && editField === 'email') {
-                            updated.purchaser_email = editValue;
+                            updated.purchaser_email = updatedFieldValue;
                         }
                         if (isGiftVoucher && editField === 'purchaser_phone') {
-                            updated.purchaser_phone = editValue;
+                            updated.purchaser_phone = updatedFieldValue;
                         }
                         return updated;
                     }
@@ -2984,11 +2980,12 @@ setBookingDetail(finalVoucherDetail);
                 setSavingEdit(false);
                 return;
             }
-            await axios.patch('/api/updateBookingField', {
+            const response = await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: editField,
                 value: editValue
             });
+            const updatedFieldValue = response?.data?.updatedValue ?? editValue;
             if (editField === 'weight' && bookingDetail.passengers && bookingDetail.passengers.length > 0) {
                 setBookingDetail(prev => ({
                     ...prev,
@@ -3007,12 +3004,12 @@ setBookingDetail(finalVoucherDetail);
                 await fetchPassengers(bookingDetail.booking.id);
                 setBookingDetail(prev => ({
                     ...prev,
-                    booking: { ...prev.booking, [editField]: editValue }
+                    booking: { ...prev.booking, [editField]: updatedFieldValue }
                 }));
             }
             // Tabloyu anında güncelle
-            setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
-            setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: editValue } : b));
+            setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: updatedFieldValue } : b));
+            setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, [editField]: updatedFieldValue } : b));
             
             // Phone/email güncellemesi yapıldığında Manifest sayfasını bilgilendir
             if (editField === 'phone' || editField === 'email') {
@@ -6873,9 +6870,7 @@ setBookingDetail(finalVoucherDetail);
                                                             <>
                                                                 {bookingDetail.voucher.expires ? (
                                                                     (() => {
-                                                                        // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
-                                                                        const flightAttempts = v.flight_attempts ?? 0;
-                                                                        return calculateExpiresDate(bookingDetail.voucher.expires, flightAttempts);
+                                                                        return formatExpiresDate(bookingDetail.voucher.expires);
                                                                     })()
                                                                 ) : '-'}
                                                                 <IconButton 
@@ -7225,9 +7220,7 @@ setBookingDetail(finalVoucherDetail);
                                                         <>
                                                             {bookingDetail.booking.expires ? (
                                                                 (() => {
-                                                                    // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
-                                                                    const flightAttempts = bookingDetail.booking.flight_attempts ?? 0;
-                                                                    return calculateExpiresDate(bookingDetail.booking.expires, flightAttempts);
+                                                                    return formatExpiresDate(bookingDetail.booking.expires);
                                                                 })()
                                                             ) : '-'}
                                                             <IconButton 
@@ -7373,9 +7366,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 ) : '-'}</Typography>
                                                                 <Typography><b>Expires:</b> {v.expires ? (
                                                                     (() => {
-                                                                        // Calculate expires date based on flight_attempts (add 6 months if multiple of 3)
-                                                                        const flightAttempts = v.flight_attempts ?? 0;
-                                                                        return calculateExpiresDate(v.expires, flightAttempts);
+                                                                        return formatExpiresDate(v.expires);
                                                                     })()
                                                                 ) : '-'}</Typography>
                                                             </>;

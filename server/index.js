@@ -18097,12 +18097,96 @@ app.patch('/api/updateBookingField', (req, res) => {
     let params;
     let normalizedValue = value;
 
+    const clearBookingAndVoucherCaches = () => {
+        __getAllBookingDataCache.lastKey = null;
+        __getAllBookingDataCache.lastResponse = null;
+        __getAllVoucherDataCache.lastKey = null;
+        __getAllVoucherDataCache.lastResponse = null;
+    };
+
+    const finalizeExpiresUpdate = () => {
+        con.query('SELECT id, voucher_code, expires FROM all_booking WHERE id = ?', [booking_id], (verifyErr, verifyRows) => {
+            if (verifyErr) {
+                console.error('Error verifying expires update:', verifyErr);
+                clearBookingAndVoucherCaches();
+                return res.json({ success: true, updatedValue: normalizedValue });
+            }
+
+            const verifiedBooking = Array.isArray(verifyRows) && verifyRows.length > 0 ? verifyRows[0] : null;
+            const verifiedExpires = verifiedBooking?.expires
+                ? moment(verifiedBooking.expires).format('YYYY-MM-DD')
+                : null;
+
+            const codesToSync = new Set();
+            if (verifiedBooking?.voucher_code) {
+                codesToSync.add(String(verifiedBooking.voucher_code).trim());
+            }
+
+            con.query(
+                `
+                SELECT vc.code
+                FROM voucher_code_usage vcu
+                INNER JOIN voucher_codes vc ON vc.id = vcu.voucher_code_id
+                WHERE vcu.booking_id = ?
+                ORDER BY vcu.used_at DESC
+                LIMIT 3
+                `,
+                [booking_id],
+                (usageErr, usageRows) => {
+                    if (usageErr) {
+                        console.warn('Error loading linked voucher codes during expires sync:', usageErr.message);
+                    } else {
+                        (usageRows || []).forEach((row) => {
+                            if (row?.code) {
+                                codesToSync.add(String(row.code).trim());
+                            }
+                        });
+                    }
+
+                    const uniqueCodes = Array.from(codesToSync).filter(Boolean);
+                    if (uniqueCodes.length === 0) {
+                        clearBookingAndVoucherCaches();
+                        return res.json({ success: true, updatedValue: verifiedExpires });
+                    }
+
+                    const placeholders = uniqueCodes.map(() => '?').join(',');
+                    const syncVoucherSql = `
+                        UPDATE all_vouchers
+                        SET expires = ?
+                        WHERE voucher_ref IN (${placeholders}) OR vc_code IN (${placeholders})
+                    `;
+                    const syncParams = [verifiedExpires, ...uniqueCodes, ...uniqueCodes];
+
+                    con.query(syncVoucherSql, syncParams, (syncErr) => {
+                        if (syncErr) {
+                            console.warn('Error syncing expires to linked vouchers:', syncErr.message);
+                        }
+                        clearBookingAndVoucherCaches();
+                        return res.json({ success: true, updatedValue: verifiedExpires });
+                    });
+                }
+            );
+        });
+    };
+
     const performUpdate = () => {
         if (field === 'weight') {
             // passenger tablosunda ana yolcunun weight bilgisini güncelle
             sql = `UPDATE passenger SET weight = ? WHERE booking_id = ? LIMIT 1`;
             params = [value, booking_id];
         } else {
+            if (field === 'expires') {
+                if (value === null || value === undefined || String(value).trim() === '') {
+                    normalizedValue = null;
+                } else {
+                    const parsedExpires = moment(value, ['YYYY-MM-DD', 'DD/MM/YYYY', 'DD-MM-YYYY', moment.ISO_8601], true);
+                    if (!parsedExpires.isValid()) {
+                        return res.status(400).json({ success: false, message: 'Invalid expires date' });
+                    }
+                    normalizedValue = parsedExpires.format('YYYY-MM-DD');
+                }
+            }
+
             // Normalize status values to proper capitalization
             if (field === 'status' && typeof value === 'string') {
                 const statusLower = value.toLowerCase();
@@ -18170,12 +18254,10 @@ app.patch('/api/updateBookingField', (req, res) => {
             }
             
             console.log('updateBookingField - Database güncelleme başarılı:', { field, value, normalizedValue, affectedRows: result.affectedRows, booking_id });
-            
-            // Invalidate getAllBookingData cache when status is updated
+
+            clearBookingAndVoucherCaches();
             if (field === 'status') {
-                __getAllBookingDataCache.lastKey = null;
-                __getAllBookingDataCache.lastResponse = null;
-                console.log('🔄 Cleared getAllBookingData cache after status update');
+                console.log('🔄 Cleared booking/voucher caches after status update');
                 console.log('🔄 [updateBookingField] Status update successful. Field:', field, 'Value:', value, 'Normalized:', normalizedValue, 'Booking ID:', booking_id);
             }
 
@@ -18204,7 +18286,10 @@ app.patch('/api/updateBookingField', (req, res) => {
             const refreshOldSlot = previousSlot && slotFields.has(field);
 
             const finalizeResponse = () => {
-                res.json({ success: true });
+                if (field === 'expires') {
+                    return finalizeExpiresUpdate();
+                }
+                res.json({ success: true, updatedValue: normalizedValue });
             };
 
             if (field === 'status') {
