@@ -24517,6 +24517,37 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                                         bookingId: booking_id.toString()
                                     });
                                 } catch (calendarError) {
+                                    const calendarErrorCode =
+                                        calendarError?.response?.data?.error?.code ||
+                                        calendarError?.response?.status ||
+                                        calendarError?.status ||
+                                        calendarError?.code;
+
+                                    if (calendarError?.googleCalendarEventMissing || calendarErrorCode === 404) {
+                                        console.warn('⚠️ Google Calendar event missing during manifest status update. Clearing stale event ID.', {
+                                            booking_id,
+                                            eventId
+                                        });
+
+                                        con.query(
+                                            'UPDATE all_booking SET google_calendar_event_id = NULL WHERE id = ?',
+                                            [booking_id],
+                                            (clearErr) => {
+                                                if (clearErr) {
+                                                    console.error('Error clearing stale Google Calendar event ID after 404:', clearErr);
+                                                }
+                                            }
+                                        );
+
+                                        saveErrorLog(
+                                            'warning',
+                                            `Google Calendar event ${eventId || 'unknown'} was not found for booking ${booking_id || 'unknown'}. Cleared stale event ID during manifest status update.`,
+                                            null,
+                                            'updateManifestStatus.updateCalendarEvent'
+                                        );
+                                        return;
+                                    }
+
                                     console.error('Error updating Google Calendar event:', calendarError);
                                     
                                     // Save error to logs database

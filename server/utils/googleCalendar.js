@@ -248,7 +248,20 @@ const updateCalendarEvent = async (eventId, flightData) => {
 
         console.log('✅ [updateCalendarEvent] Google Calendar event updated successfully:', eventId);
         console.log('✅ [updateCalendarEvent] Updated event description in response:', updateResponse.data.description);
+        return { success: true };
     } catch (error) {
+        const errorCode =
+            error?.response?.data?.error?.code ||
+            error?.response?.status ||
+            error?.status ||
+            error?.code;
+
+        if (errorCode === 404) {
+            error.googleCalendarEventMissing = true;
+            console.warn('⚠️ [updateCalendarEvent] Google Calendar event not found, treating as stale event ID:', eventId);
+            throw error;
+        }
+
         console.error('❌ Error updating Google Calendar event:', error);
         
         // Save error to logs database
