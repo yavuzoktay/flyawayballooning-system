@@ -3660,18 +3660,49 @@ app.delete('/api/experiences/:id', (req, res) => {
 
 // ==================== VOUCHER TYPES API ENDPOINTS ====================
 
+function normalizeVoucherLocation(rawLocation) {
+    if (!rawLocation || typeof rawLocation !== 'string') {
+        return '';
+    }
+
+    let cleaned = rawLocation;
+    try {
+        cleaned = decodeURIComponent(rawLocation);
+    } catch (error) {
+        cleaned = rawLocation;
+    }
+
+    const normalized = cleaned
+        .trim()
+        .toLowerCase()
+        .replace(/[-_]+/g, ' ')
+        .replace(/\s+/g, ' ');
+
+    if (!normalized) {
+        return '';
+    }
+
+    if (normalized.includes('bath')) return 'Bath';
+    if (normalized.includes('somerset')) return 'Somerset';
+    if (normalized.includes('devon')) return 'Devon';
+    if (normalized.includes('bristol')) return 'Bristol';
+
+    return cleaned.trim();
+}
+
 // Get all voucher types with updated pricing from activity table
 app.get('/api/voucher-types', (req, res) => {
     console.log('GET /api/voucher-types called');
     console.log('CORS: Request origin:', req.headers.origin);
 
     // Get location from query parameter if provided
-    const { location } = req.query;
+    const requestedLocation = req.query.location;
+    const location = normalizeVoucherLocation(requestedLocation);
 
     let sql, params = [];
 
     if (location) {
-        // If location is provided, get voucher types with location-specific pricing
+        // If location is provided, get voucher types with location-specific pricing from the latest live activity.
         sql = `
             SELECT 
                 vt.*,
@@ -3681,7 +3712,18 @@ app.get('/api/voucher-types', (req, res) => {
                 a.shared_flight_from_price,
                 a.private_charter_from_price
             FROM voucher_types vt
-            LEFT JOIN activity a ON a.status = 'Live' AND a.location = ?
+            LEFT JOIN (
+                SELECT
+                    weekday_morning_price,
+                    flexible_weekday_price,
+                    any_day_flight_price,
+                    shared_flight_from_price,
+                    private_charter_from_price
+                FROM activity
+                WHERE status = 'Live' AND location = ?
+                ORDER BY id DESC
+                LIMIT 1
+            ) a ON 1=1
             ORDER BY vt.sort_order ASC, vt.created_at DESC
         `;
         params.push(location);
@@ -3705,6 +3747,7 @@ app.get('/api/voucher-types', (req, res) => {
 
     console.log('SQL Query:', sql);
     console.log('SQL params:', params);
+    console.log('Location query:', { requestedLocation, normalizedLocation: location });
 
     con.query(sql, params, (err, result) => {
         // Ensure CORS headers are always set, even on error
@@ -4181,7 +4224,8 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
 
     // Check if we want only active voucher types (default) or all
     const showOnlyActive = req.query.active !== 'false';
-    const location = req.query.location;
+    const requestedLocation = req.query.location;
+    const location = normalizeVoucherLocation(requestedLocation);
     const passengers = req.query.passengers ? Number(req.query.passengers) : undefined;
 
     let sql, params = [];
@@ -4218,6 +4262,8 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
         let finalResult = result;
 
         // If location is provided, enrich price_per_person from activity.private_charter_pricing
+        console.log('Private charter location query:', { requestedLocation, normalizedLocation: location });
+
         if (location) {
             const actSql = 'SELECT id, activity_name, location, private_charter_pricing FROM activity WHERE status = "Live" AND location = ? ORDER BY id DESC LIMIT 1';
             con.query(actSql, [location], (aErr, aRes) => {
