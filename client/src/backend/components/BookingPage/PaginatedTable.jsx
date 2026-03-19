@@ -37,9 +37,19 @@ const PaginatedTable = ({
 
     // Helper to get column id/label
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || col?.key || ''));
-    const getDisplayName = (item, key) => {
-        const rawName = item?.[key] || '';
-        return item?.short_notice_opt_out && rawName ? `${rawName} 📵` : rawName;
+
+    const OPT_OUT_EMOJI = '📵';
+
+    const getDisplayNameParts = (item, key) => {
+        const rawName = (item?.[key] || '').toString();
+
+        const hasEmojiInText = rawName.includes(OPT_OUT_EMOJI);
+        const shouldShowEmoji = Boolean(item?.short_notice_opt_out) || hasEmojiInText;
+
+        // Remove the emoji from the text part so underline never affects it.
+        const nameText = rawName.replaceAll(OPT_OUT_EMOJI, '').trim();
+
+        return { nameText, shouldShowEmoji };
     };
 
     const getColLabel = (col) => {
@@ -625,16 +635,96 @@ const PaginatedTable = ({
                                                             fontFamily: "'Gilroy', sans-serif"
                                                         }}>
                                                             {id === 'name' ? (
-                                                                onNameClick ? (
-                                                                    <span
-                                                                        style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
-                                                                        onClick={() => onNameClick && onNameClick(item)}
-                                                                    >
-                                                                        {getDisplayName(item, id)}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span>{getDisplayName(item, id)}</span>
-                                                                )
+                                                                (() => {
+                                                                    const { nameText, shouldShowEmoji } = getDisplayNameParts(item, id);
+
+                                                                    // Use separate spans so underline never applies to the emoji.
+                                                                    const nameSpanStyles = {
+                                                                        color: '#3274b4',
+                                                                        cursor: onNameClick ? 'pointer' : 'default',
+                                                                        textDecoration: shouldShowEmoji ? 'none' : 'underline',
+                                                                        fontSize: '16px',
+                                                                        fontWeight: 'normal',
+                                                                        fontFamily: "'Gilroy', sans-serif",
+                                                                        flex: '1 1 auto',
+                                                                        minWidth: 0,
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis',
+                                                                        whiteSpace: 'nowrap'
+                                                                    };
+
+                                                                    return onNameClick ? (
+                                                                        <div
+                                                                            style={{
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'space-between',
+                                                                                width: '100%',
+                                                                                gap: '6px'
+                                                                            }}
+                                                                        >
+                                                                            <span
+                                                                                style={nameSpanStyles}
+                                                                                onClick={() => onNameClick && onNameClick(item)}
+                                                                            >
+                                                                                {nameText}
+                                                                            </span>
+                                                                            {shouldShowEmoji && (
+                                                                                <span
+                                                                                    style={{
+                                                                                        flex: '0 0 auto',
+                                                                                        marginLeft: 'auto',
+                                                                                        color: '#3274b4',
+                                                                                        fontSize: '16px',
+                                                                                        fontWeight: 'normal',
+                                                                                        lineHeight: 1
+                                                                                    }}
+                                                                                >
+                                                                                    {OPT_OUT_EMOJI}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div
+                                                                            style={{
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                justifyContent: 'space-between',
+                                                                                width: '100%',
+                                                                                gap: '6px'
+                                                                            }}
+                                                                        >
+                                                                            <span
+                                                                                style={{
+                                                                                    flex: '1 1 auto',
+                                                                                    minWidth: 0,
+                                                                                    overflow: 'hidden',
+                                                                                    textOverflow: 'ellipsis',
+                                                                                    whiteSpace: 'nowrap',
+                                                                                    fontSize: '16px',
+                                                                                    fontWeight: 'normal',
+                                                                                    fontFamily: "'Gilroy', sans-serif"
+                                                                                }}
+                                                                            >
+                                                                                {nameText}
+                                                                            </span>
+                                                                            {shouldShowEmoji && (
+                                                                                <span
+                                                                                    style={{
+                                                                                        flex: '0 0 auto',
+                                                                                        marginLeft: 'auto',
+                                                                                        color: 'inherit',
+                                                                                        fontSize: '16px',
+                                                                                        fontWeight: 'normal',
+                                                                                        lineHeight: 1
+                                                                                    }}
+                                                                                >
+                                                                                    {OPT_OUT_EMOJI}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })()
                                                             ) : id === 'passenger_booking_id' ? (
                                                                 onBookingIdClick ? (
                                                                     (() => {
