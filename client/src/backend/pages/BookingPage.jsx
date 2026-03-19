@@ -21,6 +21,92 @@ import {
 } from '../utils/emailTemplateUtils';
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 
+const SHORT_NOTICE_QUESTION_TEXT = 'Would you like to receive short notice flight availability?';
+
+const normalizeAdditionalInfoLabel = (value = '') =>
+    value
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/[?]/g, '');
+
+const isShortNoticeQuestion = (value = '') =>
+    normalizeAdditionalInfoLabel(value) === normalizeAdditionalInfoLabel(SHORT_NOTICE_QUESTION_TEXT);
+
+const isShortNoticeOptOutAnswer = (value = '') =>
+    value.toString().trim().toLowerCase() === 'no';
+
+const parseAdditionalInfoJson = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') {
+        try {
+            return JSON.parse(value);
+        } catch (error) {
+            return null;
+        }
+    }
+    return typeof value === 'object' ? value : null;
+};
+
+const getShortNoticeAvailabilityOptOut = (item) => {
+    const parsedAdditionalInfoJson = parseAdditionalInfoJson(item?.additional_information_json);
+    const parsedBookingAdditionalInfoJson = parseAdditionalInfoJson(item?.booking_additional_information_json);
+    const parsedNestedAdditionalInfoJson = parseAdditionalInfoJson(item?.additional_information?.additional_information_json);
+
+    const directFlag = [
+        item?.shortNoticeAvailabilityOptOut,
+        item?.short_notice_opt_out,
+        parsedNestedAdditionalInfoJson?.shortNoticeAvailabilityOptOut,
+        parsedAdditionalInfoJson?.shortNoticeAvailabilityOptOut,
+        parsedBookingAdditionalInfoJson?.shortNoticeAvailabilityOptOut
+    ].find(value => typeof value === 'boolean');
+
+    if (typeof directFlag === 'boolean') {
+        return directFlag;
+    }
+
+    const answers = item?.additional_information?.answers;
+    if (Array.isArray(answers)) {
+        const matchedAnswer = answers.find(answer => isShortNoticeQuestion(answer?.question_text));
+        if (matchedAnswer) {
+            return isShortNoticeOptOutAnswer(matchedAnswer.answer);
+        }
+    }
+
+    const questions = Array.isArray(item?.additional_information?.questions)
+        ? item.additional_information.questions
+        : [];
+    const questionTextByKey = new Map(
+        questions.map(question => [`question_${question.id}`, question.question_text])
+    );
+
+    const additionalInfoCandidates = [
+        parsedNestedAdditionalInfoJson,
+        parsedAdditionalInfoJson,
+        parsedBookingAdditionalInfoJson
+    ];
+
+    for (const candidate of additionalInfoCandidates) {
+        if (!candidate || typeof candidate !== 'object') continue;
+
+        if (typeof candidate.shortNoticeAvailabilityOptOut === 'boolean') {
+            return candidate.shortNoticeAvailabilityOptOut;
+        }
+
+        for (const [key, value] of Object.entries(candidate)) {
+            if (!key.startsWith('question_')) continue;
+
+            const questionText = questionTextByKey.get(key);
+            if (isShortNoticeQuestion(questionText)) {
+                return isShortNoticeOptOutAnswer(value);
+            }
+        }
+    }
+
+    return false;
+};
+
 const BookingPage = () => {
     // Mobile detection
     const theme = useTheme();
@@ -5978,6 +6064,7 @@ setBookingDetail(finalVoucherDetail);
                                             name: (Array.isArray(item.passengers) && item.passengers.length > 0
                                                 ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                                 : item.name || ''),
+                                            short_notice_opt_out: getShortNoticeAvailabilityOptOut(item),
                                             email: item.email || '',
                                             flight_type: item.flight_type || '',
                                             voucher_type: item.voucher_type || '',
@@ -6484,7 +6571,10 @@ setBookingDetail(finalVoucherDetail);
                                             }
                                         }
                                         return true;
-                                    })}
+                                    }).map(item => ({
+                                        ...item,
+                                        short_notice_opt_out: getShortNoticeAvailabilityOptOut(item)
+                                    }))}
                                     columns={isMobile 
                                         ? ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
                                         : ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]

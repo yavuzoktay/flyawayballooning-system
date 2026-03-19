@@ -37,6 +37,11 @@ const PaginatedTable = ({
 
     // Helper to get column id/label
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || col?.key || ''));
+    const getDisplayName = (item, key) => {
+        const rawName = item?.[key] || '';
+        return item?.short_notice_opt_out && rawName ? `${rawName} 📵` : rawName;
+    };
+
     const getColLabel = (col) => {
         if (typeof col === 'string') {
             if (col === 'row_id') return 'ID';
@@ -625,10 +630,10 @@ const PaginatedTable = ({
                                                                         style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
                                                                         onClick={() => onNameClick && onNameClick(item)}
                                                                     >
-                                                                        {item[id]}
+                                                                        {getDisplayName(item, id)}
                                                                     </span>
                                                                 ) : (
-                                                                    <span>{item[id]}</span>
+                                                                    <span>{getDisplayName(item, id)}</span>
                                                                 )
                                                             ) : id === 'passenger_booking_id' ? (
                                                                 onBookingIdClick ? (
