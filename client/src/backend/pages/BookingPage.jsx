@@ -29,10 +29,10 @@ const normalizeAdditionalInfoLabel = (value = '') =>
         .trim()
         .toLowerCase()
         .replace(/\s+/g, ' ')
-        .replace(/[?]/g, '');
+        .replace(/[^a-z0-9\s]/g, '');
 
 const isShortNoticeQuestion = (value = '') =>
-    normalizeAdditionalInfoLabel(value) === normalizeAdditionalInfoLabel(SHORT_NOTICE_QUESTION_TEXT);
+    normalizeAdditionalInfoLabel(value).includes(normalizeAdditionalInfoLabel(SHORT_NOTICE_QUESTION_TEXT));
 
 const isShortNoticeOptOutAnswer = (value = '') =>
     value.toString().trim().toLowerCase() === 'no';
