@@ -24,7 +24,11 @@ const getBaseUrl = () => {
 const HERO_IMAGE_URL = `${getBaseUrl()}/uploads/email/emailImage.jpg`;
 const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
 const CUSTOMER_PORTAL_HOST = 'https://flyawayballooning-system.com';
-const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_HOST}/cp`;
+const CUSTOMER_PORTAL_BASE_URL = `${CUSTOMER_PORTAL_HOST}/customerPortal`;
+const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
+const FNV_OFFSET_BASIS = 14695981039346656037n;
+const FNV_PRIME = 1099511628211n;
+const UINT64_MOD = 18446744073709551616n;
 
 const base64Encode = (value = '') => {
     try {
@@ -38,6 +42,16 @@ const base64Encode = (value = '') => {
         console.warn('Error encoding portal token:', error);
     }
     return null;
+};
+
+const getUtf8Bytes = (value = '') => {
+    if (typeof TextEncoder !== 'undefined') {
+        return new TextEncoder().encode(String(value));
+    }
+    if (typeof Buffer !== 'undefined') {
+        return Uint8Array.from(Buffer.from(String(value), 'utf8'));
+    }
+    return Uint8Array.from(String(value)).map((character) => character.charCodeAt(0));
 };
 
 const buildCustomerPortalToken = (booking = {}) => {
@@ -123,13 +137,38 @@ const buildCustomerPortalToken = (booking = {}) => {
 const sanitizeCustomerPortalToken = (token = '') =>
     String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
 
-const extractCustomerPortalToken = (value = '') => {
+const buildDeterministicCustomerPortalShortCode = (value = '') => {
+    const bytes = getUtf8Bytes(value);
+    let hash = FNV_OFFSET_BASIS;
+
+    for (const byte of bytes) {
+        hash ^= BigInt(byte);
+        hash = (hash * FNV_PRIME) % UINT64_MOD;
+    }
+
+    return hash.toString(36).padStart(13, '0');
+};
+
+const extractLegacyCustomerPortalToken = (value = '') => {
     const raw = value == null ? '' : String(value).trim();
     if (!raw) return null;
 
-    const routeMatch = raw.match(/\/(?:customerPortal|cp)\/([^/?#]+)/i);
-    if (routeMatch?.[1]) {
-        return sanitizeCustomerPortalToken(routeMatch[1]);
+    const customerPortalMatch = raw.match(/\/customerPortal\/(?!s\/)([^/?#]+)/i);
+    if (customerPortalMatch?.[1]) {
+        try {
+            return sanitizeCustomerPortalToken(decodeURIComponent(customerPortalMatch[1]));
+        } catch {
+            return sanitizeCustomerPortalToken(customerPortalMatch[1]);
+        }
+    }
+
+    const legacyAliasMatch = raw.match(/\/cp\/([^/?#]+)/i);
+    if (legacyAliasMatch?.[1]) {
+        try {
+            return sanitizeCustomerPortalToken(decodeURIComponent(legacyAliasMatch[1]));
+        } catch {
+            return sanitizeCustomerPortalToken(legacyAliasMatch[1]);
+        }
     }
 
     if (!/[/:?#]/.test(raw)) {
@@ -156,32 +195,58 @@ const extractUrlSuffix = (value = '') => {
     };
 };
 
-const buildShortCustomerPortalLink = (token = '', suffix = {}) => {
+const buildCanonicalCustomerPortalTarget = (token = '', suffix = {}) => {
     const sanitizedToken = sanitizeCustomerPortalToken(token);
     if (!sanitizedToken) return null;
 
     const search = suffix?.search || '';
     const hash = suffix?.hash || '';
-    return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${sanitizedToken}${search}${hash}`;
+    return `${CUSTOMER_PORTAL_BASE_URL}/${encodeURIComponent(sanitizedToken)}/index${search}${hash}`;
+};
+
+const buildShortCustomerPortalLinkFromTarget = (targetUrl = '') => {
+    const trimmedTargetUrl = targetUrl == null ? '' : String(targetUrl).trim();
+    if (!trimmedTargetUrl) return null;
+
+    const shortCode = buildDeterministicCustomerPortalShortCode(trimmedTargetUrl);
+    return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${shortCode}`;
 };
 
 const getCustomerPortalLink = (booking = {}) => {
+    const explicitShortUrl =
+        booking.customer_portal_short_url ||
+        booking.customerPortalShortUrl ||
+        booking.portal_short_url ||
+        booking.portalShortUrl;
+    if (explicitShortUrl) {
+        return explicitShortUrl;
+    }
+
     const portalUrl =
         booking.customer_portal_url ||
         booking.customerPortalUrl ||
         booking.portal_url ||
         booking.portalUrl;
     if (portalUrl) {
-        const shortenedPortalUrl = buildShortCustomerPortalLink(
-            extractCustomerPortalToken(portalUrl),
-            extractUrlSuffix(portalUrl)
+        const trimmedPortalUrl = String(portalUrl).trim();
+        if (/\/customerPortal\/s\/[a-z0-9]+/i.test(trimmedPortalUrl)) {
+            return trimmedPortalUrl;
+        }
+
+        const targetUrl = buildCanonicalCustomerPortalTarget(
+            extractLegacyCustomerPortalToken(trimmedPortalUrl),
+            extractUrlSuffix(trimmedPortalUrl)
         );
-        if (shortenedPortalUrl) return shortenedPortalUrl;
-        return portalUrl;
+        if (targetUrl) {
+            return buildShortCustomerPortalLinkFromTarget(targetUrl);
+        }
+
+        return trimmedPortalUrl;
     }
 
     const token = buildCustomerPortalToken(booking);
-    return buildShortCustomerPortalLink(token);
+    const targetUrl = buildCanonicalCustomerPortalTarget(token);
+    return buildShortCustomerPortalLinkFromTarget(targetUrl);
 };
 
 const normalizeTemplateName = (name = '') => (name || '').trim();

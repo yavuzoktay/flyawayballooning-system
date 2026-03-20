@@ -25847,6 +25847,64 @@ app.post('/api/save-flight-operational-selections', (req, res) => {
     });
 });
 
+app.get(['/customerPortal/s/:shortCode', '/customerPortal/s/:shortCode/*'], (req, res) => {
+    const shortCode = (req.params.shortCode || '').toString().trim().toLowerCase();
+
+    if (!shortCode) {
+        return res.status(400).send('Short code is required');
+    }
+
+    ensureCustomerPortalShortLinksSchema((schemaErr) => {
+        if (schemaErr) {
+            return res.status(500).send('Customer portal short links are not available');
+        }
+
+        con.query(
+            'SELECT target_url FROM customer_portal_short_links WHERE short_code = ? LIMIT 1',
+            [shortCode],
+            (err, rows) => {
+                if (err) {
+                    console.error('Error resolving customer portal short link:', err);
+                    return res.status(500).send('Failed to resolve short link');
+                }
+
+                if (!rows || rows.length === 0 || !rows[0].target_url) {
+                    return res.status(404).send('Customer portal link not found');
+                }
+
+                const targetUrl = String(rows[0].target_url).trim();
+
+                con.query(
+                    `
+                        UPDATE customer_portal_short_links
+                        SET click_count = click_count + 1, last_used_at = NOW()
+                        WHERE short_code = ?
+                    `,
+                    [shortCode],
+                    (updateErr) => {
+                        if (updateErr) {
+                            console.error('Error updating customer portal short link usage:', updateErr);
+                        }
+                    }
+                );
+
+                return res.redirect(302, targetUrl);
+            }
+        );
+    });
+});
+
+app.get(['/cp/:token', '/cp/:token/*'], (req, res) => {
+    const token = sanitizeCustomerPortalToken(req.params.token || '');
+    const targetUrl = buildCanonicalCustomerPortalTarget(token, extractUrlSuffix(req.originalUrl || ''));
+
+    if (!targetUrl) {
+        return res.status(404).send('Customer portal link not found');
+    }
+
+    return res.redirect(302, targetUrl);
+});
+
 // Serve React frontend from client/build (exclude /api routes)
 app.use(express.static(path.join(__dirname, '../client/build')));
 
@@ -32151,8 +32209,14 @@ function ensureEmailLogsSchema(callback) {
     });
 }
 
-const CUSTOMER_PORTAL_HOST = 'https://flyawayballooning-system.com';
-const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_HOST}/cp`;
+const CUSTOMER_PORTAL_HOST = BACKEND_PUBLIC_URL || 'https://flyawayballooning-system.com';
+const CUSTOMER_PORTAL_BASE_URL = `${CUSTOMER_PORTAL_HOST}/customerPortal`;
+const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
+const FNV_OFFSET_BASIS = 14695981039346656037n;
+const FNV_PRIME = 1099511628211n;
+const UINT64_MOD = 18446744073709551616n;
+let customerPortalShortLinksSchemaEnsured = false;
+const customerPortalShortLinkCache = new Set();
 
 // Helper function to escape HTML
 function escapeHtml(unsafe) {
@@ -32290,17 +32354,72 @@ function buildCustomerPortalToken(booking = {}) {
     }
 }
 
+function ensureCustomerPortalShortLinksSchema(callback) {
+    if (customerPortalShortLinksSchemaEnsured) {
+        return callback && callback();
+    }
+
+    const createTableSql = `
+        CREATE TABLE IF NOT EXISTS customer_portal_short_links (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            short_code VARCHAR(32) NOT NULL,
+            target_url TEXT NOT NULL,
+            portal_token VARCHAR(255) DEFAULT NULL,
+            click_count INT DEFAULT 0,
+            last_used_at TIMESTAMP NULL DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_short_code (short_code),
+            INDEX idx_portal_token (portal_token)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+
+    con.query(createTableSql, (err) => {
+        if (err) {
+            console.error('Error creating customer_portal_short_links table:', err);
+        } else {
+            customerPortalShortLinksSchemaEnsured = true;
+        }
+        callback && callback(err);
+    });
+}
+
 function sanitizeCustomerPortalToken(token = '') {
     return String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
 }
 
-function extractCustomerPortalToken(value = '') {
+function buildDeterministicCustomerPortalShortCode(value = '') {
+    const bytes = Buffer.from(String(value), 'utf8');
+    let hash = FNV_OFFSET_BASIS;
+
+    for (const byte of bytes) {
+        hash ^= BigInt(byte);
+        hash = (hash * FNV_PRIME) % UINT64_MOD;
+    }
+
+    return hash.toString(36).padStart(13, '0');
+}
+
+function extractLegacyCustomerPortalToken(value = '') {
     const raw = value == null ? '' : String(value).trim();
     if (!raw) return null;
 
-    const routeMatch = raw.match(/\/(?:customerPortal|cp)\/([^/?#]+)/i);
-    if (routeMatch && routeMatch[1]) {
-        return sanitizeCustomerPortalToken(routeMatch[1]);
+    const customerPortalMatch = raw.match(/\/customerPortal\/(?!s\/)([^/?#]+)/i);
+    if (customerPortalMatch && customerPortalMatch[1]) {
+        try {
+            return sanitizeCustomerPortalToken(decodeURIComponent(customerPortalMatch[1]));
+        } catch {
+            return sanitizeCustomerPortalToken(customerPortalMatch[1]);
+        }
+    }
+
+    const legacyAliasMatch = raw.match(/\/cp\/([^/?#]+)/i);
+    if (legacyAliasMatch && legacyAliasMatch[1]) {
+        try {
+            return sanitizeCustomerPortalToken(decodeURIComponent(legacyAliasMatch[1]));
+        } catch {
+            return sanitizeCustomerPortalToken(legacyAliasMatch[1]);
+        }
     }
 
     if (!/[/:?#]/.test(raw)) {
@@ -32327,32 +32446,94 @@ function extractUrlSuffix(value = '') {
     };
 }
 
-function buildShortCustomerPortalLink(token = '', suffix = {}) {
+function buildCanonicalCustomerPortalTarget(token = '', suffix = {}) {
     const sanitizedToken = sanitizeCustomerPortalToken(token);
     if (!sanitizedToken) return null;
 
     const search = suffix?.search || '';
     const hash = suffix?.hash || '';
-    return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${sanitizedToken}${search}${hash}`;
+    return `${CUSTOMER_PORTAL_BASE_URL}/${encodeURIComponent(sanitizedToken)}/index${search}${hash}`;
+}
+
+function persistCustomerPortalShortLink({ shortCode, targetUrl, portalToken }) {
+    if (!shortCode || !targetUrl) return;
+
+    const cacheKey = `${shortCode}|${targetUrl}`;
+    if (customerPortalShortLinkCache.has(cacheKey)) {
+        return;
+    }
+
+    customerPortalShortLinkCache.add(cacheKey);
+
+    ensureCustomerPortalShortLinksSchema((schemaErr) => {
+        if (schemaErr) {
+            customerPortalShortLinkCache.delete(cacheKey);
+            return;
+        }
+
+        const sql = `
+            INSERT INTO customer_portal_short_links (short_code, target_url, portal_token, created_at, updated_at)
+            VALUES (?, ?, ?, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE
+                target_url = VALUES(target_url),
+                portal_token = COALESCE(VALUES(portal_token), portal_token),
+                updated_at = CURRENT_TIMESTAMP
+        `;
+
+        con.query(sql, [shortCode, targetUrl, portalToken || null], (err) => {
+            if (err) {
+                console.error('Error upserting customer portal short link:', err);
+                customerPortalShortLinkCache.delete(cacheKey);
+            }
+        });
+    });
+}
+
+function buildShortCustomerPortalLinkFromTarget(targetUrl = '', portalToken = null) {
+    const trimmedTargetUrl = targetUrl == null ? '' : String(targetUrl).trim();
+    if (!trimmedTargetUrl) return null;
+
+    const shortCode = buildDeterministicCustomerPortalShortCode(trimmedTargetUrl);
+    persistCustomerPortalShortLink({ shortCode, targetUrl: trimmedTargetUrl, portalToken });
+    return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${shortCode}`;
 }
 
 function getCustomerPortalLink(booking = {}) {
+    const explicitShortUrl =
+        booking.customer_portal_short_url ||
+        booking.customerPortalShortUrl ||
+        booking.portal_short_url ||
+        booking.portalShortUrl;
+    if (explicitShortUrl) {
+        return explicitShortUrl;
+    }
+
     const portalUrl =
         booking.customer_portal_url ||
         booking.customerPortalUrl ||
         booking.portal_url ||
         booking.portalUrl;
     if (portalUrl) {
-        const shortenedPortalUrl = buildShortCustomerPortalLink(
-            extractCustomerPortalToken(portalUrl),
-            extractUrlSuffix(portalUrl)
+        const trimmedPortalUrl = String(portalUrl).trim();
+        if (/\/customerPortal\/s\/[a-z0-9]+/i.test(trimmedPortalUrl)) {
+            return trimmedPortalUrl;
+        }
+
+        const portalToken = extractLegacyCustomerPortalToken(trimmedPortalUrl);
+        const canonicalTarget = buildCanonicalCustomerPortalTarget(
+            portalToken,
+            extractUrlSuffix(trimmedPortalUrl)
         );
-        if (shortenedPortalUrl) return shortenedPortalUrl;
-        return portalUrl;
+        if (canonicalTarget) {
+            return buildShortCustomerPortalLinkFromTarget(canonicalTarget, portalToken);
+        }
+
+        return trimmedPortalUrl;
     }
 
-    const token = buildCustomerPortalToken(booking);
-    return buildShortCustomerPortalLink(token);
+    const portalToken = buildCustomerPortalToken(booking);
+    const canonicalTarget = buildCanonicalCustomerPortalTarget(portalToken);
+    return buildShortCustomerPortalLinkFromTarget(canonicalTarget, portalToken);
 }
 
 // Helper function to generate booking confirmation message HTML (matches frontend getBookingConfirmationMessageHtml)
@@ -35602,6 +35783,9 @@ app.post('/api/sendVoucherSms', async (req, res) => {
             console.warn('⚠️ No voucherId provided for SMS placeholder replacement');
         }
 
+        // Ensure a stored short-link record exists even when the client already replaced the placeholder.
+        getCustomerPortalLink(voucher);
+
         // Replace placeholders in SMS body
         const bodyWithPrompts = replaceSmsPrompts(body, voucher);
         console.log('📝 Voucher SMS body before replacement:', body.substring(0, 100));
@@ -35868,6 +36052,9 @@ app.post('/api/sendBookingSms', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid or incomplete phone number. Please update the booking with a full UK number (e.g. 07563035823).' });
         }
         
+        // Ensure a stored short-link record exists even when the client already replaced the placeholder.
+        getCustomerPortalLink(booking);
+
         // Replace placeholders in SMS body
         const bodyWithPrompts = replaceSmsPrompts(body, booking);
         console.log('📝 SMS body before replacement:', body.substring(0, 100));
@@ -36049,6 +36236,10 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
                             }
                         }
                     }
+                }
+
+                if (bookingForThisPhone) {
+                    getCustomerPortalLink(bookingForThisPhone);
                 }
 
                 // Replace placeholders for this specific booking

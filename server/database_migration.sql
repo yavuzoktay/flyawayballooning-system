@@ -332,3 +332,16 @@ CREATE TABLE IF NOT EXISTS additional_information_answers (
 
 -- Add a column to all_booking table to store additional information as JSON for backward compatibility
 ALTER TABLE all_booking ADD COLUMN IF NOT EXISTS additional_information_json JSON DEFAULT NULL COMMENT 'JSON object containing additional information answers'; 
+
+CREATE TABLE IF NOT EXISTS customer_portal_short_links (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    short_code VARCHAR(32) NOT NULL,
+    target_url TEXT NOT NULL,
+    portal_token VARCHAR(255) DEFAULT NULL,
+    click_count INT DEFAULT 0,
+    last_used_at TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_short_code (short_code),
+    INDEX idx_portal_token (portal_token)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
