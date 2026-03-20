@@ -26,9 +26,9 @@ const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
 const CUSTOMER_PORTAL_HOST = 'https://flyawayballooning-system.com';
 const CUSTOMER_PORTAL_BASE_URL = `${CUSTOMER_PORTAL_HOST}/customerPortal`;
 const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
-const FNV_OFFSET_BASIS = 14695981039346656037n;
-const FNV_PRIME = 1099511628211n;
-const UINT64_MOD = 18446744073709551616n;
+const FNV_32_OFFSET_BASIS = 0x811c9dc5;
+const FNV_32_SECONDARY_SEED = 0x9e3779b1;
+const FNV_32_PRIME = 0x01000193;
 
 const base64Encode = (value = '') => {
     try {
@@ -137,16 +137,27 @@ const buildCustomerPortalToken = (booking = {}) => {
 const sanitizeCustomerPortalToken = (token = '') =>
     String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
 
-const buildDeterministicCustomerPortalShortCode = (value = '') => {
+const buildDeterministicHashSegment = (value = '', seed = FNV_32_OFFSET_BASIS) => {
     const bytes = getUtf8Bytes(value);
-    let hash = FNV_OFFSET_BASIS;
+    let hash = seed >>> 0;
 
     for (const byte of bytes) {
-        hash ^= BigInt(byte);
-        hash = (hash * FNV_PRIME) % UINT64_MOD;
+        hash ^= byte;
+        hash = Math.imul(hash, FNV_32_PRIME) >>> 0;
     }
 
-    return hash.toString(36).padStart(13, '0');
+    return (hash >>> 0).toString(36).padStart(7, '0');
+};
+
+const buildDeterministicCustomerPortalShortCode = (value = '') => {
+    const normalizedValue = value == null ? '' : String(value);
+    const primary = buildDeterministicHashSegment(normalizedValue, FNV_32_OFFSET_BASIS);
+    const secondary = buildDeterministicHashSegment(
+        `${normalizedValue}|customerPortal`,
+        FNV_32_SECONDARY_SEED
+    );
+
+    return `${primary}${secondary}`.slice(0, 13);
 };
 
 const extractLegacyCustomerPortalToken = (value = '') => {
