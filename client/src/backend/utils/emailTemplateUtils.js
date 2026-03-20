@@ -23,7 +23,8 @@ const getBaseUrl = () => {
 
 const HERO_IMAGE_URL = `${getBaseUrl()}/uploads/email/emailImage.jpg`;
 const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
-const CUSTOMER_PORTAL_BASE_URL = 'https://flyawayballooning-system.com/customerPortal';
+const CUSTOMER_PORTAL_HOST = 'https://flyawayballooning-system.com';
+const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_HOST}/cp`;
 
 const base64Encode = (value = '') => {
     try {
@@ -119,18 +120,68 @@ const buildCustomerPortalToken = (booking = {}) => {
     return base64Encode(sourceParts.join('|'));
 };
 
+const sanitizeCustomerPortalToken = (token = '') =>
+    String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
+
+const extractCustomerPortalToken = (value = '') => {
+    const raw = value == null ? '' : String(value).trim();
+    if (!raw) return null;
+
+    const routeMatch = raw.match(/\/(?:customerPortal|cp)\/([^/?#]+)/i);
+    if (routeMatch?.[1]) {
+        return sanitizeCustomerPortalToken(routeMatch[1]);
+    }
+
+    if (!/[/:?#]/.test(raw)) {
+        const token = sanitizeCustomerPortalToken(raw);
+        return token || null;
+    }
+
+    return null;
+};
+
+const extractUrlSuffix = (value = '') => {
+    const raw = value == null ? '' : String(value);
+    if (!raw) {
+        return { search: '', hash: '' };
+    }
+
+    const hashIndex = raw.indexOf('#');
+    const searchIndex = raw.indexOf('?');
+    const searchEnd = hashIndex !== -1 && hashIndex > searchIndex ? hashIndex : raw.length;
+
+    return {
+        search: searchIndex !== -1 ? raw.slice(searchIndex, searchEnd) : '',
+        hash: hashIndex !== -1 ? raw.slice(hashIndex) : ''
+    };
+};
+
+const buildShortCustomerPortalLink = (token = '', suffix = {}) => {
+    const sanitizedToken = sanitizeCustomerPortalToken(token);
+    if (!sanitizedToken) return null;
+
+    const search = suffix?.search || '';
+    const hash = suffix?.hash || '';
+    return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${sanitizedToken}${search}${hash}`;
+};
+
 const getCustomerPortalLink = (booking = {}) => {
     const portalUrl =
         booking.customer_portal_url ||
         booking.customerPortalUrl ||
         booking.portal_url ||
         booking.portalUrl;
-    if (portalUrl) return portalUrl;
+    if (portalUrl) {
+        const shortenedPortalUrl = buildShortCustomerPortalLink(
+            extractCustomerPortalToken(portalUrl),
+            extractUrlSuffix(portalUrl)
+        );
+        if (shortenedPortalUrl) return shortenedPortalUrl;
+        return portalUrl;
+    }
 
     const token = buildCustomerPortalToken(booking);
-    if (!token) return null;
-    const sanitizedToken = token.replace(/[^a-zA-Z0-9+/=_-]/g, '');
-    return `${CUSTOMER_PORTAL_BASE_URL}/${sanitizedToken}/index`;
+    return buildShortCustomerPortalLink(token);
 };
 
 const normalizeTemplateName = (name = '') => (name || '').trim();
@@ -1427,4 +1478,3 @@ export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNot
 };
 
 export const PERSONAL_NOTE_TOKEN = PERSONAL_NOTE_PLACEHOLDER;
-

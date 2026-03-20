@@ -32151,7 +32151,8 @@ function ensureEmailLogsSchema(callback) {
     });
 }
 
-const CUSTOMER_PORTAL_BASE_URL = 'https://flyawayballooning-system.com/customerPortal';
+const CUSTOMER_PORTAL_HOST = 'https://flyawayballooning-system.com';
+const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_HOST}/cp`;
 
 // Helper function to escape HTML
 function escapeHtml(unsafe) {
@@ -32289,18 +32290,69 @@ function buildCustomerPortalToken(booking = {}) {
     }
 }
 
+function sanitizeCustomerPortalToken(token = '') {
+    return String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
+}
+
+function extractCustomerPortalToken(value = '') {
+    const raw = value == null ? '' : String(value).trim();
+    if (!raw) return null;
+
+    const routeMatch = raw.match(/\/(?:customerPortal|cp)\/([^/?#]+)/i);
+    if (routeMatch && routeMatch[1]) {
+        return sanitizeCustomerPortalToken(routeMatch[1]);
+    }
+
+    if (!/[/:?#]/.test(raw)) {
+        const token = sanitizeCustomerPortalToken(raw);
+        return token || null;
+    }
+
+    return null;
+}
+
+function extractUrlSuffix(value = '') {
+    const raw = value == null ? '' : String(value);
+    if (!raw) {
+        return { search: '', hash: '' };
+    }
+
+    const hashIndex = raw.indexOf('#');
+    const searchIndex = raw.indexOf('?');
+    const searchEnd = hashIndex !== -1 && hashIndex > searchIndex ? hashIndex : raw.length;
+
+    return {
+        search: searchIndex !== -1 ? raw.slice(searchIndex, searchEnd) : '',
+        hash: hashIndex !== -1 ? raw.slice(hashIndex) : ''
+    };
+}
+
+function buildShortCustomerPortalLink(token = '', suffix = {}) {
+    const sanitizedToken = sanitizeCustomerPortalToken(token);
+    if (!sanitizedToken) return null;
+
+    const search = suffix?.search || '';
+    const hash = suffix?.hash || '';
+    return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${sanitizedToken}${search}${hash}`;
+}
+
 function getCustomerPortalLink(booking = {}) {
     const portalUrl =
         booking.customer_portal_url ||
         booking.customerPortalUrl ||
         booking.portal_url ||
         booking.portalUrl;
-    if (portalUrl) return portalUrl;
+    if (portalUrl) {
+        const shortenedPortalUrl = buildShortCustomerPortalLink(
+            extractCustomerPortalToken(portalUrl),
+            extractUrlSuffix(portalUrl)
+        );
+        if (shortenedPortalUrl) return shortenedPortalUrl;
+        return portalUrl;
+    }
 
     const token = buildCustomerPortalToken(booking);
-    if (!token) return null;
-    const sanitizedToken = token.replace(/[^a-zA-Z0-9+/=_-]/g, '');
-    return `${CUSTOMER_PORTAL_BASE_URL}/${sanitizedToken}/index`;
+    return buildShortCustomerPortalLink(token);
 }
 
 // Helper function to generate booking confirmation message HTML (matches frontend getBookingConfirmationMessageHtml)

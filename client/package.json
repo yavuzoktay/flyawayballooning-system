@@ -40,10 +40,10 @@
     "yup": "^1.6.1"
   },
   "scripts": {
-    "start": "react-scripts --max_old_space_size=4096 start",
-    "build": "GENERATE_SOURCEMAP=false CI=false react-scripts --max_old_space_size=2048 build",
-    "build:fast": "GENERATE_SOURCEMAP=false CI=false react-scripts --max_old_space_size=1024 build",
-    "test": "react-scripts test",
+    "start": "node --max-old-space-size=4096 ./node_modules/react-scripts/bin/react-scripts.js start",
+    "build": "GENERATE_SOURCEMAP=false CI=false node --max-old-space-size=2048 ./node_modules/react-scripts/bin/react-scripts.js build",
+    "build:fast": "GENERATE_SOURCEMAP=false CI=false node --max-old-space-size=1024 ./node_modules/react-scripts/bin/react-scripts.js build",
+    "test": "node ./node_modules/react-scripts/bin/react-scripts.js test",
     "eject": "react-scripts eject"
   },
   "proxy": "http://localhost:3002",

@@ -45,6 +45,8 @@ function App() {
               path="/login"
               element={isBookingDomain ? <BookingDomainLoginRedirect /> : <Login />}
             />
+            <Route path="/cp/:token" element={<CustomerPortal />} />
+            <Route path="/cp/:token/*" element={<CustomerPortal />} />
             <Route path="/customerPortal/:token" element={<CustomerPortal />} />
             <Route path="/customerPortal/:token/*" element={<CustomerPortal />} />
             <Route path='/' element={<RequireAuth><MainLayout /></RequireAuth>}>
