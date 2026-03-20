@@ -25869,7 +25869,30 @@ app.get(['/customerPortal/s/:shortCode', '/customerPortal/s/:shortCode/*'], (req
                 }
 
                 if (!rows || rows.length === 0 || !rows[0].target_url) {
-                    return res.status(404).send('Customer portal link not found');
+                    return resolveCustomerPortalShortLinkByData(shortCode, (fallbackErr, fallbackMatch) => {
+                        if (fallbackErr) {
+                            console.error('Error rebuilding customer portal short link:', fallbackErr);
+                            return res.status(500).send('Failed to resolve short link');
+                        }
+
+                        if (!fallbackMatch?.targetUrl) {
+                            return res.status(404).send('Customer portal link not found');
+                        }
+
+                        const matchesToPersist = Array.isArray(fallbackMatch.allMatches) && fallbackMatch.allMatches.length
+                            ? fallbackMatch.allMatches
+                            : [fallbackMatch];
+
+                        matchesToPersist.forEach((match) => {
+                            persistCustomerPortalShortLink({
+                                shortCode: match.shortCode,
+                                targetUrl: match.targetUrl,
+                                portalToken: match.portalToken
+                            });
+                        });
+
+                        return res.redirect(302, fallbackMatch.targetUrl);
+                    });
                 }
 
                 const targetUrl = String(rows[0].target_url).trim();
@@ -32215,6 +32238,9 @@ const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
 const FNV_32_OFFSET_BASIS = 0x811c9dc5;
 const FNV_32_SECONDARY_SEED = 0x9e3779b1;
 const FNV_32_PRIME = 0x01000193;
+const LEGACY_FNV_OFFSET_BASIS = 14695981039346656037n;
+const LEGACY_FNV_PRIME = 1099511628211n;
+const LEGACY_UINT64_MOD = 18446744073709551616n;
 let customerPortalShortLinksSchemaEnsured = false;
 const customerPortalShortLinkCache = new Set();
 
@@ -32409,6 +32435,164 @@ function buildDeterministicCustomerPortalShortCode(value = '') {
     );
 
     return `${primary}${secondary}`.slice(0, 13);
+}
+
+function buildLegacyCustomerPortalShortCode(value = '') {
+    const bytes = Buffer.from(String(value), 'utf8');
+    let hash = LEGACY_FNV_OFFSET_BASIS;
+
+    for (const byte of bytes) {
+        hash ^= BigInt(byte);
+        hash = (hash * LEGACY_FNV_PRIME) % LEGACY_UINT64_MOD;
+    }
+
+    return hash.toString(36).padStart(13, '0');
+}
+
+function getCustomerPortalCreatedAtCandidates(value = '') {
+    const candidates = new Set();
+    const raw = value == null ? '' : String(value).trim();
+
+    if (raw) {
+        candidates.add(raw);
+    }
+
+    const addMomentFormats = (dateValue) => {
+        if (!dateValue || !dateValue.isValid()) return;
+        candidates.add(dateValue.format('DD/MM/YYYY HH:mm'));
+        candidates.add(dateValue.format('DD/MM/YYYY'));
+    };
+
+    const dayjsValue = dayjs(value);
+    if (dayjsValue.isValid()) {
+        candidates.add(dayjsValue.format('DD/MM/YYYY HH:mm'));
+        candidates.add(dayjsValue.format('DD/MM/YYYY'));
+    }
+
+    const momentValue = moment(value);
+    if (momentValue.isValid()) {
+        addMomentFormats(momentValue);
+        addMomentFormats(momentValue.clone().utc());
+
+        // Existing SMS links were generated in a mix of browser and server
+        // timezone contexts, so we try a bounded range of offsets to recover
+        // missing mappings without needing to know the original context.
+        for (let offset = -12; offset <= 14; offset += 1) {
+            addMomentFormats(momentValue.clone().utcOffset(offset * 60));
+        }
+    }
+
+    return Array.from(candidates).filter(Boolean);
+}
+
+function getCustomerPortalShortCodeVariants(targetUrl = '') {
+    const trimmedTargetUrl = targetUrl == null ? '' : String(targetUrl).trim();
+    if (!trimmedTargetUrl) return [];
+
+    return Array.from(new Set([
+        buildDeterministicCustomerPortalShortCode(trimmedTargetUrl),
+        buildLegacyCustomerPortalShortCode(trimmedTargetUrl)
+    ].filter(Boolean))).map((code) => String(code).trim().toLowerCase());
+}
+
+function buildCustomerPortalShortLinkCandidates(record = {}) {
+    const matches = [];
+    const seenTargets = new Set();
+    const createdCandidates = getCustomerPortalCreatedAtCandidates(record.created_at ?? record.created ?? '');
+
+    for (const createdCandidate of createdCandidates) {
+        const tokenSource = {
+            ...record,
+            created_at: createdCandidate,
+            created: createdCandidate
+        };
+        const portalToken = buildCustomerPortalToken(tokenSource);
+        const targetUrl = buildCanonicalCustomerPortalTarget(portalToken);
+
+        if (!targetUrl || seenTargets.has(targetUrl)) {
+            continue;
+        }
+
+        seenTargets.add(targetUrl);
+
+        const shortCodes = getCustomerPortalShortCodeVariants(targetUrl);
+        shortCodes.forEach((shortCode) => {
+            matches.push({
+                shortCode,
+                targetUrl,
+                portalToken
+            });
+        });
+    }
+
+    return matches;
+}
+
+function resolveCustomerPortalShortLinkByData(shortCode, callback) {
+    const normalizedShortCode = String(shortCode || '').trim().toLowerCase();
+    if (!normalizedShortCode) {
+        return callback(null, null);
+    }
+
+    const findMatchInRows = (rows = [], mapRow = (row) => row) => {
+        for (const row of rows) {
+            const candidateRow = mapRow(row);
+            const matches = buildCustomerPortalShortLinkCandidates(candidateRow);
+            const matched = matches.find((entry) => entry.shortCode === normalizedShortCode);
+
+            if (matched) {
+                return {
+                    ...matched,
+                    allMatches: matches
+                };
+            }
+        }
+
+        return null;
+    };
+
+    con.query(
+        'SELECT id, email, voucher_code, created_at, redeemed_voucher FROM all_booking ORDER BY created_at DESC',
+        (bookingErr, bookingRows) => {
+            if (bookingErr) {
+                return callback(bookingErr);
+            }
+
+            const bookingMatch = findMatchInRows(bookingRows);
+            if (bookingMatch) {
+                return callback(null, bookingMatch);
+            }
+
+            con.query(
+                `
+                    SELECT
+                        id,
+                        email,
+                        purchaser_email,
+                        recipient_email,
+                        voucher_ref,
+                        created_at,
+                        book_flight,
+                        redeemed
+                    FROM all_vouchers
+                    ORDER BY created_at DESC
+                `,
+                (voucherErr, voucherRows) => {
+                    if (voucherErr) {
+                        return callback(voucherErr);
+                    }
+
+                    const voucherMatch = findMatchInRows(voucherRows, (row) => ({
+                        ...row,
+                        voucher_id: row.id,
+                        _original: row
+                    }));
+
+                    return callback(null, voucherMatch || null);
+                }
+            );
+        }
+    );
 }
 
 function extractLegacyCustomerPortalToken(value = '') {
