@@ -638,11 +638,11 @@ const PaginatedTable = ({
                                                                 (() => {
                                                                     const { nameText, shouldShowEmoji } = getDisplayNameParts(item, id);
 
-                                                                    // Use separate spans so underline never applies to the emoji.
+                                                                    // Keep the name clickable without the browser-style underline.
                                                                     const nameSpanStyles = {
                                                                         color: '#3274b4',
                                                                         cursor: onNameClick ? 'pointer' : 'default',
-                                                                        textDecoration: shouldShowEmoji ? 'none' : 'underline',
+                                                                        textDecoration: 'none',
                                                                         fontSize: '16px',
                                                                         fontWeight: 'normal',
                                                                         fontFamily: "'Gilroy', sans-serif",
