@@ -990,7 +990,7 @@ const Manifest = () => {
                 if (addLink && selectedBookingForEmail) {
                     const portalLink = getCustomerPortalLink(selectedBookingForEmail);
                     if (portalLink) {
-                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
+                        smsMessage = smsMessage ? `${smsMessage}\n\n${portalLink}` : portalLink;
                     }
                 }
 
@@ -1292,7 +1292,7 @@ const Manifest = () => {
                     if (groupAddLink) {
                         const portalLink = getCustomerPortalLink(booking);
                         if (portalLink) {
-                            smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
+                            smsMessage = smsMessage ? `${smsMessage}\n\n${portalLink}` : portalLink;
                         }
                     }
 
