@@ -54,8 +54,7 @@ import {
     getDefaultTemplateMessageHtml,
     replaceSmsPrompts,
     extractMessageFromTemplateBody,
-    buildEmailHtml,
-    getCustomerPortalLink
+    buildEmailHtml
 } from '../utils/emailTemplateUtils';
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 
@@ -904,15 +903,23 @@ const Manifest = () => {
 
                 // Append Customer Portal link if Add Link checkbox is checked
                 if (addLink && selectedBookingForEmail) {
-                    const portalLink = getCustomerPortalLink(selectedBookingForEmail);
-                    if (portalLink) {
-                        const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
-                        const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
-                        if (closingPattern.test(finalHtml)) {
-                            finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
-                        } else {
-                            finalHtml += linkHtml;
+                    try {
+                        const portalRes = await axios.post('/api/customerPortalShortLink', {
+                            bookingId: selectedBookingForEmail.id,
+                            contextType: 'booking'
+                        });
+                        const portalLink = portalRes.data?.shortUrl;
+                        if (portalLink) {
+                            const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+                            const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+                            if (closingPattern.test(finalHtml)) {
+                                finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
+                            } else {
+                                finalHtml += linkHtml;
+                            }
                         }
+                    } catch (linkErr) {
+                        console.warn('⚠️ Failed to generate customer portal link:', linkErr);
                     }
                 }
 
@@ -988,9 +995,17 @@ const Manifest = () => {
 
                 // Append Customer Portal link if Add Link checkbox is checked
                 if (addLink && selectedBookingForEmail) {
-                    const portalLink = getCustomerPortalLink(selectedBookingForEmail);
-                    if (portalLink) {
-                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
+                    try {
+                        const portalRes = await axios.post('/api/customerPortalShortLink', {
+                            bookingId: selectedBookingForEmail.id,
+                            contextType: 'booking'
+                        });
+                        const portalLink = portalRes.data?.shortUrl;
+                        if (portalLink) {
+                            smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
+                        }
+                    } catch (linkErr) {
+                        console.warn('⚠️ Failed to generate customer portal link for SMS:', linkErr);
                     }
                 }
 
@@ -1164,15 +1179,23 @@ const Manifest = () => {
 
                     // Append Customer Portal link if Add Link checkbox is checked
                     if (groupAddLink) {
-                        const portalLink = getCustomerPortalLink(booking);
-                        if (portalLink) {
-                            const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
-                            const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
-                            if (closingPattern.test(finalHtml)) {
-                                finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
-                            } else {
-                                finalHtml += linkHtml;
+                        try {
+                            const portalRes = await axios.post('/api/customerPortalShortLink', {
+                                bookingId: booking.id,
+                                contextType: 'booking'
+                            });
+                            const portalLink = portalRes.data?.shortUrl;
+                            if (portalLink) {
+                                const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+                                const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+                                if (closingPattern.test(finalHtml)) {
+                                    finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
+                                } else {
+                                    finalHtml += linkHtml;
+                                }
                             }
+                        } catch (linkErr) {
+                            console.warn('⚠️ Failed to generate customer portal link:', linkErr);
                         }
                     }
 
@@ -1290,9 +1313,17 @@ const Manifest = () => {
 
                     // Append Customer Portal link if Add Link checkbox is checked
                     if (groupAddLink) {
-                        const portalLink = getCustomerPortalLink(booking);
-                        if (portalLink) {
-                            smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
+                        try {
+                            const portalRes = await axios.post('/api/customerPortalShortLink', {
+                                bookingId: booking.id,
+                                contextType: 'booking'
+                            });
+                            const portalLink = portalRes.data?.shortUrl;
+                            if (portalLink) {
+                                smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
+                            }
+                        } catch (linkErr) {
+                            console.warn('⚠️ Failed to generate customer portal link for SMS:', linkErr);
                         }
                     }
 

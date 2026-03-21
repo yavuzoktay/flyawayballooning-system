@@ -25917,6 +25917,43 @@ app.get(['/customerPortal/s/:shortCode', '/customerPortal/s/:shortCode/*'], (req
     });
 });
 
+// Generate and persist a customer portal short link for a booking or voucher
+app.post('/api/customerPortalShortLink', (req, res) => {
+    const { bookingId, contextType } = req.body;
+    if (!bookingId) {
+        return res.status(400).json({ success: false, message: 'bookingId is required' });
+    }
+
+    const isVoucher = contextType === 'voucher';
+    const query = isVoucher
+        ? 'SELECT * FROM all_vouchers WHERE id = ? LIMIT 1'
+        : 'SELECT * FROM all_booking WHERE id = ? LIMIT 1';
+
+    con.query(query, [bookingId], (err, rows) => {
+        if (err) {
+            console.error('Error fetching record for portal link:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Record not found' });
+        }
+
+        const record = rows[0];
+        // For vouchers, add the _original and voucher_id fields
+        const bookingData = isVoucher
+            ? { ...record, voucher_id: record.id, _original: record }
+            : record;
+
+        const shortUrl = getCustomerPortalLink(bookingData);
+        if (!shortUrl) {
+            return res.status(500).json({ success: false, message: 'Failed to generate portal link' });
+        }
+
+        return res.json({ success: true, shortUrl });
+    });
+});
+
 app.get(['/cp/:token', '/cp/:token/*'], (req, res) => {
     const token = sanitizeCustomerPortalToken(req.params.token || '');
     const targetUrl = buildCanonicalCustomerPortalTarget(token, extractUrlSuffix(req.originalUrl || ''));
