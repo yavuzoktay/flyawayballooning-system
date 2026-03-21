@@ -116,7 +116,7 @@ const Settings = () => {
         category: 'Merchandise',
         is_physical_item: true,
         journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
-        locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+        locations: ['Bath', 'Devon', 'Somerset', 'Bristol'],
         experience_types: ['Shared Flight', 'Private Charter'],
         sort_order: 0,
         is_active: true
@@ -136,7 +136,7 @@ const Settings = () => {
         help_text: '',
         category: 'General',
         journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
-        locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+        locations: ['Bath', 'Devon', 'Somerset', 'Bristol'],
         experience_types: ['Shared Flight', 'Private Charter'],
         sort_order: 0,
         is_active: true
@@ -1215,7 +1215,7 @@ const Settings = () => {
     });
 
     const locations = ['Somerset', 'United Kingdom'];
-    const activityLocations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+    const activityLocations = ['Bath', 'Devon', 'Somerset', 'Bristol'];
     const experienceTypes = ['Shared Flight', 'Private Charter'];
     const voucherTypeOptions = ['Weekday Morning', 'Flexible Weekday', 'Any Day Flight'];
     const journeyTypes = ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'];
@@ -2223,7 +2223,7 @@ const Settings = () => {
         }
         
         // Safely parse locations - handle both JSON and string formats
-        let parsedLocations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+        let parsedLocations = ['Bath', 'Devon', 'Somerset', 'Bristol'];
         if (item.locations) {
             try {
                 // If it's already an array, use it directly
@@ -2246,7 +2246,7 @@ const Settings = () => {
             } catch (error) {
                 console.warn('Error parsing locations:', error);
                 // Fallback to default
-                parsedLocations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                parsedLocations = ['Bath', 'Devon', 'Somerset', 'Bristol'];
             }
         }
         
@@ -2319,7 +2319,7 @@ const Settings = () => {
             category: 'Merchandise',
             is_physical_item: true,
             journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
-            locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+            locations: ['Bath', 'Devon', 'Somerset', 'Bristol'],
             experience_types: ['Shared Flight', 'Private Charter'],
             sort_order: 0,
             is_active: true
@@ -2432,10 +2432,10 @@ const Settings = () => {
                             }
                         }
                     }
-                    return ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                    return ['Bath', 'Devon', 'Somerset', 'Bristol'];
                 } catch (error) {
                     console.warn('Error parsing locations:', error);
-                    return ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                    return ['Bath', 'Devon', 'Somerset', 'Bristol'];
                 }
             })(),
             experience_types: (() => {
@@ -2489,7 +2489,7 @@ const Settings = () => {
             help_text: '',
             category: 'General',
             journey_types: ['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'],
-            locations: ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'],
+            locations: ['Bath', 'Devon', 'Somerset', 'Bristol'],
             experience_types: ['Shared Flight', 'Private Charter'],
             sort_order: 0,
             is_active: true
@@ -3430,7 +3430,7 @@ const Settings = () => {
                                                                     }
                                                                 } catch (error) {
                                                                     console.warn('Error parsing locations for display:', error);
-                                                                    locations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                                                                    locations = ['Bath', 'Devon', 'Somerset', 'Bristol'];
                                                                 }
                                                                 
                                                                 return locations.map((location) => (
@@ -3550,7 +3550,7 @@ const Settings = () => {
                                                                     formData.append('category', item.category || 'Merchandise');
                                                                     formData.append('is_physical_item', item.is_physical_item);
                                                                     formData.append('journey_types', item.journey_types ? JSON.stringify(item.journey_types) : JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']));
-                                                                    formData.append('locations', item.locations ? JSON.stringify(item.locations) : JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']));
+                                                                    formData.append('locations', item.locations ? JSON.stringify(item.locations) : JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol']));
                                                                     formData.append('sort_order', item.sort_order || 0);
                                                                     formData.append('is_active', newStatus);
                                                                     
@@ -4431,7 +4431,7 @@ const Settings = () => {
                                                                     }
                                                                 } catch (error) {
                                                                     console.warn('Error parsing locations for display:', error);
-                                                                    locations = ['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'];
+                                                                    locations = ['Bath', 'Devon', 'Somerset', 'Bristol'];
                                                                 }
                                                                 
                                                                 return locations.map((location) => (

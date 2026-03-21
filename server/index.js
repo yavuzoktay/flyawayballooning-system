@@ -3690,6 +3690,15 @@ function normalizeVoucherLocation(rawLocation) {
     return cleaned.trim();
 }
 
+const BRISTOL_LOCATION = 'Bristol';
+const BRISTOL_PRIVATE_VOUCHER_TYPES = '26,24';
+const BRISTOL_PRIVATE_VOUCHER_TYPE_TITLES = 'Private Charter,Proposal Flight';
+const BRISTOL_PRIVATE_PRICING = {
+    'Private Charter': { '2': '900', '3': '1050', '4': '1200', '8': '1800' },
+    'Proposal Flight ': { '2': '1000', '3': '1150', '4': '1300', '8': '2000' }
+};
+const DEFAULT_BOOKING_LOCATIONS = ['Bath', 'Devon', 'Somerset', BRISTOL_LOCATION];
+
 const SHARED_VOUCHER_ACTIVITY_PRICE_FIELDS = {
     'weekday morning': {
         original: 'weekday_morning_price',
@@ -3917,6 +3926,11 @@ app.get('/api/voucher-types', (req, res) => {
     // Get location from query parameter if provided
     const requestedLocation = req.query.location;
     const location = normalizeVoucherLocation(requestedLocation);
+
+    if (location === BRISTOL_LOCATION) {
+        setCorsHeaders(req, res);
+        return res.json({ success: true, data: [] });
+    }
 
     let sql, params = [];
 
@@ -5057,7 +5071,7 @@ app.post('/api/add-to-booking-items', experiencesUpload.single('add_to_booking_i
         is_physical_item !== undefined ? (is_physical_item === 'true' || is_physical_item === true) : true,
         weight_grams || 0,
         journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
-        locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']),
+        locations || JSON.stringify(DEFAULT_BOOKING_LOCATIONS),
         experience_types || JSON.stringify(['Shared Flight', 'Private Charter']),
         sort_order || 0,
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true
@@ -5149,7 +5163,7 @@ app.put('/api/add-to-booking-items/:id', experiencesUpload.single('add_to_bookin
         is_physical_item !== undefined ? (is_physical_item === 'true' || is_physical_item === true) : true,
         weight_grams || 0,
         journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift']),
-        locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta']),
+        locations || JSON.stringify(DEFAULT_BOOKING_LOCATIONS),
         experience_types || JSON.stringify(['Shared Flight', 'Private Charter']),
         sort_order || 0,
         is_active !== undefined ? (is_active === 'true' || is_active === true) : true,
@@ -5281,7 +5295,7 @@ app.post('/api/additional-information-questions', (req, res) => {
         help_text || null,
         category || 'General',
         Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])),
-        Array.isArray(locations) ? JSON.stringify(locations) : (locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'])),
+        Array.isArray(locations) ? JSON.stringify(locations) : (locations || JSON.stringify(DEFAULT_BOOKING_LOCATIONS)),
         Array.isArray(experience_types) ? JSON.stringify(experience_types) : (experience_types || JSON.stringify(['Shared Flight', 'Private Charter'])),
         sort_order || 0,
         is_active !== undefined ? is_active : true
@@ -5391,7 +5405,7 @@ app.put('/api/additional-information-questions/:id', (req, res) => {
         help_text || null,
         category || 'General',
         Array.isArray(journey_types) ? JSON.stringify(journey_types) : (journey_types || JSON.stringify(['Book Flight', 'Flight Voucher', 'Redeem Voucher', 'Buy Gift'])),
-        Array.isArray(locations) ? JSON.stringify(locations) : (locations || JSON.stringify(['Bath', 'Devon', 'Somerset', 'Bristol Fiesta'])),
+        Array.isArray(locations) ? JSON.stringify(locations) : (locations || JSON.stringify(DEFAULT_BOOKING_LOCATIONS)),
         Array.isArray(experience_types) ? JSON.stringify(experience_types) : (experience_types || JSON.stringify(['Shared Flight', 'Private Charter'])),
         sort_order || 0,
         is_active !== undefined ? is_active : true,
@@ -22870,8 +22884,12 @@ app.get("/api/activity/:id", (req, res) => {
 
 // Get voucher types for a specific location
 app.get('/api/locationVoucherTypes/:location', (req, res) => {
-    const { location } = req.params;
+    const location = normalizeVoucherLocation(req.params.location);
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
+
+    if (location === BRISTOL_LOCATION) {
+        return res.json({ success: true, data: [] });
+    }
 
     const sql = `
         SELECT voucher_type
@@ -22996,6 +23014,7 @@ app.get('/api/activeLocations', (req, res) => {
             WHERE status = 'Live'
             GROUP BY location
         ) b ON a.id = b.min_id
+        ORDER BY FIELD(a.location, 'Bath', 'Bristol', 'Devon', 'Somerset'), a.location
     `;
     con.query(sql, (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "Database error" });
@@ -23009,7 +23028,7 @@ app.get('/api/activeLocations', (req, res) => {
 
 // Get pricing information for a specific location
 app.get('/api/locationPricing/:location', (req, res) => {
-    const { location } = req.params;
+    const location = normalizeVoucherLocation(req.params.location);
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
 
     console.log('=== /api/locationPricing called ===');
@@ -23059,6 +23078,11 @@ app.get('/api/locationPricing/:location', (req, res) => {
                 if (type === 'Shared') return 'Shared Flight';
                 return type; // Keep original if not mapped
             });
+        }
+
+        if (location === BRISTOL_LOCATION) {
+            flightTypes = ['Private'];
+            experiences = ['Private Charter'];
         }
 
         console.log('Processed flight types:', flightTypes);
@@ -24216,7 +24240,7 @@ app.get('/api/getVoucherDetail', async (req, res) => {
 });
 
 app.post("/api/getActivityId", (req, res) => {
-    const { location } = req.body;
+    const location = normalizeVoucherLocation(req.body.location);
     console.log('=== /api/getActivityId called ===');
     console.log('Location:', location);
 
@@ -26350,7 +26374,7 @@ app.get(/^\/(?!api\/).*/, (req, res) => {
 
 // Get activities with flight types for ballooning-book
 app.get('/api/activities/flight-types', (req, res) => {
-    const { location } = req.query;
+    const location = normalizeVoucherLocation(req.query.location);
 
     console.log('=== /api/activities/flight-types called ===');
     console.log('Location filter:', location);
@@ -26429,6 +26453,9 @@ app.get('/api/activities/flight-types', (req, res) => {
                 return type; // Keep original if not mapped
             });
 
+            const resolvedFlightTypes = activity.location === BRISTOL_LOCATION ? ['Private'] : flightTypes;
+            const resolvedExperiences = activity.location === BRISTOL_LOCATION ? ['Private Charter'] : experiences;
+
             console.log(`Activity ${activity.activity_name}: flight_type="${activity.flight_type}" -> flightTypes=${JSON.stringify(flightTypes)} -> experiences=${JSON.stringify(experiences)}`);
 
             return {
@@ -26439,8 +26466,8 @@ app.get('/api/activities/flight-types', (req, res) => {
                 shared_flight_from_sale_price: formatSaleNumericPrice(activity.shared_flight_from_sale_price),
                 private_charter_from_sale_price: formatSaleNumericPrice(activity.private_charter_from_sale_price),
                 private_charter_sale_pricing: serializeJsonField(sanitizeSalePricingMap(activity.private_charter_sale_pricing)),
-                flight_type: flightTypes,
-                experiences: experiences
+                flight_type: resolvedFlightTypes,
+                experiences: resolvedExperiences
             };
         });
 
@@ -28359,7 +28386,7 @@ app.get('/api/stripe/diagnostics', async (req, res) => {
 
 // Get activity pricing for a specific location
 app.get('/api/locationPricing/:location', (req, res) => {
-    const { location } = req.params;
+    const location = normalizeVoucherLocation(req.params.location);
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
 
     const sql = `
@@ -28404,6 +28431,11 @@ app.get('/api/locationPricing/:location', (req, res) => {
                 if (type === 'Shared') return 'Shared Flight';
                 return type; // Keep original if not mapped
             });
+        }
+
+        if (location === BRISTOL_LOCATION) {
+            flightTypes = ['Private'];
+            experiences = ['Private Charter'];
         }
 
         res.json({
@@ -30045,6 +30077,329 @@ const runDatabaseMigrations = () => {
         'LONGTEXT NULL AFTER private_charter_pricing',
         'activity.private_charter_sale_pricing column added successfully'
     );
+
+    const migrateJsonLocationField = (tableName, columnName) => {
+        const checkSql = `
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = ?
+              AND column_name = ?
+        `;
+
+        con.query(checkSql, [tableName, columnName], (checkErr, rows) => {
+            if (checkErr) {
+                console.error(`Error checking ${tableName}.${columnName}:`, checkErr);
+                return;
+            }
+
+            const exists = rows && rows[0] && Number(rows[0].cnt) > 0;
+            if (!exists) {
+                return;
+            }
+
+            const updateSql = `
+                UPDATE ${tableName}
+                SET ${columnName} = REPLACE(${columnName}, 'Bristol Fiesta', ?)
+                WHERE ${columnName} LIKE '%Bristol Fiesta%'
+            `;
+
+            con.query(updateSql, [BRISTOL_LOCATION], (updateErr, result) => {
+                if (updateErr) {
+                    console.error(`Error migrating ${tableName}.${columnName}:`, updateErr);
+                } else if (result?.affectedRows) {
+                    console.log(`✅ Migrated ${result.affectedRows} ${tableName}.${columnName} values to Bristol`);
+                }
+            });
+        });
+    };
+
+    const migrateScalarLocationField = (tableName, columnName) => {
+        const checkSql = `
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = ?
+              AND column_name = ?
+        `;
+
+        con.query(checkSql, [tableName, columnName], (checkErr, rows) => {
+            if (checkErr) {
+                console.error(`Error checking ${tableName}.${columnName}:`, checkErr);
+                return;
+            }
+
+            const exists = rows && rows[0] && Number(rows[0].cnt) > 0;
+            if (!exists) {
+                return;
+            }
+
+            const updateSql = `
+                UPDATE ${tableName}
+                SET ${columnName} = ?
+                WHERE ${columnName} = 'Bristol Fiesta'
+            `;
+
+            con.query(updateSql, [BRISTOL_LOCATION], (updateErr, result) => {
+                if (updateErr) {
+                    console.error(`Error migrating ${tableName}.${columnName}:`, updateErr);
+                } else if (result?.affectedRows) {
+                    console.log(`✅ Migrated ${result.affectedRows} ${tableName}.${columnName} values to Bristol`);
+                }
+            });
+        });
+    };
+
+    const ensureBristolActivityAndAvailability = () => {
+        const sourceSql = `
+            SELECT *
+            FROM activity
+            WHERE status = 'Live' AND location IN ('Somerset', 'Bath', 'Devon')
+            ORDER BY FIELD(location, 'Somerset', 'Bath', 'Devon'), id ASC
+            LIMIT 1
+        `;
+
+        con.query(sourceSql, (sourceErr, sourceRows) => {
+            if (sourceErr) {
+                console.error('Error fetching source activity for Bristol migration:', sourceErr);
+                return;
+            }
+
+            if (!sourceRows || sourceRows.length === 0) {
+                console.warn('Skipping Bristol migration because no live source activity was found');
+                return;
+            }
+
+            const source = sourceRows[0];
+            const price = parseNumericPrice(source.price) ?? parseNumericPrice(source.private_price) ?? parseNumericPrice(source.private_charter_from_price) ?? 900;
+            const capacity = Number(source.capacity) || 8;
+            const sharedPrice = parseNumericPrice(source.shared_price) ?? parseNumericPrice(source.shared_flight_from_price) ?? 180;
+            const privatePrice = parseNumericPrice(source.private_price) ?? parseNumericPrice(source.private_charter_from_price) ?? 900;
+            const weekdayMorningPrice = parseNumericPrice(source.weekday_morning_price) ?? 180;
+            const flexibleWeekdayPrice = parseNumericPrice(source.flexible_weekday_price) ?? 200;
+            const anyDayFlightPrice = parseNumericPrice(source.any_day_flight_price) ?? 220;
+            const sharedFlightFromPrice = parseNumericPrice(source.shared_flight_from_price) ?? 180;
+            const privateCharterFromPrice = parseNumericPrice(source.private_charter_from_price) ?? 900;
+            const privatePricingJson = serializeJsonField(BRISTOL_PRIVATE_PRICING);
+            const privateSalePricingJson = serializeJsonField({});
+
+            const existingSql = `
+                SELECT *
+                FROM activity
+                WHERE location IN (?, 'Bristol Fiesta')
+                ORDER BY FIELD(location, ?, 'Bristol Fiesta'), id DESC
+                LIMIT 1
+            `;
+
+            con.query(existingSql, [BRISTOL_LOCATION, BRISTOL_LOCATION], (existingErr, existingRows) => {
+                if (existingErr) {
+                    console.error('Error checking existing Bristol activity:', existingErr);
+                    return;
+                }
+
+                const cloneAvailabilityRows = (bristolActivityId) => {
+                    con.query(
+                        'SELECT COUNT(*) AS cnt FROM activity_availability WHERE activity_id = ?',
+                        [bristolActivityId],
+                        (countErr, countRows) => {
+                            if (countErr) {
+                                console.error('Error checking Bristol availability rows:', countErr);
+                                return;
+                            }
+
+                            const availabilityCount = countRows && countRows[0] ? Number(countRows[0].cnt) : 0;
+                            if (availabilityCount > 0) {
+                                console.log(`✅ Bristol availability already exists (${availabilityCount} rows)`);
+                                return;
+                            }
+
+                            const cloneSql = `
+                                INSERT INTO activity_availability (
+                                    activity_id,
+                                    schedule,
+                                    date,
+                                    day_of_week,
+                                    time,
+                                    capacity,
+                                    available,
+                                    booked,
+                                    status,
+                                    channels,
+                                    flight_types,
+                                    voucher_types
+                                )
+                                SELECT
+                                    ?,
+                                    schedule,
+                                    date,
+                                    day_of_week,
+                                    time,
+                                    capacity,
+                                    available,
+                                    booked,
+                                    status,
+                                    channels,
+                                    'Private',
+                                    ?
+                                FROM activity_availability
+                                WHERE activity_id = ?
+                                  AND flight_types = 'Private'
+                            `;
+
+                            con.query(
+                                cloneSql,
+                                [bristolActivityId, BRISTOL_PRIVATE_VOUCHER_TYPE_TITLES, source.id],
+                                (cloneErr, cloneResult) => {
+                                    if (cloneErr) {
+                                        console.error('Error cloning Bristol availability rows:', cloneErr);
+                                    } else {
+                                        console.log(`✅ Bristol availability cloned (${cloneResult?.affectedRows || 0} rows)`);
+                                    }
+                                }
+                            );
+                        }
+                    );
+                };
+
+                if (existingRows && existingRows.length > 0) {
+                    const existing = existingRows[0];
+                    const updateSql = `
+                        UPDATE activity
+                        SET activity_name = ?,
+                            price = ?,
+                            capacity = ?,
+                            start_date = NULL,
+                            end_date = NULL,
+                            event_time = NULL,
+                            location = ?,
+                            flight_type = ?,
+                            status = ?,
+                            shared_price = ?,
+                            private_price = ?,
+                            voucher_type = ?,
+                            weekday_morning_price = ?,
+                            weekday_morning_sale_price = NULL,
+                            flexible_weekday_price = ?,
+                            flexible_weekday_sale_price = NULL,
+                            any_day_flight_price = ?,
+                            any_day_flight_sale_price = NULL,
+                            shared_flight_from_price = ?,
+                            shared_flight_from_sale_price = NULL,
+                            private_charter_from_price = ?,
+                            private_charter_from_sale_price = NULL,
+                            private_charter_voucher_types = ?,
+                            private_charter_pricing = ?,
+                            private_charter_sale_pricing = ?
+                        WHERE id = ?
+                    `;
+
+                    con.query(
+                        updateSql,
+                        [
+                            BRISTOL_LOCATION,
+                            price,
+                            capacity,
+                            BRISTOL_LOCATION,
+                            'Private',
+                            'Live',
+                            sharedPrice,
+                            privatePrice,
+                            '',
+                            weekdayMorningPrice,
+                            flexibleWeekdayPrice,
+                            anyDayFlightPrice,
+                            sharedFlightFromPrice,
+                            privateCharterFromPrice,
+                            BRISTOL_PRIVATE_VOUCHER_TYPES,
+                            privatePricingJson,
+                            privateSalePricingJson,
+                            existing.id
+                        ],
+                        (updateErr) => {
+                            if (updateErr) {
+                                console.error('Error updating Bristol activity:', updateErr);
+                                return;
+                            }
+
+                            console.log(`✅ Bristol activity ready (updated id ${existing.id})`);
+                            cloneAvailabilityRows(existing.id);
+                        }
+                    );
+
+                    return;
+                }
+
+                const insertSql = `
+                    INSERT INTO activity (
+                        activity_name,
+                        price,
+                        capacity,
+                        start_date,
+                        end_date,
+                        event_time,
+                        location,
+                        flight_type,
+                        status,
+                        image,
+                        shared_price,
+                        private_price,
+                        voucher_type,
+                        weekday_morning_price,
+                        weekday_morning_sale_price,
+                        flexible_weekday_price,
+                        flexible_weekday_sale_price,
+                        any_day_flight_price,
+                        any_day_flight_sale_price,
+                        shared_flight_from_price,
+                        shared_flight_from_sale_price,
+                        private_charter_from_price,
+                        private_charter_from_sale_price,
+                        private_charter_voucher_types,
+                        private_charter_pricing,
+                        private_charter_sale_pricing
+                    ) VALUES (?, ?, ?, NULL, NULL, NULL, ?, ?, ?, NULL, ?, ?, ?, ?, NULL, ?, NULL, ?, NULL, ?, NULL, ?, NULL, ?, ?, ?)
+                `;
+
+                con.query(
+                    insertSql,
+                    [
+                        BRISTOL_LOCATION,
+                        price,
+                        capacity,
+                        BRISTOL_LOCATION,
+                        'Private',
+                        'Live',
+                        sharedPrice,
+                        privatePrice,
+                        '',
+                        weekdayMorningPrice,
+                        flexibleWeekdayPrice,
+                        anyDayFlightPrice,
+                        sharedFlightFromPrice,
+                        privateCharterFromPrice,
+                        BRISTOL_PRIVATE_VOUCHER_TYPES,
+                        privatePricingJson,
+                        privateSalePricingJson
+                    ],
+                    (insertErr, insertResult) => {
+                        if (insertErr) {
+                            console.error('Error creating Bristol activity:', insertErr);
+                            return;
+                        }
+
+                        console.log(`✅ Bristol activity created (id ${insertResult.insertId})`);
+                        cloneAvailabilityRows(insertResult.insertId);
+                    }
+                );
+            });
+        });
+    };
+
+    migrateJsonLocationField('add_to_booking_items', 'locations');
+    migrateJsonLocationField('additional_information_questions', 'locations');
+    migrateScalarLocationField('all_booking', 'location');
+    migrateScalarLocationField('all_vouchers', 'preferred_location');
+    ensureBristolActivityAndAvailability();
 
     // Add numberOfPassengers column to all_vouchers table (idempotent)
     const checkNumberOfPassengersSql = `

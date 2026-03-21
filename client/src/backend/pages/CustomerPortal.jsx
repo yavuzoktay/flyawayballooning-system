@@ -2249,7 +2249,7 @@ const CustomerPortal = () => {
                             </Typography>
 
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                {availableLocations.filter(location => location !== 'Bristol Fiesta').map((location) => (
+                                {availableLocations.map((location) => (
                                     <Button
                                         key={location}
                                         variant={selectedNewLocation === location ? 'contained' : 'outlined'}

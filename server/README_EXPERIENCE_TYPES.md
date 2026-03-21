@@ -35,7 +35,7 @@ UPDATE add_to_booking_items SET experience_types = '["Shared Flight", "Private C
 2. **Sets default values**: Existing items get `["Shared Flight", "Private Charter"]` as default
 3. **Enables filtering**: Items can now be filtered based on:
    - Journey Type (Book Flight, Flight Voucher, etc.)
-   - Location (Bath, Devon, Somerset, Bristol Fiesta)
+   - Location (Bath, Devon, Somerset, Bristol)
    - Experience Type (Shared Flight, Private Charter)
 
 ## Expected Values

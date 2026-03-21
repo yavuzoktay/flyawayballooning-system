@@ -5947,7 +5947,7 @@ setBookingDetail(finalVoucherDetail);
                                                             <MenuItem value="Bath" sx={{ fontSize: '11px' }}>Bath</MenuItem>
                                                             <MenuItem value="Somerset" sx={{ fontSize: '11px' }}>Somerset</MenuItem>
                                                             <MenuItem value="Devon" sx={{ fontSize: '11px' }}>Devon</MenuItem>
-                                                            <MenuItem value="Bristol Fiesta" sx={{ fontSize: '11px' }}>Bristol Fiesta</MenuItem>
+                                                            <MenuItem value="Bristol" sx={{ fontSize: '11px' }}>Bristol</MenuItem>
                                                         </Select>
                                                     </FormControl>
                                                 </div>
@@ -6024,7 +6024,7 @@ setBookingDetail(finalVoucherDetail);
                                                     <MenuItem value="Bath">Bath</MenuItem>
                                                     <MenuItem value="Somerset">Somerset</MenuItem>
                                                     <MenuItem value="Devon">Devon</MenuItem>
-                                                    <MenuItem value="Bristol Fiesta">Bristol Fiesta</MenuItem>
+                                                    <MenuItem value="Bristol">Bristol</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>

@@ -14,7 +14,7 @@ SET @column_exists = (
 
 -- Add the column only if it doesn't exist
 SET @sql = IF(@column_exists = 0, 
-    'ALTER TABLE add_to_booking_items ADD COLUMN locations JSON DEFAULT NULL COMMENT "JSON array of applicable locations (e.g., [\"Bath\", \"Devon\", \"Somerset\", \"Bristol Fiesta\"])"',
+    'ALTER TABLE add_to_booking_items ADD COLUMN locations JSON DEFAULT NULL COMMENT "JSON array of applicable locations (e.g., [\"Bath\", \"Devon\", \"Somerset\", \"Bristol\"])"',
     'SELECT "Column locations already exists" as message'
 );
 
@@ -23,7 +23,7 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- Update existing records to have default locations (all locations)
-UPDATE add_to_booking_items SET locations = '["Bath", "Devon", "Somerset", "Bristol Fiesta"]' WHERE locations IS NULL;
+UPDATE add_to_booking_items SET locations = '["Bath", "Devon", "Somerset", "Bristol"]' WHERE locations IS NULL;
 
 -- Show the results
 SELECT 'Migration completed successfully' as status;

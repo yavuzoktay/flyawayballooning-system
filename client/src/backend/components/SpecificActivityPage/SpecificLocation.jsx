@@ -13,7 +13,7 @@ const MenuProps = {
 };
 
 const SpecificLocation = ({ defaultLocation, setDefaultLocation }) => {
-    const locations = ["Bath", "Somerset", "Devon", "Bristol Fiesta"];
+    const locations = ["Bath", "Somerset", "Devon", "Bristol"];
 
     // Handle Default Location Change
     const handleDefaultLocationChange = (event) => {
