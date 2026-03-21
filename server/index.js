@@ -32589,7 +32589,7 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
     };
 
     con.query(
-        'SELECT id, email, voucher_code, created_at, redeemed_voucher FROM all_booking ORDER BY created_at DESC',
+        'SELECT id, email, voucher_code, created_at, redeemed_voucher, book_flight, purchaser_email, recipient_email FROM all_booking ORDER BY created_at DESC',
         (bookingErr, bookingRows) => {
             if (bookingErr) {
                 return callback(bookingErr);
