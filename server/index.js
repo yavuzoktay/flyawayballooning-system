@@ -3727,9 +3727,68 @@ function parseNumericPrice(value) {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parseSaleNumericPrice(value) {
+    const parsed = parseNumericPrice(value);
+    if (parsed === null || parsed <= 0) {
+        return null;
+    }
+    return parsed;
+}
+
 function formatNumericPrice(value) {
     const parsed = parseNumericPrice(value);
     return parsed === null ? null : parsed.toFixed(2);
+}
+
+function formatSaleNumericPrice(value) {
+    const parsed = parseSaleNumericPrice(value);
+    return parsed === null ? null : parsed.toFixed(2);
+}
+
+function sanitizeSalePricingMap(rawValue) {
+    if (rawValue === undefined || rawValue === null || rawValue === '') {
+        return {};
+    }
+
+    let parsed = rawValue;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (typeof parsed !== 'string') {
+            break;
+        }
+
+        try {
+            parsed = JSON.parse(parsed);
+        } catch (error) {
+            return {};
+        }
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+    }
+
+    return Object.entries(parsed).reduce((acc, [title, value]) => {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const sanitizedTiers = Object.entries(value).reduce((tierAcc, [tier, tierValue]) => {
+                tierAcc[tier] = formatSaleNumericPrice(tierValue) || '';
+                return tierAcc;
+            }, {});
+
+            if (Object.values(sanitizedTiers).some((tierValue) => tierValue !== '')) {
+                acc[title] = sanitizedTiers;
+            }
+
+            return acc;
+        }
+
+        const sanitizedValue = formatSaleNumericPrice(value);
+        if (sanitizedValue !== null) {
+            acc[title] = sanitizedValue;
+        }
+
+        return acc;
+    }, {});
 }
 
 function buildSalePricingPayload({ originalCandidate, saleCandidate, fallbackCandidate = null }) {
@@ -3738,7 +3797,7 @@ function buildSalePricingPayload({ originalCandidate, saleCandidate, fallbackCan
             ? originalCandidate
             : fallbackCandidate
     );
-    const sale = parseNumericPrice(saleCandidate);
+    const sale = parseSaleNumericPrice(saleCandidate);
     const effective = sale !== null ? sale : original;
 
     return {
@@ -3819,7 +3878,8 @@ function buildPrivateCharterPricingPayload({
     passengers = 2
 }) {
     const original = getTieredPriceForPassengers(pricingMapRaw, title, passengers);
-    const sale = getTieredPriceForPassengers(salePricingMapRaw, title, passengers);
+    const saleCandidate = getTieredPriceForPassengers(salePricingMapRaw, title, passengers);
+    const sale = saleCandidate !== null && saleCandidate > 0 ? saleCandidate : null;
     const fallback = parseNumericPrice(defaultPrice);
     const resolvedOriginal = original !== null ? original : fallback;
     const effective = sale !== null ? sale : resolvedOriginal;
@@ -22768,6 +22828,7 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
         )
         VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+    const sanitizedPrivateCharterSalePricing = sanitizeSalePricingMap(private_charter_sale_pricing);
     con.query(sql, [
         activity_name,
         capacity,
@@ -22776,19 +22837,19 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
         voucher_type || 'All',
         formattedPrivateCharterVoucherTypes || null,
         serializeJsonField(private_charter_pricing),
-        serializeJsonField(private_charter_sale_pricing),
+        serializeJsonField(sanitizedPrivateCharterSalePricing),
         status,
         image,
         weekday_morning_price,
-        weekday_morning_sale_price || null,
+        formatSaleNumericPrice(weekday_morning_sale_price),
         flexible_weekday_price,
-        flexible_weekday_sale_price || null,
+        formatSaleNumericPrice(flexible_weekday_sale_price),
         any_day_flight_price,
-        any_day_flight_sale_price || null,
+        formatSaleNumericPrice(any_day_flight_sale_price),
         shared_flight_from_price,
-        shared_flight_from_sale_price || null,
+        formatSaleNumericPrice(shared_flight_from_sale_price),
         private_charter_from_price,
-        private_charter_from_sale_price || null
+        formatSaleNumericPrice(private_charter_from_sale_price)
     ], (err, result) => {
         if (err) {
             return res.status(500).json({ success: false, message: "Database error" });
@@ -22894,6 +22955,7 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
             UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, private_charter_sale_pricing=?, status=?, image=?, weekday_morning_price=?, weekday_morning_sale_price=?, flexible_weekday_price=?, flexible_weekday_sale_price=?, any_day_flight_price=?, any_day_flight_sale_price=?, shared_flight_from_price=?, shared_flight_from_sale_price=?, private_charter_from_price=?, private_charter_from_sale_price=?
             WHERE id=?
         `;
+        const sanitizedPrivateCharterSalePricing = sanitizeSalePricingMap(private_charter_sale_pricing);
         con.query(sql, [
             activity_name,
             capacity,
@@ -22902,19 +22964,19 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
             voucher_type || 'All',
             formattedPrivateCharterVoucherTypes || null,
             serializeJsonField(private_charter_pricing),
-            serializeJsonField(private_charter_sale_pricing),
+            serializeJsonField(sanitizedPrivateCharterSalePricing),
             status,
             finalImage,
             weekday_morning_price,
-            weekday_morning_sale_price || null,
+            formatSaleNumericPrice(weekday_morning_sale_price),
             flexible_weekday_price,
-            flexible_weekday_sale_price || null,
+            formatSaleNumericPrice(flexible_weekday_sale_price),
             any_day_flight_price,
-            any_day_flight_sale_price || null,
+            formatSaleNumericPrice(any_day_flight_sale_price),
             shared_flight_from_price,
-            shared_flight_from_sale_price || null,
+            formatSaleNumericPrice(shared_flight_from_sale_price),
             private_charter_from_price,
-            private_charter_from_sale_price || null,
+            formatSaleNumericPrice(private_charter_from_sale_price),
             id
         ], (err, result) => {
             if (err) return res.status(500).json({ success: false, message: "Database error" });
@@ -23007,15 +23069,15 @@ app.get('/api/locationPricing/:location', (req, res) => {
             success: true,
             data: {
                 weekday_morning_price: pricing.weekday_morning_price,
-                weekday_morning_sale_price: pricing.weekday_morning_sale_price,
+                weekday_morning_sale_price: formatSaleNumericPrice(pricing.weekday_morning_sale_price),
                 flexible_weekday_price: pricing.flexible_weekday_price,
-                flexible_weekday_sale_price: pricing.flexible_weekday_sale_price,
+                flexible_weekday_sale_price: formatSaleNumericPrice(pricing.flexible_weekday_sale_price),
                 any_day_flight_price: pricing.any_day_flight_price,
-                any_day_flight_sale_price: pricing.any_day_flight_sale_price,
+                any_day_flight_sale_price: formatSaleNumericPrice(pricing.any_day_flight_sale_price),
                 shared_flight_from_price: pricing.shared_flight_from_price,
-                shared_flight_from_sale_price: pricing.shared_flight_from_sale_price,
+                shared_flight_from_sale_price: formatSaleNumericPrice(pricing.shared_flight_from_sale_price),
                 private_charter_from_price: pricing.private_charter_from_price,
-                private_charter_from_sale_price: pricing.private_charter_from_sale_price,
+                private_charter_from_sale_price: formatSaleNumericPrice(pricing.private_charter_from_sale_price),
                 flight_type: flightTypes,
                 experiences: experiences
             }
@@ -26371,6 +26433,12 @@ app.get('/api/activities/flight-types', (req, res) => {
 
             return {
                 ...activity,
+                weekday_morning_sale_price: formatSaleNumericPrice(activity.weekday_morning_sale_price),
+                flexible_weekday_sale_price: formatSaleNumericPrice(activity.flexible_weekday_sale_price),
+                any_day_flight_sale_price: formatSaleNumericPrice(activity.any_day_flight_sale_price),
+                shared_flight_from_sale_price: formatSaleNumericPrice(activity.shared_flight_from_sale_price),
+                private_charter_from_sale_price: formatSaleNumericPrice(activity.private_charter_from_sale_price),
+                private_charter_sale_pricing: serializeJsonField(sanitizeSalePricingMap(activity.private_charter_sale_pricing)),
                 flight_type: flightTypes,
                 experiences: experiences
             };
@@ -28342,15 +28410,15 @@ app.get('/api/locationPricing/:location', (req, res) => {
             success: true,
             data: {
                 weekday_morning_price: pricing.weekday_morning_price,
-                weekday_morning_sale_price: pricing.weekday_morning_sale_price,
+                weekday_morning_sale_price: formatSaleNumericPrice(pricing.weekday_morning_sale_price),
                 flexible_weekday_price: pricing.flexible_weekday_price,
-                flexible_weekday_sale_price: pricing.flexible_weekday_sale_price,
+                flexible_weekday_sale_price: formatSaleNumericPrice(pricing.flexible_weekday_sale_price),
                 any_day_flight_price: pricing.any_day_flight_price,
-                any_day_flight_sale_price: pricing.any_day_flight_sale_price,
+                any_day_flight_sale_price: formatSaleNumericPrice(pricing.any_day_flight_sale_price),
                 shared_flight_from_price: pricing.shared_flight_from_price,
-                shared_flight_from_sale_price: pricing.shared_flight_from_sale_price,
+                shared_flight_from_sale_price: formatSaleNumericPrice(pricing.shared_flight_from_sale_price),
                 private_charter_from_price: pricing.private_charter_from_price,
-                private_charter_from_sale_price: pricing.private_charter_from_sale_price,
+                private_charter_from_sale_price: formatSaleNumericPrice(pricing.private_charter_from_sale_price),
                 flight_type: flightTypes,
                 experiences: experiences
             }

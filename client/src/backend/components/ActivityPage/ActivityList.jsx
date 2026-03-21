@@ -62,6 +62,75 @@ const isSelectedPrivateVoucherType = (selectedValues, voucherId) => {
     return false;
 };
 
+const SALE_PRICE_FIELDS = [
+    'weekday_morning_sale_price',
+    'flexible_weekday_sale_price',
+    'any_day_flight_sale_price',
+    'shared_flight_from_sale_price',
+    'private_charter_from_sale_price'
+];
+
+const parseSalePriceValue = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+
+    const normalized = String(value).trim().replace(/\s+/g, '').replace(/,/g, '.');
+    if (!normalized) return null;
+
+    const parsed = parseFloat(normalized);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+
+    return parsed;
+};
+
+const normalizeSaleFieldValue = (value) => (parseSalePriceValue(value) === null ? '' : value);
+
+const normalizeTieredSalePricingMap = (pricingMap) => {
+    if (!pricingMap || typeof pricingMap !== 'object' || Array.isArray(pricingMap)) {
+        return {};
+    }
+
+    return Object.entries(pricingMap).reduce((acc, [title, tierValues]) => {
+        if (tierValues && typeof tierValues === 'object' && !Array.isArray(tierValues)) {
+            const normalizedTiers = Object.entries(tierValues).reduce((tierAcc, [tier, value]) => {
+                tierAcc[tier] = normalizeSaleFieldValue(value);
+                return tierAcc;
+            }, {});
+
+            acc[title] = normalizedTiers;
+            return acc;
+        }
+
+        acc[title] = normalizeSaleFieldValue(tierValues);
+        return acc;
+    }, {});
+};
+
+const normalizeActivitySaleFields = (activityData = {}) => {
+    const normalized = { ...activityData };
+
+    SALE_PRICE_FIELDS.forEach((field) => {
+        normalized[field] = normalizeSaleFieldValue(activityData[field]);
+    });
+
+    normalized.private_charter_sale_pricing = normalizeTieredSalePricingMap(
+        parseNestedPricingMap(activityData.private_charter_sale_pricing)
+    );
+
+    return normalized;
+};
+
+const sanitizeActivityFormForSubmit = (formState = {}) => {
+    const sanitized = { ...formState };
+
+    SALE_PRICE_FIELDS.forEach((field) => {
+        sanitized[field] = normalizeSaleFieldValue(formState[field]);
+    });
+
+    sanitized.private_charter_sale_pricing = normalizeTieredSalePricingMap(formState.private_charter_sale_pricing);
+
+    return sanitized;
+};
+
 const ActivityList = ({ activity }) => {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState({
@@ -239,7 +308,9 @@ const ActivityList = ({ activity }) => {
         setSuccess(false);
         try {
             const formData = new FormData();
-            Object.entries(form).forEach(([key, value]) => {
+            const sanitizedForm = sanitizeActivityFormForSubmit(form);
+
+            Object.entries(sanitizedForm).forEach(([key, value]) => {
                 if (key === 'flight_type' || key === 'voucher_type' || key === 'private_charter_voucher_types') {
                     formData.append(key, value.join(','));
                 } else if (key === 'private_charter_pricing' || key === 'private_charter_sale_pricing') {
@@ -280,7 +351,7 @@ const ActivityList = ({ activity }) => {
                 let parsedData = data.data;
                 parsedData.private_charter_pricing = parseNestedPricingMap(parsedData.private_charter_pricing);
                 parsedData.private_charter_sale_pricing = parseNestedPricingMap(parsedData.private_charter_sale_pricing);
-                setEditForm(parsedData);
+                setEditForm(normalizeActivitySaleFields(parsedData));
                 setEditImagePreview(parsedData.image ? parsedData.image : null);
             } else {
                 setEditForm({});
@@ -369,7 +440,9 @@ const ActivityList = ({ activity }) => {
         setEditError('');
         try {
             const formData = new FormData();
-            Object.entries(editForm).forEach(([key, value]) => {
+            const sanitizedEditForm = sanitizeActivityFormForSubmit(editForm);
+
+            Object.entries(sanitizedEditForm).forEach(([key, value]) => {
                 if (key === 'flight_type' || key === 'voucher_type' || key === 'private_charter_voucher_types') {
                     formData.append(key, Array.isArray(value) ? value.join(',') : value);
                 } else if (key === 'private_charter_pricing' || key === 'private_charter_sale_pricing') {
