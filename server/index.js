@@ -32324,11 +32324,23 @@ function buildCustomerPortalToken(booking = {}) {
         booking.portal_link_token;
     if (explicitToken) return explicitToken;
 
-    // For Flight Voucher, use voucher ID instead of booking ID (unless it's already redeemed into a booking)
-    // For Gift Voucher, use voucher ID
-    // For other types, use booking ID
-    const isFlightVoucher = booking.book_flight === 'Flight Voucher' || booking.is_flight_voucher;
-    const isGiftVoucher = booking.book_flight === 'Gift Voucher';
+    // For Flight/Gift Voucher links we may receive the type from different
+    // tables/contexts (all_vouchers.book_flight, all_booking.flight_type, etc.).
+    const bookingTypeRaw =
+        booking.book_flight ??
+        booking.bookFlight ??
+        booking.flight_type ??
+        booking.flightType ??
+        booking.voucher_type ??
+        booking.voucherType ??
+        '';
+    const bookingType = String(bookingTypeRaw).trim().toLowerCase();
+    const isFlightVoucher = Boolean(
+        booking.is_flight_voucher ||
+        booking.isFlightVoucher ||
+        bookingType.includes('flight voucher')
+    );
+    const isGiftVoucher = bookingType.includes('gift voucher');
     const isVoucherIdForced = (() => {
         try {
             const idRaw = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
@@ -32511,11 +32523,12 @@ function getCustomerPortalCreatedAtCandidates(value = '') {
         addMomentFormats(momentValue);
         addMomentFormats(momentValue.clone().utc());
 
-        // Existing SMS links were generated in a mix of browser and server
-        // timezone contexts, so we try a bounded range of offsets to recover
-        // missing mappings without needing to know the original context.
-        for (let offset = -12; offset <= 14; offset += 1) {
-            addMomentFormats(momentValue.clone().utcOffset(offset * 60));
+        // Existing links were generated in a mix of browser/server timezone
+        // contexts (including half/quarter-hour offsets). We try a bounded
+        // range of offsets to recover missing mappings without knowing
+        // the original runtime timezone.
+        for (let offsetMinutes = -12 * 60; offsetMinutes <= 14 * 60; offsetMinutes += 15) {
+            addMomentFormats(momentValue.clone().utcOffset(offsetMinutes));
         }
     }
 
@@ -32544,20 +32557,22 @@ function buildCustomerPortalShortLinkCandidates(record = {}) {
             created: createdCandidate
         };
         const portalToken = buildCustomerPortalToken(tokenSource);
-        const targetUrl = buildCanonicalCustomerPortalTarget(portalToken);
+        const targetUrls = buildCustomerPortalTargetCandidates(portalToken);
 
-        if (!targetUrl || seenTargets.has(targetUrl)) {
-            continue;
-        }
+        targetUrls.forEach((targetUrl) => {
+            if (!targetUrl || seenTargets.has(targetUrl)) {
+                return;
+            }
 
-        seenTargets.add(targetUrl);
+            seenTargets.add(targetUrl);
 
-        const shortCodes = getCustomerPortalShortCodeVariants(targetUrl);
-        shortCodes.forEach((shortCode) => {
-            matches.push({
-                shortCode,
-                targetUrl,
-                portalToken
+            const shortCodes = getCustomerPortalShortCodeVariants(targetUrl);
+            shortCodes.forEach((shortCode) => {
+                matches.push({
+                    shortCode,
+                    targetUrl,
+                    portalToken
+                });
             });
         });
     }
@@ -32589,13 +32604,33 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
     };
 
     con.query(
-        'SELECT id, email, voucher_code, created_at, redeemed_voucher, book_flight, purchaser_email, recipient_email FROM all_booking ORDER BY created_at DESC',
+        `
+            SELECT
+                id,
+                email,
+                voucher_code,
+                created_at,
+                redeemed_voucher,
+                flight_type,
+                voucher_type,
+                voucher_type_detail
+            FROM all_booking
+            ORDER BY created_at DESC
+        `,
         (bookingErr, bookingRows) => {
             if (bookingErr) {
                 return callback(bookingErr);
             }
 
-            const bookingMatch = findMatchInRows(bookingRows);
+            const bookingMatch = findMatchInRows(bookingRows, (row) => ({
+                ...row,
+                book_flight:
+                    row.book_flight ||
+                    row.flight_type ||
+                    row.voucher_type_detail ||
+                    row.voucher_type ||
+                    null
+            }));
             if (bookingMatch) {
                 return callback(null, bookingMatch);
             }
@@ -32678,13 +32713,26 @@ function extractUrlSuffix(value = '') {
     };
 }
 
-function buildCanonicalCustomerPortalTarget(token = '', suffix = {}) {
+function buildCustomerPortalTargetCandidates(token = '', suffix = {}) {
     const sanitizedToken = sanitizeCustomerPortalToken(token);
-    if (!sanitizedToken) return null;
+    if (!sanitizedToken) return [];
 
     const search = suffix?.search || '';
     const hash = suffix?.hash || '';
-    return `${CUSTOMER_PORTAL_BASE_URL}/${encodeURIComponent(sanitizedToken)}/index${search}${hash}`;
+    const encodedToken = encodeURIComponent(sanitizedToken);
+
+    return Array.from(new Set([
+        // Canonical
+        `${CUSTOMER_PORTAL_BASE_URL}/${encodedToken}/index${search}${hash}`,
+        // Legacy variants used by older links
+        `${CUSTOMER_PORTAL_BASE_URL}/${encodedToken}${search}${hash}`,
+        `${CUSTOMER_PORTAL_BASE_URL}/${sanitizedToken}/index${search}${hash}`,
+        `${CUSTOMER_PORTAL_BASE_URL}/${sanitizedToken}${search}${hash}`
+    ]));
+}
+
+function buildCanonicalCustomerPortalTarget(token = '', suffix = {}) {
+    return buildCustomerPortalTargetCandidates(token, suffix)[0] || null;
 }
 
 function persistCustomerPortalShortLink({ shortCode, targetUrl, portalToken }) {

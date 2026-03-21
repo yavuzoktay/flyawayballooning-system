@@ -1,7 +1,7 @@
 import axios from "axios";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
-import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, TableContainer, FormControlLabel, Switch, FormGroup, Checkbox, Chip, InputAdornment, useTheme, useMediaQuery } from "@mui/material";
+import { Container, FormControl, InputLabel, MenuItem, OutlinedInput, Select, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Grid, Typography, Box, Divider, IconButton, Table, TableHead, TableRow, TableCell, TableBody, TableContainer, FormControlLabel, Switch, FormGroup, Checkbox, Chip, InputAdornment, useTheme, useMediaQuery, Collapse } from "@mui/material";
 import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -111,7 +111,10 @@ const BookingPage = () => {
     // Mobile detection
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    
+
+    const [mobileBookingFiltersOpen, setMobileBookingFiltersOpen] = useState(false);
+    const [mobileVoucherFiltersOpen, setMobileVoucherFiltersOpen] = useState(false);
+
     const [activeTab, setActiveTab] = useState("bookings");
     const [booking, setBooking] = useState([]);
     const [dateRequested, setDateRequested] = useState([]);
@@ -5691,7 +5694,7 @@ setBookingDetail(finalVoucherDetail);
                                             />
                                             <OutlinedInput
                                                 readOnly
-                                                onClick={() => setFilterDialogOpen(true)}
+                                                onClick={() => setMobileBookingFiltersOpen(prev => !prev)}
                                                 value=""
                                                 sx={{
                                                     cursor: 'pointer',
@@ -5711,8 +5714,11 @@ setBookingDetail(finalVoucherDetail);
                                                 }}
                                                 size="small"
                                                 startAdornment={
-                                                    <InputAdornment position="start" sx={{ margin: 0 }}>
-                                                        <FilterListIcon fontSize="small" color="secondary" />
+                                                    <InputAdornment position="start" sx={{ margin: 0, position: 'relative' }}>
+                                                        <FilterListIcon fontSize="small" color={mobileBookingFiltersOpen || filters.experience || filters.status || filters.voucherType || filters.location ? 'primary' : 'secondary'} />
+                                                        {(filters.experience || filters.status || filters.voucherType || filters.location) && (
+                                                            <Box sx={{ position: 'absolute', top: -4, right: -6, width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                                                        )}
                                                     </InputAdornment>
                                                 }
                                             />
@@ -5863,163 +5869,167 @@ setBookingDetail(finalVoucherDetail);
                                             />
                                         </Box>
                                     )}
-                                    <div className="booking-filter-wrap" style={isMobile ? {
-                                        display: 'flex',
-                                        flexWrap: 'wrap',
-                                        gap: '4px',
-                                        margin: '0'
-                                    } : {}}>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 160 
-                                            }} size="small" className="booking-filter-field">
-                                                <InputLabel id="book-flight-type-label" sx={isMobile ? { fontSize: '11px' } : {}}>Experience</InputLabel>
+                                    {isMobile ? (
+                                        <Collapse in={mobileBookingFiltersOpen} timeout="auto" unmountOnExit>
+                                            <Box sx={{
+                                                mt: 1,
+                                                p: 1.5,
+                                                bgcolor: '#f8f9fa',
+                                                borderRadius: 2,
+                                                border: '1px solid #e0e0e0',
+                                                display: 'flex',
+                                                flexWrap: 'wrap',
+                                                gap: '4px'
+                                            }}>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-flight-type-label-m" sx={{ fontSize: '11px' }}>Experience</InputLabel>
+                                                        <Select
+                                                            labelId="book-flight-type-label-m"
+                                                            value={filters.experience}
+                                                            label="Experience"
+                                                            onChange={(e) => handleFilterChange("experience", e.target.value)}
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Private Charter" sx={{ fontSize: '11px' }}>Private Charter</MenuItem>
+                                                            <MenuItem value="Shared Flight" sx={{ fontSize: '11px' }}>Shared Flight</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-Select-label-m" sx={{ fontSize: '11px' }}>Status</InputLabel>
+                                                        <Select
+                                                            labelId="book-Select-label-m"
+                                                            value={filters.status}
+                                                            onChange={(e) => handleFilterChange("status", e.target.value)}
+                                                            label="Status"
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Scheduled" sx={{ fontSize: '11px' }}>Scheduled</MenuItem>
+                                                            <MenuItem value="Expired" sx={{ fontSize: '11px' }}>Expired</MenuItem>
+                                                            <MenuItem value="Flown" sx={{ fontSize: '11px' }}>Flown</MenuItem>
+                                                            <MenuItem value="No Show" sx={{ fontSize: '11px' }}>No Show</MenuItem>
+                                                            <MenuItem value="Cancelled" sx={{ fontSize: '11px' }}>Cancelled</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-voucher-type-label-m" sx={{ fontSize: '11px' }}>Voucher Type</InputLabel>
+                                                        <Select
+                                                            labelId="book-voucher-type-label-m"
+                                                            value={filters.voucherType}
+                                                            onChange={(e) => handleFilterChange("voucherType", e.target.value)}
+                                                            label="Voucher Type"
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Weekday Morning" sx={{ fontSize: '11px' }}>Weekday Morning</MenuItem>
+                                                            <MenuItem value="Flexible Weekday" sx={{ fontSize: '11px' }}>Flexible Weekday</MenuItem>
+                                                            <MenuItem value="Any Day Flight" sx={{ fontSize: '11px' }}>Any Day Flight</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-location-label-m" sx={{ fontSize: '11px' }}>Location</InputLabel>
+                                                        <Select
+                                                            labelId="book-location-label-m"
+                                                            value={filters.location}
+                                                            onChange={(e) => handleFilterChange("location", e.target.value)}
+                                                            label="Location"
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Bath" sx={{ fontSize: '11px' }}>Bath</MenuItem>
+                                                            <MenuItem value="Somerset" sx={{ fontSize: '11px' }}>Somerset</MenuItem>
+                                                            <MenuItem value="Devon" sx={{ fontSize: '11px' }}>Devon</MenuItem>
+                                                            <MenuItem value="Bristol Fiesta" sx={{ fontSize: '11px' }}>Bristol Fiesta</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                {(filters.experience || filters.status || filters.voucherType || filters.location) && (
+                                                    <Box sx={{ width: '100%', mt: 0.5, textAlign: 'center' }}>
+                                                        <Button size="small" onClick={() => { handleFilterChange("experience", ""); handleFilterChange("status", ""); handleFilterChange("voucherType", ""); handleFilterChange("location", ""); }} sx={{ fontSize: '11px', textTransform: 'none' }}>
+                                                            Clear Filters
+                                                        </Button>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        </Collapse>
+                                    ) : (
+                                    <div className="booking-filter-wrap">
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small" className="booking-filter-field">
+                                                <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
                                                     value={filters.experience}
                                                     label="Experience"
                                                     onChange={(e) => handleFilterChange("experience", e.target.value)}
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Private Charter" sx={isMobile ? { fontSize: '11px' } : {}}>Private Charter</MenuItem>
-                                                    <MenuItem value="Shared Flight" sx={isMobile ? { fontSize: '11px' } : {}}>Shared Flight</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Private Charter">Private Charter</MenuItem>
+                                                    <MenuItem value="Shared Flight">Shared Flight</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 160 
-                                            }} size="small">
-                                                <InputLabel id="book-Select-label" sx={isMobile ? { fontSize: '11px' } : {}}>Status</InputLabel>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
+                                                <InputLabel id="book-Select-label">Status</InputLabel>
                                                 <Select
                                                     labelId="book-Select-label"
                                                     value={filters.status}
                                                     onChange={(e) => handleFilterChange("status", e.target.value)}
                                                     label="Status"
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Scheduled" sx={isMobile ? { fontSize: '11px' } : {}}>Scheduled</MenuItem>
-                                                    <MenuItem value="Expired" sx={isMobile ? { fontSize: '11px' } : {}}>Expired</MenuItem>
-                                                    <MenuItem value="Flown" sx={isMobile ? { fontSize: '11px' } : {}}>Flown</MenuItem>
-                                                    <MenuItem value="No Show" sx={isMobile ? { fontSize: '11px' } : {}}>No Show</MenuItem>
-                                                    <MenuItem value="Cancelled" sx={isMobile ? { fontSize: '11px' } : {}}>Cancelled</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Scheduled">Scheduled</MenuItem>
+                                                    <MenuItem value="Expired">Expired</MenuItem>
+                                                    <MenuItem value="Flown">Flown</MenuItem>
+                                                    <MenuItem value="No Show">No Show</MenuItem>
+                                                    <MenuItem value="Cancelled">Cancelled</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 180 
-                                            }} size="small">
-                                                <InputLabel id="book-voucher-type-label" sx={isMobile ? { fontSize: '11px' } : {}}>Voucher Type</InputLabel>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 180 }} size="small">
+                                                <InputLabel id="book-voucher-type-label">Voucher Type</InputLabel>
                                                 <Select
                                                     labelId="book-voucher-type-label"
                                                     value={filters.voucherType}
                                                     onChange={(e) => handleFilterChange("voucherType", e.target.value)}
                                                     label="Voucher Type"
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Weekday Morning" sx={isMobile ? { fontSize: '11px' } : {}}>Weekday Morning</MenuItem>
-                                                    <MenuItem value="Flexible Weekday" sx={isMobile ? { fontSize: '11px' } : {}}>Flexible Weekday</MenuItem>
-                                                    <MenuItem value="Any Day Flight" sx={isMobile ? { fontSize: '11px' } : {}}>Any Day Flight</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Weekday Morning">Weekday Morning</MenuItem>
+                                                    <MenuItem value="Flexible Weekday">Flexible Weekday</MenuItem>
+                                                    <MenuItem value="Any Day Flight">Any Day Flight</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 160 
-                                            }} size="small">
-                                                <InputLabel id="book-location-label" sx={isMobile ? { fontSize: '11px' } : {}}>Location</InputLabel>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
+                                                <InputLabel id="book-location-label">Location</InputLabel>
                                                 <Select
                                                     labelId="book-location-label"
                                                     value={filters.location}
                                                     onChange={(e) => handleFilterChange("location", e.target.value)}
                                                     label="Location"
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Bath" sx={isMobile ? { fontSize: '11px' } : {}}>Bath</MenuItem>
-                                                    <MenuItem value="Somerset" sx={isMobile ? { fontSize: '11px' } : {}}>Somerset</MenuItem>
-                                                    <MenuItem value="Devon" sx={isMobile ? { fontSize: '11px' } : {}}>Devon</MenuItem>
-                                                    <MenuItem value="Bristol Fiesta" sx={isMobile ? { fontSize: '11px' } : {}}>Bristol Fiesta</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Bath">Bath</MenuItem>
+                                                    <MenuItem value="Somerset">Somerset</MenuItem>
+                                                    <MenuItem value="Devon">Devon</MenuItem>
+                                                    <MenuItem value="Bristol Fiesta">Bristol Fiesta</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
                                     </div>
+                                    )}
                                 </div>
                                 {/* Search results count */}
                                 {filters.search && filters.search.trim() !== "" && (
@@ -6211,6 +6221,36 @@ setBookingDetail(finalVoucherDetail);
                                                     </InputAdornment>
                                                 }
                                             />
+                                            <OutlinedInput
+                                                readOnly
+                                                onClick={() => setMobileVoucherFiltersOpen(prev => !prev)}
+                                                value=""
+                                                sx={{
+                                                    cursor: 'pointer',
+                                                    height: '32px',
+                                                    width: '40px',
+                                                    minWidth: '40px',
+                                                    maxWidth: '40px',
+                                                    '& input': {
+                                                        cursor: 'pointer',
+                                                        textAlign: 'center',
+                                                        padding: '0',
+                                                        display: 'none'
+                                                    },
+                                                    '& fieldset': {
+                                                        border: 'none'
+                                                    }
+                                                }}
+                                                size="small"
+                                                startAdornment={
+                                                    <InputAdornment position="start" sx={{ margin: 0, position: 'relative' }}>
+                                                        <FilterListIcon fontSize="small" color={mobileVoucherFiltersOpen || filters.voucherType || filters.experience || filters.actualVoucherType || filters.redeemedStatus ? 'primary' : 'secondary'} />
+                                                        {(filters.voucherType || filters.experience || filters.actualVoucherType || filters.redeemedStatus) && (
+                                                            <Box sx={{ position: 'absolute', top: -4, right: -6, width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                                                        )}
+                                                    </InputAdornment>
+                                                }
+                                            />
                                     </div>
                                     )}
                                     <div className="booking-search-booking" style={{ 
@@ -6399,158 +6439,157 @@ setBookingDetail(finalVoucherDetail);
                                             />
                                         )}
                                     </div>
-                                    <div className="booking-filter-wrap" style={isMobile ? {
-                                        display: 'flex',
-                                        flexWrap: 'wrap',
-                                        gap: '4px',
-                                        margin: '0'
-                                    } : {}}>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 160 
-                                            }} size="small">
-                                                <InputLabel id="book-voucher-type-label" sx={isMobile ? { fontSize: '11px' } : {}}>Book Flight</InputLabel>
+                                    {isMobile ? (
+                                        <Collapse in={mobileVoucherFiltersOpen} timeout="auto" unmountOnExit>
+                                            <Box sx={{
+                                                mt: 1,
+                                                p: 1.5,
+                                                bgcolor: '#f8f9fa',
+                                                borderRadius: 2,
+                                                border: '1px solid #e0e0e0',
+                                                display: 'flex',
+                                                flexWrap: 'wrap',
+                                                gap: '4px'
+                                            }}>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-voucher-type-label-vm" sx={{ fontSize: '11px' }}>Book Flight</InputLabel>
+                                                        <Select
+                                                            labelId="book-voucher-type-label-vm"
+                                                            value={filters.voucherType}
+                                                            onChange={(e) => handleFilterChange("voucherType", e.target.value)}
+                                                            label="Book Flight"
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Flight Voucher" sx={{ fontSize: '11px' }}>Flight Voucher</MenuItem>
+                                                            <MenuItem value="Gift Voucher" sx={{ fontSize: '11px' }}>Gift Voucher</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-flight-type-label-vm" sx={{ fontSize: '11px' }}>Experience</InputLabel>
+                                                        <Select
+                                                            labelId="book-flight-type-label-vm"
+                                                            value={filters.experience}
+                                                            label="Experience"
+                                                            onChange={(e) => handleFilterChange("experience", e.target.value)}
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Private Charter" sx={{ fontSize: '11px' }}>Private Charter</MenuItem>
+                                                            <MenuItem value="Shared Flight" sx={{ fontSize: '11px' }}>Shared Flight</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-actual-voucher-type-label-vm" sx={{ fontSize: '11px' }}>Voucher Type</InputLabel>
+                                                        <Select
+                                                            labelId="book-actual-voucher-type-label-vm"
+                                                            value={filters.actualVoucherType}
+                                                            label="Voucher Type"
+                                                            onChange={(e) => handleFilterChange("actualVoucherType", e.target.value)}
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Weekday Morning" sx={{ fontSize: '11px' }}>Weekday Morning</MenuItem>
+                                                            <MenuItem value="Flexible Weekday" sx={{ fontSize: '11px' }}>Flexible Weekday</MenuItem>
+                                                            <MenuItem value="Any Day Flight" sx={{ fontSize: '11px' }}>Any Day Flight</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                                                    <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                                        <InputLabel id="book-redeemed-status-label-vm" sx={{ fontSize: '11px' }}>Redeemed</InputLabel>
+                                                        <Select
+                                                            labelId="book-redeemed-status-label-vm"
+                                                            value={filters.redeemedStatus}
+                                                            onChange={(e) => handleFilterChange("redeemedStatus", e.target.value)}
+                                                            label="Redeemed"
+                                                            sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                                        >
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
+                                                            <MenuItem value="Yes" sx={{ fontSize: '11px' }}>Yes</MenuItem>
+                                                            <MenuItem value="No" sx={{ fontSize: '11px' }}>No</MenuItem>
+                                                        </Select>
+                                                    </FormControl>
+                                                </div>
+                                                {(filters.voucherType || filters.experience || filters.actualVoucherType || filters.redeemedStatus) && (
+                                                    <Box sx={{ width: '100%', mt: 0.5, textAlign: 'center' }}>
+                                                        <Button size="small" onClick={() => { handleFilterChange("voucherType", ""); handleFilterChange("experience", ""); handleFilterChange("actualVoucherType", ""); handleFilterChange("redeemedStatus", ""); }} sx={{ fontSize: '11px', textTransform: 'none' }}>
+                                                            Clear Filters
+                                                        </Button>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        </Collapse>
+                                    ) : (
+                                    <div className="booking-filter-wrap">
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
+                                                <InputLabel id="book-voucher-type-label">Book Flight</InputLabel>
                                                 <Select
                                                     labelId="book-voucher-type-label"
                                                     value={filters.voucherType}
                                                     onChange={(e) => handleFilterChange("voucherType", e.target.value)}
                                                     label="Book Flight"
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Flight Voucher" sx={isMobile ? { fontSize: '11px' } : {}}>Flight Voucher</MenuItem>
-                                                    <MenuItem value="Gift Voucher" sx={isMobile ? { fontSize: '11px' } : {}}>Gift Voucher</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Flight Voucher">Flight Voucher</MenuItem>
+                                                    <MenuItem value="Gift Voucher">Gift Voucher</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 160 
-                                            }} size="small">
-                                                <InputLabel id="book-flight-type-label" sx={isMobile ? { fontSize: '11px' } : {}}>Experience</InputLabel>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
+                                                <InputLabel id="book-flight-type-label">Experience</InputLabel>
                                                 <Select
                                                     labelId="book-flight-type-label"
                                                     value={filters.experience}
                                                     label="Experience"
                                                     onChange={(e) => handleFilterChange("experience", e.target.value)}
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Private Charter" sx={isMobile ? { fontSize: '11px' } : {}}>Private Charter</MenuItem>
-                                                    <MenuItem value="Shared Flight" sx={isMobile ? { fontSize: '11px' } : {}}>Shared Flight</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Private Charter">Private Charter</MenuItem>
+                                                    <MenuItem value="Shared Flight">Shared Flight</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 180 
-                                            }} size="small">
-                                                <InputLabel id="book-actual-voucher-type-label" sx={isMobile ? { fontSize: '11px' } : {}}>Voucher Type</InputLabel>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 180 }} size="small">
+                                                <InputLabel id="book-actual-voucher-type-label">Voucher Type</InputLabel>
                                                 <Select
                                                     labelId="book-actual-voucher-type-label"
                                                     value={filters.actualVoucherType}
                                                     label="Voucher Type"
                                                     onChange={(e) => handleFilterChange("actualVoucherType", e.target.value)}
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Weekday Morning" sx={isMobile ? { fontSize: '11px' } : {}}>Weekday Morning</MenuItem>
-                                                    <MenuItem value="Flexible Weekday" sx={isMobile ? { fontSize: '11px' } : {}}>Flexible Weekday</MenuItem>
-                                                    <MenuItem value="Any Day Flight" sx={isMobile ? { fontSize: '11px' } : {}}>Any Day Flight</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Weekday Morning">Weekday Morning</MenuItem>
+                                                    <MenuItem value="Flexible Weekday">Flexible Weekday</MenuItem>
+                                                    <MenuItem value="Any Day Flight">Any Day Flight</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
-                                        <div className="booking-filter-field" style={isMobile ? {
-                                            flex: '1 1 calc(50% - 2px)',
-                                            minWidth: 0,
-                                            margin: '0'
-                                        } : {}}>
-                                            <FormControl sx={isMobile ? { 
-                                                m: 0.5, 
-                                                minWidth: 0,
-                                                width: '100%'
-                                            } : { 
-                                                m: 1, 
-                                                minWidth: 160 
-                                            }} size="small">
-                                                <InputLabel id="book-redeemed-status-label" sx={isMobile ? { fontSize: '11px' } : {}}>Redeemed</InputLabel>
+                                        <div className="booking-filter-field">
+                                            <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
+                                                <InputLabel id="book-redeemed-status-label">Redeemed</InputLabel>
                                                 <Select
                                                     labelId="book-redeemed-status-label"
                                                     value={filters.redeemedStatus}
                                                     onChange={(e) => handleFilterChange("redeemedStatus", e.target.value)}
                                                     label="Redeemed"
-                                                    sx={isMobile ? { 
-                                                        fontSize: '11px',
-                                                        height: '32px',
-                                                        '& .MuiSelect-select': {
-                                                            padding: '6px 8px',
-                                                            fontSize: '11px'
-                                                        }
-                                                    } : {}}
                                                 >
-                                                    <MenuItem value="" sx={isMobile ? { fontSize: '11px' } : {}}>
-                                                        <em>Select</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Yes" sx={isMobile ? { fontSize: '11px' } : {}}>Yes</MenuItem>
-                                                    <MenuItem value="No" sx={isMobile ? { fontSize: '11px' } : {}}>No</MenuItem>
+                                                    <MenuItem value=""><em>Select</em></MenuItem>
+                                                    <MenuItem value="Yes">Yes</MenuItem>
+                                                    <MenuItem value="No">No</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
                                     </div>
+                                    )}
                                 </div>
                                 {/* Search results count */}
                                 {filters.search && filters.search.trim() !== "" && (

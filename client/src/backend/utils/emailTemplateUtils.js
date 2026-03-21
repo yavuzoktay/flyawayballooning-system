@@ -63,18 +63,47 @@ const buildCustomerPortalToken = (booking = {}) => {
         booking.portal_link_token;
     if (explicitToken) return explicitToken;
 
-    // For Flight Voucher, use voucher ID instead of booking ID
-    // For Gift Voucher, use voucher ID
-    // For other types, use booking ID
-    const isFlightVoucher = booking.book_flight === 'Flight Voucher' || booking.is_flight_voucher;
-    const isGiftVoucher = booking.book_flight === 'Gift Voucher';
+    // For Flight/Gift Voucher links we may receive the type from different
+    // tables/contexts (all_vouchers.book_flight, all_booking.flight_type, etc.).
+    const bookingTypeRaw =
+        booking.book_flight ??
+        booking.bookFlight ??
+        booking.flight_type ??
+        booking.flightType ??
+        booking.voucher_type ??
+        booking.voucherType ??
+        '';
+    const bookingType = String(bookingTypeRaw).trim().toLowerCase();
+    const isFlightVoucher = Boolean(
+        booking.is_flight_voucher ||
+        booking.isFlightVoucher ||
+        bookingType.includes('flight voucher')
+    );
+    const isGiftVoucher = bookingType.includes('gift voucher');
+    const isVoucherIdForced = (() => {
+        try {
+            const idRaw = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+            return String(idRaw).startsWith('voucher-');
+        } catch {
+            return false;
+        }
+    })();
+    const isRedeemedVoucher = (() => {
+        const v = booking.redeemed_voucher ?? booking.is_voucher_redeemed ?? booking.redeemed ?? booking._original?.redeemed;
+        if (v === undefined || v === null) return false;
+        if (typeof v === 'string') return v.trim().toLowerCase() === 'yes' || v.trim().toLowerCase() === 'true';
+        return v === 1 || v === true;
+    })();
     
     // Get voucher ID from _original if available, or from booking.voucher_id
     const voucherId = booking._original?.id || booking.voucher_id || null;
     
     // Determine ID to use: voucher ID for Flight/Gift Voucher, booking ID for others
     let idToUse = '';
-    if (isFlightVoucher || isGiftVoucher) {
+    if (isVoucherIdForced) {
+        // Caller explicitly provided voucher-* id; keep voucher context even if redeemed
+        idToUse = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
+    } else if ((isFlightVoucher || isGiftVoucher) && !isRedeemedVoucher) {
         // Use voucher ID with prefix for Flight/Gift Voucher
         if (voucherId) {
             idToUse = `voucher-${voucherId}`;
