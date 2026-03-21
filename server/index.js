@@ -3690,6 +3690,165 @@ function normalizeVoucherLocation(rawLocation) {
     return cleaned.trim();
 }
 
+const SHARED_VOUCHER_ACTIVITY_PRICE_FIELDS = {
+    'weekday morning': {
+        original: 'weekday_morning_price',
+        sale: 'weekday_morning_sale_price'
+    },
+    'flexible weekday': {
+        original: 'flexible_weekday_price',
+        sale: 'flexible_weekday_sale_price'
+    },
+    'any day flight': {
+        original: 'any_day_flight_price',
+        sale: 'any_day_flight_sale_price'
+    }
+};
+
+function normalizeVoucherTitleKey(title) {
+    return (title || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function getSharedVoucherActivityPriceFields(title) {
+    return SHARED_VOUCHER_ACTIVITY_PRICE_FIELDS[normalizeVoucherTitleKey(title)] || null;
+}
+
+function parseNumericPrice(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    let sanitized = value;
+    if (typeof sanitized === 'string') {
+        sanitized = sanitized.trim().replace(/,/g, '');
+    }
+
+    const parsed = parseFloat(sanitized);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatNumericPrice(value) {
+    const parsed = parseNumericPrice(value);
+    return parsed === null ? null : parsed.toFixed(2);
+}
+
+function buildSalePricingPayload({ originalCandidate, saleCandidate, fallbackCandidate = null }) {
+    const original = parseNumericPrice(
+        originalCandidate !== undefined && originalCandidate !== null && originalCandidate !== ''
+            ? originalCandidate
+            : fallbackCandidate
+    );
+    const sale = parseNumericPrice(saleCandidate);
+    const effective = sale !== null ? sale : original;
+
+    return {
+        original_price: formatNumericPrice(original),
+        sale_price: formatNumericPrice(sale),
+        effective_price: formatNumericPrice(effective),
+        has_sale_price: sale !== null
+    };
+}
+
+function parseTieredPricingMap(rawValue) {
+    let parsed = rawValue;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (typeof parsed !== 'string') {
+            break;
+        }
+
+        try {
+            parsed = JSON.parse(parsed);
+        } catch (error) {
+            break;
+        }
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {};
+    }
+
+    return parsed;
+}
+
+function getTieredPricingEntryForTitle(pricingMapRaw, voucherTitleRaw) {
+    const pricingMap = parseTieredPricingMap(pricingMapRaw);
+    if (!pricingMap || typeof pricingMap !== 'object') {
+        return undefined;
+    }
+
+    if (pricingMap[voucherTitleRaw] !== undefined) {
+        return pricingMap[voucherTitleRaw];
+    }
+
+    const trimmedTitle = voucherTitleRaw?.trim?.();
+    if (trimmedTitle && pricingMap[trimmedTitle] !== undefined) {
+        return pricingMap[trimmedTitle];
+    }
+
+    const normalizedTitle = normalizeVoucherTitleKey(voucherTitleRaw);
+    for (const key of Object.keys(pricingMap)) {
+        if (normalizeVoucherTitleKey(key) === normalizedTitle) {
+            return pricingMap[key];
+        }
+    }
+
+    return undefined;
+}
+
+function getTieredPriceForPassengers(pricingMapRaw, voucherTitleRaw, passengers = 2) {
+    const entry = getTieredPricingEntryForTitle(pricingMapRaw, voucherTitleRaw);
+    if (entry === undefined || entry === null || entry === '') {
+        return null;
+    }
+
+    if (typeof entry === 'object' && !Array.isArray(entry)) {
+        const tierKey = String([2, 3, 4, 8].includes(Number(passengers)) ? Number(passengers) : 2);
+        const tierValue = entry[tierKey] ?? entry['2'];
+        return parseNumericPrice(tierValue);
+    }
+
+    return parseNumericPrice(entry);
+}
+
+function buildPrivateCharterPricingPayload({
+    defaultPrice,
+    pricingMapRaw,
+    salePricingMapRaw,
+    title,
+    passengers = 2
+}) {
+    const original = getTieredPriceForPassengers(pricingMapRaw, title, passengers);
+    const sale = getTieredPriceForPassengers(salePricingMapRaw, title, passengers);
+    const fallback = parseNumericPrice(defaultPrice);
+    const resolvedOriginal = original !== null ? original : fallback;
+    const effective = sale !== null ? sale : resolvedOriginal;
+
+    return {
+        original_price: formatNumericPrice(resolvedOriginal),
+        sale_price: formatNumericPrice(sale),
+        effective_price: formatNumericPrice(effective),
+        has_sale_price: sale !== null
+    };
+}
+
+function serializeJsonField(value, fallback = {}) {
+    if (value === undefined || value === null || value === '') {
+        return JSON.stringify(fallback);
+    }
+
+    if (typeof value === 'string') {
+        try {
+            JSON.parse(value);
+            return value;
+        } catch (error) {
+            return JSON.stringify(fallback);
+        }
+    }
+
+    return JSON.stringify(value);
+}
+
 // Get all voucher types with updated pricing from activity table
 app.get('/api/voucher-types', (req, res) => {
     console.log('GET /api/voucher-types called');
@@ -3709,16 +3868,27 @@ app.get('/api/voucher-types', (req, res) => {
                 COALESCE(a.weekday_morning_price, vt.price_per_person) as weekday_morning_price,
                 COALESCE(a.flexible_weekday_price, vt.price_per_person) as flexible_weekday_price,
                 COALESCE(a.any_day_flight_price, vt.price_per_person) as any_day_flight_price,
+                a.weekday_morning_sale_price,
+                a.flexible_weekday_sale_price,
+                a.any_day_flight_sale_price,
                 a.shared_flight_from_price,
+                a.shared_flight_from_sale_price,
                 a.private_charter_from_price
+                ,
+                a.private_charter_from_sale_price
             FROM voucher_types vt
             LEFT JOIN (
                 SELECT
                     weekday_morning_price,
                     flexible_weekday_price,
                     any_day_flight_price,
+                    weekday_morning_sale_price,
+                    flexible_weekday_sale_price,
+                    any_day_flight_sale_price,
                     shared_flight_from_price,
-                    private_charter_from_price
+                    shared_flight_from_sale_price,
+                    private_charter_from_price,
+                    private_charter_from_sale_price
                 FROM activity
                 WHERE status = 'Live' AND location = ?
                 ORDER BY id DESC
@@ -3735,8 +3905,13 @@ app.get('/api/voucher-types', (req, res) => {
                 COALESCE(a.weekday_morning_price, vt.price_per_person) as weekday_morning_price,
                 COALESCE(a.flexible_weekday_price, vt.price_per_person) as flexible_weekday_price,
                 COALESCE(a.any_day_flight_price, vt.price_per_person) as any_day_flight_price,
+                a.weekday_morning_sale_price,
+                a.flexible_weekday_sale_price,
+                a.any_day_flight_sale_price,
                 a.shared_flight_from_price,
-                a.private_charter_from_price
+                a.shared_flight_from_sale_price,
+                a.private_charter_from_price,
+                a.private_charter_from_sale_price
             FROM voucher_types vt
             LEFT JOIN (
                 SELECT * FROM activity WHERE status = 'Live' ORDER BY id ASC LIMIT 1
@@ -3760,28 +3935,32 @@ app.get('/api/voucher-types', (req, res) => {
 
         // Process the results to map voucher types to their correct pricing
         const processedVoucherTypes = result.map(vt => {
-            let updatedPrice = vt.price_per_person;
-
-            // Map voucher type titles to their corresponding pricing fields
-            if (vt.title === 'Weekday Morning' && vt.weekday_morning_price) {
-                updatedPrice = vt.weekday_morning_price;
-            } else if (vt.title === 'Flexible Weekday' && vt.flexible_weekday_price) {
-                updatedPrice = vt.flexible_weekday_price;
-            } else if (vt.title === 'Any Day Flight' && vt.any_day_flight_price) {
-                updatedPrice = vt.any_day_flight_price;
-            }
+            const fieldConfig = getSharedVoucherActivityPriceFields(vt.title);
+            const pricingPayload = buildSalePricingPayload({
+                originalCandidate: fieldConfig ? vt[fieldConfig.original] : vt.price_per_person,
+                saleCandidate: fieldConfig ? vt[fieldConfig.sale] : null,
+                fallbackCandidate: vt.price_per_person
+            });
 
             return {
                 ...vt,
                 image_text_tag: vt.image_text_tag || null,
-                price_per_person: updatedPrice,
+                price_per_person: pricingPayload.effective_price ?? vt.price_per_person,
+                original_price: pricingPayload.original_price ?? formatNumericPrice(vt.price_per_person),
+                sale_price: pricingPayload.sale_price,
+                has_sale_price: pricingPayload.has_sale_price,
                 // Add the activity pricing fields for reference
                 activity_pricing: {
                     weekday_morning_price: vt.weekday_morning_price,
                     flexible_weekday_price: vt.flexible_weekday_price,
                     any_day_flight_price: vt.any_day_flight_price,
+                    weekday_morning_sale_price: vt.weekday_morning_sale_price,
+                    flexible_weekday_sale_price: vt.flexible_weekday_sale_price,
+                    any_day_flight_sale_price: vt.any_day_flight_sale_price,
                     shared_flight_from_price: vt.shared_flight_from_price,
-                    private_charter_from_price: vt.private_charter_from_price
+                    shared_flight_from_sale_price: vt.shared_flight_from_sale_price,
+                    private_charter_from_price: vt.private_charter_from_price,
+                    private_charter_from_sale_price: vt.private_charter_from_sale_price
                 }
             };
         });
@@ -4259,59 +4438,68 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
 
         // For admin view (showOnlyActive = false), return all voucher types
         // For frontend view (showOnlyActive = true), return only active ones
-        let finalResult = result;
+        let finalResult = result.map(v => {
+            const pricingPayload = buildPrivateCharterPricingPayload({
+                defaultPrice: v.price_per_person,
+                title: v.title,
+                passengers
+            });
+
+            return {
+                ...v,
+                price_per_person: pricingPayload.effective_price ?? v.price_per_person,
+                original_price: pricingPayload.original_price ?? formatNumericPrice(v.price_per_person),
+                sale_price: pricingPayload.sale_price,
+                has_sale_price: pricingPayload.has_sale_price
+            };
+        });
 
         // If location is provided, enrich price_per_person from activity.private_charter_pricing
         console.log('Private charter location query:', { requestedLocation, normalizedLocation: location });
 
         if (location) {
-            const actSql = 'SELECT id, activity_name, location, private_charter_pricing FROM activity WHERE status = "Live" AND location = ? ORDER BY id DESC LIMIT 1';
+            const actSql = `
+                SELECT
+                    id,
+                    activity_name,
+                    location,
+                    private_charter_pricing,
+                    private_charter_sale_pricing,
+                    private_charter_from_price,
+                    private_charter_from_sale_price
+                FROM activity
+                WHERE status = "Live" AND location = ?
+                ORDER BY id DESC
+                LIMIT 1
+            `;
             con.query(actSql, [location], (aErr, aRes) => {
                 if (aErr) {
                     console.error('Error fetching activity for pricing:', aErr);
                 } else if (aRes && aRes.length > 0) {
-                    let pricingMap = {};
-                    try {
-                        const raw = aRes[0].private_charter_pricing;
-                        pricingMap = typeof raw === 'string' ? JSON.parse(raw || '{}') : (raw || {});
-                    } catch (e) {
-                        pricingMap = {};
-                    }
                     const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
                     const selectedPassengers = passengers && [2, 3, 4, 8].includes(passengers) ? String(passengers) : '2';
                     // Map titles to prices (tolerant)
                     finalResult = finalResult.map(v => {
-                        const title = v.title || '';
-                        let matchVal = null;
+                        const pricingPayload = buildPrivateCharterPricingPayload({
+                            defaultPrice: v.price_per_person,
+                            pricingMapRaw: aRes[0].private_charter_pricing,
+                            salePricingMapRaw: aRes[0].private_charter_sale_pricing,
+                            title: v.title || '',
+                            passengers: selectedPassengers
+                        });
 
-                        // Güvenli erişim için pricingMap kontrolü
-                        if (pricingMap && typeof pricingMap === 'object') {
-                            matchVal = pricingMap[title];
-                            if (matchVal == null) matchVal = pricingMap[title.trim?.()];
-                            if (matchVal == null) {
-                                const normTitle = normalize(title);
-                                for (const k of Object.keys(pricingMap)) {
-                                    if (normalize(k) === normTitle) { matchVal = pricingMap[k]; break; }
-                                }
-                            }
-                        }
-                        if (matchVal != null && matchVal !== '') {
-                            if (typeof matchVal === 'object') {
-                                const tierVal = matchVal[selectedPassengers] ?? matchVal['2'];
-                                const parsedTier = parseFloat(tierVal);
-                                if (!Number.isNaN(parsedTier)) {
-                                    v.price_per_person = parsedTier.toFixed(2);
-                                    v.price_unit = 'total';
-                                }
-                            } else {
-                                const parsed = parseFloat(matchVal);
-                                if (!Number.isNaN(parsed)) {
-                                    v.price_per_person = parsed.toFixed(2);
-                                    v.price_unit = 'total';
-                                }
-                            }
-                        }
-                        return v;
+                        const hasActivityPricing =
+                            getTieredPricingEntryForTitle(aRes[0].private_charter_pricing, v.title || '') !== undefined ||
+                            getTieredPricingEntryForTitle(aRes[0].private_charter_sale_pricing, v.title || '') !== undefined;
+
+                        return {
+                            ...v,
+                            price_per_person: pricingPayload.effective_price ?? v.price_per_person,
+                            original_price: pricingPayload.original_price ?? formatNumericPrice(v.price_per_person),
+                            sale_price: pricingPayload.sale_price,
+                            has_sale_price: pricingPayload.has_sale_price,
+                            price_unit: hasActivityPricing ? 'total' : (v.price_unit || 'total')
+                        };
                     });
                 }
                 console.log('Query result:', result);
@@ -22503,7 +22691,28 @@ app.get('/api/analytics', async (req, res) => {
 });
 // Create Activity endpoint (with image upload)
 app.post("/api/createActivity", upload.single('image'), (req, res) => {
-    const { activity_name, capacity, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
+    const {
+        activity_name,
+        capacity,
+        event_time,
+        location,
+        flight_type,
+        voucher_type,
+        private_charter_voucher_types,
+        private_charter_pricing,
+        private_charter_sale_pricing,
+        status,
+        weekday_morning_price,
+        weekday_morning_sale_price,
+        flexible_weekday_price,
+        flexible_weekday_sale_price,
+        any_day_flight_price,
+        any_day_flight_sale_price,
+        shared_flight_from_price,
+        shared_flight_from_sale_price,
+        private_charter_from_price,
+        private_charter_from_sale_price
+    } = req.body;
     let image = null;
     if (req.file) {
         // Sunucuya göre path'i düzelt
@@ -22532,10 +22741,55 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
     }
 
     const sql = `
-        INSERT INTO activity (activity_name, capacity, start_date, end_date, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price)
-        VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO activity (
+            activity_name,
+            capacity,
+            start_date,
+            end_date,
+            event_time,
+            location,
+            flight_type,
+            voucher_type,
+            private_charter_voucher_types,
+            private_charter_pricing,
+            private_charter_sale_pricing,
+            status,
+            image,
+            weekday_morning_price,
+            weekday_morning_sale_price,
+            flexible_weekday_price,
+            flexible_weekday_sale_price,
+            any_day_flight_price,
+            any_day_flight_sale_price,
+            shared_flight_from_price,
+            shared_flight_from_sale_price,
+            private_charter_from_price,
+            private_charter_from_sale_price
+        )
+        VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    con.query(sql, [activity_name, capacity, location, formattedFlightType, voucher_type || 'All', formattedPrivateCharterVoucherTypes || null, JSON.stringify(private_charter_pricing || {}), status, image, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price], (err, result) => {
+    con.query(sql, [
+        activity_name,
+        capacity,
+        location,
+        formattedFlightType,
+        voucher_type || 'All',
+        formattedPrivateCharterVoucherTypes || null,
+        serializeJsonField(private_charter_pricing),
+        serializeJsonField(private_charter_sale_pricing),
+        status,
+        image,
+        weekday_morning_price,
+        weekday_morning_sale_price || null,
+        flexible_weekday_price,
+        flexible_weekday_sale_price || null,
+        any_day_flight_price,
+        any_day_flight_sale_price || null,
+        shared_flight_from_price,
+        shared_flight_from_sale_price || null,
+        private_charter_from_price,
+        private_charter_from_sale_price || null
+    ], (err, result) => {
         if (err) {
             return res.status(500).json({ success: false, message: "Database error" });
         }
@@ -22585,7 +22839,28 @@ app.get('/api/locationVoucherTypes/:location', (req, res) => {
 // Update activity by id (with image upload)
 app.put("/api/activity/:id", upload.single('image'), (req, res) => {
     const { id } = req.params;
-    const { activity_name, capacity, event_time, location, flight_type, voucher_type, private_charter_voucher_types, private_charter_pricing, status, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price } = req.body;
+    const {
+        activity_name,
+        capacity,
+        event_time,
+        location,
+        flight_type,
+        voucher_type,
+        private_charter_voucher_types,
+        private_charter_pricing,
+        private_charter_sale_pricing,
+        status,
+        weekday_morning_price,
+        weekday_morning_sale_price,
+        flexible_weekday_price,
+        flexible_weekday_sale_price,
+        any_day_flight_price,
+        any_day_flight_sale_price,
+        shared_flight_from_price,
+        shared_flight_from_sale_price,
+        private_charter_from_price,
+        private_charter_from_sale_price
+    } = req.body;
     let image = null;
     if (req.file) {
         image = `/uploads/activities/${req.file.filename}`;
@@ -22616,10 +22891,32 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
         }
 
         const sql = `
-            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, status=?, image=?, weekday_morning_price=?, flexible_weekday_price=?, any_day_flight_price=?, shared_flight_from_price=?, private_charter_from_price=?
+            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, private_charter_sale_pricing=?, status=?, image=?, weekday_morning_price=?, weekday_morning_sale_price=?, flexible_weekday_price=?, flexible_weekday_sale_price=?, any_day_flight_price=?, any_day_flight_sale_price=?, shared_flight_from_price=?, shared_flight_from_sale_price=?, private_charter_from_price=?, private_charter_from_sale_price=?
             WHERE id=?
         `;
-        con.query(sql, [activity_name, capacity, location, formattedFlightType, voucher_type || 'All', formattedPrivateCharterVoucherTypes || null, JSON.stringify(private_charter_pricing || {}), status, finalImage, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, id], (err, result) => {
+        con.query(sql, [
+            activity_name,
+            capacity,
+            location,
+            formattedFlightType,
+            voucher_type || 'All',
+            formattedPrivateCharterVoucherTypes || null,
+            serializeJsonField(private_charter_pricing),
+            serializeJsonField(private_charter_sale_pricing),
+            status,
+            finalImage,
+            weekday_morning_price,
+            weekday_morning_sale_price || null,
+            flexible_weekday_price,
+            flexible_weekday_sale_price || null,
+            any_day_flight_price,
+            any_day_flight_sale_price || null,
+            shared_flight_from_price,
+            shared_flight_from_sale_price || null,
+            private_charter_from_price,
+            private_charter_from_sale_price || null,
+            id
+        ], (err, result) => {
             if (err) return res.status(500).json({ success: false, message: "Database error" });
             res.json({ success: true, data: result });
         });
@@ -22657,7 +22954,18 @@ app.get('/api/locationPricing/:location', (req, res) => {
     console.log('Location:', location);
 
     const sql = `
-        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, flight_type
+        SELECT
+            weekday_morning_price,
+            weekday_morning_sale_price,
+            flexible_weekday_price,
+            flexible_weekday_sale_price,
+            any_day_flight_price,
+            any_day_flight_sale_price,
+            shared_flight_from_price,
+            shared_flight_from_sale_price,
+            private_charter_from_price,
+            private_charter_from_sale_price,
+            flight_type
         FROM activity 
         WHERE location = ? AND status = 'Live'
         ORDER BY id ASC
@@ -22699,10 +23007,15 @@ app.get('/api/locationPricing/:location', (req, res) => {
             success: true,
             data: {
                 weekday_morning_price: pricing.weekday_morning_price,
+                weekday_morning_sale_price: pricing.weekday_morning_sale_price,
                 flexible_weekday_price: pricing.flexible_weekday_price,
+                flexible_weekday_sale_price: pricing.flexible_weekday_sale_price,
                 any_day_flight_price: pricing.any_day_flight_price,
+                any_day_flight_sale_price: pricing.any_day_flight_sale_price,
                 shared_flight_from_price: pricing.shared_flight_from_price,
+                shared_flight_from_sale_price: pricing.shared_flight_from_sale_price,
                 private_charter_from_price: pricing.private_charter_from_price,
+                private_charter_from_sale_price: pricing.private_charter_from_sale_price,
                 flight_type: flightTypes,
                 experiences: experiences
             }
@@ -25980,7 +26293,28 @@ app.get('/api/activities/flight-types', (req, res) => {
     console.log('=== /api/activities/flight-types called ===');
     console.log('Location filter:', location);
 
-    let sql = 'SELECT id, activity_name, location, flight_type, status, private_charter_pricing, weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price FROM activity WHERE status = "Live"';
+    let sql = `
+        SELECT
+            id,
+            activity_name,
+            location,
+            flight_type,
+            status,
+            private_charter_pricing,
+            private_charter_sale_pricing,
+            weekday_morning_price,
+            weekday_morning_sale_price,
+            flexible_weekday_price,
+            flexible_weekday_sale_price,
+            any_day_flight_price,
+            any_day_flight_sale_price,
+            shared_flight_from_price,
+            shared_flight_from_sale_price,
+            private_charter_from_price,
+            private_charter_from_sale_price
+        FROM activity
+        WHERE status = "Live"
+    `;
     const params = [];
 
     if (location) {
@@ -26005,9 +26339,13 @@ app.get('/api/activities/flight-types', (req, res) => {
             id: r.id,
             name: r.activity_name,
             weekday_morning_price: r.weekday_morning_price,
+            weekday_morning_sale_price: r.weekday_morning_sale_price,
             flexible_weekday_price: r.flexible_weekday_price,
+            flexible_weekday_sale_price: r.flexible_weekday_sale_price,
             any_day_flight_price: r.any_day_flight_price,
-            shared_flight_from_price: r.shared_flight_from_price
+            any_day_flight_sale_price: r.any_day_flight_sale_price,
+            shared_flight_from_price: r.shared_flight_from_price,
+            shared_flight_from_sale_price: r.shared_flight_from_sale_price
         })));
 
         // Process flight types to map them to experience names
@@ -27957,7 +28295,18 @@ app.get('/api/locationPricing/:location', (req, res) => {
     if (!location) return res.status(400).json({ success: false, message: 'Location is required' });
 
     const sql = `
-        SELECT weekday_morning_price, flexible_weekday_price, any_day_flight_price, shared_flight_from_price, private_charter_from_price, flight_type
+        SELECT
+            weekday_morning_price,
+            weekday_morning_sale_price,
+            flexible_weekday_price,
+            flexible_weekday_sale_price,
+            any_day_flight_price,
+            any_day_flight_sale_price,
+            shared_flight_from_price,
+            shared_flight_from_sale_price,
+            private_charter_from_price,
+            private_charter_from_sale_price,
+            flight_type
         FROM activity 
         WHERE location = ? AND status = 'Live'
         ORDER BY id ASC
@@ -27993,10 +28342,15 @@ app.get('/api/locationPricing/:location', (req, res) => {
             success: true,
             data: {
                 weekday_morning_price: pricing.weekday_morning_price,
+                weekday_morning_sale_price: pricing.weekday_morning_sale_price,
                 flexible_weekday_price: pricing.flexible_weekday_price,
+                flexible_weekday_sale_price: pricing.flexible_weekday_sale_price,
                 any_day_flight_price: pricing.any_day_flight_price,
+                any_day_flight_sale_price: pricing.any_day_flight_sale_price,
                 shared_flight_from_price: pricing.shared_flight_from_price,
+                shared_flight_from_sale_price: pricing.shared_flight_from_sale_price,
                 private_charter_from_price: pricing.private_charter_from_price,
+                private_charter_from_sale_price: pricing.private_charter_from_sale_price,
                 flight_type: flightTypes,
                 experiences: experiences
             }
@@ -29554,6 +29908,75 @@ app.post('/api/createTestBooking', (req, res) => {
 // Database migration function
 const runDatabaseMigrations = () => {
     console.log('Running database migrations...');
+
+    const ensureColumnExists = (tableName, columnName, definition, successLabel) => {
+        const checkSql = `
+            SELECT COUNT(*) AS cnt
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = ?
+              AND column_name = ?
+        `;
+
+        con.query(checkSql, [tableName, columnName], (checkErr, rows) => {
+            if (checkErr) {
+                console.error(`Error checking ${tableName}.${columnName}:`, checkErr);
+                return;
+            }
+
+            const exists = rows && rows[0] && Number(rows[0].cnt) > 0;
+            if (exists) {
+                console.log(`✅ ${tableName}.${columnName} already exists`);
+                return;
+            }
+
+            const alterSql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`;
+            con.query(alterSql, (alterErr) => {
+                if (alterErr) {
+                    console.error(`Error adding ${tableName}.${columnName}:`, alterErr);
+                } else {
+                    console.log(`✅ ${successLabel || `${tableName}.${columnName} column added successfully`}`);
+                }
+            });
+        });
+    };
+
+    ensureColumnExists(
+        'activity',
+        'weekday_morning_sale_price',
+        'DECIMAL(10,2) NULL AFTER weekday_morning_price',
+        'activity.weekday_morning_sale_price column added successfully'
+    );
+    ensureColumnExists(
+        'activity',
+        'flexible_weekday_sale_price',
+        'DECIMAL(10,2) NULL AFTER flexible_weekday_price',
+        'activity.flexible_weekday_sale_price column added successfully'
+    );
+    ensureColumnExists(
+        'activity',
+        'any_day_flight_sale_price',
+        'DECIMAL(10,2) NULL AFTER any_day_flight_price',
+        'activity.any_day_flight_sale_price column added successfully'
+    );
+    ensureColumnExists(
+        'activity',
+        'shared_flight_from_sale_price',
+        'DECIMAL(10,2) NULL AFTER shared_flight_from_price',
+        'activity.shared_flight_from_sale_price column added successfully'
+    );
+    ensureColumnExists(
+        'activity',
+        'private_charter_from_sale_price',
+        'DECIMAL(10,2) NULL AFTER private_charter_from_price',
+        'activity.private_charter_from_sale_price column added successfully'
+    );
+    ensureColumnExists(
+        'activity',
+        'private_charter_sale_pricing',
+        'LONGTEXT NULL AFTER private_charter_pricing',
+        'activity.private_charter_sale_pricing column added successfully'
+    );
 
     // Add numberOfPassengers column to all_vouchers table (idempotent)
     const checkNumberOfPassengersSql = `

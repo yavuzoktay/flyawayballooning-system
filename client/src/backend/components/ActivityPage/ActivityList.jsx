@@ -17,6 +17,51 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { Checkbox, FormControlLabel, FormGroup } from '@mui/material';
 import CreateAvailabilitiesModal from './CreateAvailabilitiesModal';
 
+const parseNestedPricingMap = (value) => {
+    let parsed = value;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (typeof parsed !== 'string') {
+            break;
+        }
+
+        try {
+            parsed = JSON.parse(parsed);
+        } catch (error) {
+            break;
+        }
+    }
+
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+};
+
+const getTieredPriceValue = (pricingMap, title, tier) => {
+    if (!pricingMap || !title) return '';
+    const entry = pricingMap[title];
+
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        return entry[String(tier)] || '';
+    }
+
+    if (tier === 2) {
+        return entry || '';
+    }
+
+    return '';
+};
+
+const isSelectedPrivateVoucherType = (selectedValues, voucherId) => {
+    if (Array.isArray(selectedValues)) {
+        return selectedValues.includes(voucherId.toString());
+    }
+
+    if (typeof selectedValues === 'string') {
+        return selectedValues.split(',').map(item => item.trim()).includes(voucherId.toString());
+    }
+
+    return false;
+};
+
 const ActivityList = ({ activity }) => {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState({
@@ -27,11 +72,17 @@ const ActivityList = ({ activity }) => {
         voucher_type: [], // voucher types array
         private_charter_voucher_types: [], // private charter voucher types array
         private_charter_pricing: {}, // individual pricing for each voucher type
+        private_charter_sale_pricing: {}, // sale pricing for each voucher type
         weekday_morning_price: '',
+        weekday_morning_sale_price: '',
         flexible_weekday_price: '',
+        flexible_weekday_sale_price: '',
         any_day_flight_price: '',
+        any_day_flight_sale_price: '',
         shared_flight_from_price: '',
+        shared_flight_from_sale_price: '',
         private_charter_from_price: '',
+        private_charter_from_sale_price: '',
         status: 'Live',
     });
     const [saving, setSaving] = useState(false);
@@ -39,7 +90,8 @@ const ActivityList = ({ activity }) => {
     const [success, setSuccess] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState({
-        private_charter_pricing: {}
+        private_charter_pricing: {},
+        private_charter_sale_pricing: {}
     });
     const [editId, setEditId] = useState(null);
     const [editSaving, setEditSaving] = useState(false);
@@ -84,7 +136,25 @@ const ActivityList = ({ activity }) => {
     const handleClose = () => {
         setOpen(false);
         setForm({
-            activity_name: '', capacity: '', location: '', flight_type: [], voucher_type: [], private_charter_voucher_types: [], private_charter_pricing: {}, weekday_morning_price: '', flexible_weekday_price: '', any_day_flight_price: '', shared_flight_from_price: '', private_charter_from_price: '', status: 'Live'
+            activity_name: '',
+            capacity: '',
+            location: '',
+            flight_type: [],
+            voucher_type: [],
+            private_charter_voucher_types: [],
+            private_charter_pricing: {},
+            private_charter_sale_pricing: {},
+            weekday_morning_price: '',
+            weekday_morning_sale_price: '',
+            flexible_weekday_price: '',
+            flexible_weekday_sale_price: '',
+            any_day_flight_price: '',
+            any_day_flight_sale_price: '',
+            shared_flight_from_price: '',
+            shared_flight_from_sale_price: '',
+            private_charter_from_price: '',
+            private_charter_from_sale_price: '',
+            status: 'Live'
         });
         setError('');
         setSuccess(false);
@@ -116,6 +186,22 @@ const ActivityList = ({ activity }) => {
                 newTypes = newTypes.filter(t => t !== value);
             }
             setForm({ ...form, private_charter_voucher_types: newTypes });
+        } else if (name.startsWith('private_charter_sale_price_')) {
+            const voucherTypeId = name.replace('private_charter_sale_price_', '');
+            const voucherType = privateCharterVoucherTypes.find(vt => vt.id.toString() === voucherTypeId);
+            if (voucherType) {
+                const existingForTitle = form.private_charter_sale_pricing[voucherType.title];
+                const pricingForTitle = (existingForTitle && typeof existingForTitle === 'object') ? { ...existingForTitle } : {};
+                const tierKey = String(groupPassengerTier);
+                pricingForTitle[tierKey] = value;
+                setForm({
+                    ...form,
+                    private_charter_sale_pricing: {
+                        ...form.private_charter_sale_pricing,
+                        [voucherType.title]: pricingForTitle
+                    }
+                });
+            }
         } else if (name.startsWith('private_charter_price_')) {
             const voucherTypeId = name.replace('private_charter_price_', '');
             // Find the voucher type by ID to get the title
@@ -156,7 +242,7 @@ const ActivityList = ({ activity }) => {
             Object.entries(form).forEach(([key, value]) => {
                 if (key === 'flight_type' || key === 'voucher_type' || key === 'private_charter_voucher_types') {
                     formData.append(key, value.join(','));
-                } else if (key === 'private_charter_pricing') {
+                } else if (key === 'private_charter_pricing' || key === 'private_charter_sale_pricing') {
                     formData.append(key, JSON.stringify(value));
                 } else {
                     formData.append(key, value);
@@ -192,13 +278,8 @@ const ActivityList = ({ activity }) => {
             if (data.success) {
                 // Parse private_charter_pricing if it's a string
                 let parsedData = data.data;
-                if (parsedData.private_charter_pricing && typeof parsedData.private_charter_pricing === 'string') {
-                    try {
-                        parsedData.private_charter_pricing = JSON.parse(parsedData.private_charter_pricing);
-                    } catch (e) {
-                        parsedData.private_charter_pricing = {};
-                    }
-                }
+                parsedData.private_charter_pricing = parseNestedPricingMap(parsedData.private_charter_pricing);
+                parsedData.private_charter_sale_pricing = parseNestedPricingMap(parsedData.private_charter_sale_pricing);
                 setEditForm(parsedData);
                 setEditImagePreview(parsedData.image ? parsedData.image : null);
             } else {
@@ -237,6 +318,22 @@ const ActivityList = ({ activity }) => {
                 newTypes = newTypes.filter(t => t !== value);
             }
             setEditForm({ ...editForm, private_charter_voucher_types: newTypes });
+        } else if (name.startsWith('private_charter_sale_price_')) {
+            const voucherTypeId = name.replace('private_charter_sale_price_', '');
+            const voucherType = privateCharterVoucherTypes.find(vt => vt.id.toString() === voucherTypeId);
+            if (voucherType) {
+                const existingForTitle = editForm.private_charter_sale_pricing ? editForm.private_charter_sale_pricing[voucherType.title] : undefined;
+                const pricingForTitle = (existingForTitle && typeof existingForTitle === 'object') ? { ...existingForTitle } : {};
+                const tierKey = String(editGroupPassengerTier);
+                pricingForTitle[tierKey] = value;
+                setEditForm({
+                    ...editForm,
+                    private_charter_sale_pricing: {
+                        ...editForm.private_charter_sale_pricing,
+                        [voucherType.title]: pricingForTitle
+                    }
+                });
+            }
         } else if (name.startsWith('private_charter_price_')) {
             const voucherTypeId = name.replace('private_charter_price_', '');
             // Find the voucher type by ID to get the title
@@ -275,7 +372,7 @@ const ActivityList = ({ activity }) => {
             Object.entries(editForm).forEach(([key, value]) => {
                 if (key === 'flight_type' || key === 'voucher_type' || key === 'private_charter_voucher_types') {
                     formData.append(key, Array.isArray(value) ? value.join(',') : value);
-                } else if (key === 'private_charter_pricing') {
+                } else if (key === 'private_charter_pricing' || key === 'private_charter_sale_pricing') {
                     formData.append(key, JSON.stringify(value));
                 } else {
                     formData.append(key, value);
@@ -476,6 +573,7 @@ const ActivityList = ({ activity }) => {
                         
                         <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
                         <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={form.shared_flight_from_price} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Shared Flight Sale Price" name="shared_flight_from_sale_price" value={form.shared_flight_from_sale_price} onChange={handleChange} type="number" fullWidth />
                         
                         <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
                         <FormGroup row sx={{ mb: 2, mt: 1 }}>
@@ -495,8 +593,11 @@ const ActivityList = ({ activity }) => {
                         
                         <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
                         <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={form.weekday_morning_price} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Weekday Morning Sale Price" name="weekday_morning_sale_price" value={form.weekday_morning_sale_price} onChange={handleChange} type="number" fullWidth />
                         <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={form.flexible_weekday_price} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Flexible Weekday Sale Price" name="flexible_weekday_sale_price" value={form.flexible_weekday_sale_price} onChange={handleChange} type="number" fullWidth />
                         <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={form.any_day_flight_price} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Any Day Flight Sale Price" name="any_day_flight_sale_price" value={form.any_day_flight_sale_price} onChange={handleChange} type="number" fullWidth />
                     </div>
                     
                     {/* Private Charter From Price - Separate section */}
@@ -529,6 +630,7 @@ const ActivityList = ({ activity }) => {
                             This field is for Private Charter experiences only
                         </div>
                         <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={form.private_charter_from_price} onChange={handleChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Private Charter From Sale Price" name="private_charter_from_sale_price" value={form.private_charter_from_sale_price} onChange={handleChange} type="number" fullWidth />
                     </div>
 
                     {/* Private Charter Voucher Types Section */}
@@ -580,7 +682,7 @@ const ActivityList = ({ activity }) => {
                                             key={voucherType.id}
                                             control={
                                                 <Checkbox 
-                                                    checked={form.private_charter_voucher_types.includes(voucherType.id.toString())} 
+                                                    checked={isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)} 
                                                     onChange={handleChange} 
                                                     name="private_charter_voucher_types" 
                                                     value={voucherType.id.toString()} 
@@ -610,7 +712,7 @@ const ActivityList = ({ activity }) => {
                                         <div key={voucherType.id} style={{ marginBottom: '12px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <Checkbox 
-                                                    checked={form.private_charter_voucher_types.includes(voucherType.id.toString())} 
+                                                    checked={isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)} 
                                                     disabled
                                                     style={{ color: '#856404' }}
                                                 />
@@ -621,15 +723,28 @@ const ActivityList = ({ activity }) => {
                                                     size="small"
                                                     type="number"
                                                     name={`private_charter_price_${voucherType.id}`}
-                                                    value={(typeof form.private_charter_pricing[voucherType.title] === 'object' ? (form.private_charter_pricing[voucherType.title][String(groupPassengerTier)] || '') : (groupPassengerTier === 2 ? (form.private_charter_pricing[voucherType.title] || '') : ''))}
+                                                    value={getTieredPriceValue(form.private_charter_pricing, voucherType.title, groupPassengerTier)}
                                                     onChange={handleChange}
-                                                    placeholder="0.00"
+                                                    placeholder="Original"
                                                     min="0"
                                                     step="0.01"
                                                     style={{ width: '120px' }}
-                                                    disabled={!form.private_charter_voucher_types.includes(voucherType.id.toString())}
+                                                    disabled={!isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)}
                                                 />
                                                 <span style={{ color: '#856404', fontSize: '14px' }}>£</span>
+                                                <TextField
+                                                    size="small"
+                                                    type="number"
+                                                    name={`private_charter_sale_price_${voucherType.id}`}
+                                                    value={getTieredPriceValue(form.private_charter_sale_pricing, voucherType.title, groupPassengerTier)}
+                                                    onChange={handleChange}
+                                                    placeholder="Sale"
+                                                    min="0"
+                                                    step="0.01"
+                                                    style={{ width: '120px' }}
+                                                    disabled={!isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)}
+                                                />
+                                                <span style={{ color: '#856404', fontSize: '14px' }}>£ sale</span>
                                             </div>
                                         </div>
                                     ))}
@@ -862,6 +977,7 @@ const ActivityList = ({ activity }) => {
                         
                         <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
                         <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={editForm.shared_flight_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Shared Flight Sale Price" name="shared_flight_from_sale_price" value={editForm.shared_flight_from_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
                         
                         <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
                         <FormGroup row sx={{ mb: 2, mt: 1 }}>
@@ -881,8 +997,11 @@ const ActivityList = ({ activity }) => {
                         
                         <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
                         <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={editForm.weekday_morning_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Weekday Morning Sale Price" name="weekday_morning_sale_price" value={editForm.weekday_morning_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
                         <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={editForm.flexible_weekday_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Flexible Weekday Sale Price" name="flexible_weekday_sale_price" value={editForm.flexible_weekday_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
                         <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={editForm.any_day_flight_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Any Day Flight Sale Price" name="any_day_flight_sale_price" value={editForm.any_day_flight_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
                     </div>
                     
                     {/* Private Charter From Price - Separate section */}
@@ -915,6 +1034,7 @@ const ActivityList = ({ activity }) => {
                             This field is for Private Charter experiences only
                         </div>
                         <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={editForm.private_charter_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
+                        <TextField margin="dense" label="Private Charter From Sale Price" name="private_charter_from_sale_price" value={editForm.private_charter_from_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
                     </div>
 
                     {/* Private Charter Voucher Types Section */}
@@ -966,7 +1086,7 @@ const ActivityList = ({ activity }) => {
                                             key={voucherType.id}
                                             control={
                                                 <Checkbox 
-                                                    checked={Array.isArray(editForm.private_charter_voucher_types) ? editForm.private_charter_voucher_types.includes(voucherType.id.toString()) : (typeof editForm.private_charter_voucher_types === 'string' ? editForm.private_charter_voucher_types.split(',') : [])} 
+                                                    checked={isSelectedPrivateVoucherType(editForm.private_charter_voucher_types, voucherType.id)} 
                                                     onChange={handleEditChange} 
                                                     name="private_charter_voucher_types" 
                                                     value={voucherType.id.toString()} 
@@ -996,7 +1116,7 @@ const ActivityList = ({ activity }) => {
                                         <div key={voucherType.id} style={{ marginBottom: '12px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <Checkbox 
-                                                    checked={Array.isArray(editForm.private_charter_voucher_types) ? editForm.private_charter_voucher_types.includes(voucherType.id.toString()) : (typeof editForm.private_charter_voucher_types === 'string' ? editForm.private_charter_voucher_types.split(',') : [])} 
+                                                    checked={isSelectedPrivateVoucherType(editForm.private_charter_voucher_types, voucherType.id)} 
                                                     disabled
                                                     style={{ color: '#856404' }}
                                                 />
@@ -1007,16 +1127,26 @@ const ActivityList = ({ activity }) => {
                                                     size="small"
                                                     type="number"
                                                     name={`private_charter_price_${voucherType.id}`}
-                                                    value={(editForm.private_charter_pricing && typeof editForm.private_charter_pricing[voucherType.title] === 'object')
-                                                        ? (editForm.private_charter_pricing[voucherType.title][String(editGroupPassengerTier)] || '')
-                                                        : ((editGroupPassengerTier === 2 && editForm.private_charter_pricing && editForm.private_charter_pricing[voucherType.title]) ? editForm.private_charter_pricing[voucherType.title] : '')}
+                                                    value={getTieredPriceValue(editForm.private_charter_pricing, voucherType.title, editGroupPassengerTier)}
                                                     onChange={handleEditChange}
-                                                    placeholder="0.00"
+                                                    placeholder="Original"
                                                     min="0"
                                                     step="0.01"
                                                     style={{ width: '120px' }}
                                                 />
                                                 <span style={{ color: '#856404', fontSize: '14px' }}>£</span>
+                                                <TextField
+                                                    size="small"
+                                                    type="number"
+                                                    name={`private_charter_sale_price_${voucherType.id}`}
+                                                    value={getTieredPriceValue(editForm.private_charter_sale_pricing, voucherType.title, editGroupPassengerTier)}
+                                                    onChange={handleEditChange}
+                                                    placeholder="Sale"
+                                                    min="0"
+                                                    step="0.01"
+                                                    style={{ width: '120px' }}
+                                                />
+                                                <span style={{ color: '#856404', fontSize: '14px' }}>£ sale</span>
                                             </div>
                                         </div>
                                     ))}
