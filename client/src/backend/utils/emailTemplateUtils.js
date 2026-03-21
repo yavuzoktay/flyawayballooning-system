@@ -223,7 +223,7 @@ const buildShortCustomerPortalLinkFromTarget = (targetUrl = '') => {
     return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${shortCode}`;
 };
 
-const getCustomerPortalLink = (booking = {}) => {
+export const getCustomerPortalLink = (booking = {}) => {
     const explicitShortUrl =
         booking.customer_portal_short_url ||
         booking.customerPortalShortUrl ||

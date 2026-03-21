@@ -17,7 +17,8 @@ import {
     getDefaultTemplateMessageHtml,
     extractMessageFromTemplateBody,
     buildEmailHtml,
-    replaceSmsPrompts
+    replaceSmsPrompts,
+    getCustomerPortalLink
 } from '../utils/emailTemplateUtils';
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 
@@ -602,6 +603,7 @@ const BookingPage = () => {
     // Email and SMS checkboxes for Send a Message popup
     const [sendMessageEmailChecked, setSendMessageEmailChecked] = useState(true);
     const [sendMessageSmsChecked, setSendMessageSmsChecked] = useState(true);
+    const [addLink, setAddLink] = useState(false);
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsLoading, setEmailLogsLoading] = useState(false);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
@@ -1239,12 +1241,28 @@ const BookingPage = () => {
                     (t) => t.id?.toString() === emailForm.template?.toString()
                 );
                 const templateName = resolveTemplateName(emailForm.template, dbTemplate);
-                const finalHtml = buildEmailHtml({
+                let finalHtml = buildEmailHtml({
                     templateName,
                     messageHtml: emailForm.message,
                     booking: selectedBookingForEmail,
                     personalNote
                 });
+
+                // Append Customer Portal link if Add Link checkbox is checked
+                if (addLink && selectedBookingForEmail) {
+                    const portalLink = getCustomerPortalLink(selectedBookingForEmail);
+                    if (portalLink) {
+                        const linkHtml = `<p style="margin-top:20px;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;" target="_blank">Customer Portal</a></p>`;
+                        // Insert before closing </td></tr></table> or append before </body>
+                        if (finalHtml.includes('</td>')) {
+                            const lastTdClose = finalHtml.lastIndexOf('</td>');
+                            finalHtml = finalHtml.slice(0, lastTdClose) + linkHtml + finalHtml.slice(lastTdClose);
+                        } else {
+                            finalHtml += linkHtml;
+                        }
+                    }
+                }
+
                 const finalText = stripHtml(finalHtml);
 
                 console.log('📧 Sending email with data:', {
@@ -1399,21 +1417,29 @@ const BookingPage = () => {
                     }
                 }
 
+                // Append Customer Portal link if Add Link checkbox is checked
+                if (addLink && selectedBookingForEmail) {
+                    const portalLink = getCustomerPortalLink(selectedBookingForEmail);
+                    if (portalLink) {
+                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal: ${portalLink}` : `Customer Portal: ${portalLink}`;
+                    }
+                }
+
                 let finalSmsMessage = smsMessage;
-                
+
                 // Final check - ensure total length doesn't exceed limit
                 if (finalSmsMessage.length > SMS_MAX_LENGTH) {
                     const truncated = finalSmsMessage.substring(0, SMS_MAX_LENGTH - 3).trim();
-                    const finalTruncated = truncated.endsWith('.') || truncated.endsWith('!') || truncated.endsWith('?') 
-                        ? truncated + '..' 
+                    const finalTruncated = truncated.endsWith('.') || truncated.endsWith('!') || truncated.endsWith('?')
+                        ? truncated + '..'
                         : truncated + '...';
                     console.warn('⚠️ SMS message truncated to fit 1600 character limit');
                     finalSmsMessage = finalTruncated;
                 }
-                
+
                 // Use finalSmsMessage for sending
                 const smsMessageToSend = finalSmsMessage;
-                
+
                 // Validate SMS message before sending
                 if (!smsMessageToSend || smsMessageToSend.trim().length === 0) {
                     console.error('⚠️ SMS message is empty, skipping SMS send');
@@ -1553,6 +1579,7 @@ const BookingPage = () => {
                     setEmailModalOpen(false);
                     setEmailForm({ to: '', subject: '', message: '', template: 'custom' });
                     setPersonalNote('');
+                    setAddLink(false);
                     setSmsForm({ to: '', message: '', template: 'custom' });
                     setSmsPersonalNote('');
                     setSendMessageEmailChecked(true);
@@ -10422,6 +10449,7 @@ setBookingDetail(finalVoucherDetail);
                         setEmailModalOpen(false);
                         setSendMessageEmailChecked(true);
                         setSendMessageSmsChecked(true);
+                        setAddLink(false);
                         setSmsForm({ to: '', message: '', template: 'custom' });
                     }}
                     maxWidth={isMobile ? "md" : "lg"}
@@ -10703,14 +10731,43 @@ setBookingDetail(finalVoucherDetail);
                             {/* Email Template Preview */}
                             {/* Shared personal note for Email/SMS (same as Manifest page) */}
                             <Grid item xs={12}>
-                                <Typography variant="subtitle2" sx={{ 
-                                    mb: isMobile ? 0.5 : 1, 
-                                    fontWeight: 500, 
-                                    fontSize: isMobile ? 13 : '14px',
-                                    color: isMobile ? 'inherit' : '#374151'
-                                }}>
-                                    Add an optional, personalized note
-                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1 }}>
+                                    <Typography variant="subtitle2" sx={{
+                                        fontWeight: 500,
+                                        fontSize: isMobile ? 13 : '14px',
+                                        color: isMobile ? 'inherit' : '#374151'
+                                    }}>
+                                        Add an optional, personalized note
+                                    </Typography>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={addLink}
+                                                onChange={(e) => setAddLink(e.target.checked)}
+                                                size="small"
+                                                sx={{
+                                                    color: '#6b7280',
+                                                    padding: '4px',
+                                                    '&.Mui-checked': {
+                                                        color: '#3b82f6',
+                                                    },
+                                                    '& .MuiSvgIcon-root': {
+                                                        fontSize: isMobile ? 18 : 20,
+                                                    },
+                                                }}
+                                            />
+                                        }
+                                        label="Add Link"
+                                        sx={{
+                                            margin: 0,
+                                            '& .MuiFormControlLabel-label': {
+                                                fontSize: isMobile ? '12px' : '13px',
+                                                fontWeight: 500,
+                                                color: addLink ? '#3b82f6' : '#6b7280',
+                                            }
+                                        }}
+                                    />
+                                </Box>
                                 <TextField
                                     fullWidth
                                     placeholder="Nice to speak with you today!"
@@ -10720,7 +10777,7 @@ setBookingDetail(finalVoucherDetail);
                                     rows={isMobile ? 4 : 6}
                                     variant="outlined"
                                     size={isMobile ? "small" : "medium"}
-                                    sx={{ 
+                                    sx={{
                                         '& .MuiOutlinedInput-root': {
                                             borderRadius: isMobile ? 2 : '6px',
                                             fontSize: isMobile ? '14px' : '14px',
