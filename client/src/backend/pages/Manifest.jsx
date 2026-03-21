@@ -990,8 +990,7 @@ const Manifest = () => {
                 if (addLink && selectedBookingForEmail) {
                     const portalLink = getCustomerPortalLink(selectedBookingForEmail);
                     if (portalLink) {
-                        const cleanLink = portalLink.replace(/^https?:\/\//, '');
-                        smsMessage = smsMessage ? `${smsMessage}\n\n${cleanLink}` : cleanLink;
+                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
                     }
                 }
 
@@ -1293,8 +1292,7 @@ const Manifest = () => {
                     if (groupAddLink) {
                         const portalLink = getCustomerPortalLink(booking);
                         if (portalLink) {
-                            const cleanLink = portalLink.replace(/^https?:\/\//, '');
-                            smsMessage = smsMessage ? `${smsMessage}\n\n${cleanLink}` : cleanLink;
+                            smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
                         }
                     }
 

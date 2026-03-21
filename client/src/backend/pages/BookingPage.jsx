@@ -1421,9 +1421,7 @@ const BookingPage = () => {
                 if (addLink && selectedBookingForEmail) {
                     const portalLink = getCustomerPortalLink(selectedBookingForEmail);
                     if (portalLink) {
-                        // Strip https:// for cleaner SMS display - phones auto-detect URLs
-                        const cleanLink = portalLink.replace(/^https?:\/\//, '');
-                        smsMessage = smsMessage ? `${smsMessage}\n\n${cleanLink}` : cleanLink;
+                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
                     }
                 }
 
