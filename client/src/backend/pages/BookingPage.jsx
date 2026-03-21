@@ -1252,11 +1252,11 @@ const BookingPage = () => {
                 if (addLink && selectedBookingForEmail) {
                     const portalLink = getCustomerPortalLink(selectedBookingForEmail);
                     if (portalLink) {
-                        const linkHtml = `<p style="margin-top:20px;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;" target="_blank">Customer Portal</a></p>`;
-                        // Insert before closing </td></tr></table> or append before </body>
-                        if (finalHtml.includes('</td>')) {
-                            const lastTdClose = finalHtml.lastIndexOf('</td>');
-                            finalHtml = finalHtml.slice(0, lastTdClose) + linkHtml + finalHtml.slice(lastTdClose);
+                        const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+                        // Insert inside the content area - before the closing </td></tr></table></td></tr></table></body> sequence
+                        const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+                        if (closingPattern.test(finalHtml)) {
+                            finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
                         } else {
                             finalHtml += linkHtml;
                         }
@@ -1421,7 +1421,7 @@ const BookingPage = () => {
                 if (addLink && selectedBookingForEmail) {
                     const portalLink = getCustomerPortalLink(selectedBookingForEmail);
                     if (portalLink) {
-                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal: ${portalLink}` : `Customer Portal: ${portalLink}`;
+                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
                     }
                 }
 
@@ -10739,34 +10739,36 @@ setBookingDetail(finalVoucherDetail);
                                     }}>
                                         Add an optional, personalized note
                                     </Typography>
-                                    <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={addLink}
-                                                onChange={(e) => setAddLink(e.target.checked)}
-                                                size="small"
-                                                sx={{
-                                                    color: '#6b7280',
-                                                    padding: '4px',
-                                                    '&.Mui-checked': {
-                                                        color: '#3b82f6',
-                                                    },
-                                                    '& .MuiSvgIcon-root': {
-                                                        fontSize: isMobile ? 18 : 20,
-                                                    },
-                                                }}
-                                            />
-                                        }
-                                        label="Add Link"
-                                        sx={{
-                                            margin: 0,
-                                            '& .MuiFormControlLabel-label': {
-                                                fontSize: isMobile ? '12px' : '13px',
-                                                fontWeight: 500,
-                                                color: addLink ? '#3b82f6' : '#6b7280',
+                                    {((sendMessageEmailChecked && emailForm.template === 'custom') || (sendMessageSmsChecked && (!smsForm.template || smsForm.template === 'custom'))) && (
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={addLink}
+                                                    onChange={(e) => setAddLink(e.target.checked)}
+                                                    size="small"
+                                                    sx={{
+                                                        color: '#6b7280',
+                                                        padding: '4px',
+                                                        '&.Mui-checked': {
+                                                            color: '#3b82f6',
+                                                        },
+                                                        '& .MuiSvgIcon-root': {
+                                                            fontSize: isMobile ? 18 : 20,
+                                                        },
+                                                    }}
+                                                />
                                             }
-                                        }}
-                                    />
+                                            label="Add Link"
+                                            sx={{
+                                                margin: 0,
+                                                '& .MuiFormControlLabel-label': {
+                                                    fontSize: isMobile ? '12px' : '13px',
+                                                    fontWeight: 500,
+                                                    color: addLink ? '#3b82f6' : '#6b7280',
+                                                }
+                                            }}
+                                        />
+                                    )}
                                 </Box>
                                 <TextField
                                     fullWidth

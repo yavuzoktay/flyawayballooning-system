@@ -906,10 +906,10 @@ const Manifest = () => {
                 if (addLink && selectedBookingForEmail) {
                     const portalLink = getCustomerPortalLink(selectedBookingForEmail);
                     if (portalLink) {
-                        const linkHtml = `<p style="margin-top:20px;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;" target="_blank">Customer Portal</a></p>`;
-                        if (finalHtml.includes('</td>')) {
-                            const lastTdClose = finalHtml.lastIndexOf('</td>');
-                            finalHtml = finalHtml.slice(0, lastTdClose) + linkHtml + finalHtml.slice(lastTdClose);
+                        const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+                        const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+                        if (closingPattern.test(finalHtml)) {
+                            finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
                         } else {
                             finalHtml += linkHtml;
                         }
@@ -990,7 +990,7 @@ const Manifest = () => {
                 if (addLink && selectedBookingForEmail) {
                     const portalLink = getCustomerPortalLink(selectedBookingForEmail);
                     if (portalLink) {
-                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal: ${portalLink}` : `Customer Portal: ${portalLink}`;
+                        smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
                     }
                 }
 
@@ -1166,10 +1166,10 @@ const Manifest = () => {
                     if (groupAddLink) {
                         const portalLink = getCustomerPortalLink(booking);
                         if (portalLink) {
-                            const linkHtml = `<p style="margin-top:20px;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;" target="_blank">Customer Portal</a></p>`;
-                            if (finalHtml.includes('</td>')) {
-                                const lastTdClose = finalHtml.lastIndexOf('</td>');
-                                finalHtml = finalHtml.slice(0, lastTdClose) + linkHtml + finalHtml.slice(lastTdClose);
+                            const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+                            const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+                            if (closingPattern.test(finalHtml)) {
+                                finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
                             } else {
                                 finalHtml += linkHtml;
                             }
@@ -1292,7 +1292,7 @@ const Manifest = () => {
                     if (groupAddLink) {
                         const portalLink = getCustomerPortalLink(booking);
                         if (portalLink) {
-                            smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal: ${portalLink}` : `Customer Portal: ${portalLink}`;
+                            smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
                         }
                     }
 
@@ -7990,6 +7990,7 @@ const Manifest = () => {
                                 <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
                                     Add an optional, personalized note
                                 </Typography>
+                                {((groupMessageEmailChecked && groupMessageForm.template === 'custom') || (groupMessageSmsChecked && (!groupSmsForm.template || groupSmsForm.template === 'custom'))) && (
                                 <FormControlLabel
                                     control={
                                         <Checkbox
@@ -8018,6 +8019,7 @@ const Manifest = () => {
                                         }
                                     }}
                                 />
+                                )}
                             </Box>
                             <TextField
                                 fullWidth
@@ -8558,6 +8560,7 @@ const Manifest = () => {
                                 }}>
                                     Add an optional, personalized note
                                 </Typography>
+                                {((sendMessageEmailChecked && emailForm.template === 'custom') || (sendMessageSmsChecked && (!smsForm.template || smsForm.template === 'custom'))) && (
                                 <FormControlLabel
                                     control={
                                         <Checkbox
@@ -8586,6 +8589,7 @@ const Manifest = () => {
                                         }
                                     }}
                                 />
+                                )}
                             </Box>
                             <TextField
                                 fullWidth
