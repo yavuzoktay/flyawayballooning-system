@@ -26659,7 +26659,11 @@ app.get(['/customerPortal/s/:shortCode', '/customerPortal/s/:shortCode/*'], (req
                 if (!rows || rows.length === 0 || !rows[0].target_url) {
                     return resolveCustomerPortalShortLinkByData(shortCode, (fallbackErr, fallbackMatch) => {
                         if (fallbackErr) {
-                            console.error('Error rebuilding customer portal short link:', fallbackErr);
+                            console.error(
+                                'Error rebuilding customer portal short link:',
+                                fallbackErr?.message || fallbackErr,
+                                fallbackErr?.sqlMessage || ''
+                            );
                             return res.status(500).send('Failed to resolve short link');
                         }
 
@@ -33827,30 +33831,18 @@ function buildCustomerPortalShortLinkCandidates(record = {}) {
     return matches;
 }
 
-function resolveCustomerPortalShortLinkByData(shortCode, callback) {
-    const normalizedShortCode = String(shortCode || '').trim().toLowerCase();
-    if (!normalizedShortCode) {
-        return callback(null, null);
-    }
+function isUnknownColumnError(err) {
+    return Boolean(
+        err &&
+            (err.errno === 1054 ||
+                err.code === 'ER_BAD_FIELD_ERROR' ||
+                String(err.sqlMessage || err.message || '').includes('Unknown column'))
+    );
+}
 
-    const findMatchInRows = (rows = [], mapRow = (row) => row) => {
-        for (const row of rows) {
-            const candidateRow = mapRow(row);
-            const matches = buildCustomerPortalShortLinkCandidates(candidateRow);
-            const matched = matches.find((entry) => entry.shortCode === normalizedShortCode);
-
-            if (matched) {
-                return {
-                    ...matched,
-                    allMatches: matches
-                };
-            }
-        }
-
-        return null;
-    };
-
-    con.query(
+/** Load all_booking rows for portal short-code rebuild; retries with fewer columns if DB schema is older. */
+function queryAllBookingsForPortalScan(callback) {
+    const queries = [
         `
             SELECT
                 id,
@@ -33865,59 +33857,212 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
             FROM all_booking
             ORDER BY created_at DESC
         `,
-        (bookingErr, bookingRows) => {
-            if (bookingErr) {
-                return callback(bookingErr);
-            }
+        `
+            SELECT
+                id,
+                email,
+                voucher_code,
+                created_at,
+                redeemed_voucher,
+                book_flight,
+                flight_type,
+                voucher_type
+            FROM all_booking
+            ORDER BY created_at DESC
+        `,
+        `
+            SELECT
+                id,
+                email,
+                voucher_code,
+                created_at,
+                flight_type,
+                voucher_type
+            FROM all_booking
+            ORDER BY created_at DESC
+        `,
+        `
+            SELECT
+                id,
+                email,
+                voucher_code,
+                created_at,
+                flight_type
+            FROM all_booking
+            ORDER BY created_at DESC
+        `,
+        `
+            SELECT
+                id,
+                email,
+                voucher_code,
+                created_at
+            FROM all_booking
+            ORDER BY created_at DESC
+        `
+    ];
 
-            const bookingMatch = findMatchInRows(bookingRows, (row) => ({
-                ...row,
-                book_flight:
-                    row.book_flight ||
-                    row.flight_type ||
-                    row.voucher_type_detail ||
-                    row.voucher_type ||
-                    null
-            }));
-            if (bookingMatch) {
-                return callback(null, bookingMatch);
-            }
-
-            con.query(
-                `
-                    SELECT
-                        id,
-                        email,
-                        purchaser_email,
-                        recipient_email,
-                        voucher_ref,
-                        created_at,
-                        book_flight,
-                        voucher_type,
-                        redeemed
-                    FROM all_vouchers
-                    ORDER BY created_at DESC
-                `,
-                (voucherErr, voucherRows) => {
-                    if (voucherErr) {
-                        return callback(voucherErr);
-                    }
-
-                    const voucherMatch = findMatchInRows(voucherRows, (row) => ({
-                        ...row,
-                        voucher_id: row.id,
-                        _original: row,
-                        book_flight:
-                            row.book_flight ||
-                            row.voucher_type ||
-                            null
-                    }));
-
-                    return callback(null, voucherMatch || null);
-                }
+    const tryNext = (index) => {
+        if (index >= queries.length) {
+            return callback(
+                new Error('all_booking: could not run portal short-link scan (no compatible column set)')
             );
         }
-    );
+        con.query(queries[index], (err, rows) => {
+            if (err && isUnknownColumnError(err)) {
+                return tryNext(index + 1);
+            }
+            if (err) {
+                return callback(err);
+            }
+            callback(null, rows);
+        });
+    };
+
+    tryNext(0);
+}
+
+/** Load all_vouchers rows for portal short-code rebuild; retries if optional columns are missing. */
+function queryAllVouchersForPortalScan(callback) {
+    const queries = [
+        `
+            SELECT
+                id,
+                email,
+                purchaser_email,
+                recipient_email,
+                voucher_ref,
+                created_at,
+                book_flight,
+                voucher_type,
+                redeemed
+            FROM all_vouchers
+            ORDER BY created_at DESC
+        `,
+        `
+            SELECT
+                id,
+                email,
+                purchaser_email,
+                recipient_email,
+                voucher_ref,
+                created_at,
+                book_flight,
+                redeemed
+            FROM all_vouchers
+            ORDER BY created_at DESC
+        `,
+        `
+            SELECT
+                id,
+                email,
+                voucher_ref,
+                created_at,
+                book_flight,
+                redeemed
+            FROM all_vouchers
+            ORDER BY created_at DESC
+        `,
+        `
+            SELECT
+                id,
+                email,
+                voucher_ref,
+                created_at,
+                redeemed
+            FROM all_vouchers
+            ORDER BY created_at DESC
+        `,
+        `
+            SELECT
+                id,
+                voucher_ref,
+                created_at
+            FROM all_vouchers
+            ORDER BY created_at DESC
+        `
+    ];
+
+    const tryNext = (index) => {
+        if (index >= queries.length) {
+            return callback(
+                new Error('all_vouchers: could not run portal short-link scan (no compatible column set)')
+            );
+        }
+        con.query(queries[index], (err, rows) => {
+            if (err && isUnknownColumnError(err)) {
+                return tryNext(index + 1);
+            }
+            if (err) {
+                return callback(err);
+            }
+            callback(null, rows);
+        });
+    };
+
+    tryNext(0);
+}
+
+function resolveCustomerPortalShortLinkByData(shortCode, callback) {
+    const normalizedShortCode = String(shortCode || '').trim().toLowerCase();
+    if (!normalizedShortCode) {
+        return callback(null, null);
+    }
+
+    const findMatchInRows = (rows = [], mapRow = (row) => row) => {
+        for (const row of rows) {
+            try {
+                const candidateRow = mapRow(row);
+                const matches = buildCustomerPortalShortLinkCandidates(candidateRow);
+                const matched = matches.find((entry) => entry.shortCode === normalizedShortCode);
+
+                if (matched) {
+                    return {
+                        ...matched,
+                        allMatches: matches
+                    };
+                }
+            } catch (rowErr) {
+                console.error('Customer portal short link candidate row error:', rowErr);
+            }
+        }
+
+        return null;
+    };
+
+    queryAllBookingsForPortalScan((bookingErr, bookingRows) => {
+        if (bookingErr) {
+            return callback(bookingErr);
+        }
+
+        const bookingMatch = findMatchInRows(bookingRows || [], (row) => ({
+            ...row,
+            book_flight:
+                row.book_flight ||
+                row.flight_type ||
+                row.voucher_type_detail ||
+                row.voucher_type ||
+                null
+        }));
+        if (bookingMatch) {
+            return callback(null, bookingMatch);
+        }
+
+        queryAllVouchersForPortalScan((voucherErr, voucherRows) => {
+            if (voucherErr) {
+                return callback(voucherErr);
+            }
+
+            const voucherMatch = findMatchInRows(voucherRows || [], (row) => ({
+                ...row,
+                voucher_id: row.id,
+                _original: row,
+                book_flight: row.book_flight || row.voucher_type || null
+            }));
+
+            return callback(null, voucherMatch || null);
+        });
+    });
 }
 
 function extractLegacyCustomerPortalToken(value = '') {
