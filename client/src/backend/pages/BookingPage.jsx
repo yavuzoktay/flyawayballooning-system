@@ -9371,12 +9371,11 @@ setBookingDetail(finalVoucherDetail);
                         fontWeight: 700, 
                         fontSize: isMobile ? 18 : '20px',
                         display: 'flex',
-                        flexDirection: isMobile ? 'column' : 'row',
-                        justifyContent: 'space-between',
-                        alignItems: isMobile ? 'flex-start' : 'center',
+                        flexDirection: 'row',
+                        justifyContent: 'flex-start',
+                        alignItems: 'center',
                         pb: isMobile ? 1 : 2,
                         padding: isMobile ? '12px 16px' : '20px 24px',
-                        gap: isMobile ? 1 : 0,
                         color: isMobile ? 'inherit' : '#1f2937',
                         borderBottom: isMobile ? 'none' : '1px solid #e5e7eb',
                         margin: isMobile ? 'inherit' : 0
@@ -9387,61 +9386,6 @@ setBookingDetail(finalVoucherDetail);
                             color: isMobile ? 'inherit' : '#1f2937'
                         }}>
                             Payments / Promos
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: isMobile ? 0.5 : 1, flexWrap: isMobile ? 'wrap' : 'nowrap', width: isMobile ? '100%' : 'auto' }}>
-                            <Button 
-                                variant="outlined" 
-                                size={isMobile ? "small" : "medium"}
-                                sx={{ 
-                                    textTransform: 'none', 
-                                    borderRadius: isMobile ? 1 : '6px',
-                                    fontSize: isMobile ? 12 : '14px',
-                                    padding: isMobile ? '4px 8px' : '8px 16px',
-                                    minWidth: isMobile ? 'auto' : 'inherit',
-                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
-                                    '&:hover': {
-                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                    }
-                                }}
-                            >
-                                + Payment
-                            </Button>
-                            <Button 
-                                variant="outlined" 
-                                size={isMobile ? "small" : "medium"}
-                                sx={{ 
-                                    textTransform: 'none', 
-                                    borderRadius: isMobile ? 1 : '6px',
-                                    fontSize: isMobile ? 12 : '14px',
-                                    padding: isMobile ? '4px 8px' : '8px 16px',
-                                    minWidth: isMobile ? 'auto' : 'inherit',
-                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
-                                    '&:hover': {
-                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                    }
-                                }}
-                            >
-                                + Promo
-                            </Button>
-                            <Button 
-                                variant="outlined" 
-                                size={isMobile ? "small" : "medium"}
-                                startIcon={<span style={{ fontSize: isMobile ? 14 : 'inherit' }}>🕐</span>}
-                                sx={{ 
-                                    textTransform: 'none', 
-                                    borderRadius: isMobile ? 1 : '6px',
-                                    fontSize: isMobile ? 11 : '14px',
-                                    padding: isMobile ? '4px 6px' : '8px 16px',
-                                    minWidth: isMobile ? 'auto' : 'inherit',
-                                    whiteSpace: isMobile ? 'normal' : 'nowrap',
-                                    borderColor: isMobile ? 'inherit' : '#d1d5db',
-                                    '&:hover': {
-                                        borderColor: isMobile ? 'inherit' : '#9ca3af'
-                                    }
-                                }}
-                            >
-                                Save Card & Charge Later
-                            </Button>
                         </Box>
                     </DialogTitle>
                     <DialogContent dividers sx={{ background: '#ffffff', p: 0, padding: isMobile ? '0' : '0' }}>

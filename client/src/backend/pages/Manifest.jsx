@@ -7055,36 +7055,12 @@ const Manifest = () => {
                     fontWeight: 700, 
                     fontSize: 24,
                     display: 'flex',
-                    justifyContent: 'space-between',
+                    justifyContent: 'flex-start',
                     alignItems: 'center',
                     pb: 2
                 }}>
                     <Box component="span" sx={{ fontWeight: 700, fontSize: '1.5rem' }}>
                         Payments / Promos
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button 
-                            variant="outlined" 
-                            size="small"
-                            sx={{ textTransform: 'none', borderRadius: 1 }}
-                        >
-                            + Payment
-                        </Button>
-                        <Button 
-                            variant="outlined" 
-                            size="small"
-                            sx={{ textTransform: 'none', borderRadius: 1 }}
-                        >
-                            + Promo
-                        </Button>
-                        <Button 
-                            variant="outlined" 
-                            size="small"
-                            startIcon={<span>🕐</span>}
-                            sx={{ textTransform: 'none', borderRadius: 1 }}
-                        >
-                            Save Card & Charge Later
-                        </Button>
                     </Box>
                 </DialogTitle>
                 <DialogContent dividers sx={{ background: '#ffffff', p: 0 }}>

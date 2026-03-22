@@ -866,7 +866,7 @@ const PaginatedTable = ({
                                                             return (
                                                                 <a
                                                                     href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
-                                                                    style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
+                                                                    style={{ color: '#3274b4', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
                                                                     target="_self"
                                                                     rel="noopener noreferrer"
                                                                 >
@@ -924,7 +924,7 @@ const PaginatedTable = ({
                                                         return (
                                                             <a
                                                                 href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
-                                                                style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
+                                                                style={{ color: '#3274b4', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
                                                                 target="_self"
                                                                 rel="noopener noreferrer"
                                                             >
@@ -979,7 +979,7 @@ const PaginatedTable = ({
                                                         <span
                                                             style={{
                                                                 color: '#3274b4',
-                                                                textDecoration: 'underline',
+                                                                textDecoration: 'none',
                                                                 cursor: 'pointer',
                                                                 fontWeight: 'normal',
                                                                 fontSize: '16px',
