@@ -2166,7 +2166,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
         if (cleanVoucherCodeForValidation) {
             // First, get voucher info from all_vouchers table (including paid amount)
             const getVoucherInfoSql = `
-            SELECT created_at, voucher_type, experience_type, book_flight, paid
+            SELECT created_at, voucher_type, experience_type, book_flight, paid, expires
             FROM all_vouchers 
             WHERE UPPER(voucher_ref) = UPPER(?)
             LIMIT 1
@@ -2220,9 +2220,21 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         console.log('⚠️ Could not find voucher price, using totalPrice:', voucherOriginalPrice);
                     }
 
-                    // Calculate expire date based on voucher type and created_at
+                    // Prefer all_vouchers.expires (purchase validity); else created_at + duration
                     let expiresDate = null;
-                    if (voucherCreatedAt) {
+                    if (voucherInfoResult.length > 0) {
+                        const vr = voucherInfoResult[0];
+                        const chooseFt = vr.experience_type ? { type: vr.experience_type } : chooseFlightType;
+                        expiresDate = resolveBookingExpiresFromVoucherRow(vr, chooseFt, null, voucherType);
+                        if (expiresDate) {
+                            console.log('✅ Expire date from voucher row (expires or created_at+duration):', {
+                                storedExpires: vr.expires,
+                                voucherCreatedAt: vr.created_at,
+                                expiresDate
+                            });
+                        }
+                    }
+                    if (voucherCreatedAt && !expiresDate) {
                         // Voucher türüne göre expire süresini belirle
                         let durationMonths = 24; // Default
 
@@ -2239,12 +2251,12 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
                         // Voucher'ın created_at tarihinden itibaren hesapla
                         expiresDate = moment(voucherCreatedAt).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
-                        console.log('✅ Expire date calculated:', {
+                        console.log('✅ Expire date calculated (legacy from created_at):', {
                             voucherCreatedAt,
                             durationMonths,
                             expiresDate
                         });
-                    } else {
+                    } else if (!voucherCreatedAt) {
                         // Voucher bilgisi yoksa, bugünden itibaren hesapla
                         if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
                             expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
@@ -2264,9 +2276,8 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
             // Fallback function to get only price if voucher info query fails
             function getVoucherPriceOnly() {
-                // First try all_vouchers table for paid amount
                 const getVoucherPaidSql = `
-                    SELECT paid 
+                    SELECT paid, created_at, expires, voucher_type, experience_type
                     FROM all_vouchers 
                     WHERE UPPER(voucher_ref) = UPPER(?)
                     LIMIT 1
@@ -2274,54 +2285,52 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
                 con.query(getVoucherPaidSql, [cleanVoucherCodeForValidation], (voucherPaidErr, voucherPaidResult) => {
                     let voucherOriginalPrice = totalPrice || 0;
+                    const voucherRow = (!voucherPaidErr && voucherPaidResult.length > 0) ? voucherPaidResult[0] : null;
 
-                    // Priority: 1. all_vouchers.paid, 2. voucher_codes.paid_amount, 3. totalPrice
-                    if (!voucherPaidErr && voucherPaidResult.length > 0 && voucherPaidResult[0].paid != null && voucherPaidResult[0].paid > 0) {
-                        voucherOriginalPrice = parseFloat(voucherPaidResult[0].paid) || 0;
+                    function resolveExpiresDateFallback() {
+                        if (voucherRow) {
+                            const chooseFt = voucherRow.experience_type ? { type: voucherRow.experience_type } : chooseFlightType;
+                            const fromRow = resolveBookingExpiresFromVoucherRow(voucherRow, chooseFt, null, voucherRow.voucher_type);
+                            if (fromRow) return fromRow;
+                        }
+                        if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                            return moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                        }
+                        if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                            return moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
+                        }
+                        return moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                    }
+
+                    function finishWithPrice(price) {
+                        const expiresDate = resolveExpiresDateFallback();
+                        const vt = voucherRow && voucherRow.voucher_type ? voucherRow.voucher_type : null;
+                        createBookingWithPrice(price, expiresDate, vt);
+                    }
+
+                    if (voucherRow && voucherRow.paid != null && voucherRow.paid > 0) {
+                        voucherOriginalPrice = parseFloat(voucherRow.paid) || 0;
                         console.log('✅ Found original voucher price from all_vouchers.paid (fallback):', voucherOriginalPrice);
-                    } else {
-                        // Fallback to voucher_codes table
-                const getVoucherPriceSql = `
+                        finishWithPrice(voucherOriginalPrice);
+                        return;
+                    }
+
+                    const getVoucherPriceSql = `
                 SELECT paid_amount 
                 FROM voucher_codes 
                 WHERE UPPER(code) = UPPER(?)
                 LIMIT 1
             `;
 
-                con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
-                    if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
-                                voucherOriginalPrice = parseFloat(priceResult[0].paid_amount) || 0;
-                                console.log('✅ Found original voucher price from voucher_codes.paid_amount (fallback):', voucherOriginalPrice);
-                            } else {
-                                console.log('⚠️ Could not find voucher price, using totalPrice (fallback):', voucherOriginalPrice);
-                    }
-
-                    // Voucher bilgisi yoksa, bugünden itibaren hesapla
-                    let expiresDate = null;
-                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
-                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
-                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    } else {
-                        expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    }
-
-                    createBookingWithPrice(voucherOriginalPrice, expiresDate, null);
-                });
-                        return;
-                    }
-
-                    // Voucher bilgisi yoksa, bugünden itibaren hesapla
-                    let expiresDate = null;
-                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
-                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
-                        expiresDate = moment().add(18, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    } else {
-                        expiresDate = moment().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
-                    }
-
-                    createBookingWithPrice(voucherOriginalPrice, expiresDate, null);
+                    con.query(getVoucherPriceSql, [cleanVoucherCode], (priceErr, priceResult) => {
+                        if (!priceErr && priceResult.length > 0 && priceResult[0].paid_amount) {
+                            voucherOriginalPrice = parseFloat(priceResult[0].paid_amount) || 0;
+                            console.log('✅ Found original voucher price from voucher_codes.paid_amount (fallback):', voucherOriginalPrice);
+                        } else {
+                            console.log('⚠️ Could not find voucher price, using totalPrice (fallback):', voucherOriginalPrice);
+                        }
+                        finishWithPrice(voucherOriginalPrice);
+                    });
                 });
             }
         } else {
@@ -3752,6 +3761,40 @@ function formatNumericPrice(value) {
 function formatSaleNumericPrice(value) {
     const parsed = parseSaleNumericPrice(value);
     return parsed === null ? null : parsed.toFixed(2);
+}
+
+/** True if DB date column is usable (not null / empty / MySQL zero-date). */
+function isUsableVoucherExpiresRaw(raw) {
+    if (raw == null || raw === '') return false;
+    const s = String(raw).trim();
+    if (!s || s === '0000-00-00' || s === '0000-00-00 00:00:00') return false;
+    return true;
+}
+
+/**
+ * Redeemed / linked bookings should use the purchaser voucher's stored `expires` when set.
+ * Otherwise fall back to created_at + voucher-type duration (legacy behaviour).
+ */
+function resolveBookingExpiresFromVoucherRow(voucherRow, chooseFlightType, bookingData, voucherTypeTitle) {
+    if (!voucherRow) return null;
+    if (isUsableVoucherExpiresRaw(voucherRow.expires)) {
+        const mExp = moment(voucherRow.expires);
+        if (mExp.isValid()) {
+            return mExp.format('YYYY-MM-DD HH:mm:ss');
+        }
+    }
+    const createdAt = voucherRow.created_at;
+    if (!createdAt) return null;
+    let durationMonths = 24;
+    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+        durationMonths = 18;
+    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+        const vt = (bookingData && bookingData.selectedVoucherType && bookingData.selectedVoucherType.title) || voucherTypeTitle || '';
+        durationMonths = (vt === 'Any Day Flight') ? 24 : 18;
+    }
+    const m = moment(createdAt);
+    if (!m.isValid()) return null;
+    return m.clone().add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
 }
 
 function sanitizeSalePricingMap(rawValue) {
@@ -15098,23 +15141,34 @@ app.post('/api/createBooking', (req, res) => {
     // expires hesaplama akışı
     if (voucher_code) {
         // Voucher redeemed mi ve satın alma tarihi nedir?
-        const voucherQuery = 'SELECT created_at, status FROM all_vouchers WHERE voucher_code = ? LIMIT 1';
-        con.query(voucherQuery, [voucher_code], (err, voucherResult) => {
+        const voucherQuery = `
+            SELECT created_at, status, expires, voucher_type, experience_type
+            FROM all_vouchers
+            WHERE UPPER(voucher_code) = UPPER(?) OR UPPER(voucher_ref) = UPPER(?)
+            LIMIT 1
+        `;
+        con.query(voucherQuery, [voucher_code, voucher_code], (err, voucherResult) => {
             if (err) {
                 console.error('Error fetching voucher:', err);
                 return res.status(500).json({ success: false, error: 'Database query failed to fetch voucher' });
             }
             if (voucherResult.length > 0 && voucherResult[0].status === 'redeemed') {
-                // Redeemed voucher: expires = voucher satın alma tarihi + duration (Private Charter: 18 months, others: 24 months)
-                let durationMonths = 24;
-                if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
-                    durationMonths = 18;
-                } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
-                    // Shared: Any Day Flight = 24, others = 18
-                    const vt = bookingData?.selectedVoucherType?.title || voucher_type || '';
-                    durationMonths = (vt === 'Any Day Flight') ? 24 : 18;
+                const vr = voucherResult[0];
+                const chooseFt = vr.experience_type ? { type: vr.experience_type } : chooseFlightType;
+                expiresDate = resolveBookingExpiresFromVoucherRow(vr, chooseFt, bookingData, voucher_type);
+                if (!expiresDate && vr.created_at) {
+                    let durationMonths = 24;
+                    if (chooseFlightType && chooseFlightType.type === 'Private Charter') {
+                        durationMonths = 18;
+                    } else if (chooseFlightType && chooseFlightType.type === 'Shared Flight') {
+                        const vt = bookingData?.selectedVoucherType?.title || voucher_type || '';
+                        durationMonths = (vt === 'Any Day Flight') ? 24 : 18;
+                    }
+                    expiresDate = moment(vr.created_at).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
                 }
-                expiresDate = moment(voucherResult[0].created_at).add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
+                if (!expiresDate) {
+                    expiresDate = now.clone().add(24, 'months').format('YYYY-MM-DD HH:mm:ss');
+                }
                 insertBookingAndPassengers(expiresDate);
             } else {
                 // Diğer durumlar: flight_attempts >= 10 ise 36 ay, yoksa 24 ay
@@ -15208,6 +15262,117 @@ app.post('/api/update-expires-dates', (req, res) => {
                 message: 'Expires dates updated successfully',
                 updated_bookings: bookingResult.affectedRows,
                 sample_records: sampleResult
+            });
+        });
+    });
+});
+
+/**
+ * Backfill all_booking.expires for redeemed-voucher bookings from the linked all_vouchers row:
+ * prefer stored voucher expires (purchase validity), else created_at + type duration (same rules as app code).
+ * POST body: { dryRun?: boolean } — dryRun true = preview only (no UPDATE).
+ */
+app.post('/api/sync-redeemed-booking-expires-from-vouchers', (req, res) => {
+    const dryRun = !!(req.body && req.body.dryRun);
+
+    const voucherTypeCoalesce = `COALESCE(NULLIF(TRIM(v.voucher_type), ''), NULLIF(TRIM(v.voucher_type_detail), ''))`;
+
+    const newExpiresSql = `
+        CASE
+            WHEN v.expires IS NOT NULL
+                AND CAST(v.expires AS CHAR(19)) NOT IN ('0000-00-00 00:00:00', '0000-00-00')
+                AND v.expires > '1970-01-02'
+            THEN v.expires
+            WHEN v.experience_type = 'Private Charter' THEN DATE_ADD(v.created_at, INTERVAL 18 MONTH)
+            WHEN v.experience_type = 'Shared Flight' AND (${voucherTypeCoalesce}) = 'Any Day Flight' THEN DATE_ADD(v.created_at, INTERVAL 24 MONTH)
+            WHEN v.experience_type = 'Shared Flight' THEN DATE_ADD(v.created_at, INTERVAL 18 MONTH)
+            ELSE DATE_ADD(v.created_at, INTERVAL 24 MONTH)
+        END
+    `;
+
+    const joinSql = `
+        INNER JOIN all_vouchers v
+            ON b.voucher_code IS NOT NULL AND TRIM(b.voucher_code) <> ''
+            AND NOT (b.voucher_code REGEXP '^[0-9]+$' AND CAST(b.voucher_code AS UNSIGNED) = b.id)
+            AND (
+                UPPER(TRIM(b.voucher_code)) = UPPER(TRIM(COALESCE(v.voucher_ref, '')))
+                OR UPPER(TRIM(b.voucher_code)) = UPPER(TRIM(COALESCE(v.voucher_code, '')))
+            )
+    `;
+
+    const redeemedWhere = `
+        (b.redeemed_voucher = 'Yes' OR b.redeemed_voucher = 1 OR b.flight_type_source = 'Redeem Voucher')
+        AND v.created_at IS NOT NULL
+    `;
+
+    const countSql = `
+        SELECT COUNT(*) AS cnt
+        FROM all_booking b
+        ${joinSql}
+        WHERE ${redeemedWhere}
+    `;
+
+    const previewSql = `
+        SELECT
+            b.id,
+            b.voucher_code,
+            b.expires AS booking_expires,
+            v.id AS voucher_table_id,
+            v.expires AS voucher_expires,
+            (${newExpiresSql}) AS new_expires
+        FROM all_booking b
+        ${joinSql}
+        WHERE ${redeemedWhere}
+        ORDER BY b.id DESC
+        LIMIT 100
+    `;
+
+    const updateSql = `
+        UPDATE all_booking b
+        ${joinSql}
+        SET b.expires = (${newExpiresSql})
+        WHERE ${redeemedWhere}
+    `;
+
+    con.query(countSql, (countErr, countRows) => {
+        if (countErr) {
+            console.error('sync-redeemed-booking-expires count:', countErr);
+            return res.status(500).json({ success: false, error: countErr.message || 'Count query failed' });
+        }
+        const totalMatched = countRows && countRows[0] ? Number(countRows[0].cnt) : 0;
+
+        if (dryRun) {
+            return con.query(previewSql, (prevErr, previewRows) => {
+                if (prevErr) {
+                    console.error('sync-redeemed-booking-expires preview:', prevErr);
+                    return res.status(500).json({ success: false, error: prevErr.message || 'Preview query failed' });
+                }
+                return res.json({
+                    success: true,
+                    dryRun: true,
+                    matched_bookings: totalMatched,
+                    preview_limit: 100,
+                    preview: previewRows
+                });
+            });
+        }
+
+        con.query(updateSql, (updErr, updResult) => {
+            if (updErr) {
+                console.error('sync-redeemed-booking-expires update:', updErr);
+                return res.status(500).json({ success: false, error: updErr.message || 'UPDATE failed' });
+            }
+            con.query(previewSql, (prevErr, previewRows) => {
+                if (prevErr) {
+                    console.warn('sync-redeemed-booking-expires post-update preview:', prevErr.message);
+                }
+                return res.json({
+                    success: true,
+                    dryRun: false,
+                    matched_bookings: totalMatched,
+                    updated_rows: updResult ? updResult.affectedRows : 0,
+                    sample_after: previewRows || []
+                });
             });
         });
     });
@@ -15880,13 +16045,8 @@ app.post('/api/createVoucher', (req, res) => {
         // Define variables for Redeem Voucher booking
         const flight_type_redeem = flight_type || 'Shared Flight'; // Use the flight type from request or default
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
-        // Shared Flight: Any Day Flight = 24 months, others = 18 months; Private Charter = 18 months
-        let durationMonths = 24;
-        if (voucherType && voucherType !== 'Any Day Flight') {
-            durationMonths = 18;
-        }
-        const expiresFinal = moment().add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
 
+        function insertRedeemBookingRow(expiresFinal) {
         // Create booking record in all_booking table for Redeem Voucher
         const bookingSql = `
             INSERT INTO all_booking (
@@ -15969,6 +16129,28 @@ app.post('/api/createVoucher', (req, res) => {
                 sendAutomaticBookingConfirmationEmail(bookingResult.insertId);
             }
         });
+        }
+
+        con.query(
+            'SELECT created_at, expires, voucher_type, experience_type FROM all_vouchers WHERE id = ? LIMIT 1',
+            [voucherId],
+            (vErr, vRows) => {
+                let expiresFinal = null;
+                if (!vErr && vRows && vRows.length > 0) {
+                    const r = vRows[0];
+                    const chooseFt = { type: r.experience_type || flight_type_redeem };
+                    expiresFinal = resolveBookingExpiresFromVoucherRow(r, chooseFt, null, r.voucher_type || voucherType);
+                }
+                if (!expiresFinal) {
+                    let durationMonths = 24;
+                    if (voucherType && voucherType !== 'Any Day Flight') {
+                        durationMonths = 18;
+                    }
+                    expiresFinal = moment().add(durationMonths, 'months').format('YYYY-MM-DD HH:mm:ss');
+                }
+                insertRedeemBookingRow(expiresFinal);
+            }
+        );
     }
 
     // Update voucher redemption status in all_vouchers table
