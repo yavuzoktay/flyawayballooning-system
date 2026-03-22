@@ -566,7 +566,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         }
 
         // When flight type changes, clear voucher types that don't match the new flight type
-        const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
+        const normalizeType = t => t.replace(' Flight', '').replace(' Charter', '').trim().toLowerCase();
         const selectedTypes = selectedFlightTypes.map(t => normalizeType(t));
         
         // Clear voucher types that don't match current flight type
@@ -795,7 +795,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         });
         
         // Apply flight type filtering if needed (but keep all slots for resource calculation)
-        const normalizeType = t => t.replace(' Flight', '').trim().toLowerCase();
+        const normalizeType = t => t.replace(' Flight', '').replace(' Charter', '').trim().toLowerCase();
         const selectedTypes = selectedFlightTypes.length > 0 ? selectedFlightTypes.map(t => normalizeType(t)) : [];
         
         // Filter slots by flight type if flight types are selected
