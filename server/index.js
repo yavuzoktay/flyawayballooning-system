@@ -13180,6 +13180,9 @@ app.post('/api/createBooking', (req, res) => {
     if (!chooseLocation || !chooseFlightType || !passengerData) {
         return res.status(400).json({ success: false, message: 'Missing required booking information.' });
     }
+    if (!Array.isArray(passengerData) || passengerData.length === 0) {
+        return res.status(400).json({ success: false, message: 'passengerData must be a non-empty array.' });
+    }
 
     // Extract voucher_type from req.body for use in expires calculation
     // Prioritize selectedVoucherType.title (from ballooning-book section), then voucher_type, then selectedVoucherType
@@ -13215,7 +13218,8 @@ app.post('/api/createBooking', (req, res) => {
         selectedVoucherType: req.body.selectedVoucherType || (voucher_type ? { title: voucher_type } : null)
     };
 
-    const passengerName = `${passengerData[0].firstName} ${passengerData[0].lastName}`;
+    const p0 = passengerData[0] || {};
+    const passengerName = `${p0.firstName || ''} ${p0.lastName || ''}`.trim() || 'Guest';
     const now = moment();
     let expiresDate = null;
 
@@ -13324,8 +13328,21 @@ app.post('/api/createBooking', (req, res) => {
                 datePart = selectedDate.split(' ')[0];
             } else if (typeof selectedDate === 'string' && selectedDate.length > 10) {
                 datePart = selectedDate.substring(0, 10);
+            } else if (selectedDate != null && typeof selectedDate !== 'string') {
+                const md = moment(selectedDate);
+                datePart = md.isValid() ? md.format('YYYY-MM-DD') : String(selectedDate).slice(0, 10);
             }
             bookingDateTime = `${datePart} ${selectedTime}`;
+        }
+        // Non-string values make .trim() throw → 500 (e.g. Date object from some clients)
+        if (bookingDateTime != null && bookingDateTime !== '' && typeof bookingDateTime !== 'string') {
+            const mdt = moment(bookingDateTime);
+            bookingDateTime = mdt.isValid() ? mdt.format('YYYY-MM-DD HH:mm:ss') : String(bookingDateTime);
+        }
+        if (bookingDateTime == null || bookingDateTime === undefined) {
+            bookingDateTime = '';
+        } else {
+            bookingDateTime = String(bookingDateTime).trim();
         }
         // Determine flight_type_source: 'Redeem Voucher' if activitySelect is 'Redeem Voucher', otherwise use flight_type/experience
         const flight_type_source = activitySelect === 'Redeem Voucher' ? 'Redeem Voucher' : (chooseFlightType?.type || experience || null);
@@ -13829,6 +13846,27 @@ app.post('/api/createBooking', (req, res) => {
                 console.error('Error number:', err.errno);
                 console.error('Full error:', err);
                 console.error('=== END ERROR DETAILS ===');
+
+                // Live DBs missing all_booking.season_saver break UPDATE/INSERT — self-heal then retry once
+                if (err.code === 'ER_BAD_FIELD_ERROR' && /season_saver/i.test(String(err.sqlMessage || err.message || ''))) {
+                    console.warn('⚠️ [createBooking] season_saver column missing; running ALTER TABLE and retrying');
+                    return con.query(
+                        'ALTER TABLE all_booking ADD COLUMN season_saver TINYINT(1) NOT NULL DEFAULT 0',
+                        (alterErr) => {
+                            if (alterErr && !/duplicate column name/i.test(String(alterErr.message || ''))) {
+                                console.error('❌ [createBooking] ALTER season_saver failed:', alterErr);
+                                return res.status(500).json({ success: false, error: 'Database query failed to create booking', details: alterErr.message });
+                            }
+                            con.query(bookingSql, bookingValues, (err2, result2) => {
+                                if (err2) {
+                                    console.error('❌ [createBooking] Retry after season_saver ALTER failed:', err2);
+                                    return res.status(500).json({ success: false, error: 'Database query failed to create booking', details: err2.message });
+                                }
+                                handleBookingInsertSuccess(result2, oldBookingInfo);
+                            });
+                        }
+                    );
+                }
                 
                 // If foreign key constraint error for voucher_code, try to insert it and retry
                 if (err.code === 'ER_NO_REFERENCED_ROW_2' && err.sqlMessage && err.sqlMessage.includes('voucher_code')) {
@@ -30401,6 +30439,14 @@ const runDatabaseMigrations = () => {
         'private_charter_sale_pricing',
         'LONGTEXT NULL AFTER private_charter_pricing',
         'activity.private_charter_sale_pricing column added successfully'
+    );
+
+    // createBooking UPDATE/INSERT sets season_saver; older DBs without this column return 500 on rebook
+    ensureColumnExists(
+        'all_booking',
+        'season_saver',
+        'TINYINT(1) NOT NULL DEFAULT 0',
+        'all_booking.season_saver column added successfully'
     );
 
     const migrateJsonLocationField = (tableName, columnName) => {
