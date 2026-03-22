@@ -4513,7 +4513,7 @@ setBookingDetail(finalVoucherDetail);
                 if (selectedFlightTypes.includes('shared')) {
                     flightType = 'Shared Flight';
                 } else if (selectedFlightTypes.includes('private')) {
-                    flightType = 'Private Flight';
+                    flightType = 'Private Charter';
                 }
             }
             
@@ -4523,7 +4523,7 @@ setBookingDetail(finalVoucherDetail);
                 if (existingFlightType.toLowerCase().includes('shared')) {
                     flightType = 'Shared Flight';
                 } else if (existingFlightType.toLowerCase().includes('private')) {
-                    flightType = 'Private Flight';
+                    flightType = 'Private Charter';
                 }
             }
 
@@ -4647,11 +4647,12 @@ setBookingDetail(finalVoucherDetail);
             
             // Determine experience from flightType - this is critical for manifest page Type display
             // experience field is used in manifest page to show "Type: Shared Flight" or "Type: Private Flight"
-            let experience = flightType; // Default to flightType
+            let experience = flightType;
             if (flightType === 'Shared Flight') {
                 experience = 'Shared Flight';
-            } else if (flightType === 'Private Flight' || flightType === 'Private Charter') {
-                experience = 'Private Charter'; // Use 'Private Charter' for consistency
+            } else if (flightType && String(flightType).toLowerCase().includes('private')) {
+                experience = 'Private Charter';
+                flightType = 'Private Charter';
             }
             
             console.log('🔄 Rebook - Flight Type:', flightType, 'Experience:', experience);

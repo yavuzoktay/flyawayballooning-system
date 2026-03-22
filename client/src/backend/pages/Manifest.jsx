@@ -3228,7 +3228,7 @@ const Manifest = () => {
                 if (selectedFlightTypes.includes('shared')) {
                     flightType = 'Shared Flight';
                 } else if (selectedFlightTypes.includes('private')) {
-                    flightType = 'Private Flight';
+                    flightType = 'Private Charter';
                 }
             }
             
@@ -3238,11 +3238,11 @@ const Manifest = () => {
                 if (existingFlightType.toLowerCase().includes('shared')) {
                     flightType = 'Shared Flight';
                 } else if (existingFlightType.toLowerCase().includes('private')) {
-                    flightType = 'Private Flight';
+                    flightType = 'Private Charter';
                 } else {
                     // Last fallback: use passenger count (but this should rarely happen)
                     const passengerCount = bookingDetail.booking.pax || 1;
-                    flightType = passengerCount === 1 ? 'Shared Flight' : 'Private Flight';
+                    flightType = passengerCount === 1 ? 'Shared Flight' : 'Private Charter';
                 }
             }
             
@@ -3304,11 +3304,12 @@ const Manifest = () => {
             
             // Determine experience from flightType - this is critical for manifest page Type display
             // experience field is used in manifest page to show "Type: Shared Flight" or "Type: Private Flight"
-            let experience = flightType; // Default to flightType
+            let experience = flightType;
             if (flightType === 'Shared Flight') {
                 experience = 'Shared Flight';
-            } else if (flightType === 'Private Flight' || flightType === 'Private Charter') {
-                experience = 'Private Charter'; // Use 'Private Charter' for consistency
+            } else if (flightType && String(flightType).toLowerCase().includes('private')) {
+                experience = 'Private Charter';
+                flightType = 'Private Charter';
             }
             
             console.log('🔄 Manifest Rebook - Flight Type:', flightType, 'Experience:', experience);

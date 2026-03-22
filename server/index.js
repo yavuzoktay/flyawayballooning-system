@@ -13139,6 +13139,29 @@ app.post('/api/createBooking', (req, res) => {
         rebook_from_booking_id // Old booking ID for payment history transfer during rebook
     } = req.body;
 
+    // voucher_code may be sent as a number (JSON); .trim() would throw and yield 500
+    if (voucher_code !== undefined && voucher_code !== null && voucher_code !== '') {
+        voucher_code = String(voucher_code).trim();
+        if (voucher_code === '') voucher_code = null;
+    } else {
+        voucher_code = null;
+    }
+
+    // Rebook / UI often sends "Private Flight" or "private" while DB + availability use "Private Charter"
+    if (chooseFlightType && typeof chooseFlightType === 'object' && chooseFlightType.type != null) {
+        const rawFt = String(chooseFlightType.type).trim();
+        const ftLower = rawFt.toLowerCase();
+        if ((ftLower === 'private' || ftLower === 'private flight') && !ftLower.includes('shared')) {
+            chooseFlightType = { ...chooseFlightType, type: 'Private Charter' };
+        }
+    }
+    if (typeof activitySelect === 'string') {
+        const aLower = activitySelect.trim().toLowerCase();
+        if (aLower === 'private' || aLower === 'private flight') {
+            activitySelect = 'Private Charter';
+        }
+    }
+
     // Unify add-on field: always use choose_add_on as array of {name, price}
     if (!choose_add_on && chooseAddOn) {
         choose_add_on = chooseAddOn;
@@ -13178,7 +13201,13 @@ app.post('/api/createBooking', (req, res) => {
         voucher_type = '';
     }
 
-    const experience = req.body.experience || chooseFlightType?.type || '';
+    let experience = req.body.experience || chooseFlightType?.type || '';
+    if (typeof experience === 'string') {
+        const eLower = experience.trim().toLowerCase();
+        if (eLower === 'private' || eLower === 'private flight') {
+            experience = 'Private Charter';
+        }
+    }
     const season_saver = req.body.season_saver === true || req.body.season_saver === 1 || req.body.season_saver === '1' ? 1 : 0;
 
     // Create bookingData object for use in expires calculation
