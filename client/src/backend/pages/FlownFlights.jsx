@@ -21,12 +21,14 @@ import {
     Grid,
     Divider,
     IconButton,
-    OutlinedInput
+    OutlinedInput,
+    Collapse
 } from "@mui/material";
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import dayjs from 'dayjs';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -36,7 +38,9 @@ import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 const FlownFlights = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    
+
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
     const [flownFlights, setFlownFlights] = useState([]);
     const [filteredFlights, setFilteredFlights] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -695,6 +699,36 @@ const FlownFlights = () => {
                                 </InputAdornment>
                             }
                         />
+                        <OutlinedInput
+                            readOnly
+                            onClick={() => setMobileFiltersOpen(prev => !prev)}
+                            value=""
+                            sx={{
+                                cursor: 'pointer',
+                                height: '32px',
+                                width: '40px',
+                                minWidth: '40px',
+                                maxWidth: '40px',
+                                '& input': {
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    padding: '0',
+                                    display: 'none'
+                                },
+                                '& fieldset': {
+                                    border: 'none'
+                                }
+                            }}
+                            size="small"
+                            startAdornment={
+                                <InputAdornment position="start" sx={{ margin: 0, position: 'relative' }}>
+                                    <FilterListIcon fontSize="small" color={mobileFiltersOpen || experienceFilter || yearFilter || pilotFilter || locationFilter ? 'primary' : 'secondary'} />
+                                    {(experienceFilter || yearFilter || pilotFilter || locationFilter) && (
+                                        <Box sx={{ position: 'absolute', top: -4, right: -6, width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                                    )}
+                                </InputAdornment>
+                            }
+                        />
                     </>
                 ) : (
                     <>
@@ -721,8 +755,8 @@ const FlownFlights = () => {
                 )}
             </Box>
 
-            {/* Filters */}
-            <Box sx={{ mb: 3, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 2, flexWrap: 'wrap' }}>
+            {/* Search - always visible */}
+            <Box sx={{ mb: isMobile ? 1 : 0 }}>
                 <TextField
                     placeholder="Search..."
                     value={searchTerm}
@@ -730,14 +764,104 @@ const FlownFlights = () => {
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
-                                <SearchIcon />
+                                <SearchIcon sx={{ fontSize: isMobile ? '16px' : 'inherit' }} />
                             </InputAdornment>
                         ),
                     }}
-                    sx={{ flex: 1, minWidth: isMobile ? '100%' : 200 }}
+                    sx={{ width: '100%', minWidth: isMobile ? '100%' : 200, ...(isMobile ? { '& .MuiOutlinedInput-input': { padding: '6px 8px', fontSize: '16px' }, '& .MuiOutlinedInput-root': { height: '36px' } } : {}) }}
                     size="small"
                 />
-                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
+            </Box>
+
+            {/* Filters */}
+            {isMobile ? (
+                <Collapse in={mobileFiltersOpen} timeout="auto" unmountOnExit>
+                    <Box sx={{
+                        mt: 1,
+                        mb: 2,
+                        p: 1.5,
+                        bgcolor: '#f8f9fa',
+                        borderRadius: 2,
+                        border: '1px solid #e0e0e0',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '4px'
+                    }}>
+                        <div style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                            <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                <InputLabel sx={{ fontSize: '11px' }}>Experience</InputLabel>
+                                <Select
+                                    value={experienceFilter}
+                                    label="Experience"
+                                    onChange={(e) => setExperienceFilter(e.target.value)}
+                                    sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                >
+                                    <MenuItem value="" sx={{ fontSize: '11px' }}>All</MenuItem>
+                                    <MenuItem value="Shared" sx={{ fontSize: '11px' }}>Shared</MenuItem>
+                                    <MenuItem value="Private" sx={{ fontSize: '11px' }}>Private</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </div>
+                        <div style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                            <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                <InputLabel sx={{ fontSize: '11px' }}>By Year</InputLabel>
+                                <Select
+                                    value={yearFilter}
+                                    label="By Year"
+                                    onChange={(e) => setYearFilter(e.target.value)}
+                                    sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                >
+                                    <MenuItem value="" sx={{ fontSize: '11px' }}>All</MenuItem>
+                                    {years.map(year => (
+                                        <MenuItem key={year} value={year} sx={{ fontSize: '11px' }}>{year}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </div>
+                        <div style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                            <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                <InputLabel sx={{ fontSize: '11px' }}>Pilot</InputLabel>
+                                <Select
+                                    value={pilotFilter}
+                                    label="Pilot"
+                                    onChange={(e) => setPilotFilter(e.target.value)}
+                                    sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                >
+                                    <MenuItem value="" sx={{ fontSize: '11px' }}>All</MenuItem>
+                                    {pilots.map(pilot => (
+                                        <MenuItem key={pilot} value={pilot} sx={{ fontSize: '11px' }}>{pilot}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </div>
+                        <div style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
+                            <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
+                                <InputLabel sx={{ fontSize: '11px' }}>Location</InputLabel>
+                                <Select
+                                    value={locationFilter}
+                                    label="Location"
+                                    onChange={(e) => setLocationFilter(e.target.value)}
+                                    sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
+                                >
+                                    <MenuItem value="" sx={{ fontSize: '11px' }}>All</MenuItem>
+                                    {locations.map(loc => (
+                                        <MenuItem key={loc} value={loc} sx={{ fontSize: '11px' }}>{loc}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </div>
+                        {(experienceFilter || yearFilter || pilotFilter || locationFilter) && (
+                            <Box sx={{ width: '100%', mt: 0.5, textAlign: 'center' }}>
+                                <Button size="small" onClick={() => { setExperienceFilter(''); setYearFilter(''); setPilotFilter(''); setLocationFilter(''); }} sx={{ fontSize: '11px', textTransform: 'none' }}>
+                                    Clear Filters
+                                </Button>
+                            </Box>
+                        )}
+                    </Box>
+                </Collapse>
+            ) : (
+            <Box sx={{ mb: 3, display: 'flex', flexDirection: 'row', gap: 2, flexWrap: 'wrap' }}>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
                     <InputLabel>Experience</InputLabel>
                     <Select
                         value={experienceFilter}
@@ -749,7 +873,7 @@ const FlownFlights = () => {
                         <MenuItem value="Private">Private</MenuItem>
                     </Select>
                 </FormControl>
-                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
                     <InputLabel>By Year</InputLabel>
                     <Select
                         value={yearFilter}
@@ -762,7 +886,7 @@ const FlownFlights = () => {
                         ))}
                     </Select>
                 </FormControl>
-                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
                     <InputLabel>Pilot</InputLabel>
                     <Select
                         value={pilotFilter}
@@ -775,7 +899,7 @@ const FlownFlights = () => {
                         ))}
                     </Select>
                 </FormControl>
-                <FormControl size="small" sx={{ minWidth: isMobile ? '100%' : 150 }}>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
                     <InputLabel>Location</InputLabel>
                     <Select
                         value={locationFilter}
@@ -789,6 +913,7 @@ const FlownFlights = () => {
                     </Select>
                 </FormControl>
             </Box>
+            )}
 
             {/* Table */}
             {loading ? (
