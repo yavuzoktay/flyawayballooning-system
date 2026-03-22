@@ -7885,8 +7885,8 @@ setBookingDetail(finalVoucherDetail);
                                                 </Box>
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
-                                            {/* Related Booking (for vouchers) */}
-                                            {activeTab === 'vouchers' && bookingDetail.booking ? (
+                                            {/* Related Booking (for vouchers) - only show when voucher has been redeemed */}
+                                            {activeTab === 'vouchers' && bookingDetail.booking && (bookingDetail.voucher?.redeemed === 'Yes' || bookingDetail.voucher?.redeemed === true || bookingDetail.voucher?.status === 'Used') ? (
                                                 <Box sx={{ mb: 2 }}>
                                                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Related Booking</Typography>
                                                     <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
