@@ -23400,18 +23400,24 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
     });
 });
 
-// Get unique live locations from activity table (with image)
+// Get unique live locations from activity table (with image), ordered by admin Activity list (display_order)
 app.get('/api/activeLocations', (req, res) => {
     const sql = `
         SELECT a.id, a.location, a.image
         FROM activity a
         INNER JOIN (
-            SELECT MIN(id) as min_id
+            SELECT location, MIN(display_order) AS min_ord
             FROM activity
             WHERE status = 'Live'
             GROUP BY location
-        ) b ON a.id = b.min_id
-        ORDER BY FIELD(a.location, 'Bath', 'Bristol', 'Devon', 'Somerset'), a.location
+        ) lo ON a.location = lo.location AND a.display_order = lo.min_ord AND a.status = 'Live'
+        INNER JOIN (
+            SELECT location, display_order, MIN(id) AS pick_id
+            FROM activity
+            WHERE status = 'Live'
+            GROUP BY location, display_order
+        ) pick ON a.id = pick.pick_id
+        ORDER BY a.display_order ASC, a.location ASC
     `;
     con.query(sql, (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "Database error" });
@@ -26857,7 +26863,7 @@ app.get('/api/activities/flight-types', (req, res) => {
         params.push(location);
     }
 
-    sql += ' ORDER BY location, display_order ASC, activity_name ASC';
+    sql += ' ORDER BY display_order ASC, location ASC, activity_name ASC';
 
     console.log('SQL query:', sql);
     console.log('SQL params:', params);
