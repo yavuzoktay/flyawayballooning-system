@@ -5533,7 +5533,7 @@ const Manifest = () => {
                                                                     <span style={{ 
                                                                         color: 'rgb(50, 116, 180)', 
                                                                         cursor: 'pointer', 
-                                                                        textDecoration: 'underline',
+                                                                        textDecoration: 'none',
                                                                         fontSize: isMobile ? '12px' : '0.875rem',
                                                                     }}
                                                                         onClick={() => handleNameClick(flight.id)}>
