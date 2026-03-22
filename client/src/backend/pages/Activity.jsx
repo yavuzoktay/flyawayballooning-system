@@ -1,10 +1,10 @@
-import { Container } from "@mui/material";
+import { Box, CircularProgress, Container } from "@mui/material";
 import React from "react";
 import ActivityList from "../components/ActivityPage/ActivityList";
 import useActivity from "../api/useActivity";
 
 const Activity = () => {
-    const {activity, loading, error} = useActivity();
+    const { activity, loading, error, setActivity } = useActivity();
 
     return (
         <div className="activity-page-wrap">
@@ -16,12 +16,16 @@ const Activity = () => {
                     <hr />
                 </div>
                 <div className="activity-body-wrap">
-                    {error ? (
+                    {loading && !error ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 6 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : error ? (
                         <div style={{ color: 'red', padding: '20px' }}>
                             Error: {error}
                         </div>
                     ) : (
-                        <ActivityList activity={activity} />
+                        <ActivityList activity={activity} setActivity={setActivity} />
                     )}
                 </div>
             </Container>

@@ -16,6 +16,14 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHighOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Checkbox, FormControlLabel, FormGroup, Switch } from '@mui/material';
 import CreateAvailabilitiesModal from './CreateAvailabilitiesModal';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+
+const arrayMove = (list, fromIndex, toIndex) => {
+    const next = [...list];
+    const [removed] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, removed);
+    return next;
+};
 
 const parseNestedPricingMap = (value) => {
     let parsed = value;
@@ -131,7 +139,7 @@ const sanitizeActivityFormForSubmit = (formState = {}) => {
     return sanitized;
 };
 
-const ActivityList = ({ activity }) => {
+const ActivityList = ({ activity, setActivity }) => {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState({
         activity_name: '',
@@ -178,6 +186,15 @@ const ActivityList = ({ activity }) => {
     // Passenger tier selection for group pricing (Edit form)
     const [editGroupPassengerTier, setEditGroupPassengerTier] = useState(2);
     const navigate = useNavigate();
+
+    const [rows, setRows] = useState(() => (Array.isArray(activity) ? [...activity] : []));
+    const [draggingId, setDraggingId] = useState(null);
+    const [dropTargetId, setDropTargetId] = useState(null);
+    const [reorderError, setReorderError] = useState('');
+
+    useEffect(() => {
+        setRows(Array.isArray(activity) ? [...activity] : []);
+    }, [activity]);
 
     // Fetch private charter voucher types on component mount
     useEffect(() => {
@@ -520,8 +537,70 @@ const ActivityList = ({ activity }) => {
         setAvailModalOpen(true);
     };
 
-    // Ensure activity is always an array
-    const safeActivity = Array.isArray(activity) ? activity : [];
+    const handleActivityDragStart = (e, id) => {
+        e.dataTransfer.setData('text/plain', String(id));
+        e.dataTransfer.effectAllowed = 'move';
+        setDraggingId(id);
+    };
+
+    const handleActivityDragEnd = () => {
+        setDraggingId(null);
+        setDropTargetId(null);
+    };
+
+    const handleActivityDragOverRow = (e, rowId) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (rowId !== draggingId) {
+            setDropTargetId(rowId);
+        }
+    };
+
+    const handleActivityDragLeaveRow = (e) => {
+        const related = e.relatedTarget;
+        if (related && e.currentTarget.contains(related)) {
+            return;
+        }
+        setDropTargetId(null);
+    };
+
+    const handleActivityDropOnRow = async (e, targetId) => {
+        e.preventDefault();
+        setDropTargetId(null);
+        const sourceId = Number(e.dataTransfer.getData('text/plain'));
+        if (!Number.isFinite(sourceId)) {
+            setDraggingId(null);
+            return;
+        }
+        const fromIndex = rows.findIndex((r) => r.id === sourceId);
+        const toIndex = rows.findIndex((r) => r.id === targetId);
+        if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
+            setDraggingId(null);
+            return;
+        }
+        const previous = [...rows];
+        const newRows = arrayMove(rows, fromIndex, toIndex);
+        setRows(newRows);
+        setReorderError('');
+        setDraggingId(null);
+        try {
+            const res = await fetch('/api/activities/reorder', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: newRows.map((r) => r.id) }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || 'Failed to save order');
+            }
+            if (typeof setActivity === 'function') {
+                setActivity(newRows);
+            }
+        } catch (err) {
+            setRows(previous);
+            setReorderError(err.message || 'Could not save order');
+        }
+    };
 
     return (
         <div className="activity-list-wrap">
@@ -896,11 +975,16 @@ const ActivityList = ({ activity }) => {
             </Dialog>
 
             {/* Activity Table */}
+            {reorderError ? (
+                <div style={{ color: '#c62828', marginBottom: 12, fontSize: 14 }} role="alert">
+                    {reorderError}
+                </div>
+            ) : null}
             <TableContainer component={Paper} style={{ marginTop: "0px" }} className="activity-table-container">
                 <Table className="activity-table">
                     <TableHead>
                         <TableRow>
-                            <TableCell>S. No.</TableCell>
+                            <TableCell width={120}>S. No.</TableCell>
                             <TableCell>Activity Name</TableCell>
                             <TableCell>Status</TableCell>
                             <TableCell>Action</TableCell>
@@ -909,9 +993,31 @@ const ActivityList = ({ activity }) => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {safeActivity.map((item, index) => (
-                            <TableRow key={index}>
-                                <TableCell>{index + 1}</TableCell>
+                        {rows.map((item, index) => (
+                            <TableRow
+                                key={item.id}
+                                hover
+                                onDragOver={(e) => handleActivityDragOverRow(e, item.id)}
+                                onDragLeave={handleActivityDragLeaveRow}
+                                onDrop={(e) => handleActivityDropOnRow(e, item.id)}
+                                className={[
+                                    draggingId === item.id ? 'activity-table-row--dragging' : '',
+                                    dropTargetId === item.id ? 'activity-table-row--drop-target' : '',
+                                ].filter(Boolean).join(' ')}
+                            >
+                                <TableCell>
+                                    <span
+                                        className="activity-drag-handle"
+                                        draggable
+                                        onDragStart={(e) => handleActivityDragStart(e, item.id)}
+                                        onDragEnd={handleActivityDragEnd}
+                                        title="Drag to reorder"
+                                        aria-label="Drag to reorder row"
+                                    >
+                                        <DragIndicatorIcon fontSize="small" />
+                                    </span>
+                                    {index + 1}
+                                </TableCell>
                                 <TableCell>{item?.activity_name}</TableCell>
                                 <TableCell>{item?.status || 'Live'}</TableCell>
                                 <TableCell>

@@ -13027,7 +13027,7 @@ app.get('/api/getAllPassengers', (req, res) => {
 
 // Get All Activity Data (Legacy endpoint - redirects to /api/activities)
 app.get('/api/getAllActivity', (req, res) => {
-    const sql = 'SELECT * FROM activity ORDER BY activity_name';
+    const sql = 'SELECT * FROM activity ORDER BY display_order ASC, activity_name ASC';
     con.query(sql, (err, result) => {
         if (err) {
             console.error("Error occurred:", err);
@@ -23198,7 +23198,14 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
         formattedPrivateCharterVoucherTypes = private_charter_voucher_types.split(',').map(type => type.trim()).join(',');
     }
 
-    const sql = `
+    const sanitizedPrivateCharterSalePricing = sanitizeSalePricingMap(private_charter_sale_pricing);
+    con.query('SELECT COALESCE(MAX(display_order), 0) + 1 AS next_order FROM activity', (errMax, maxRows) => {
+        if (errMax) {
+            return res.status(500).json({ success: false, message: "Database error" });
+        }
+        const nextOrder = maxRows && maxRows[0] && maxRows[0].next_order != null ? maxRows[0].next_order : 1;
+
+        const sql = `
         INSERT INTO activity (
             activity_name,
             capacity,
@@ -23222,37 +23229,39 @@ app.post("/api/createActivity", upload.single('image'), (req, res) => {
             shared_flight_from_price,
             shared_flight_from_sale_price,
             private_charter_from_price,
-            private_charter_from_sale_price
+            private_charter_from_sale_price,
+            display_order
         )
-        VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const sanitizedPrivateCharterSalePricing = sanitizeSalePricingMap(private_charter_sale_pricing);
-    con.query(sql, [
-        activity_name,
-        capacity,
-        location,
-        formattedFlightType,
-        voucher_type || 'All',
-        formattedPrivateCharterVoucherTypes || null,
-        serializeJsonField(private_charter_pricing),
-        serializeJsonField(sanitizedPrivateCharterSalePricing),
-        status,
-        image,
-        weekday_morning_price,
-        formatSaleNumericPrice(weekday_morning_sale_price),
-        flexible_weekday_price,
-        formatSaleNumericPrice(flexible_weekday_sale_price),
-        any_day_flight_price,
-        formatSaleNumericPrice(any_day_flight_sale_price),
-        shared_flight_from_price,
-        formatSaleNumericPrice(shared_flight_from_sale_price),
-        private_charter_from_price,
-        formatSaleNumericPrice(private_charter_from_sale_price)
-    ], (err, result) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: "Database error" });
-        }
-        res.json({ success: true, data: result });
+        con.query(sql, [
+            activity_name,
+            capacity,
+            location,
+            formattedFlightType,
+            voucher_type || 'All',
+            formattedPrivateCharterVoucherTypes || null,
+            serializeJsonField(private_charter_pricing),
+            serializeJsonField(sanitizedPrivateCharterSalePricing),
+            status,
+            image,
+            weekday_morning_price,
+            formatSaleNumericPrice(weekday_morning_sale_price),
+            flexible_weekday_price,
+            formatSaleNumericPrice(flexible_weekday_sale_price),
+            any_day_flight_price,
+            formatSaleNumericPrice(any_day_flight_sale_price),
+            shared_flight_from_price,
+            formatSaleNumericPrice(shared_flight_from_sale_price),
+            private_charter_from_price,
+            formatSaleNumericPrice(private_charter_from_sale_price),
+            nextOrder
+        ], (err, result) => {
+            if (err) {
+                return res.status(500).json({ success: false, message: "Database error" });
+            }
+            res.json({ success: true, data: result });
+        });
     });
 });
 
@@ -24221,7 +24230,7 @@ app.get('/api/availabilities/filter', (req, res) => {
 
 // Get all activities (id, activity_name, status)
 app.get('/api/activities', (req, res) => {
-    const sql = 'SELECT id, activity_name, status, capacity, location FROM activity ORDER BY activity_name';
+    const sql = 'SELECT id, activity_name, status, capacity, location, display_order FROM activity ORDER BY display_order ASC, activity_name ASC';
     con.query(sql, (err, result) => {
         if (err) {
             console.error('Database error in /api/activities:', err);
@@ -24242,13 +24251,58 @@ app.get('/api/activities', (req, res) => {
     });
 });
 
+// Persist activity row order (admin Activity page drag-and-drop). Requires `display_order` column — see server/activity_display_order.sql
+app.put('/api/activities/reorder', (req, res) => {
+    const { order } = req.body || {};
+    if (!Array.isArray(order) || order.length === 0) {
+        return res.status(400).json({ success: false, message: 'order must be a non-empty array of activity ids' });
+    }
+    const ids = order.map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0);
+    if (ids.length !== order.length) {
+        return res.status(400).json({ success: false, message: 'Invalid activity ids in order' });
+    }
+    const unique = new Set(ids);
+    if (unique.size !== ids.length) {
+        return res.status(400).json({ success: false, message: 'Duplicate activity ids in order' });
+    }
+
+    const inClause = ids.map(() => '?').join(', ');
+    const verifySql = `SELECT id FROM activity WHERE id IN (${inClause})`;
+    con.query(verifySql, ids, (verifyErr, existingRows) => {
+        if (verifyErr) {
+            console.error('Database error verifying /api/activities/reorder ids:', verifyErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: verifyErr.message });
+        }
+        const found = Array.isArray(existingRows) ? existingRows.length : 0;
+        if (found !== ids.length) {
+            return res.status(400).json({ success: false, message: 'One or more activity ids do not exist' });
+        }
+
+        const caseParts = ids.map(() => 'WHEN ? THEN ?').join(' ');
+        const sql = `UPDATE activity SET display_order = CASE id ${caseParts} ELSE display_order END WHERE id IN (${inClause})`;
+        const params = [];
+        ids.forEach((id, idx) => {
+            params.push(id, idx + 1);
+        });
+        params.push(...ids);
+
+        con.query(sql, params, (err) => {
+            if (err) {
+                console.error('Database error in /api/activities/reorder:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err.message });
+            }
+            res.json({ success: true, updated: ids.length });
+        });
+    });
+});
+
 // Get all activities with location and pricing info for rebooking
 app.get('/api/activitiesForRebook', (req, res) => {
     const sql = `
         SELECT id, activity_name, location, shared_price, private_price, flight_type, status 
         FROM activity 
         WHERE status = 'Live' 
-        ORDER BY activity_name, location
+        ORDER BY display_order ASC, activity_name ASC, location ASC
     `;
     con.query(sql, (err, result) => {
         if (err) return res.status(500).json({ success: false, message: 'Database error', error: err });
@@ -26803,7 +26857,7 @@ app.get('/api/activities/flight-types', (req, res) => {
         params.push(location);
     }
 
-    sql += ' ORDER BY location, activity_name';
+    sql += ' ORDER BY location, display_order ASC, activity_name ASC';
 
     console.log('SQL query:', sql);
     console.log('SQL params:', params);

@@ -738,6 +738,31 @@ a.edit-activity svg {
     color: var(--dark-blue);
 }
 
+.activity-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    vertical-align: middle;
+    color: #6b7280;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.activity-drag-handle:active {
+    cursor: grabbing;
+}
+
+.activity-table-row--dragging {
+    opacity: 0.55;
+}
+
+.activity-table-row--drop-target {
+    outline: 2px dashed #3274b4;
+    outline-offset: -2px;
+}
+
 /* Activity Page Mobile Responsive Styles - Only for mobile devices */
 @media screen and (max-width: 768px) {
     /* Activity Page Container */
