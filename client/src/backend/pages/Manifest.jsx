@@ -5699,7 +5699,7 @@ const Manifest = () => {
                                                                     whiteSpace: 'normal'
                                                                 }}
                                                             >
-                                                                                                            Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0)} &nbsp;&nbsp;|
+                                                                                                            Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0).toFixed(2)} &nbsp;&nbsp;|
                                                 Total Weight: {totalWeightDisplay} kg &nbsp;&nbsp;|
                                                 Total Pax: {passengerCountDisplay}
                                                         </TableCell>
