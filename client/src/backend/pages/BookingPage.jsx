@@ -2381,10 +2381,23 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                     finalVoucherDetail.voucherNotes = [];
                 }
 
-                // Load passenger data for Flight Vouchers
+                const voucherLooksRedeemed =
+                    voucherItem.redeemed === 'Yes' ||
+                    voucherItem.redeemed === true ||
+                    voucherItem.status === 'Used' ||
+                    finalVoucherDetail.voucher?.redeemed === 'Yes' ||
+                    finalVoucherDetail.voucher?.redeemed === true ||
+                    finalVoucherDetail.voucher?.status === 'Used';
+
+                if (!voucherLooksRedeemed) {
+                    finalVoucherDetail.booking = null;
+                    finalVoucherDetail.passengers = [];
+                }
+
+                // Load passenger / related booking for Flight Vouchers only after redeem
                 try {
                     console.log('🔄 Loading passenger data for Flight Voucher...');
-                    if (voucherItem.voucher_ref) {
+                    if (voucherLooksRedeemed && voucherItem.voucher_ref) {
                         // Try to find the booking associated with this voucher
                         const bookingResponse = await axios.get(`/api/findBookingByVoucherRef?voucher_ref=${voucherItem.voucher_ref}`);
                         if (bookingResponse.data.success && bookingResponse.data.booking) {
@@ -2405,6 +2418,8 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
                             console.log('⚠️ No booking found for voucher_ref:', voucherItem.voucher_ref);
                             finalVoucherDetail.passengers = [];
                         }
+                    } else if (!voucherLooksRedeemed) {
+                        console.log('⚠️ Voucher not redeemed — skipping related booking / passenger load from all_booking');
                     } else {
                         console.log('⚠️ No voucher_ref found, skipping passenger load');
                         finalVoucherDetail.passengers = [];

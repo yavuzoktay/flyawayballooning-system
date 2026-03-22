@@ -10385,6 +10385,15 @@ app.get('/api/getBookingByVoucherCode', (req, res) => {
     });
 });
 
+function isAllVoucherRedeemedRow(voucherRow) {
+    if (!voucherRow) return false;
+    const r = voucherRow.redeemed;
+    if (r === true || r === 1) return true;
+    if (typeof r === 'string' && ['yes', 'true'].includes(r.trim().toLowerCase())) return true;
+    const st = String(voucherRow.status || '').trim().toLowerCase();
+    return st === 'used';
+}
+
 // Find a single booking by voucher_ref / voucher_code (used by frontend to open booking details from All Vouchers)
 app.get('/api/findBookingByVoucherRef', (req, res) => {
     const rawCode = (req.query.voucher_ref || '').trim();
@@ -10395,6 +10404,26 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
 
     console.log('🔍 findBookingByVoucherRef: Searching for voucher_ref:', rawCode);
 
+    // Unredeemed vouchers must not resolve to arbitrary bookings that happen to share voucher_code
+    con.query(
+        'SELECT id, redeemed, status FROM all_vouchers WHERE voucher_ref = ? LIMIT 1',
+        [rawCode],
+        (voucherLookupErr, voucherLookupRows) => {
+            if (voucherLookupErr) {
+                console.error('Error in findBookingByVoucherRef (voucher lookup):', voucherLookupErr);
+                return res.status(500).json({ success: false, message: 'Database error', error: voucherLookupErr });
+            }
+            if (voucherLookupRows && voucherLookupRows.length > 0 && !isAllVoucherRedeemedRow(voucherLookupRows[0])) {
+                console.log('✅ findBookingByVoucherRef: Voucher not redeemed — skipping booking resolution');
+                return res.json({ success: true, booking: null });
+            }
+
+            runFindBookingByVoucherRefAfterVoucherCheck(rawCode, res);
+        }
+    );
+});
+
+function runFindBookingByVoucherRefAfterVoucherCheck(rawCode, res) {
     // First, try to find booking by direct voucher_code match
     // Also check voucher_code_usage for Gift Voucher redemptions
     const sql = `
@@ -10543,7 +10572,7 @@ app.get('/api/findBookingByVoucherRef', (req, res) => {
             });
         });
     });
-});
+}
 
 // Get Payment History for a booking
 app.get('/api/booking-payment-history/:bookingId', (req, res) => {
@@ -24538,11 +24567,11 @@ app.get('/api/getVoucherDetail', async (req, res) => {
             voucher.passenger_details = [];
         }
 
-        // 2. İlgili booking (varsa)
+        // 2. İlgili booking (varsa) — yalnızca redeem edilmiş voucher'lar için (voucher_code çakışmasında yanlış booking'i önler)
         let booking = null;
         let passengers = [];
         let notes = [];
-        if (voucher.voucher_ref) {
+        if (voucher.voucher_ref && isAllVoucherRedeemedRow(voucher)) {
             const [bookingRows] = await new Promise((resolve, reject) => {
                 con.query('SELECT * FROM all_booking WHERE voucher_code = ?', [voucher.voucher_ref], (err, rows) => {
                     if (err) reject(err);
@@ -33555,7 +33584,8 @@ function buildCustomerPortalToken(booking = {}) {
     const isFlightVoucher = Boolean(
         booking.is_flight_voucher ||
         booking.isFlightVoucher ||
-        bookingType.includes('flight voucher')
+        bookingType.includes('flight voucher') ||
+        bookingType.includes('book flight')
     );
     const isGiftVoucher = bookingType.includes('gift voucher');
     const isVoucherIdForced = (() => {
@@ -33863,6 +33893,7 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
                         voucher_ref,
                         created_at,
                         book_flight,
+                        voucher_type,
                         redeemed
                     FROM all_vouchers
                     ORDER BY created_at DESC
@@ -33875,7 +33906,11 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
                     const voucherMatch = findMatchInRows(voucherRows, (row) => ({
                         ...row,
                         voucher_id: row.id,
-                        _original: row
+                        _original: row,
+                        book_flight:
+                            row.book_flight ||
+                            row.voucher_type ||
+                            null
                     }));
 
                     return callback(null, voucherMatch || null);
