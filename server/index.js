@@ -33754,8 +33754,6 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
                 created_at,
                 redeemed_voucher,
                 book_flight,
-                purchaser_email,
-                recipient_email,
                 flight_type,
                 voucher_type,
                 voucher_type_detail

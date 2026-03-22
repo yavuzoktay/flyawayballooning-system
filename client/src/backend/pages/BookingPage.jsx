@@ -2321,6 +2321,8 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.booking_phone = voucherItem.booking_phone || finalVoucherDetail.voucher.booking_phone;
     // Copy booking_email from getAllVoucherData (for redeemed Gift Vouchers - Passenger 1 email = Booking Details email)
     finalVoucherDetail.voucher.booking_email = voucherItem.booking_email || finalVoucherDetail.voucher.booking_email;
+    // Copy redeemed status from list data
+    finalVoucherDetail.voucher.redeemed = voucherItem.redeemed || finalVoucherDetail.voucher.redeemed;
     
     // Copy additional information data from getAllVoucherData
     if (voucherItem.additional_information) {
