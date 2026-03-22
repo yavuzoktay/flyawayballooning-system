@@ -26659,7 +26659,11 @@ app.get(['/customerPortal/s/:shortCode', '/customerPortal/s/:shortCode/*'], (req
                 if (!rows || rows.length === 0 || !rows[0].target_url) {
                     return resolveCustomerPortalShortLinkByData(shortCode, (fallbackErr, fallbackMatch) => {
                         if (fallbackErr) {
-                            console.error('Error rebuilding customer portal short link:', fallbackErr);
+                            console.error(
+                                'Error rebuilding customer portal short link:',
+                                fallbackErr?.message || fallbackErr,
+                                fallbackErr?.sqlMessage || ''
+                            );
                             return res.status(500).send('Failed to resolve short link');
                         }
 
@@ -33581,13 +33585,20 @@ function buildCustomerPortalToken(booking = {}) {
         booking.voucherType ??
         '';
     const bookingType = String(bookingTypeRaw).trim().toLowerCase();
+    const isGiftVoucher =
+        bookingType.includes('gift voucher') || bookingType.includes('buy gift');
+    const voucherRefForKind = String(
+        booking.voucher_ref ?? booking._original?.voucher_ref ?? booking.voucher_code ?? booking.voucherCode ?? ''
+    ).trim();
+    // Flight rows often store only book_flight ("Any Day Flight", etc.) without "Book Flight" in text;
+    // all_vouchers may lack a voucher_type column on older DBs — use voucher_ref + not-gift as a safe signal.
     const isFlightVoucher = Boolean(
         booking.is_flight_voucher ||
-        booking.isFlightVoucher ||
-        bookingType.includes('flight voucher') ||
-        bookingType.includes('book flight')
+            booking.isFlightVoucher ||
+            bookingType.includes('flight voucher') ||
+            bookingType.includes('book flight') ||
+            (!isGiftVoucher && voucherRefForKind !== '')
     );
-    const isGiftVoucher = bookingType.includes('gift voucher');
     const isVoucherIdForced = (() => {
         try {
             const idRaw = booking.id ?? booking.booking_id ?? booking.bookingId ?? '';
@@ -33835,15 +33846,19 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
 
     const findMatchInRows = (rows = [], mapRow = (row) => row) => {
         for (const row of rows) {
-            const candidateRow = mapRow(row);
-            const matches = buildCustomerPortalShortLinkCandidates(candidateRow);
-            const matched = matches.find((entry) => entry.shortCode === normalizedShortCode);
+            try {
+                const candidateRow = mapRow(row);
+                const matches = buildCustomerPortalShortLinkCandidates(candidateRow);
+                const matched = matches.find((entry) => entry.shortCode === normalizedShortCode);
 
-            if (matched) {
-                return {
-                    ...matched,
-                    allMatches: matches
-                };
+                if (matched) {
+                    return {
+                        ...matched,
+                        allMatches: matches
+                    };
+                }
+            } catch (rowErr) {
+                console.error('Customer portal short link candidate row error:', rowErr);
             }
         }
 
@@ -33893,7 +33908,6 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
                         voucher_ref,
                         created_at,
                         book_flight,
-                        voucher_type,
                         redeemed
                     FROM all_vouchers
                     ORDER BY created_at DESC
@@ -33907,10 +33921,7 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
                         ...row,
                         voucher_id: row.id,
                         _original: row,
-                        book_flight:
-                            row.book_flight ||
-                            row.voucher_type ||
-                            null
+                        book_flight: row.book_flight || null
                     }));
 
                     return callback(null, voucherMatch || null);
