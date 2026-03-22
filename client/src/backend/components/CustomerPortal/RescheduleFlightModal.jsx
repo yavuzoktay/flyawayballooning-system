@@ -73,6 +73,20 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         bookingData
     });
 
+    // Season Saver flag – matches server-side check in the reschedule endpoint
+    const isSeasonSaver = bookingData?.season_saver === 1 || bookingData?.season_saver === '1' || bookingData?.season_saver === true;
+
+    // Returns true when the given dayjs date falls in the Season Saver blocked
+    // window (May 31 – September 1, inclusive) for any year.
+    const isSeasonSaverBlocked = (d) => {
+        if (!isSeasonSaver) return false;
+        const year = d.year();
+        const seasonStart = dayjs(`${year}-05-31`);
+        const seasonEnd = dayjs(`${year}-09-01`);
+        return d.isSame(seasonStart, 'day') || d.isSame(seasonEnd, 'day') ||
+            (d.isAfter(seasonStart, 'day') && d.isBefore(seasonEnd, 'day'));
+    };
+
     // Helper function to check if a date is a weekday (Monday-Friday)
     const isWeekday = (date) => {
         const day = date.getDay();
@@ -762,14 +776,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             const isPast = d.isBefore(dayjs(), 'day');
             const isSelected = selectedDate && dayjs(selectedDate).isSame(d, 'day');
             const isAfterExpiry = expiryDate ? d.isAfter(expiryDate, 'day') : false;
-            
+            const isBlockedBySeason = isSeasonSaverBlocked(d);
+
         const { total, soldOut, slots, hasEnoughSpace } = getSpacesForDate(d.toDate());
             const hasAnySlots = slots.length > 0;
-            
+
             // Date is selectable only if there's enough space for all passengers
             // Similar to Change Flight Location modal logic
             // Additionally: do NOT allow selecting dates after the Voucher / Booking Expiry Date
-            const isSelectable = inCurrentMonth && !isPast && !isAfterExpiry && hasAnySlots && !soldOut && hasEnoughSpace;
+            // Additionally: block Season Saver bookings during summer (May 31 – Sep 1)
+            const isSelectable = inCurrentMonth && !isPast && !isAfterExpiry && !isBlockedBySeason && hasAnySlots && !soldOut && hasEnoughSpace;
             
             cells.push(
                 <div
@@ -801,6 +817,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ? '#f0f0f0'
                                 : isAfterExpiry
                                     ? '#f0f0f0'
+                                : isBlockedBySeason
+                                    ? '#f0f0f0'
                                 : soldOut
                                     ? '#888'
                                     : '#22c55e',  // Green for available dates (like Change Flight Location)
@@ -809,6 +827,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             : isPast
                                 ? '#999'
                                 : isAfterExpiry
+                                    ? '#999'
+                                : isBlockedBySeason
                                     ? '#999'
                                 : soldOut
                                     ? '#fff'
@@ -1191,6 +1211,13 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                     ))}
                                 </RadioGroup>
                             </Box>
+                        )}
+
+                        {/* Season Saver info message */}
+                        {isSeasonSaver && (
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                Season Saver bookings can only be scheduled October to May.
+                            </Alert>
                         )}
 
                         {/* Calendar */}

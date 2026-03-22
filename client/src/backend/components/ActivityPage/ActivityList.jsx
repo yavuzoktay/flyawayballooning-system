@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHighOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Checkbox, FormControlLabel, FormGroup } from '@mui/material';
+import { Checkbox, FormControlLabel, FormGroup, Switch } from '@mui/material';
 import CreateAvailabilitiesModal from './CreateAvailabilitiesModal';
 
 const parseNestedPricingMap = (value) => {
@@ -1231,19 +1231,72 @@ const ActivityList = ({ activity }) => {
                             </div>
                         )}
                     </div>
-                    
-                    <div style={{ 
-                        marginTop: 20, 
-                        marginBottom: 16, 
-                        padding: '16px', 
-                        backgroundColor: '#e8f5e8', 
-                        borderRadius: '8px', 
-                        border: '1px solid #c8e6c9' 
+
+                    {/* Season Saver Settings */}
+                    <div style={{
+                        marginTop: 24,
+                        marginBottom: 16,
+                        padding: '16px',
+                        backgroundColor: '#fce4ec',
+                        borderRadius: '8px',
+                        border: '1px solid #f8bbd0'
                     }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
+                        <div style={{
+                            marginBottom: 12,
+                            fontWeight: 600,
+                            fontSize: '16px',
+                            color: '#c62828',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '18px' }}>🏷️</span>
+                            Season Saver
+                        </div>
+                        <div style={{
+                            fontSize: '13px',
+                            color: '#c62828',
+                            marginBottom: '12px',
+                            fontStyle: 'italic'
+                        }}>
+                            Configure Season Saver pricing for this activity
+                        </div>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={editForm.season_saver_enabled === 1 || editForm.season_saver_enabled === true || editForm.season_saver_enabled === '1'}
+                                    onChange={(e) => setEditForm({ ...editForm, season_saver_enabled: e.target.checked ? 1 : 0 })}
+                                    name="season_saver_enabled"
+                                    color="primary"
+                                />
+                            }
+                            label="Enable Season Saver"
+                        />
+                        <TextField
+                            margin="dense"
+                            label="Season Saver Price"
+                            name="season_saver_price"
+                            value={editForm.season_saver_price || ''}
+                            onChange={handleEditChange}
+                            type="number"
+                            fullWidth
+                            inputProps={{ step: '0.01', min: '0' }}
+                            placeholder="e.g. 175.00"
+                        />
+                    </div>
+
+                    <div style={{
+                        marginTop: 20,
+                        marginBottom: 16,
+                        padding: '16px',
+                        backgroundColor: '#e8f5e8',
+                        borderRadius: '8px',
+                        border: '1px solid #c8e6c9'
+                    }}>
+                        <div style={{
+                            marginBottom: 12,
+                            fontWeight: 600,
+                            fontSize: '16px',
                             color: '#2e7d32',
                             display: 'flex',
                             alignItems: 'center',
@@ -1252,15 +1305,15 @@ const ActivityList = ({ activity }) => {
                             <span style={{ fontSize: '18px' }}>✅</span>
                             Status & Configuration
                         </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#2e7d32', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
+                        <div style={{
+                            fontSize: '13px',
+                            color: '#2e7d32',
+                            marginBottom: '12px',
+                            fontStyle: 'italic'
                         }}>
                             Set the activity status and upload any images
                         </div>
-                        
+
                         {/* Sync Pricing Button */}
                         {editForm.private_charter_pricing && Object.keys(editForm.private_charter_pricing).length > 0 && (
                             <div style={{ marginBottom: '16px' }}>

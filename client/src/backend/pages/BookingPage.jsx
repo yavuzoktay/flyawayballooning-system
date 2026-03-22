@@ -6118,7 +6118,7 @@ setBookingDetail(finalVoucherDetail);
                                             short_notice_opt_out: getShortNoticeAvailabilityOptOut(item),
                                             email: item.email || '',
                                             flight_type: item.flight_type || '',
-                                            voucher_type: item.voucher_type || '',
+                                            voucher_type: (item.voucher_type || '') + (item.season_saver ? ' ☘️' : ''),
                                             location: item.location || '',
                                             flight_date: (item.status === 'Cancelled') ? '-' : (item.flight_date_display || item.flight_date || ''),
                                             pax: item.pax || '',
@@ -6653,9 +6653,10 @@ setBookingDetail(finalVoucherDetail);
                                         return true;
                                     }).map(item => ({
                                         ...item,
+                                        voucher_type: (item.voucher_type || '') + (item.season_saver ? ' ☘️' : ''),
                                         short_notice_opt_out: getShortNoticeAvailabilityOptOut(item)
                                     }))}
-                                    columns={isMobile 
+                                    columns={isMobile
                                         ? ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
                                         : ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
                                     }

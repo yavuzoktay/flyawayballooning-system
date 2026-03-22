@@ -8134,6 +8134,62 @@ const buildInviteFriendsData = async ({
     };
 };
 
+const buildCustomerPortalSeasonSaverUpgradeOffer = async (booking, effectiveLocation) => {
+    const isSeasonSaver = booking.season_saver === 1 || booking.season_saver === '1' || booking.season_saver === true;
+    if (!isSeasonSaver) return null;
+
+    const bookingStatus = String(booking.status || '').toLowerCase();
+    if (bookingStatus === 'cancelled') return null;
+
+    const paidAmount = Number(booking.paid) || 0;
+    const addOnsAmount = Number(booking.add_to_booking_items_total_price) || 0;
+    const weatherRefundAmount = Number(booking.weather_refund_total_price) || 0;
+    const basePaid = Math.max(0, paidAmount - addOnsAmount - weatherRefundAmount);
+    const pax = parseInt(booking.pax) || 1;
+
+    // Get current standard Flexible Weekday price from activity table
+    let standardPrice = null;
+    try {
+        const activityRows = await new Promise((resolve, reject) => {
+            const loc = effectiveLocation || booking.location || '';
+            con.query(
+                "SELECT flexible_weekday_price FROM activity WHERE location = ? AND status = 'Live' LIMIT 1",
+                [loc],
+                (err, rows) => err ? reject(err) : resolve(rows)
+            );
+        });
+        if (activityRows && activityRows.length > 0 && activityRows[0].flexible_weekday_price) {
+            standardPrice = parseFloat(activityRows[0].flexible_weekday_price);
+        }
+    } catch (e) {
+        console.error('Error fetching standard price for season saver upgrade:', e);
+    }
+
+    if (!standardPrice || standardPrice <= 0) {
+        standardPrice = 220; // fallback
+    }
+
+    const standardTotal = roundCurrency(standardPrice * pax);
+    const upgradeCost = roundCurrency(Math.max(standardTotal - basePaid, 0));
+
+    if (upgradeCost <= 0) return null;
+
+    return {
+        eligible: true,
+        mode: 'season_saver_upgrade',
+        title: '☘️ Upgrade to Standard',
+        description: `Remove Season Saver restrictions and upgrade to a Standard Flexible Weekday voucher for £${upgradeCost.toFixed(2)}.`,
+        buttonLabel: 'Upgrade',
+        requiredPassengerCount: 0,
+        totalCharge: upgradeCost,
+        standardPrice,
+        standardTotal,
+        currentPaid: basePaid,
+        pax,
+        voucherType: 'Flexible Weekday'
+    };
+};
+
 const buildCustomerPortalUpsellOffer = async ({
     booking,
     passengers,
@@ -8142,6 +8198,10 @@ const buildCustomerPortalUpsellOffer = async ({
     flightDate,
     isFlightVoucher
 }) => {
+    // Check for Season Saver upgrade first
+    const seasonSaverOffer = await buildCustomerPortalSeasonSaverUpgradeOffer(booking, location);
+    if (seasonSaverOffer) return seasonSaverOffer;
+
     if (!booking || isFlightVoucher || !isCustomerPortalSharedBooking(booking)) {
         return null;
     }
@@ -8280,7 +8340,8 @@ const distributeAmountAcrossPassengers = (totalAmount, passengerCount) => {
 const applyCustomerPortalUpsell = async (session, storeData) => {
     const upsellData = storeData?.customerPortalUpsellData;
 
-    if (!upsellData?.bookingId || !Array.isArray(upsellData.passengers) || upsellData.passengers.length === 0) {
+    const isSeasonSaverUpgradeApply = upsellData?.offerSnapshot?.mode === 'season_saver_upgrade';
+    if (!upsellData?.bookingId || (!isSeasonSaverUpgradeApply && (!Array.isArray(upsellData.passengers) || upsellData.passengers.length === 0))) {
         throw new Error('Customer portal upsell data is incomplete');
     }
 
@@ -8319,6 +8380,27 @@ const applyCustomerPortalUpsell = async (session, storeData) => {
     }
 
     const distributedPrices = distributeAmountAcrossPassengers(paidAmount, upsellData.passengers.length);
+    // Handle Season Saver upgrade: remove restriction, update voucher type, update paid
+    const isSeasonSaverUpgrade = upsellData.offerSnapshot?.mode === 'season_saver_upgrade';
+    if (isSeasonSaverUpgrade) {
+        const nextPaid = roundCurrency((Number(booking.paid) || 0) + paidAmount);
+        await runPoolQuery(
+            `UPDATE all_booking SET season_saver = 0, voucher_type = 'Flexible Weekday', paid = ?, original_amount = ? WHERE id = ?`,
+            [nextPaid, roundCurrency(Number(booking.original_amount || 0) + paidAmount), upsellData.bookingId]
+        );
+        // Also update corresponding voucher if exists
+        if (booking.voucher_code) {
+            await runPoolQuery(
+                `UPDATE all_vouchers SET season_saver = 0 WHERE voucher_ref = ?`,
+                [booking.voucher_code]
+            ).catch(() => {});
+        }
+        await savePaymentHistory(session, upsellData.bookingId, null, booking.voucher_code || null);
+        storeData.processed = true;
+        storeData.customerPortalUpsellData = { ...upsellData, applied: true, booking_id: upsellData.bookingId };
+        return { success: true, bookingId: upsellData.bookingId, mode: 'season_saver_upgrade' };
+    }
+
     const isPrivateUpgrade = upsellData.offerSnapshot?.mode === 'private_upgrade';
     const targetBookingTotal = isPrivateUpgrade && Number.isFinite(Number(upsellData.offerSnapshot?.privateEightPrice))
         ? roundCurrency(Number(upsellData.offerSnapshot.privateEightPrice))
@@ -13095,8 +13177,9 @@ app.post('/api/createBooking', (req, res) => {
     if (isGenericExperienceValue(voucher_type)) {
         voucher_type = '';
     }
-    
+
     const experience = req.body.experience || chooseFlightType?.type || '';
+    const season_saver = req.body.season_saver === true || req.body.season_saver === 1 || req.body.season_saver === '1' ? 1 : 0;
 
     // Create bookingData object for use in expires calculation
     const bookingData = {
@@ -13258,17 +13341,18 @@ app.post('/api/createBooking', (req, res) => {
                 weather_refund_total_price = ?,
                 flight_type_source = ?,
                 resources = ?,
-                google_calendar_event_id = ?
+                google_calendar_event_id = ?,
+                season_saver = ?
             WHERE id = ?
         ` : `
             INSERT INTO all_booking (
                 name,
-                flight_type, 
-                flight_date, 
-                pax, 
-                location, 
-                status, 
-                paid, 
+                flight_type,
+                flight_date,
+                pax,
+                location,
+                status,
+                paid,
                 due,
                 voucher_code,
                 created_at,
@@ -13296,8 +13380,9 @@ app.post('/api/createBooking', (req, res) => {
                 weather_refund_total_price,
                 flight_type_source,
                 resources,
-                google_calendar_event_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                google_calendar_event_id,
+                season_saver
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         // Debug log for choose_add_on and bookingValues
@@ -13609,6 +13694,7 @@ app.post('/api/createBooking', (req, res) => {
             flight_type_source,
             getAssignedResource(chooseFlightType.type || experience, actualPaxCount),
             null, // google_calendar_event_id (will be set after event creation)
+            season_saver, // season_saver flag
             parseInt(rebook_from_booking_id) // WHERE id = ? for UPDATE
         ] : [
             passengerName,
@@ -13666,7 +13752,8 @@ app.post('/api/createBooking', (req, res) => {
             weather_refund_total_price,
             flight_type_source,
             getAssignedResource(chooseFlightType.type || experience, actualPaxCount),
-            null // google_calendar_event_id
+            null, // google_calendar_event_id
+            season_saver // season_saver flag
         ];
         console.log('bookingValues:', bookingValues);
         console.log('isRebook:', isRebook, 'rebook_from_booking_id:', rebook_from_booking_id);
@@ -15809,16 +15896,17 @@ app.post('/api/createVoucher', (req, res) => {
             console.log('Generated voucher_ref for Flight Voucher:', finalVoucherRef);
         }
 
-        const insertSql = `INSERT INTO all_vouchers 
-            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers, additional_information_json, add_to_booking_items, resources)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const insertSql = `INSERT INTO all_vouchers
+            (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers, additional_information_json, add_to_booking_items, resources, season_saver)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
+        const voucherSeasonSaver = req.body.season_saver === true || req.body.season_saver === 1 || req.body.season_saver === '1' ? 1 : 0;
         const values = [
             emptyToNull(name),
             emptyToNull(weight),
-            emptyToNull(flight_type), // This will go to experience_type column
-            emptyToNull(voucher_type), // This will go to book_flight column
-            emptyToNull(actualVoucherType), // This will go to voucher_type column (actual voucher type)
+            emptyToNull(flight_type),
+            emptyToNull(voucher_type),
+            emptyToNull(actualVoucherType),
             emptyToNull(email),
             emptyToNull(phone),
             emptyToNull(mobile),
@@ -15826,28 +15914,25 @@ app.post('/api/createVoucher', (req, res) => {
             emptyToNull(redeemed),
             paid,
             emptyToNull(offer_code),
-            emptyToNull(finalVoucherRef), // Use generated voucher_ref
+            emptyToNull(finalVoucherRef),
             now,
-            emptyToNull(finalRecipientName), // Use final recipient values
-            emptyToNull(finalRecipientEmail), // Use final recipient values
-            emptyToNull(finalRecipientPhone), // Use final recipient values
+            emptyToNull(finalRecipientName),
+            emptyToNull(finalRecipientEmail),
+            emptyToNull(finalRecipientPhone),
             emptyToNull(recipient_gift_date),
             emptyToNull(preferred_location),
             emptyToNull(preferred_time),
             emptyToNull(preferred_day),
-            0, // flight_attempts starts at 0 for each created voucher
-            // Purchaser information values
-            // For Gift Vouchers: name/email/phone/mobile are purchaser info, recipient_* are separate
-            // For Flight Vouchers: name/email/phone/mobile are the main contact info
-            emptyToNull(finalPurchaserName), // Use final purchaser values
-            emptyToNull(finalPurchaserEmail), // Use final purchaser values
-            emptyToNull(finalPurchaserPhone), // Use final purchaser values
-            emptyToNull(finalPurchaserMobile), // Use final purchaser values
-            resolvedPassengerCount, // Number of passengers
-            // Persist additional information answers regardless of which key frontend used
-            (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null, // additional_information_json
-            add_to_booking_items ? JSON.stringify(add_to_booking_items) : null, // add_to_booking_items
-            getAssignedResource(flight_type, resolvedPassengerCount) // resources (calculated based on experience_type and passenger count)
+            0,
+            emptyToNull(finalPurchaserName),
+            emptyToNull(finalPurchaserEmail),
+            emptyToNull(finalPurchaserPhone),
+            emptyToNull(finalPurchaserMobile),
+            resolvedPassengerCount,
+            (additional_information_json || additionalInfo || additional_information) ? JSON.stringify(additional_information_json || additionalInfo || additional_information) : null,
+            add_to_booking_items ? JSON.stringify(add_to_booking_items) : null,
+            getAssignedResource(flight_type, resolvedPassengerCount),
+            voucherSeasonSaver
         ];
 
         // Values being inserted for voucher creation
@@ -20941,7 +21026,10 @@ app.post('/api/customer-portal-upsell/create-session', async (req, res) => {
         return res.status(400).json({ success: false, message: 'A valid customer portal token is required.' });
     }
 
-    if (!Array.isArray(passengers) || passengers.length === 0) {
+    // Season Saver upgrade doesn't require passengers
+    const isSeasonSaverUpgrade = offerMode === 'season_saver_upgrade';
+
+    if (!isSeasonSaverUpgrade && (!Array.isArray(passengers) || passengers.length === 0)) {
         return res.status(400).json({ success: false, message: 'At least one passenger is required.' });
     }
 
@@ -20949,25 +21037,27 @@ app.post('/api/customer-portal-upsell/create-session', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Stripe configuration error: Secret key not found' });
     }
 
-    const normalizedPassengers = passengers.map((passenger) => ({
+    const normalizedPassengers = isSeasonSaverUpgrade ? [] : (passengers || []).map((passenger) => ({
         first_name: String(passenger?.first_name || '').trim(),
         last_name: String(passenger?.last_name || '').trim(),
         weight: String(passenger?.weight || '').trim()
     }));
 
-    const hasInvalidPassenger = normalizedPassengers.some((passenger) => {
-        const parsedWeight = Number(passenger.weight);
-        return (
-            !passenger.first_name ||
-            !passenger.last_name ||
-            !passenger.weight ||
-            !Number.isFinite(parsedWeight) ||
-            parsedWeight <= 0
-        );
-    });
+    if (!isSeasonSaverUpgrade) {
+        const hasInvalidPassenger = normalizedPassengers.some((passenger) => {
+            const parsedWeight = Number(passenger.weight);
+            return (
+                !passenger.first_name ||
+                !passenger.last_name ||
+                !passenger.weight ||
+                !Number.isFinite(parsedWeight) ||
+                parsedWeight <= 0
+            );
+        });
 
-    if (hasInvalidPassenger) {
-        return res.status(400).json({ success: false, message: 'Each passenger must include first name, last name and weight.' });
+        if (hasInvalidPassenger) {
+            return res.status(400).json({ success: false, message: 'Each passenger must include first name, last name and weight.' });
+        }
     }
 
     try {
@@ -21135,10 +21225,26 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             }
         }
 
+        // Season Saver date restriction: block May 31 - September 1
+        const isSeasonSaver = booking.season_saver === 1 || booking.season_saver === '1' || booking.season_saver === true;
+        if (isSeasonSaver) {
+            const requestedDate = dayjs(flight_date);
+            const year = requestedDate.year();
+            const seasonStart = dayjs(`${year}-05-31`);
+            const seasonEnd = dayjs(`${year}-09-01`);
+            if (requestedDate.isSame(seasonStart, 'day') || requestedDate.isSame(seasonEnd, 'day') ||
+                (requestedDate.isAfter(seasonStart, 'day') && requestedDate.isBefore(seasonEnd, 'day'))) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Season Saver bookings cannot be scheduled between May 31 and September 1. Please select a date outside of this period.'
+                });
+            }
+        }
+
         // Update booking
         const updateSql = `
-            UPDATE all_booking 
-            SET flight_date = ?, 
+            UPDATE all_booking
+            SET flight_date = ?,
                 location = ?,
                 activity_id = ?,
                 status = 'Scheduled',
@@ -23120,7 +23226,9 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
         shared_flight_from_price,
         shared_flight_from_sale_price,
         private_charter_from_price,
-        private_charter_from_sale_price
+        private_charter_from_sale_price,
+        season_saver_price,
+        season_saver_enabled
     } = req.body;
     let image = null;
     if (req.file) {
@@ -23152,7 +23260,7 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
         }
 
         const sql = `
-            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, private_charter_sale_pricing=?, status=?, image=?, weekday_morning_price=?, weekday_morning_sale_price=?, flexible_weekday_price=?, flexible_weekday_sale_price=?, any_day_flight_price=?, any_day_flight_sale_price=?, shared_flight_from_price=?, shared_flight_from_sale_price=?, private_charter_from_price=?, private_charter_from_sale_price=?
+            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, private_charter_sale_pricing=?, status=?, image=?, weekday_morning_price=?, weekday_morning_sale_price=?, flexible_weekday_price=?, flexible_weekday_sale_price=?, any_day_flight_price=?, any_day_flight_sale_price=?, shared_flight_from_price=?, shared_flight_from_sale_price=?, private_charter_from_price=?, private_charter_from_sale_price=?, season_saver_price=?, season_saver_enabled=?
             WHERE id=?
         `;
         const sanitizedPrivateCharterSalePricing = sanitizeSalePricingMap(private_charter_sale_pricing);
@@ -23177,6 +23285,8 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
             formatSaleNumericPrice(shared_flight_from_sale_price),
             private_charter_from_price,
             formatSaleNumericPrice(private_charter_from_sale_price),
+            season_saver_price || null,
+            season_saver_enabled === 'true' || season_saver_enabled === true || season_saver_enabled === '1' || season_saver_enabled === 1 ? 1 : 0,
             id
         ], (err, result) => {
             if (err) return res.status(500).json({ success: false, message: "Database error" });
@@ -24865,8 +24975,8 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, 
         recipient_email, recipient_phone, recipient_gift_date, preferred_location, 
         preferred_time, preferred_day, flight_attempts, status, purchaser_name, 
-        purchaser_email, purchaser_phone, purchaser_mobile, add_to_booking_items
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        purchaser_email, purchaser_phone, purchaser_mobile, add_to_booking_items, season_saver
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     const values = [
         'Gift Voucher - Book Flight',                    // name
@@ -24897,7 +25007,8 @@ app.post("/api/addTestGiftVoucher", (req, res) => {
         'gift@example.com',                            // purchaser_email
         '01234567890',                                 // purchaser_phone
         '01234567890',                                 // purchaser_mobile
-        null                                           // add_to_booking_items (test data)
+        null,                                          // add_to_booking_items (test data)
+        0                                              // season_saver
     ];
 
     con.query(insertSql, values, (err, result) => {
@@ -26579,7 +26690,9 @@ app.get('/api/activities/flight-types', (req, res) => {
             shared_flight_from_price,
             shared_flight_from_sale_price,
             private_charter_from_price,
-            private_charter_from_sale_price
+            private_charter_from_sale_price,
+            season_saver_price,
+            season_saver_enabled
         FROM activity
         WHERE status = "Live"
     `;
@@ -28072,8 +28185,8 @@ async function createVoucherFromWebhook(voucherData) {
             const resolvedOriginalAmount = original_amount != null ? Number(original_amount) : resolvedPaid;
             
             const insertSql = `INSERT INTO all_vouchers 
-                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details, season_saver)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
@@ -28109,7 +28222,8 @@ async function createVoucherFromWebhook(voucherData) {
                     phone: p.phone || null,
                     ticket_type: p.ticketType || null,
                     weather_refund: !!p.weatherRefund
-                }))) : null
+                }))) : null,
+                0 // season_saver
             ];
 
             // Always create a SINGLE voucher regardless of passenger count (reverted behavior)

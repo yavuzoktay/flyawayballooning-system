@@ -85,6 +85,10 @@ const normalizeUpsellOfferTitle = (offer) => {
         return '🎈Make it Private';
     }
 
+    if (offer.mode === 'season_saver_upgrade') {
+        return '☘️ Upgrade to Standard Flexible Weekday';
+    }
+
     return String(offer.title || '').trim();
 };
 
@@ -101,6 +105,10 @@ const normalizeUpsellOfferButtonLabel = (offer) => {
         return 'Add Passenger';
     }
 
+    if (offer.mode === 'season_saver_upgrade') {
+        return 'Upgrade';
+    }
+
     return String(offer.buttonLabel || '').trim();
 };
 
@@ -115,6 +123,10 @@ const normalizeUpsellOfferDescription = (offer) => {
 
     if (offer.mode === 'private_upgrade') {
         return String(offer.description || getPrivateUpgradeDescription(offer)).trim();
+    }
+
+    if (offer.mode === 'season_saver_upgrade') {
+        return `Upgrade your Season Saver voucher to a Standard Flexible Weekday for ${formatPounds(offer.totalCharge || 0)}.`;
     }
 
     return String(offer.description || '').trim();
@@ -998,6 +1010,7 @@ const CustomerPortal = () => {
     );
     const upsellOffer = bookingData?.upsell_offer || null;
     const isPrivateUpgradeOffer = upsellOffer?.mode === 'private_upgrade';
+    const isSeasonSaverUpgradeOffer = upsellOffer?.mode === 'season_saver_upgrade';
     const upsellOfferTitle = normalizeUpsellOfferTitle(upsellOffer);
     const upsellOfferButtonLabel = normalizeUpsellOfferButtonLabel(upsellOffer);
     const upsellOfferDescription = normalizeUpsellOfferDescription(upsellOffer);
@@ -1024,7 +1037,7 @@ const CustomerPortal = () => {
         !isFlightVoucherSection &&
         !isFullyRefunded
     );
-    const shouldHideInviteFriends = ['single_discount', 'private_upgrade'].includes(upsellOffer?.mode);
+    const shouldHideInviteFriends = ['single_discount', 'private_upgrade', 'season_saver_upgrade'].includes(upsellOffer?.mode);
     const shouldShowInviteFriends = Boolean(
         bookingData?.invite_friends?.visible &&
         bookingData?.invite_friends?.availableSpaces !== 0 &&
@@ -1340,6 +1353,7 @@ const CustomerPortal = () => {
                                         return 'Standard';
                                     }
                                 })()}
+                                {(bookingData.season_saver === 1 || bookingData.season_saver === '1' || bookingData.season_saver === true) && ' ☘️'}
                             </Typography>
                         </Box>
                         <Box sx={mobileBookingDetailSx(5)}>
@@ -1632,10 +1646,14 @@ const CustomerPortal = () => {
                             mb: 3,
                             borderRadius: 4,
                             border: '1px solid',
-                            borderColor: isPrivateUpgradeOffer ? '#243244' : inviteSectionPalette.border,
-                            background: isPrivateUpgradeOffer
-                                ? 'linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 100%)'
-                                : inviteSectionPalette.background
+                            borderColor: isSeasonSaverUpgradeOffer
+                                ? '#2e7d32'
+                                : isPrivateUpgradeOffer ? '#243244' : inviteSectionPalette.border,
+                            background: isSeasonSaverUpgradeOffer
+                                ? 'linear-gradient(135deg, rgba(232,245,233,0.97) 0%, rgba(200,230,201,0.97) 100%)'
+                                : isPrivateUpgradeOffer
+                                    ? 'linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 100%)'
+                                    : inviteSectionPalette.background
                         }}
                     >
                         <Box
@@ -1653,7 +1671,9 @@ const CustomerPortal = () => {
                                     sx={{
                                         fontWeight: 700,
                                         mb: 1,
-                                        color: isPrivateUpgradeOffer ? '#f8fafc' : inviteSectionPalette.heading
+                                        color: isSeasonSaverUpgradeOffer
+                                            ? '#1b5e20'
+                                            : isPrivateUpgradeOffer ? '#f8fafc' : inviteSectionPalette.heading
                                     }}
                                 >
                                     {upsellOfferTitle}
@@ -1663,9 +1683,11 @@ const CustomerPortal = () => {
                                         variant="body1"
                                         sx={{
                                             mb: 1.5,
-                                            color: isPrivateUpgradeOffer
-                                                ? 'rgba(248,250,252,0.88)'
-                                                : inviteSectionPalette.body
+                                            color: isSeasonSaverUpgradeOffer
+                                                ? '#33691e'
+                                                : isPrivateUpgradeOffer
+                                                    ? 'rgba(248,250,252,0.88)'
+                                                    : inviteSectionPalette.body
                                         }}
                                     >
                                         {upsellOfferDescription}

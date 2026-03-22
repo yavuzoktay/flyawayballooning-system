@@ -26,6 +26,10 @@ const getUpsellModalTitle = (offer) => {
         return '🎈Make it Private';
     }
 
+    if (offer?.mode === 'season_saver_upgrade') {
+        return '☘️ Upgrade to Standard Flexible Weekday';
+    }
+
     return 'Add Passenger';
 };
 
@@ -42,6 +46,10 @@ const getUpsellDescription = (offer) => {
         return `Add another passenger to your flight for ${formatCurrency(offer.discountedSeatPrice || offer.totalCharge)} and save ${formatCurrency(offer.discountAmount)}.`;
     }
 
+    if (offer.mode === 'season_saver_upgrade') {
+        return `Upgrade your Season Saver voucher to a Standard Flexible Weekday for ${formatCurrency(offer.totalCharge || 0)}. This removes Season Saver restrictions and gives you full flexibility.`;
+    }
+
     return String(offer.description || '').trim();
 };
 
@@ -52,7 +60,8 @@ const CustomerPortalUpsellModal = ({
     onClose,
     onSubmit
 }) => {
-    const requiredPassengerCount = Math.max(1, offer?.requiredPassengerCount || 1);
+    const isSeasonSaverUpgrade = offer?.mode === 'season_saver_upgrade';
+    const requiredPassengerCount = isSeasonSaverUpgrade ? 0 : Math.max(1, offer?.requiredPassengerCount || 1);
     const [passengers, setPassengers] = useState(() => createEmptyPassengers(requiredPassengerCount));
     const [formError, setFormError] = useState('');
 
@@ -77,6 +86,15 @@ const CustomerPortalUpsellModal = ({
             ];
         }
 
+        if (offer.mode === 'season_saver_upgrade') {
+            return [
+                { label: 'Passengers', value: String(offer.pax || 1) },
+                { label: 'Standard Price (total)', value: formatCurrency(offer.standardTotal || 0) },
+                { label: 'Already Paid', value: formatCurrency(offer.currentPaid || 0) },
+                { label: 'Upgrade Amount', value: formatCurrency(offer.totalCharge || 0) }
+            ];
+        }
+
         return [
             { label: 'Standard Price', value: formatCurrency(offer.regularSeatPrice || 0) },
             { label: 'Saving', value: `-${formatCurrency(offer.discountAmount || 0)}` },
@@ -98,6 +116,13 @@ const CustomerPortalUpsellModal = ({
     };
 
     const handleSubmit = async () => {
+        // Season Saver upgrade doesn't require passenger details
+        if (isSeasonSaverUpgrade) {
+            setFormError('');
+            await onSubmit?.([]);
+            return;
+        }
+
         const normalizedPassengers = passengers.map((passenger) => ({
             first_name: String(passenger.first_name || '').trim(),
             last_name: String(passenger.last_name || '').trim(),
@@ -179,54 +204,56 @@ const CustomerPortalUpsellModal = ({
                     </Alert>
                 )}
 
-                <Box sx={{ display: 'grid', gap: 2 }}>
-                    {passengers.map((passenger, index) => (
-                        <Paper
-                            key={`upsell-passenger-${index}`}
-                            elevation={0}
-                            sx={{
-                                p: 2,
-                                borderRadius: 2,
-                                border: '1px solid #e5e7eb',
-                                backgroundColor: '#fff'
-                            }}
-                        >
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
-                                Passenger {index + 1}
-                            </Typography>
-                            <Box
+                {!isSeasonSaverUpgrade && (
+                    <Box sx={{ display: 'grid', gap: 2 }}>
+                        {passengers.map((passenger, index) => (
+                            <Paper
+                                key={`upsell-passenger-${index}`}
+                                elevation={0}
                                 sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
-                                    gap: 1.5
+                                    p: 2,
+                                    borderRadius: 2,
+                                    border: '1px solid #e5e7eb',
+                                    backgroundColor: '#fff'
                                 }}
                             >
-                                <TextField
-                                    label="First Name"
-                                    value={passenger.first_name}
-                                    onChange={(event) => updatePassenger(index, 'first_name', event.target.value)}
-                                    fullWidth
-                                    size="small"
-                                />
-                                <TextField
-                                    label="Last Name"
-                                    value={passenger.last_name}
-                                    onChange={(event) => updatePassenger(index, 'last_name', event.target.value)}
-                                    fullWidth
-                                    size="small"
-                                />
-                                <TextField
-                                    label="Weight (kg)"
-                                    value={passenger.weight}
-                                    onChange={(event) => updatePassenger(index, 'weight', event.target.value.replace(/[^0-9.]/g, ''))}
-                                    fullWidth
-                                    size="small"
-                                    inputProps={{ inputMode: 'decimal', pattern: '[0-9.]*' }}
-                                />
-                            </Box>
-                        </Paper>
-                    ))}
-                </Box>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5 }}>
+                                    Passenger {index + 1}
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+                                        gap: 1.5
+                                    }}
+                                >
+                                    <TextField
+                                        label="First Name"
+                                        value={passenger.first_name}
+                                        onChange={(event) => updatePassenger(index, 'first_name', event.target.value)}
+                                        fullWidth
+                                        size="small"
+                                    />
+                                    <TextField
+                                        label="Last Name"
+                                        value={passenger.last_name}
+                                        onChange={(event) => updatePassenger(index, 'last_name', event.target.value)}
+                                        fullWidth
+                                        size="small"
+                                    />
+                                    <TextField
+                                        label="Weight (kg)"
+                                        value={passenger.weight}
+                                        onChange={(event) => updatePassenger(index, 'weight', event.target.value.replace(/[^0-9.]/g, ''))}
+                                        fullWidth
+                                        size="small"
+                                        inputProps={{ inputMode: 'decimal', pattern: '[0-9.]*' }}
+                                    />
+                                </Box>
+                            </Paper>
+                        ))}
+                    </Box>
+                )}
             </DialogContent>
             <DialogActions sx={{ px: 3, py: 2 }}>
                 <Button onClick={onClose} disabled={submitting} color="inherit">
@@ -238,7 +265,7 @@ const CustomerPortalUpsellModal = ({
                     disabled={submitting}
                     sx={{ textTransform: 'none', fontWeight: 700 }}
                 >
-                    {submitting ? 'Redirecting...' : (offer?.mode === 'private_upgrade' ? 'Upgrade' : 'Add')}
+                    {submitting ? 'Redirecting...' : (offer?.mode === 'private_upgrade' || isSeasonSaverUpgrade ? 'Upgrade' : 'Add')}
                 </Button>
             </DialogActions>
         </Dialog>
