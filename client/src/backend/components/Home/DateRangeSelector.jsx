@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import config from "../../../config";
 import { ADMIN_MANUAL_BOOKING_AUTH } from "../../auth/adminCredentials";
+import { formatGbp } from "../../utils/formatGbp";
 
 const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [startDate, setStartDate] = useState("");
@@ -477,10 +478,10 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                                         <tbody>
                                             <tr>
                                                 <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>{summary.totalPax}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.completedFlights}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.totalSales.toFixed(2)}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.totalLiability.toFixed(2)}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{summary.totalVAT.toFixed(2)}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.completedFlights)}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.totalSales)}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.totalLiability)}</td>
+                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.totalVAT)}</td>
                                             </tr>
                                         </tbody>
                                     </table>

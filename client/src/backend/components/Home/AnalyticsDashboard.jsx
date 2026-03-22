@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Grid, Card, CardContent, Typography } from '@mui/material';
 import axios from 'axios';
 import config from '../../../config';
+import { formatGbp } from '../../utils/formatGbp';
 
 
 const AnalyticsDashboard = ({ dateRange }) => {
@@ -60,10 +61,10 @@ const AnalyticsDashboard = ({ dateRange }) => {
                             {analytics?.addOns?.length > 0 ? (
                                 <>
                                     {analytics.addOns.map((a, i) => (
-                                        <Typography key={i}>{a.name}: <span style={{color:'#16a085'}}>£{a.value}</span></Typography>
+                                        <Typography key={i}>{a.name}: <span style={{color:'#16a085'}}>£{formatGbp(a.value)}</span></Typography>
                                     ))}
                                     <Typography sx={{ mt: 1, fontWeight: 'bold' }}>
-                                        Total: <span style={{color:'#16a085'}}>£{analytics?.addOnsTotal || 0}</span>
+                                        Total: <span style={{color:'#16a085'}}>£{formatGbp(analytics?.addOnsTotal)}</span>
                                     </Typography>
                                 </>
                             ) : (
@@ -93,18 +94,18 @@ const AnalyticsDashboard = ({ dateRange }) => {
                         <CardContent>
                             <Typography variant="h6">Liability by Location</Typography>
                             {analytics?.liabilityByLocation?.map((l, i) => (
-                                <Typography key={i}>{l.location}: <span style={{color:'#e67e22'}}>£{l.value}</span></Typography>
+                                <Typography key={i}>{l.location}: <span style={{color:'#e67e22'}}>£{formatGbp(l.value)}</span></Typography>
                             )) || <Typography>No data available</Typography>}
                             <Typography variant="h6" sx={{ mt: 2 }}>Liability by Flight Type</Typography>
                             {analytics?.liabilityByFlightType?.map((l, i) => (
-                                <Typography key={i}>{l.type}: <span style={{color:'#e67e22'}}>£{l.value}</span></Typography>
+                                <Typography key={i}>{l.type}: <span style={{color:'#e67e22'}}>£{formatGbp(l.value)}</span></Typography>
                             )) || <Typography>No data available</Typography>}
                             <Typography variant="h6" sx={{ mt: 2 }}>Refundable Liability</Typography>
-                            <Typography><span style={{color:'#16a085'}}>£{analytics?.refundableLiability || 0}</span></Typography>
+                            <Typography><span style={{color:'#16a085'}}>£{formatGbp(analytics?.refundableLiability)}</span></Typography>
                             <Typography variant="h6" sx={{ mt: 2 }}>Voucher Liability</Typography>
                             <Typography>
                                 <span style={{color:'#2980b9'}}>
-                                    £{Number(analytics?.voucherLiability || 0).toFixed(2)}
+                                    £{formatGbp(analytics?.voucherLiability)}
                                 </span>
                             </Typography>
                         </CardContent>
