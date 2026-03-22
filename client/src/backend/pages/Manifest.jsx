@@ -4043,7 +4043,20 @@ const Manifest = () => {
     const lastPilotFetchRef = React.useRef({ date: null, inFlight: false });
     const [pilotNotification, setPilotNotification] = useState({ show: false, message: '', type: 'success' });
 
-    const slotKey = React.useCallback((activityId, date, time) => `${activityId}_${date}_${time}`, []);
+    const slotKey = React.useCallback((activityId, date, time, segment = '') => {
+        const seg = segment === null || segment === undefined ? '' : String(segment);
+        return `${activityId}_${date}_${time}_${seg}`;
+    }, []);
+
+    // Private vs Shared at same activity/date/time need distinct crew/pilot keys (matches server slot_segment)
+    const getManifestSlotSegment = React.useCallback((flight) => {
+        if (!flight) return '';
+        const ft = String(flight.flight_type || flight.experience || '').trim();
+        const lower = ft.toLowerCase();
+        if (lower.includes('private')) return 'private';
+        if (lower.includes('shared')) return 'shared';
+        return '';
+    }, []);
 
     // Normalize flight_date to (YYYY-MM-DD, HH:mm) for slot key consistency with crew-assignments API
     const getSlotPartsFromFlightDate = React.useCallback((flightDate) => {
@@ -4093,7 +4106,10 @@ const Manifest = () => {
                             normalizedTime = normalizedTime.substring(0, 5); // Extract HH:mm
                         }
                         
-                        const slotKeyValue = slotKey(assignment.activity_id, normalizedDate, normalizedTime);
+                        const segment = assignment.slot_segment != null && assignment.slot_segment !== undefined
+                            ? String(assignment.slot_segment)
+                            : '';
+                        const slotKeyValue = slotKey(assignment.activity_id, normalizedDate, normalizedTime, segment);
                         assignments[slotKeyValue] = assignment.crew_id;
                     }
                 });
@@ -4139,7 +4155,10 @@ const Manifest = () => {
                             normalizedTime = normalizedTime.substring(0, 5); // Extract HH:mm
                         }
                         
-                        const slotKeyValue = slotKey(assignment.activity_id, normalizedDate, normalizedTime);
+                        const segment = assignment.slot_segment != null && assignment.slot_segment !== undefined
+                            ? String(assignment.slot_segment)
+                            : '';
+                        const slotKeyValue = slotKey(assignment.activity_id, normalizedDate, normalizedTime, segment);
                         assignments[slotKeyValue] = assignment.pilot_id;
                     }
                 });
@@ -4169,7 +4188,7 @@ const Manifest = () => {
     };
 
     // Function to clear crew assignment
-    const clearCrewAssignment = async (activityId, flightDateStr) => {
+    const clearCrewAssignment = async (activityId, flightDateStr, slotSegment = '') => {
         let date = null; let time = null;
         if (typeof flightDateStr === 'string') {
             const parts = flightDateStr.split(' ');
@@ -4184,10 +4203,11 @@ const Manifest = () => {
                 activity_id: activityId, 
                 date, 
                 time, 
-                crew_id: null 
+                crew_id: null,
+                slot_segment: slotSegment
             });
             
-            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
+            const slotKeyValue = slotKey(activityId, date, time.substring(0,5), slotSegment);
             setCrewAssignmentsBySlot(prev => {
                 const updated = { ...prev };
                 delete updated[slotKeyValue];
@@ -4213,7 +4233,7 @@ const Manifest = () => {
     };
 
     // Function to clear pilot assignment
-    const clearPilotAssignment = async (activityId, flightDateStr) => {
+    const clearPilotAssignment = async (activityId, flightDateStr, slotSegment = '') => {
         let date = null; let time = null;
         if (typeof flightDateStr === 'string') {
             const parts = flightDateStr.split(' ');
@@ -4228,10 +4248,11 @@ const Manifest = () => {
                 activity_id: activityId, 
                 date, 
                 time, 
-                pilot_id: null 
+                pilot_id: null,
+                slot_segment: slotSegment
             });
             
-            const slotKeyValue = slotKey(activityId, date, time.substring(0,5));
+            const slotKeyValue = slotKey(activityId, date, time.substring(0,5), slotSegment);
             setPilotAssignmentsBySlot(prev => {
                 const updated = { ...prev };
                 delete updated[slotKeyValue];
@@ -4296,7 +4317,7 @@ const Manifest = () => {
         }
     }, [selectedDate, refreshPilotAssignments]); // Only when selectedDate changes
 
-    const handleCrewChange = async (activityId, flightDateStr, crewId) => {
+    const handleCrewChange = async (activityId, flightDateStr, crewId, slotSegment = '') => {
         // flightDateStr like 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD 17:00:00'
         let date = null; let time = null;
         if (typeof flightDateStr === 'string') {
@@ -4353,11 +4374,12 @@ const Manifest = () => {
                 activity_id: normalizedActivityId, 
                 date, 
                 time, 
-                crew_id: normalizedCrewId 
+                crew_id: normalizedCrewId,
+                slot_segment: slotSegment
             });
             console.log('Crew assignment saved:', response.data);
             
-            const slotKeyValue = slotKey(normalizedActivityId, date, time.substring(0,5));
+            const slotKeyValue = slotKey(normalizedActivityId, date, time.substring(0,5), slotSegment);
             console.log('Updating local state with key:', slotKeyValue, 'value:', normalizedCrewId);
             
             // Update local state immediately for instant feedback
@@ -4485,7 +4507,7 @@ const Manifest = () => {
         }
     };
 
-    const handlePilotChange = async (activityId, flightDateStr, pilotId) => {
+    const handlePilotChange = async (activityId, flightDateStr, pilotId, slotSegment = '') => {
         // flightDateStr like 'YYYY-MM-DD HH:mm:ss' or 'YYYY-MM-DD 17:00:00'
         let date = null; let time = null;
         if (typeof flightDateStr === 'string') {
@@ -4542,11 +4564,12 @@ const Manifest = () => {
                 activity_id: normalizedActivityId, 
                 date, 
                 time, 
-                pilot_id: normalizedPilotId 
+                pilot_id: normalizedPilotId,
+                slot_segment: slotSegment
             });
             console.log('Pilot assignment saved:', response.data);
             
-            const slotKeyValue = slotKey(normalizedActivityId, date, time.substring(0,5));
+            const slotKeyValue = slotKey(normalizedActivityId, date, time.substring(0,5), slotSegment);
             console.log('Updating local state with key:', slotKeyValue, 'value:', normalizedPilotId);
             
             // Update local state immediately for instant feedback
@@ -5184,7 +5207,8 @@ const Manifest = () => {
                                                     {(() => {
                                                         const activityIdForSlot = getFlightActivityId(first);
                                                         const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
-                                                        const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
+                                                        const manifestSeg = getManifestSlotSegment(first);
+                                                        const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart, manifestSeg);
                                                         const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
                                                         const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
                                                         const selectedCrew = crewList.find(c => c.id == currentCrewId);
@@ -5194,7 +5218,7 @@ const Manifest = () => {
                                                             <Select
                                                                 native
                                                                 value={currentCrewId || ''}
-                                                                onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                                                onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value, manifestSeg)}
                                                                 disabled={!isActivityIdValid}
                                                                 sx={{ 
                                                                     flex: '1 1 auto',
@@ -5228,7 +5252,8 @@ const Manifest = () => {
                                                     {(() => {
                                                         const activityIdForSlot = getFlightActivityId(first);
                                                         const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
-                                                        const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
+                                                        const manifestSeg = getManifestSlotSegment(first);
+                                                        const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart, manifestSeg);
                                                         const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
                                                         const isActivityIdValid = activityIdForSlot !== null && activityIdForSlot !== undefined && !isNaN(activityIdForSlot);
                                                         const selectedPilot = pilotList.find(p => p.id == currentPilotId);
@@ -5238,7 +5263,7 @@ const Manifest = () => {
                                                             <Select
                                                                 native
                                                                 value={currentPilotId || ''}
-                                                                onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                                                onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value, manifestSeg)}
                                                                 disabled={!isActivityIdValid}
                                                                 sx={{ 
                                                                     flex: '1 1 auto',
@@ -5299,7 +5324,8 @@ const Manifest = () => {
                                                 {!isMobile && (() => {
                             const activityIdForSlot = getFlightActivityId(first);
                             const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
-                            const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
+                            const manifestSeg = getManifestSlotSegment(first);
+                            const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart, manifestSeg);
                             const currentCrewId = crewAssignmentsBySlot[slotKeyValue];
                             
                             // Check if activityId is valid
@@ -5318,7 +5344,7 @@ const Manifest = () => {
                                     <Select
                                         native
                                         value={currentCrewId || ''}
-                                        onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                        onChange={(e) => handleCrewChange(activityIdForSlot, first.flight_date, e.target.value, manifestSeg)}
                                         disabled={!isActivityIdValid}
                                         sx={{ 
                                             minWidth: 140, 
@@ -5367,7 +5393,8 @@ const Manifest = () => {
                                                 {!isMobile && (() => {
                             const activityIdForSlot = getFlightActivityId(first);
                             const { datePart, timePart } = getSlotPartsFromFlightDate(first.flight_date);
-                            const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart);
+                            const manifestSeg = getManifestSlotSegment(first);
+                            const slotKeyValue = slotKey(activityIdForSlot, datePart, timePart, manifestSeg);
                             const currentPilotId = pilotAssignmentsBySlot[slotKeyValue];
                             
                             // Check if activityId is valid
@@ -5386,7 +5413,7 @@ const Manifest = () => {
                                     <Select
                                         native
                                         value={currentPilotId || ''}
-                                        onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value)}
+                                        onChange={(e) => handlePilotChange(activityIdForSlot, first.flight_date, e.target.value, manifestSeg)}
                                         disabled={!isActivityIdValid}
                                         sx={{ 
                                             minWidth: 140, 
@@ -9152,7 +9179,7 @@ const Manifest = () => {
                             const date = typeof first.flight_date === 'string' ? first.flight_date.split(' ')[0] : dayjs(first.flight_date).format('YYYY-MM-DD');
                             const time = first.time_slot ? first.time_slot.substring(0, 5) : (first.flight_date && typeof first.flight_date === 'string' && first.flight_date.length >= 16 ? first.flight_date.substring(11, 16) : null);
                             if (date && time) {
-                                const pilotKey = slotKey(activityId, date, time);
+                                const pilotKey = slotKey(activityId, date, time, getManifestSlotSegment(first));
                                 const pilotId = pilotAssignmentsBySlot[pilotKey];
                                 if (pilotId) {
                                     pilotName = getPilotName(pilotId);
@@ -9166,7 +9193,7 @@ const Manifest = () => {
                             const date = typeof first.flight_date === 'string' ? first.flight_date.split(' ')[0] : dayjs(first.flight_date).format('YYYY-MM-DD');
                             const time = first.time_slot ? first.time_slot.substring(0, 5) : (first.flight_date && typeof first.flight_date === 'string' && first.flight_date.length >= 16 ? first.flight_date.substring(11, 16) : null);
                             if (date && time) {
-                                const crewKey = slotKey(activityId, date, time);
+                                const crewKey = slotKey(activityId, date, time, getManifestSlotSegment(first));
                                 const crewId = crewAssignmentsBySlot[crewKey];
                                 if (crewId) {
                                     crewName = getCrewMemberName(crewId);

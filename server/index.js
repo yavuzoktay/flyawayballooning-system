@@ -14057,15 +14057,16 @@ app.post('/api/createBooking', (req, res) => {
                                     let clearTime = oldTimeSlot || (oldFlightDate && typeof oldFlightDate === 'string' && oldFlightDate.includes(' ') ? oldFlightDate.split(' ')[1] : null);
                                     if (clearTime && clearTime.length === 5 && /^\d{2}:\d{2}$/.test(clearTime)) clearTime = clearTime + ':00';
                                     if (clearTime) {
-                                        const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-                                        const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                                        const clearSeg = normalizeAssignmentSlotSegment(oldFlightType);
+                                        const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
+                                        const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
                                         await new Promise((resolve, reject) => {
-                                            con.query(delCrew, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                            con.query(delCrew, [clearActivityId, clearDate, clearTime, clearSeg], (e) => e ? reject(e) : resolve());
                                         });
                                         await new Promise((resolve, reject) => {
-                                            con.query(delPilot, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                            con.query(delPilot, [clearActivityId, clearDate, clearTime, clearSeg], (e) => e ? reject(e) : resolve());
                                         });
-                                        console.log('✅ [Rebook Cleanup] Cleared crew and pilot assignments for old slot:', { activity_id: clearActivityId, date: clearDate, time: clearTime });
+                                        console.log('✅ [Rebook Cleanup] Cleared crew and pilot assignments for old slot:', { activity_id: clearActivityId, date: clearDate, time: clearTime, slot_segment: clearSeg });
                                     }
                                 }
                             } catch (clearErr) {
@@ -19185,15 +19186,16 @@ app.patch('/api/updateBookingField', (req, res) => {
                                         let clearTime = timeSlot || (flightDate && typeof flightDate === 'string' && flightDate.includes(' ') ? flightDate.split(' ')[1] : null);
                                         if (clearTime && clearTime.length === 5 && /^\d{2}:\d{2}$/.test(clearTime)) clearTime = clearTime + ':00';
                                         if (clearTime) {
-                                            const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-                                            const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+                                            const clearSeg = normalizeAssignmentSlotSegment(flightType);
+                                            const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
+                                            const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
                                             await new Promise((resolve, reject) => {
-                                                con.query(delCrew, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                                con.query(delCrew, [clearActivityId, clearDate, clearTime, clearSeg], (e) => e ? reject(e) : resolve());
                                             });
                                             await new Promise((resolve, reject) => {
-                                                con.query(delPilot, [clearActivityId, clearDate, clearTime], (e) => e ? reject(e) : resolve());
+                                                con.query(delPilot, [clearActivityId, clearDate, clearTime, clearSeg], (e) => e ? reject(e) : resolve());
                                             });
-                                            console.log('✅ [updateBookingField] Cleared crew and pilot assignments for cancelled slot:', { activity_id: clearActivityId, date: clearDate, time: clearTime });
+                                            console.log('✅ [updateBookingField] Cleared crew and pilot assignments for cancelled slot:', { activity_id: clearActivityId, date: clearDate, time: clearTime, slot_segment: clearSeg });
                                         }
                                     }
                                 } catch (clearErr) {
@@ -25443,15 +25445,24 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
             try {
                 let clearTime = formattedTime;
                 if (clearTime && clearTime.length === 5 && /^\d{2}:\d{2}$/.test(clearTime)) clearTime = clearTime + ':00';
-                const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-                const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
+
+                const [ftRows] = await new Promise((resolve, reject) => {
+                    con.query('SELECT flight_type FROM all_booking WHERE id = ?', [booking_id], (err, rows) => {
+                        if (err) reject(err);
+                        else resolve([rows]);
+                    });
+                });
+                const cancelSeg = normalizeAssignmentSlotSegment(ftRows && ftRows[0] ? ftRows[0].flight_type : '');
+
+                const delCrew = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
+                const delPilot = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
                 await new Promise((resolve, reject) => {
-                    con.query(delCrew, [activity_id, formattedDate, clearTime], (e) => e ? reject(e) : resolve());
+                    con.query(delCrew, [activity_id, formattedDate, clearTime, cancelSeg], (e) => e ? reject(e) : resolve());
                 });
                 await new Promise((resolve, reject) => {
-                    con.query(delPilot, [activity_id, formattedDate, clearTime], (e) => e ? reject(e) : resolve());
+                    con.query(delPilot, [activity_id, formattedDate, clearTime, cancelSeg], (e) => e ? reject(e) : resolve());
                 });
-                console.log('✅ [Cancel] Cleared crew and pilot assignments for cancelled slot:', { activity_id, date: formattedDate, time: clearTime });
+                console.log('✅ [Cancel] Cleared crew and pilot assignments for cancelled slot:', { activity_id, date: formattedDate, time: clearTime, slot_segment: cancelSeg });
             } catch (clearErr) {
                 console.error('❌ [Cancel] Error clearing crew/pilot for cancelled slot:', clearErr);
             }
@@ -32041,6 +32052,23 @@ app.get('/api/session-status', (req, res) => {
     return res.json(result);
 });
 
+// Private vs Shared can share same activity/date/time — segment disambiguates manifest slots
+function normalizeAssignmentSlotSegment(raw) {
+    if (raw === null || raw === undefined) return '';
+    const s = String(raw).trim().toLowerCase();
+    if (!s) return '';
+    if (s.includes('private')) return 'private';
+    if (s.includes('shared')) return 'shared';
+    return String(raw).trim().slice(0, 32);
+}
+
+function sqlBookingsFlightTypeMatchesSegment(segment) {
+    if (!segment) return '';
+    if (segment === 'private') return " AND LOWER(COALESCE(flight_type, '')) LIKE '%private%' ";
+    if (segment === 'shared') return " AND LOWER(COALESCE(flight_type, '')) LIKE '%shared%' ";
+    return '';
+}
+
 // Crew Assignment Migrations
 function runCrewAssignmentMigrations() {
     const createAssignments = `
@@ -32049,11 +32077,12 @@ function runCrewAssignmentMigrations() {
             activity_id INT NOT NULL,
             date DATE NOT NULL,
             time TIME NOT NULL,
+            slot_segment VARCHAR(32) NOT NULL DEFAULT '',
             crew_id INT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uniq_slot (activity_id, date, time)
-        ) COMMENT 'Assigned crew per activity/date/time slot';
+            UNIQUE KEY uniq_slot (activity_id, date, time, slot_segment)
+        ) COMMENT 'Assigned crew per activity/date/time slot (segment = private|shared)';
     `;
     con.query(createAssignments, (err) => {
         if (err) {
@@ -32073,11 +32102,12 @@ function runPilotAssignmentMigrations() {
             activity_id INT NOT NULL,
             date DATE NOT NULL,
             time TIME NOT NULL,
+            slot_segment VARCHAR(32) NOT NULL DEFAULT '',
             pilot_id INT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uniq_slot (activity_id, date, time)
-        ) COMMENT 'Assigned pilots per activity/date/time slot';
+            UNIQUE KEY uniq_slot (activity_id, date, time, slot_segment)
+        ) COMMENT 'Assigned pilots per activity/date/time slot (segment = private|shared)';
     `;
     con.query(createPilotAssignments, (err) => {
         if (err) {
@@ -32088,6 +32118,48 @@ function runPilotAssignmentMigrations() {
     });
 }
 runPilotAssignmentMigrations();
+
+// Existing DBs: add slot_segment and widen unique key (CREATE IF NOT EXISTS skips new columns)
+function runFlightAssignmentSlotSegmentMigration() {
+    const migrateTable = (tableName) => {
+        con.query(`SHOW COLUMNS FROM ${tableName} LIKE 'slot_segment'`, (err, rows) => {
+            if (err) {
+                console.error(`slot_segment migration: cannot inspect ${tableName}:`, err.message);
+                return;
+            }
+            if (rows && rows.length > 0) {
+                return;
+            }
+            con.query(
+                `ALTER TABLE ${tableName} ADD COLUMN slot_segment VARCHAR(32) NOT NULL DEFAULT '' AFTER time`,
+                (e2) => {
+                    if (e2) {
+                        console.error(`slot_segment migration: add column ${tableName}:`, e2.message);
+                        return;
+                    }
+                    con.query(`ALTER TABLE ${tableName} DROP INDEX uniq_slot`, (e3) => {
+                        if (e3 && !String(e3.message || '').includes("check that it exists") && !String(e3.message || '').includes("Can't DROP")) {
+                            console.error(`slot_segment migration: drop uniq_slot ${tableName}:`, e3.message);
+                        }
+                        con.query(
+                            `ALTER TABLE ${tableName} ADD UNIQUE KEY uniq_slot (activity_id, date, time, slot_segment)`,
+                            (e4) => {
+                                if (e4) {
+                                    console.error(`slot_segment migration: add uniq_slot ${tableName}:`, e4.message);
+                                } else {
+                                    console.log(`✅ ${tableName}: slot_segment + uniq_slot(activity_id, date, time, slot_segment)`);
+                                }
+                            }
+                        );
+                    });
+                }
+            );
+        });
+    };
+    migrateTable('flight_crew_assignments');
+    migrateTable('flight_pilot_assignments');
+}
+runFlightAssignmentSlotSegmentMigration();
 
 // Update existing date_request table with missing columns
 const updateDateRequestTable = () => {
@@ -32262,7 +32334,8 @@ app.get('/api/crew-assignments', (req, res) => {
 
 // Upsert crew assignment for a slot
 app.post('/api/crew-assignment', (req, res) => {
-    const { activity_id, date, time, crew_id } = req.body;
+    const { activity_id, date, time, crew_id, slot_segment } = req.body;
+    const normalizedSegment = normalizeAssignmentSlotSegment(slot_segment);
     
     // Validate required fields
     if (activity_id === null || activity_id === undefined || activity_id === '') {
@@ -32300,12 +32373,12 @@ app.post('/api/crew-assignment', (req, res) => {
         });
     }
 
-    console.log('Saving crew assignment:', { activity_id: normalizedActivityId, date, time, crew_id: normalizedCrewId });
+    console.log('Saving crew assignment:', { activity_id: normalizedActivityId, date, time, crew_id: normalizedCrewId, slot_segment: normalizedSegment });
 
     // If crew_id is null, delete the assignment
     if (normalizedCrewId === null || normalizedCrewId === undefined) {
-        const deleteSql = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-        con.query(deleteSql, [normalizedActivityId, date, time], async (err, result) => {
+        const deleteSql = 'DELETE FROM flight_crew_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
+        con.query(deleteSql, [normalizedActivityId, date, time, normalizedSegment], async (err, result) => {
             if (err) {
                 console.error('Error deleting crew assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -32315,6 +32388,7 @@ app.post('/api/crew-assignment', (req, res) => {
             // Update Google Calendar events - remove crew but keep pilot
             try {
                 const flightDateTime = `${date} ${time}`;
+                const segClause = sqlBookingsFlightTypeMatchesSegment(normalizedSegment);
                 const getBookingsSql = `
                     SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
                     FROM all_booking 
@@ -32323,6 +32397,7 @@ app.post('/api/crew-assignment', (req, res) => {
                     AND (time_slot = ? OR TIME(flight_date) = ?)
                     AND status != 'Cancelled'
                     AND google_calendar_event_id IS NOT NULL
+                    ${segClause}
                 `;
                 
                 con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
@@ -32335,6 +32410,7 @@ app.post('/api/crew-assignment', (req, res) => {
                             AND DATE(flight_date) = ? 
                             AND (time_slot = ? OR TIME(flight_date) = ?)
                             AND status != 'Cancelled'
+                            ${segClause}
                         `;
                         
                         con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
@@ -32350,10 +32426,11 @@ app.post('/api/crew-assignment', (req, res) => {
                                 WHERE fpa.activity_id = ? 
                                 AND fpa.date = ? 
                                 AND fpa.time = ?
+                                AND fpa.slot_segment = ?
                                 LIMIT 1
                             `;
                             
-                            con.query(getPilotSql, [normalizedActivityId, date, time], async (pilotErr, pilotResult) => {
+                            con.query(getPilotSql, [normalizedActivityId, date, time, normalizedSegment], async (pilotErr, pilotResult) => {
                                 let pilotMember = null;
                                 if (!pilotErr && pilotResult && pilotResult.length > 0) {
                                     pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
@@ -32395,7 +32472,7 @@ app.post('/api/crew-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Crew assignment cleared',
-                data: { activity_id: normalizedActivityId, date, time, crew_id: null }
+                data: { activity_id: normalizedActivityId, date, time, crew_id: null, slot_segment: normalizedSegment }
             });
         });
         return;
@@ -32414,12 +32491,12 @@ app.post('/api/crew-assignment', (req, res) => {
         }
 
         const sql = `
-            INSERT INTO flight_crew_assignments (activity_id, date, time, crew_id)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO flight_crew_assignments (activity_id, date, time, slot_segment, crew_id)
+            VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
         `;
 
-        con.query(sql, [normalizedActivityId, date, time, normalizedCrewId], async (err, result) => {
+        con.query(sql, [normalizedActivityId, date, time, normalizedSegment, normalizedCrewId], async (err, result) => {
             if (err) {
                 console.error('Error upserting crew assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -32438,6 +32515,7 @@ app.post('/api/crew-assignment', (req, res) => {
 
                     // Get all bookings for this flight slot
                     const flightDateTime = `${date} ${time}`;
+                    const segClauseSave = sqlBookingsFlightTypeMatchesSegment(normalizedSegment);
                     const getBookingsSql = `
                         SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
                         FROM all_booking 
@@ -32446,6 +32524,7 @@ app.post('/api/crew-assignment', (req, res) => {
                         AND (time_slot = ? OR TIME(flight_date) = ?)
                         AND status != 'Cancelled'
                         AND google_calendar_event_id IS NOT NULL
+                        ${segClauseSave}
                     `;
                     
                     con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
@@ -32458,6 +32537,7 @@ app.post('/api/crew-assignment', (req, res) => {
                                 AND DATE(flight_date) = ? 
                                 AND (time_slot = ? OR TIME(flight_date) = ?)
                                 AND status != 'Cancelled'
+                                ${segClauseSave}
                             `;
                             
                             con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
@@ -32473,10 +32553,11 @@ app.post('/api/crew-assignment', (req, res) => {
                                     WHERE fpa.activity_id = ? 
                                     AND fpa.date = ? 
                                     AND fpa.time = ?
+                                    AND fpa.slot_segment = ?
                                     LIMIT 1
                                 `;
                                 
-                                con.query(getPilotSql, [normalizedActivityId, date, time], async (pilotErr, pilotResult) => {
+                                con.query(getPilotSql, [normalizedActivityId, date, time, normalizedSegment], async (pilotErr, pilotResult) => {
                                     let pilotMember = null;
                                     if (!pilotErr && pilotResult && pilotResult.length > 0) {
                                         pilotMember = `${pilotResult[0].first_name} ${pilotResult[0].last_name}`;
@@ -32532,7 +32613,7 @@ app.post('/api/crew-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Crew assignment saved',
-                data: { activity_id: normalizedActivityId, date, time, crew_id: normalizedCrewId }
+                data: { activity_id: normalizedActivityId, date, time, crew_id: normalizedCrewId, slot_segment: normalizedSegment }
             });
         });
     });
@@ -32566,7 +32647,8 @@ app.get('/api/pilot-assignments', (req, res) => {
 
 // Upsert pilot assignment for a slot
 app.post('/api/pilot-assignment', (req, res) => {
-    const { activity_id, date, time, pilot_id } = req.body;
+    const { activity_id, date, time, pilot_id, slot_segment } = req.body;
+    const normalizedSegment = normalizeAssignmentSlotSegment(slot_segment);
     
     // Validate required fields
     if (activity_id === null || activity_id === undefined || activity_id === '') {
@@ -32604,12 +32686,12 @@ app.post('/api/pilot-assignment', (req, res) => {
         });
     }
 
-    console.log('Saving pilot assignment:', { activity_id: normalizedActivityId, date, time, pilot_id: normalizedPilotId });
+    console.log('Saving pilot assignment:', { activity_id: normalizedActivityId, date, time, pilot_id: normalizedPilotId, slot_segment: normalizedSegment });
 
     // If pilot_id is null, delete the assignment
     if (normalizedPilotId === null || normalizedPilotId === undefined) {
-        const deleteSql = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ?';
-        con.query(deleteSql, [normalizedActivityId, date, time], async (err, result) => {
+        const deleteSql = 'DELETE FROM flight_pilot_assignments WHERE activity_id = ? AND date = ? AND time = ? AND slot_segment = ?';
+        con.query(deleteSql, [normalizedActivityId, date, time, normalizedSegment], async (err, result) => {
             if (err) {
                 console.error('Error deleting pilot assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -32619,6 +32701,7 @@ app.post('/api/pilot-assignment', (req, res) => {
             // Update Google Calendar events - remove pilot but keep crew
             try {
                 const flightDateTime = `${date} ${time}`;
+                const segClauseP = sqlBookingsFlightTypeMatchesSegment(normalizedSegment);
                 const getBookingsSql = `
                     SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
                     FROM all_booking 
@@ -32627,6 +32710,7 @@ app.post('/api/pilot-assignment', (req, res) => {
                     AND (time_slot = ? OR TIME(flight_date) = ?)
                     AND status != 'Cancelled'
                     AND google_calendar_event_id IS NOT NULL
+                    ${segClauseP}
                 `;
                 
                 con.query(getBookingsSql, [normalizedActivityId, date, time, time], async (bookingsErr, bookingsResult) => {
@@ -32639,6 +32723,7 @@ app.post('/api/pilot-assignment', (req, res) => {
                             AND DATE(flight_date) = ? 
                             AND (time_slot = ? OR TIME(flight_date) = ?)
                             AND status != 'Cancelled'
+                            ${segClauseP}
                         `;
                         
                         con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
@@ -32654,10 +32739,11 @@ app.post('/api/pilot-assignment', (req, res) => {
                                 WHERE fca.activity_id = ? 
                                 AND fca.date = ? 
                                 AND fca.time = ?
+                                AND fca.slot_segment = ?
                                 LIMIT 1
                             `;
                             
-                            con.query(getCrewSql, [normalizedActivityId, date, time], async (crewErr, crewResult) => {
+                            con.query(getCrewSql, [normalizedActivityId, date, time, normalizedSegment], async (crewErr, crewResult) => {
                                 let crewMember = null;
                                 if (!crewErr && crewResult && crewResult.length > 0) {
                                     crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
@@ -32699,7 +32785,7 @@ app.post('/api/pilot-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Pilot assignment cleared',
-                data: { activity_id: normalizedActivityId, date, time, pilot_id: null }
+                data: { activity_id: normalizedActivityId, date, time, pilot_id: null, slot_segment: normalizedSegment }
             });
         });
         return;
@@ -32718,12 +32804,12 @@ app.post('/api/pilot-assignment', (req, res) => {
         }
 
         const sql = `
-            INSERT INTO flight_pilot_assignments (activity_id, date, time, pilot_id)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO flight_pilot_assignments (activity_id, date, time, slot_segment, pilot_id)
+            VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE pilot_id = VALUES(pilot_id), updated_at = CURRENT_TIMESTAMP
         `;
 
-        con.query(sql, [normalizedActivityId, date, time, normalizedPilotId], async (err, result) => {
+        con.query(sql, [normalizedActivityId, date, time, normalizedSegment, normalizedPilotId], async (err, result) => {
             if (err) {
                 console.error('Error upserting pilot assignment:', err);
                 return res.status(500).json({ success: false, message: 'Database error', error: err.message });
@@ -32746,6 +32832,7 @@ app.post('/api/pilot-assignment', (req, res) => {
 
                     // Get all bookings for this flight slot
                     const flightDateTime = `${date} ${time}`;
+                    const segClausePilotSave = sqlBookingsFlightTypeMatchesSegment(normalizedSegment);
                     const getBookingsSql = `
                         SELECT id, google_calendar_event_id, flight_type, location, flight_date, pax, time_slot
                         FROM all_booking 
@@ -32754,6 +32841,7 @@ app.post('/api/pilot-assignment', (req, res) => {
                         AND (time_slot = ? OR TIME(flight_date) = ?)
                         AND status != 'Cancelled'
                         AND google_calendar_event_id IS NOT NULL
+                        ${segClausePilotSave}
                     `;
                     
                     console.log('📅 [pilot-assignment] Querying bookings with params:', {
@@ -32781,6 +32869,7 @@ app.post('/api/pilot-assignment', (req, res) => {
                                 AND DATE(flight_date) = ? 
                                 AND (time_slot = ? OR TIME(flight_date) = ?)
                                 AND status != 'Cancelled'
+                                ${segClausePilotSave}
                             `;
                             
                             con.query(getTotalPassengersSql, [normalizedActivityId, date, time, time], async (paxErr, paxResult) => {
@@ -32796,10 +32885,11 @@ app.post('/api/pilot-assignment', (req, res) => {
                                     WHERE fca.activity_id = ? 
                                     AND fca.date = ? 
                                     AND fca.time = ?
+                                    AND fca.slot_segment = ?
                                     LIMIT 1
                                 `;
                                 
-                                con.query(getCrewSql, [normalizedActivityId, date, time], async (crewErr, crewResult) => {
+                                con.query(getCrewSql, [normalizedActivityId, date, time, normalizedSegment], async (crewErr, crewResult) => {
                                     let crewMember = null;
                                     if (!crewErr && crewResult && crewResult.length > 0) {
                                         crewMember = `${crewResult[0].first_name} ${crewResult[0].last_name}`;
@@ -32874,7 +32964,7 @@ app.post('/api/pilot-assignment', (req, res) => {
             res.json({
                 success: true,
                 message: 'Pilot assignment saved',
-                data: { activity_id: normalizedActivityId, date, time, pilot_id: normalizedPilotId }
+                data: { activity_id: normalizedActivityId, date, time, pilot_id: normalizedPilotId, slot_segment: normalizedSegment }
             });
         });
     });
@@ -32925,8 +33015,8 @@ app.post('/api/debug/crew-assignments/test', (req, res) => {
     };
 
     const sql = `
-        INSERT INTO flight_crew_assignments (activity_id, date, time, crew_id)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO flight_crew_assignments (activity_id, date, time, slot_segment, crew_id)
+        VALUES (?, ?, ?, '', ?)
         ON DUPLICATE KEY UPDATE crew_id = VALUES(crew_id), updated_at = CURRENT_TIMESTAMP
     `;
 
