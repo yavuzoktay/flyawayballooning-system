@@ -1045,6 +1045,7 @@ const CustomerPortal = () => {
         !isFullyRefunded &&
         hasScheduledFlightDate
     );
+    const isPrivateChangeLocationBooking = ((bookingData?.flight_type || bookingData?.experience || '').toLowerCase().includes('private'));
 
     return (
             <>
@@ -2606,7 +2607,9 @@ const CustomerPortal = () => {
                                                         >
                                                             <div style={{ fontSize: isMobile ? 11 : 13, lineHeight: 1.2, fontWeight: 700 }}>{d.date()}</div>
                                                             <div style={{ fontSize: isMobile ? 7 : 9, fontWeight: 600, lineHeight: 1.2, textAlign: 'center' }}>
-                                                                {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
+                                                                {isPrivateChangeLocationBooking
+                                                                    ? ''
+                                                                    : (slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`))}
                                                             </div>
                                                         </div>
                                                     );
@@ -2717,8 +2720,10 @@ const CustomerPortal = () => {
                                                                     }
                                                                 }}
                                                             >
-                                                                {slot.time} ({slot.available || slot.calculated_available || 0}/{slot.capacity})
-                                                                {!hasEnoughSpace && ` - Insufficient space for ${passengerCount} passenger${passengerCount > 1 ? 's' : ''}`}
+                                                                {isPrivateChangeLocationBooking
+                                                                    ? slot.time
+                                                                    : `${slot.time} (${slot.available || slot.calculated_available || 0}/${slot.capacity})`}
+                                                                {!isPrivateChangeLocationBooking && !hasEnoughSpace && ` - Insufficient space for ${passengerCount} passenger${passengerCount > 1 ? 's' : ''}`}
                                                             </Button>
                                                         );
                                                     });

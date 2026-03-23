@@ -665,6 +665,13 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         return isCurrentBookingPrivate && currentBookingPassengerCount > 0 && currentBookingPassengerCount <= 4;
     }, [isCurrentBookingPrivate, currentBookingPassengerCount]);
 
+    // Hide "Spaces" helper text for private flow in Rebook popup (dates + times).
+    const shouldHideSpacesForPrivate = useMemo(() => {
+        if (isCurrentBookingPrivate) return true;
+        const normalizedTypes = (selectedFlightTypes || []).map((t) => String(t || '').trim().toLowerCase());
+        return normalizedTypes.includes('private') && !normalizedTypes.includes('shared');
+    }, [isCurrentBookingPrivate, selectedFlightTypes]);
+
     // Balloon 210 global usage tracking (same as Live Availability)
     const normalizeSlotDate = (value) => {
         if (!value) return '';
@@ -1015,7 +1022,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                     <div style={{ fontSize: isMobile ? 6 : 8, fontWeight: 600, lineHeight: 1.1, textAlign: 'center' }}>
                         {isCurrentBookingDate 
                             ? 'Current' 
-                            : (availableSlots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`))
+                            : (shouldHideSpacesForPrivate
+                                ? ''
+                                : (availableSlots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)))
                         }
                     </div>
                 </div>
@@ -1237,7 +1246,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {timeDisplay} ({availableSeats} Spaces)
+                                                                {shouldHideSpacesForPrivate ? timeDisplay : `${timeDisplay} (${availableSeats} Spaces)`}
                                                             </Button>
                                                         );
                                                     })}
@@ -1602,7 +1611,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {slot.time} ({availableSeats} Spaces)
+                                                                {shouldHideSpacesForPrivate ? slot.time : `${slot.time} (${availableSeats} Spaces)`}
                                                             </Button>
                                                         );
                                                     })}
