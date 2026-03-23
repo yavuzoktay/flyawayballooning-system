@@ -4615,7 +4615,8 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                             original_price: pricingPayload.original_price ?? formatNumericPrice(v.price_per_person),
                             sale_price: pricingPayload.sale_price,
                             has_sale_price: pricingPayload.has_sale_price,
-                            price_unit: hasActivityPricing ? 'total' : (v.price_unit || 'total')
+                            // Activity modal group pricing is "per person". These tier values should be interpreted as pp.
+                            price_unit: hasActivityPricing ? 'pp' : (v.price_unit || 'pp')
                         };
                     });
                 }
