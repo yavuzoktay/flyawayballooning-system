@@ -8404,7 +8404,7 @@ setBookingDetail(finalVoucherDetail);
                                                     
                                                     return allNotes.length > 0 ? allNotes.map((n, i) => (
                                                     <Box key={n.id || i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0, position: 'relative' }}>
-                                                        <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
+                                                        <Typography variant="body2" sx={{ color: '#888', fontSize: 12, pr: '80px' }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
                                                         {editingNoteId === n.id ? (
                                                             <>
                                                                 <TextField
@@ -8421,10 +8421,10 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         ) : (
                                                             <>
-                                                        <Typography>{n.notes}</Typography>
+                                                        <Typography sx={{ pr: '80px' }}>{n.notes}</Typography>
                                                                 <IconButton
                                                                     size="small"
-                                                                    sx={{ position: 'absolute', right: 60, top: 8 }}
+                                                                    sx={{ position: 'absolute', right: 60, top: 0 }}
                                                                     onClick={() => handleEditNoteClick(n.id, n.notes)}
                                                                     aria-label="Edit note"
                                                                 >
@@ -8432,7 +8432,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 </IconButton>
                                                                 <IconButton
                                                                     size="small"
-                                                                    sx={{ position: 'absolute', right: 8, top: 8, color: 'red' }}
+                                                                    sx={{ position: 'absolute', right: 8, top: 0, color: 'red' }}
                                                                     onClick={() => handleDeleteNote(n.id, n)}
                                                                     aria-label="Delete note"
                                                                 >
