@@ -1088,7 +1088,7 @@ const CustomerPortal = () => {
         }
         return 0;
     };
-    const balloon210InUseByDateTime = React.useMemo(() => {
+    const balloon210InUseByDateTime = (() => {
         const source = allLocationAvailabilities.length > 0 ? allLocationAvailabilities : locationAvailabilities;
         const map = new Map();
         source.forEach((s) => {
@@ -1103,7 +1103,7 @@ const CustomerPortal = () => {
             }
         });
         return map;
-    }, [allLocationAvailabilities, locationAvailabilities]);
+    })();
     const getAvailableSeatsForChangeLocation = (slot) => {
         if (!slot) return 0;
 
