@@ -7161,7 +7161,7 @@ setBookingDetail(finalVoucherDetail);
                                                         const passenger1Name = passenger1 
                                                             ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
                                                             : '';
-                                                        return passenger1Name || bookingDetail.booking.name || '-';
+                                                        return bookingDetail.booking.name || passenger1Name || '-';
                                                     })()}
                                                     <IconButton 
                                                         size="small" 
@@ -7172,7 +7172,10 @@ setBookingDetail(finalVoucherDetail);
                                                         const passenger1Name = passenger1 
                                                             ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
                                                             : '';
-                                                        handleEditClick('name', passenger1Name || bookingDetail.booking.name || '');
+                                                        handleEditClick(
+                                                            'name',
+                                                            bookingDetail.booking.name || passenger1Name || ''
+                                                        );
                                                         }}
                                                         sx={{ 
                                                             padding: isMobile ? '2px' : '8px',
