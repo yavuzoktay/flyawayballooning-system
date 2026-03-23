@@ -28641,63 +28641,89 @@ async function createVoucherFromWebhook(voucherData) {
                 // Column order: name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref (index 12)
                 const updatedValues = [...values];
                 updatedValues[12] = uniqueVoucherCode; // voucher_ref is at index 12
+                const runInsert = () => {
+                    con.query(insertSql, updatedValues, (err, result) => {
+                        if (err) {
+                            console.error('Webhook voucher insertion error:', err);
 
-                con.query(insertSql, updatedValues, (err, result) => {
-                    if (err) {
-                        console.error('Webhook voucher insertion error:', err);
-                        return reject(err);
-                    }
-                    console.log(`Webhook voucher created successfully, ID: ${result.insertId}, Code: ${uniqueVoucherCode}`);
-
-                    // NOTE: Vouchers do NOT store additional information in additional_information_answers table
-                    // The additional_information_answers table has a foreign key constraint to all_booking table,
-                    // but vouchers are stored in all_vouchers table, not all_booking table.
-                    // Additional information for vouchers is already stored in additional_information_json column.
-                    // Only bookings (not vouchers) should store data in additional_information_answers table.
-
-                    // Send Flight Voucher Confirmation email if webhook hasn't sent it yet
-                    // Check email_logs to prevent duplicates - if webhook already sent, skip
-                    if (normalizedBookFlight === 'Flight Voucher') {
-                        // Check if email was already sent by webhook handler
-                        con.query(`
-                            SELECT id FROM email_logs 
-                            WHERE context_type = 'voucher' 
-                              AND context_id = ? 
-                              AND template_type = 'flight_voucher_confirmation_automatic'
-                            LIMIT 1
-                        `, [result.insertId], (emailLogErr, emailLogRows) => {
-                            if (emailLogErr) {
-                                console.warn('⚠️ Could not check email_logs for Flight Voucher email (fallback):', emailLogErr?.message || emailLogErr);
-                                // If check fails, send email anyway (better to send duplicate than miss email)
-                                console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (email_logs check failed) for voucher ID:', result.insertId);
-                                sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
-                                    console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
-                                });
-                            } else if (!emailLogRows || emailLogRows.length === 0) {
-                                // Email not sent yet, send it now
-                                console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (webhook did not send) for voucher ID:', result.insertId);
-                                sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
-                                    console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
-                                });
-                            } else {
-                                console.log('⏭️ [FALLBACK] Skipping Flight Voucher Confirmation email - already sent by webhook for voucher ID:', result.insertId);
+                            // Backward-compatible self-heal for older DBs:
+                            // some installations don't have all_vouchers.season_saver
+                            const sqlMsg = String(err.sqlMessage || err.message || '');
+                            if (err.code === 'ER_BAD_FIELD_ERROR' && /season_saver/i.test(sqlMsg)) {
+                                console.warn('⚠️ Missing all_vouchers.season_saver; adding column then retrying insert...');
+                                return con.query(
+                                    'ALTER TABLE all_vouchers ADD COLUMN season_saver TINYINT(1) NOT NULL DEFAULT 0',
+                                    (alterErr) => {
+                                        if (alterErr) {
+                                            // If column was added concurrently or already exists, just retry the insert.
+                                            const alterMsg = String(alterErr.sqlMessage || alterErr.message || '');
+                                            if (alterErr.code === 'ER_DUP_FIELDNAME' || /duplicate column|already exists/i.test(alterMsg)) {
+                                                return runInsert();
+                                            }
+                                            return reject(alterErr);
+                                        }
+                                        return runInsert();
+                                    }
+                                );
                             }
-                        });
-                    }
 
-                    // Note: Gift Voucher Confirmation email is sent in webhook handler, not here
-                    // This prevents duplicate emails when createBookingFromSession fallback is called
-                    if (normalizedBookFlight === 'Gift Voucher') {
-                        const webhookRecipientEmail = (recipient_email || '').trim();
-                        if (webhookRecipientEmail) {
-                            scheduleReceivedGiftVoucherEmail(result.insertId, webhookRecipientEmail).catch((err) => {
-                                console.error('Error scheduling Received GV email:', err);
+                            return reject(err);
+                        }
+
+                        console.log(`Webhook voucher created successfully, ID: ${result.insertId}, Code: ${uniqueVoucherCode}`);
+
+                        // NOTE: Vouchers do NOT store additional information in additional_information_answers table
+                        // The additional_information_answers table has a foreign key constraint to all_booking table,
+                        // but vouchers are stored in all_vouchers table, not all_booking table.
+                        // Additional information for vouchers is already stored in additional_information_json column.
+                        // Only bookings (not vouchers) should store data in additional_information_answers table.
+
+                        // Send Flight Voucher Confirmation email if webhook hasn't sent it yet
+                        // Check email_logs to prevent duplicates - if webhook already sent, skip
+                        if (normalizedBookFlight === 'Flight Voucher') {
+                            // Check if email was already sent by webhook handler
+                            con.query(`
+                                SELECT id FROM email_logs 
+                                WHERE context_type = 'voucher' 
+                                  AND context_id = ? 
+                                  AND template_type = 'flight_voucher_confirmation_automatic'
+                                LIMIT 1
+                            `, [result.insertId], (emailLogErr, emailLogRows) => {
+                                if (emailLogErr) {
+                                    console.warn('⚠️ Could not check email_logs for Flight Voucher email (fallback):', emailLogErr?.message || emailLogErr);
+                                    // If check fails, send email anyway (better to send duplicate than miss email)
+                                    console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (email_logs check failed) for voucher ID:', result.insertId);
+                                    sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
+                                        console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
+                                    });
+                                } else if (!emailLogRows || emailLogRows.length === 0) {
+                                    // Email not sent yet, send it now
+                                    console.log('📧 [FALLBACK] Sending Flight Voucher Confirmation email (webhook did not send) for voucher ID:', result.insertId);
+                                    sendAutomaticFlightVoucherConfirmationEmail(result.insertId).catch((err) => {
+                                        console.error('Error sending Flight Voucher Confirmation email (fallback):', err);
+                                    });
+                                } else {
+                                    console.log('⏭️ [FALLBACK] Skipping Flight Voucher Confirmation email - already sent by webhook for voucher ID:', result.insertId);
+                                }
                             });
                         }
-                    }
 
-                    resolve(result.insertId);
-                });
+                        // Note: Gift Voucher Confirmation email is sent in webhook handler, not here
+                        // This prevents duplicate emails when createBookingFromSession fallback is called
+                        if (normalizedBookFlight === 'Gift Voucher') {
+                            const webhookRecipientEmail = (recipient_email || '').trim();
+                            if (webhookRecipientEmail) {
+                                scheduleReceivedGiftVoucherEmail(result.insertId, webhookRecipientEmail).catch((err) => {
+                                    console.error('Error scheduling Received GV email:', err);
+                                });
+                            }
+                        }
+
+                        resolve(result.insertId);
+                    });
+                };
+
+                runInsert();
             }
         });
     });
