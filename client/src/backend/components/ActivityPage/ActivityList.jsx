@@ -48,11 +48,13 @@ const getTieredPriceValue = (pricingMap, title, tier) => {
     const entry = pricingMap[title];
 
     if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-        return entry[String(tier)] || '';
+        // Keep explicit 0 values (e.g. user sets £0 sale) instead of treating them as "empty".
+        return entry[String(tier)] ?? '';
     }
 
     if (tier === 2) {
-        return entry || '';
+        // Preserve 0 (falsy) but still meaningful for controlled inputs.
+        return entry ?? '';
     }
 
     return '';
