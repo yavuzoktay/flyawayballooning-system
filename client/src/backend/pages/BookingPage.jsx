@@ -606,6 +606,9 @@ const BookingPage = () => {
     const [sendMessageEmailChecked, setSendMessageEmailChecked] = useState(true);
     const [sendMessageSmsChecked, setSendMessageSmsChecked] = useState(true);
     const [addLink, setAddLink] = useState(false);
+    // Minimize email/sms preview boxes by default in Send a Message popup.
+    const [sendMessageEmailPreviewOpen, setSendMessageEmailPreviewOpen] = useState(false);
+    const [sendMessageSmsPreviewOpen, setSendMessageSmsPreviewOpen] = useState(false);
     const [emailLogs, setEmailLogs] = useState([]);
     const [emailLogsLoading, setEmailLogsLoading] = useState(false);
     const [emailLogsPollId, setEmailLogsPollId] = useState(null);
@@ -10482,6 +10485,8 @@ setBookingDetail(finalVoucherDetail);
                         setEmailModalOpen(false);
                         setSendMessageEmailChecked(true);
                         setSendMessageSmsChecked(true);
+                        setSendMessageEmailPreviewOpen(false);
+                        setSendMessageSmsPreviewOpen(false);
                         setAddLink(false);
                         setSmsForm({ to: '', message: '', template: 'custom' });
                     }}
@@ -10942,146 +10947,178 @@ setBookingDetail(finalVoucherDetail);
                                         <span style={{ fontSize: isMobile ? 16 : 20 }}>🎈</span> {emailForm.subject || 'Flight update'}
                                     </Typography>
                                     
-                                    {/* Email Body Preview */}
-                                        <Box
-                                            sx={{
-                                                display: 'flex',
-                                                justifyContent: 'center',
-                                                width: '100%',
-                                                overflow: 'auto',
-                                                pb: 0,
-                                                mb: 0
-                                            }}
-                                        >
+                                    {/* Email Body Preview (collapsed by default) */}
+                                    <Box sx={{ mb: 1 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="caption" sx={{ color: '#374151', fontSize: 12, fontWeight: 600 }}>
+                                                Email Preview
+                                            </Typography>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ textTransform: 'none', fontSize: 12 }}
+                                                onClick={() => setSendMessageEmailPreviewOpen(v => !v)}
+                                            >
+                                                {sendMessageEmailPreviewOpen ? 'Hide' : 'Show'}
+                                            </Button>
+                                        </Box>
+
+                                        <Collapse in={sendMessageEmailPreviewOpen} timeout={200} unmountOnExit>
                                             <Box
                                                 sx={{
-                                                    transform: isMobile ? 'scale(0.5)' : 'scale(0.75)',
-                                                    transformOrigin: 'top center',
-                                                    width: isMobile ? '200%' : '133.33%',
-                                                    width: isMobile ? '200%' : '100%',
-                                                    overflow: 'visible',
-                                                    marginBottom: isMobile ? '-50%' : '-25%',
-                                                    '& table': {
-                                                        maxWidth: '100% !important',
-                                                        width: '100% !important',
-                                                        marginBottom: '0 !important'
-                                                    },
-                                                    '& img': {
-                                                        maxWidth: '100% !important',
-                                                        height: 'auto !important'
-                                                    },
-                                                    '& *': {
-                                                        fontSize: isMobile ? '12px !important' : 'inherit !important',
-                                                        lineHeight: 'inherit !important'
-                                                    },
-                                                    '& body': {
-                                                        margin: '0 !important',
-                                                        padding: '0 !important'
-                                                    },
-                                                    '& td': {
-                                                        padding: isMobile ? '8px !important' : '16px !important'
-                                                    },
-                                                    '& table[role="presentation"]': {
-                                                        margin: '0 !important',
-                                                        marginBottom: '0 !important'
-                                                    },
-                                                    '& tr:last-child td': {
-                                                        paddingBottom: isMobile ? '8px !important' : '16px !important'
-                                                    }
+                                                    display: 'flex',
+                                                    justifyContent: 'center',
+                                                    width: '100%',
+                                                    overflow: 'auto',
+                                                    pb: 0,
+                                                    mb: 0
                                                 }}
-                                                dangerouslySetInnerHTML={{ __html: previewHtml }}
-                                            />
-                                        </Box>
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        transform: isMobile ? 'scale(0.5)' : 'scale(0.75)',
+                                                        transformOrigin: 'top center',
+                                                        width: isMobile ? '200%' : '133.33%',
+                                                        width: isMobile ? '200%' : '100%',
+                                                        overflow: 'visible',
+                                                        marginBottom: isMobile ? '-50%' : '-25%',
+                                                        '& table': {
+                                                            maxWidth: '100% !important',
+                                                            width: '100% !important',
+                                                            marginBottom: '0 !important'
+                                                        },
+                                                        '& img': {
+                                                            maxWidth: '100% !important',
+                                                            height: 'auto !important'
+                                                        },
+                                                        '& *': {
+                                                            fontSize: isMobile ? '12px !important' : 'inherit !important',
+                                                            lineHeight: 'inherit !important'
+                                                        },
+                                                        '& body': {
+                                                            margin: '0 !important',
+                                                            padding: '0 !important'
+                                                        },
+                                                        '& td': {
+                                                            padding: isMobile ? '8px !important' : '16px !important'
+                                                        },
+                                                        '& table[role="presentation"]': {
+                                                            margin: '0 !important',
+                                                            marginBottom: '0 !important'
+                                                        },
+                                                        '& tr:last-child td': {
+                                                            paddingBottom: isMobile ? '8px !important' : '16px !important'
+                                                        }
+                                                    }}
+                                                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                                                />
+                                            </Box>
+                                        </Collapse>
+                                    </Box>
                                 </Box>
                             </Grid>
                             )}
                             {/* SMS Template Preview */}
                             {sendMessageSmsChecked && (
                                 <Grid item xs={12}>
-                                    <Box sx={{ 
-                                        border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
-                                        borderRadius: isMobile ? 2 : '8px', 
+                                    <Box sx={{
+                                        border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb',
+                                        borderRadius: isMobile ? 2 : '8px',
                                         p: isMobile ? 1 : 2,
                                         backgroundColor: '#f9f9f9',
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        alignItems: 'flex-start'
+                                        mb: isMobile ? 1 : 2
                                     }}>
-                                        {/* Mobile Device Preview */}
-                                        <Box sx={{ 
-                                            width: isMobile ? '240px' : '320px',
-                                            maxWidth: '100%',
-                                            background: '#000',
-                                            borderRadius: isMobile ? '18px' : '24px',
-                                            padding: isMobile ? '8px' : '12px',
-                                            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
-                                        }}>
-                                            {/* Phone Screen */}
-                                            <Box sx={{
-                                                background: '#f5f5f5',
-                                                borderRadius: isMobile ? '14px' : '20px',
-                                                padding: isMobile ? '6px' : '8px',
-                                                minHeight: isMobile ? '280px' : '400px'
-                                            }}>
-                                                {/* Status Bar */}
-                                                <Box sx={{
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    padding: isMobile ? '6px 8px' : '8px 12px',
-                                                    fontSize: isMobile ? '8px' : '10px',
-                                                    color: '#000',
-                                                    background: '#fff',
-                                                    borderRadius: isMobile ? '8px 8px 0 0' : '12px 12px 0 0'
-                                                }}>
-                                                    <span>9:41</span>
-                                                    <Box sx={{ display: 'flex', gap: isMobile ? '2px' : '4px', alignItems: 'center' }}>
-                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
-                                                        <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
-                                                    </Box>
-                                                </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="caption" sx={{ color: '#374151', fontSize: 12, fontWeight: 600 }}>
+                                                SMS Preview
+                                            </Typography>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ textTransform: 'none', fontSize: 12 }}
+                                                onClick={() => setSendMessageSmsPreviewOpen(v => !v)}
+                                            >
+                                                {sendMessageSmsPreviewOpen ? 'Hide' : 'Show'}
+                                            </Button>
+                                        </Box>
 
-                                                {/* Message Preview */}
+                                        <Collapse in={sendMessageSmsPreviewOpen} timeout={200} unmountOnExit>
+                                            {/* Mobile Device Preview */}
+                                            <Box sx={{
+                                                width: isMobile ? '240px' : '320px',
+                                                maxWidth: '100%',
+                                                background: '#000',
+                                                borderRadius: isMobile ? '18px' : '24px',
+                                                padding: isMobile ? '8px' : '12px',
+                                                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)'
+                                            }}>
+                                                {/* Phone Screen */}
                                                 <Box sx={{
-                                                    padding: isMobile ? '12px' : '16px',
-                                                    background: '#fff',
-                                                    borderRadius: isMobile ? '0 0 8px 8px' : '0 0 12px 12px',
-                                                    minHeight: isMobile ? '200px' : '300px',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    justifyContent: 'flex-start'
+                                                    background: '#f5f5f5',
+                                                    borderRadius: isMobile ? '14px' : '20px',
+                                                    padding: isMobile ? '6px' : '8px',
+                                                    minHeight: isMobile ? '280px' : '400px'
                                                 }}>
-                                                    {/* Message Bubble */}
+                                                    {/* Status Bar */}
                                                     <Box sx={{
-                                                        background: '#e5e7eb',
-                                                        borderRadius: isMobile ? '12px' : '16px',
-                                                        padding: isMobile ? '8px 12px' : '12px 16px',
-                                                        marginBottom: isMobile ? '6px' : '8px',
-                                                        maxWidth: '85%',
-                                                        alignSelf: 'flex-start',
-                                                        wordWrap: 'break-word',
-                                                        fontSize: isMobile ? '12px' : '14px',
-                                                        lineHeight: '1.5',
-                                                        color: '#111827',
-                                                        whiteSpace: 'pre-wrap'
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        padding: isMobile ? '6px 8px' : '8px 12px',
+                                                        fontSize: isMobile ? '8px' : '10px',
+                                                        color: '#000',
+                                                        background: '#fff',
+                                                        borderRadius: isMobile ? '8px 8px 0 0' : '12px 12px 0 0'
                                                     }}>
-                                                        {(() => {
-                                                            const booking = selectedBookingForEmail || {};
-                                                            const isCustom = !smsForm.template || smsForm.template === 'custom';
-                                                            if (isCustom) {
-                                                                return (personalNote && personalNote.trim()) ? personalNote.trim() : 'Your message will appear here...';
-                                                            }
-                                                            const messageText = smsForm.message || '';
-                                                            const messageWithPrompts = replaceSmsPrompts(messageText, booking);
-                                                            const finalMessage = personalNote 
-                                                                ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
-                                                                : messageWithPrompts;
-                                                            return finalMessage || 'Your message will appear here...';
-                                                        })()}
+                                                        <span>9:41</span>
+                                                        <Box sx={{ display: 'flex', gap: isMobile ? '2px' : '4px', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: isMobile ? '10px' : '12px' }}>🔗</span>
+                                                            <span style={{ fontSize: isMobile ? '10px' : '12px' }}>⌨️</span>
+                                                        </Box>
+                                                    </Box>
+
+                                                    {/* Message Preview */}
+                                                    <Box sx={{
+                                                        padding: isMobile ? '12px' : '16px',
+                                                        background: '#fff',
+                                                        borderRadius: isMobile ? '0 0 8px 8px' : '0 0 12px 12px',
+                                                        minHeight: isMobile ? '200px' : '300px',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        justifyContent: 'flex-start'
+                                                    }}>
+                                                        {/* Message Bubble */}
+                                                        <Box sx={{
+                                                            background: '#e5e7eb',
+                                                            borderRadius: isMobile ? '12px' : '16px',
+                                                            padding: isMobile ? '8px 12px' : '12px 16px',
+                                                            marginBottom: isMobile ? '6px' : '8px',
+                                                            maxWidth: '85%',
+                                                            alignSelf: 'flex-start',
+                                                            wordWrap: 'break-word',
+                                                            fontSize: isMobile ? '12px' : '14px',
+                                                            lineHeight: '1.5',
+                                                            color: '#111827',
+                                                            whiteSpace: 'pre-wrap'
+                                                        }}>
+                                                            {(() => {
+                                                                const booking = selectedBookingForEmail || {};
+                                                                const isCustom = !smsForm.template || smsForm.template === 'custom';
+                                                                if (isCustom) {
+                                                                    return (personalNote && personalNote.trim()) ? personalNote.trim() : 'Your message will appear here...';
+                                                                }
+                                                                const messageText = smsForm.message || '';
+                                                                const messageWithPrompts = replaceSmsPrompts(messageText, booking);
+                                                                const finalMessage = personalNote
+                                                                    ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
+                                                                    : messageWithPrompts;
+                                                                return finalMessage || 'Your message will appear here...';
+                                                            })()}
+                                                        </Box>
                                                     </Box>
                                                 </Box>
                                             </Box>
-                                        </Box>
+                                        </Collapse>
                                     </Box>
                                 </Grid>
                             )}
