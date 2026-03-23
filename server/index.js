@@ -23367,12 +23367,21 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
             formattedPrivateCharterVoucherTypes = private_charter_voucher_types.split(',').map(type => type.trim()).join(',');
         }
 
-        const sql = `
+        const sqlFull = `
             UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, private_charter_sale_pricing=?, status=?, image=?, weekday_morning_price=?, weekday_morning_sale_price=?, flexible_weekday_price=?, flexible_weekday_sale_price=?, any_day_flight_price=?, any_day_flight_sale_price=?, shared_flight_from_price=?, shared_flight_from_sale_price=?, private_charter_from_price=?, private_charter_from_sale_price=?, season_saver_price=?, season_saver_enabled=?
             WHERE id=?
         `;
+
+        // Backward-compatible update for installations without season_saver columns.
+        const sqlNoSeasonSaver = `
+            UPDATE activity SET activity_name=?, capacity=?, start_date=NULL, end_date=NULL, event_time=NULL, location=?, flight_type=?, voucher_type=?, private_charter_voucher_types=?, private_charter_pricing=?, private_charter_sale_pricing=?, status=?, image=?, weekday_morning_price=?, weekday_morning_sale_price=?, flexible_weekday_price=?, flexible_weekday_sale_price=?, any_day_flight_price=?, any_day_flight_sale_price=?, shared_flight_from_price=?, shared_flight_from_sale_price=?, private_charter_from_price=?, private_charter_from_sale_price=?
+            WHERE id=?
+        `;
         const sanitizedPrivateCharterSalePricing = sanitizeSalePricingMap(private_charter_sale_pricing);
-        con.query(sql, [
+
+        const seasonSaverEnabledValue = season_saver_enabled === 'true' || season_saver_enabled === true || season_saver_enabled === '1' || season_saver_enabled === 1 ? 1 : 0;
+
+        const paramsFull = [
             activity_name,
             capacity,
             location,
@@ -23394,10 +23403,51 @@ app.put("/api/activity/:id", upload.single('image'), (req, res) => {
             private_charter_from_price,
             formatSaleNumericPrice(private_charter_from_sale_price),
             season_saver_price || null,
-            season_saver_enabled === 'true' || season_saver_enabled === true || season_saver_enabled === '1' || season_saver_enabled === 1 ? 1 : 0,
+            seasonSaverEnabledValue,
             id
-        ], (err, result) => {
-            if (err) return res.status(500).json({ success: false, message: "Database error" });
+        ];
+
+        const paramsNoSeasonSaver = [
+            activity_name,
+            capacity,
+            location,
+            formattedFlightType,
+            voucher_type || 'All',
+            formattedPrivateCharterVoucherTypes || null,
+            serializeJsonField(private_charter_pricing),
+            serializeJsonField(sanitizedPrivateCharterSalePricing),
+            status,
+            finalImage,
+            weekday_morning_price,
+            formatSaleNumericPrice(weekday_morning_sale_price),
+            flexible_weekday_price,
+            formatSaleNumericPrice(flexible_weekday_sale_price),
+            any_day_flight_price,
+            formatSaleNumericPrice(any_day_flight_sale_price),
+            shared_flight_from_price,
+            formatSaleNumericPrice(shared_flight_from_sale_price),
+            private_charter_from_price,
+            formatSaleNumericPrice(private_charter_from_sale_price),
+            id
+        ];
+
+        // Try full SQL first. If season_saver columns don't exist, retry without them.
+        con.query(sqlFull, paramsFull, (err, result) => {
+            if (err) {
+                const isMissingSeasonSaverColumns =
+                    err.code === 'ER_BAD_FIELD_ERROR' &&
+                    typeof err.message === 'string' &&
+                    (err.message.includes('season_saver_price') || err.message.includes('season_saver_enabled'));
+
+                if (isMissingSeasonSaverColumns) {
+                    return con.query(sqlNoSeasonSaver, paramsNoSeasonSaver, (err2, result2) => {
+                        if (err2) return res.status(500).json({ success: false, message: "Database error" });
+                        return res.json({ success: true, data: result2 });
+                    });
+                }
+
+                return res.status(500).json({ success: false, message: "Database error" });
+            }
             res.json({ success: true, data: result });
         });
     });
