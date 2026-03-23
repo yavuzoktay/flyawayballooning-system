@@ -26880,72 +26880,116 @@ app.get('/api/activities/flight-types', (req, res) => {
     console.log('SQL query:', sql);
     console.log('SQL params:', params);
 
-    con.query(sql, params, (err, result) => {
-        if (err) {
-            console.error('Error fetching activities with flight types:', err);
-            return res.status(500).json({ success: false, message: 'Database error', error: err.message });
-        }
+    const runActivitiesQuery = (sqlToRun) => {
+        con.query(sqlToRun, params, (err, result) => {
+            if (err) {
+                // Backward-compatible fallback for older DB schemas.
+                // Some installations may not have `season_saver_price` column yet.
+                const isBadFieldError =
+                    err &&
+                    err.code === 'ER_BAD_FIELD_ERROR' &&
+                    typeof err.message === 'string';
 
-        console.log('Raw database result:', result);
-        console.log('Raw database result - private_charter_pricing fields:', result.map(r => ({ id: r.id, name: r.activity_name, pricing: r.private_charter_pricing })));
-        console.log('Raw database result - shared flight pricing fields:', result.map(r => ({
-            id: r.id,
-            name: r.activity_name,
-            weekday_morning_price: r.weekday_morning_price,
-            weekday_morning_sale_price: r.weekday_morning_sale_price,
-            flexible_weekday_price: r.flexible_weekday_price,
-            flexible_weekday_sale_price: r.flexible_weekday_sale_price,
-            any_day_flight_price: r.any_day_flight_price,
-            any_day_flight_sale_price: r.any_day_flight_sale_price,
-            shared_flight_from_price: r.shared_flight_from_price,
-            shared_flight_from_sale_price: r.shared_flight_from_sale_price
-        })));
+                if (isBadFieldError) {
+                    const missingSeasonSaverPrice = err.message.includes('season_saver_price');
+                    const missingSeasonSaverEnabled = err.message.includes('season_saver_enabled');
 
-        // Process flight types to map them to experience names
-        const processedActivities = result.map(activity => {
-            let flightTypes = [];
-            if (activity.flight_type) {
-                // Parse flight_type which can be comma-separated string or array
-                if (typeof activity.flight_type === 'string') {
-                    flightTypes = activity.flight_type.split(',').map(type => type.trim());
-                } else if (Array.isArray(activity.flight_type)) {
-                    flightTypes = activity.flight_type;
+                    if (missingSeasonSaverPrice || missingSeasonSaverEnabled) {
+                        console.warn(
+                            "[/api/activities/flight-types] Backward-compatible fallback for missing season saver columns."
+                        );
+
+                        let fallbackSql = sqlToRun;
+                        if (missingSeasonSaverPrice) {
+                            fallbackSql = fallbackSql.replace(
+                                'season_saver_price,',
+                                'NULL AS season_saver_price,'
+                            );
+                        }
+                        if (missingSeasonSaverEnabled) {
+                            fallbackSql = fallbackSql.replace(
+                                'season_saver_enabled',
+                                'NULL AS season_saver_enabled'
+                            );
+                        }
+
+                        return runActivitiesQuery(fallbackSql);
+                    }
                 }
+
+                console.error('Error fetching activities with flight types:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Database error',
+                    error: err.message
+                });
             }
 
-            // Map flight types to experience names
-            const experiences = flightTypes.map(type => {
-                if (type === 'Private') return 'Private Charter';
-                if (type === 'Shared') return 'Shared Flight';
-                return type; // Keep original if not mapped
+            console.log('Raw database result:', result);
+            console.log('Raw database result - private_charter_pricing fields:', result.map(r => ({ id: r.id, name: r.activity_name, pricing: r.private_charter_pricing })));
+            console.log('Raw database result - shared flight pricing fields:', result.map(r => ({
+                id: r.id,
+                name: r.activity_name,
+                weekday_morning_price: r.weekday_morning_price,
+                weekday_morning_sale_price: r.weekday_morning_sale_price,
+                flexible_weekday_price: r.flexible_weekday_price,
+                flexible_weekday_sale_price: r.flexible_weekday_sale_price,
+                any_day_flight_price: r.any_day_flight_price,
+                any_day_flight_sale_price: r.any_day_flight_sale_price,
+                shared_flight_from_price: r.shared_flight_from_price,
+                shared_flight_from_sale_price: r.shared_flight_from_sale_price
+            })));
+
+            // Process flight types to map them to experience names
+            const processedActivities = result.map(activity => {
+                let flightTypes = [];
+                if (activity.flight_type) {
+                    // Parse flight_type which can be comma-separated string or array
+                    if (typeof activity.flight_type === 'string') {
+                        flightTypes = activity.flight_type.split(',').map(type => type.trim());
+                    } else if (Array.isArray(activity.flight_type)) {
+                        flightTypes = activity.flight_type;
+                    }
+                }
+
+                // Map flight types to experience names
+                const experiences = flightTypes.map(type => {
+                    if (type === 'Private') return 'Private Charter';
+                    if (type === 'Shared') return 'Shared Flight';
+                    return type; // Keep original if not mapped
+                });
+
+                const resolvedFlightTypes = activity.location === BRISTOL_LOCATION ? ['Private'] : flightTypes;
+                const resolvedExperiences = activity.location === BRISTOL_LOCATION ? ['Private Charter'] : experiences;
+
+                console.log(
+                    `Activity ${activity.activity_name}: flight_type="${activity.flight_type}" -> flightTypes=${JSON.stringify(flightTypes)} -> experiences=${JSON.stringify(experiences)}`
+                );
+
+                return {
+                    ...activity,
+                    weekday_morning_sale_price: formatSaleNumericPrice(activity.weekday_morning_sale_price),
+                    flexible_weekday_sale_price: formatSaleNumericPrice(activity.flexible_weekday_sale_price),
+                    any_day_flight_sale_price: formatSaleNumericPrice(activity.any_day_flight_sale_price),
+                    shared_flight_from_sale_price: formatSaleNumericPrice(activity.shared_flight_from_sale_price),
+                    private_charter_from_sale_price: formatSaleNumericPrice(activity.private_charter_from_sale_price),
+                    private_charter_sale_pricing: serializeJsonField(sanitizeSalePricingMap(activity.private_charter_sale_pricing)),
+                    flight_type: resolvedFlightTypes,
+                    experiences: resolvedExperiences
+                };
             });
 
-            const resolvedFlightTypes = activity.location === BRISTOL_LOCATION ? ['Private'] : flightTypes;
-            const resolvedExperiences = activity.location === BRISTOL_LOCATION ? ['Private Charter'] : experiences;
+            console.log('Processed activities:', processedActivities);
+            console.log('=== /api/activities/flight-types response ===');
 
-            console.log(`Activity ${activity.activity_name}: flight_type="${activity.flight_type}" -> flightTypes=${JSON.stringify(flightTypes)} -> experiences=${JSON.stringify(experiences)}`);
-
-            return {
-                ...activity,
-                weekday_morning_sale_price: formatSaleNumericPrice(activity.weekday_morning_sale_price),
-                flexible_weekday_sale_price: formatSaleNumericPrice(activity.flexible_weekday_sale_price),
-                any_day_flight_sale_price: formatSaleNumericPrice(activity.any_day_flight_sale_price),
-                shared_flight_from_sale_price: formatSaleNumericPrice(activity.shared_flight_from_sale_price),
-                private_charter_from_sale_price: formatSaleNumericPrice(activity.private_charter_from_sale_price),
-                private_charter_sale_pricing: serializeJsonField(sanitizeSalePricingMap(activity.private_charter_sale_pricing)),
-                flight_type: resolvedFlightTypes,
-                experiences: resolvedExperiences
-            };
+            res.json({
+                success: true,
+                data: processedActivities
+            });
         });
+    };
 
-        console.log('Processed activities:', processedActivities);
-        console.log('=== /api/activities/flight-types response ===');
-
-        res.json({
-            success: true,
-            data: processedActivities
-        });
-    });
+    runActivitiesQuery(sql);
 });
 
 // Global error handler to ensure CORS headers are always set
