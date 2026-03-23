@@ -8422,8 +8422,22 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : (
                                                             <>
                                                         <Typography>{n.notes}</Typography>
-                                                                <Button size="small" sx={{ position: 'absolute', right: 60, top: 8 }} onClick={() => handleEditNoteClick(n.id, n.notes)}>Edit</Button>
-                                                                <Button size="small" color="error" sx={{ position: 'absolute', right: 8, top: 8 }} onClick={() => handleDeleteNote(n.id, n)}>Delete</Button>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    sx={{ position: 'absolute', right: 60, top: 8 }}
+                                                                    onClick={() => handleEditNoteClick(n.id, n.notes)}
+                                                                    aria-label="Edit note"
+                                                                >
+                                                                    <EditIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                                </IconButton>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    sx={{ position: 'absolute', right: 8, top: 8, color: 'red' }}
+                                                                    onClick={() => handleDeleteNote(n.id, n)}
+                                                                    aria-label="Delete note"
+                                                                >
+                                                                    <DeleteIcon fontSize={isMobile ? '12px' : 'small'} />
+                                                                </IconButton>
                                                             </>
                                                         )}
                                                     </Box>
