@@ -6385,7 +6385,7 @@ const Manifest = () => {
                                                             
                                                             return (
                                                                 <Typography key={p.id}>
-                                                                    Passenger {i + 1}: {editingPassenger === p.id ? (
+                                                                    {i + 1}: {editingPassenger === p.id ? (
                                                                         <>
                                                                             <input
                                                                                 value={editPassengerFirstName}

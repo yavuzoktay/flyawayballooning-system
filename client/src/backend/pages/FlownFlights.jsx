@@ -1707,7 +1707,7 @@ const FlownFlights = () => {
                                                 <Box>
                                                     {bookingDetail.passengers.map((p, i) => (
                                                         <Typography key={p.id} sx={{ mb: 1 }}>
-                                                            Passenger {i + 1}: {editingPassenger === p.id ? (
+                                                            {i + 1}: {editingPassenger === p.id ? (
                                                                 <>
                                                                     <input
                                                                         value={editPassengerFirstName}

@@ -7953,7 +7953,7 @@ setBookingDetail(finalVoucherDetail);
                                                                         const isEditing = editingVoucherPassenger?.voucher_id === voucherId && editingVoucherPassenger?.passenger_index === i;
                                                                         return (
                                                                             <Typography key={`${p.id || i}-${p.first_name || ''}-${p.last_name || ''}-${i}`}>
-                                                                                Passenger {i + 1}: {isEditing ? (
+                                                                                {i + 1}: {isEditing ? (
                                                                                     <>
                                                                                         <input
                                                                                             value={editVoucherPassengerFirstName}
@@ -8027,7 +8027,7 @@ setBookingDetail(finalVoucherDetail);
 
                                                                                                     return (
                                                                 <Typography key={p.id}>
-                                                                            Passenger {i + 1}: {editingPassenger === p.id ? (
+                                                                            {i + 1}: {editingPassenger === p.id ? (
                                                                         <>
                                                                             <input
                                                                                 value={editPassengerFirstName}
