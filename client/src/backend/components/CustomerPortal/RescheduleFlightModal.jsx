@@ -1270,7 +1270,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 <Typography variant="h6" sx={{ mb: isMobile ? 1 : 2, fontSize: isMobile ? 14 : 18, fontWeight: 600 }}>
                                     Select Time for {dayjs(selectedDate).format('DD MMMM YYYY')}
                                 </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 6 : 1.5, marginBottom: isMobile ? 12 : 16 }}>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? 6 : 1.5, marginBottom: isMobile ? 6 : 8 }}>
                                     {getTimesForDate(selectedDate).length === 0 ? (
                                         <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
                                             <Typography color="text.secondary" sx={{ fontSize: 16, fontWeight: 500 }}>
@@ -1348,11 +1348,6 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                             );
                                         })
                                     )}
-                                </Box>
-                                <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#22c55e' }}>
-                                    <Typography variant="body2" sx={{ fontSize: 14 }}>
-                                        ✓ Times are set according to sunrise and sunset.
-                                    </Typography>
                                 </Box>
                             </Box>
                         )}
