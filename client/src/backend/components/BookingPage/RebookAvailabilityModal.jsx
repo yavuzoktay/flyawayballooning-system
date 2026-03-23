@@ -1174,13 +1174,17 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         // Use calculated available seats from getAvailableSeatsForSlot
                                                         const availableSeats = getAvailableSeatsForSlot(slot);
                                                         const isAvailable = availableSeats > 0;
+                                                        const passengerCountForSelection = (passengerData && passengerData.length > 0)
+                                                            ? passengerData.length
+                                                            : (numberOfVouchers || currentBookingPassengerCount || 1);
+                                                        const hasEnoughSpace = availableSeats >= passengerCountForSelection;
                                                         // Format time: "09:00:00" -> "09:00"
                                                         const timeDisplay = slot.time ? (slot.time.includes(':') ? slot.time.substring(0, 5) : slot.time) : '';
                                                         const timeForComparison = slot.time ? (slot.time.includes(':') ? slot.time.substring(0, 5) : slot.time) : '';
                                                         const isSelected = selectedTime === slot.time || selectedTime === timeForComparison;
                                                         const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                                         const isPastTime = slotDateTime.isBefore(dayjs());
-                                                        const isDisabled = !isAvailable || isPastTime;
+                                                        const isDisabled = !isAvailable || isPastTime || !hasEnoughSpace;
                                                         return (
                                                             <Button
                                                                 key={slot.id}
@@ -1230,7 +1234,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {timeDisplay} ({availableSeats} Spaces)
+                                                                {timeDisplay} ({availableSeats} Spaces
+                                                                {hasEnoughSpace
+                                                                    ? ')'
+                                                                    : ` - Insufficient for ${passengerCountForSelection} passenger${passengerCountForSelection > 1 ? 's' : ''})`}
                                                             </Button>
                                                         );
                                                     })}
@@ -1543,10 +1550,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         // Use calculated available seats from getAvailableSeatsForSlot
                                                         const availableSeats = getAvailableSeatsForSlot(slot);
                                                         const isAvailable = availableSeats > 0;
+                                                        const passengerCountForSelection = currentBookingPassengerCount || 1;
+                                                        const hasEnoughSpace = availableSeats >= passengerCountForSelection;
                                                         const isSelected = selectedTime === slot.time;
                                                         const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                                         const isPastTime = slotDateTime.isBefore(dayjs());
-                                                        const isDisabled = !isAvailable || isPastTime;
+                                                        const isDisabled = !isAvailable || isPastTime || !hasEnoughSpace;
                                                         return (
                                                             <Button
                                                                 key={slot.id}
@@ -1590,7 +1599,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {slot.time} ({availableSeats} Spaces)
+                                                                {slot.time} ({availableSeats} Spaces
+                                                                {hasEnoughSpace
+                                                                    ? ')'
+                                                                    : ` - Insufficient for ${passengerCountForSelection} passenger${passengerCountForSelection > 1 ? 's' : ''})`}
                                                             </Button>
                                                         );
                                                     })}
@@ -1644,7 +1656,35 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                 finalSelectedLocation = firstSelectedLocation;
                             }
                         }
-                        
+
+                        // Validate passenger count vs available spaces for the selected slot.
+                        // Customer portal does the same check before confirming reschedule.
+                        const passengerCountForSelection = isGiftVoucherDetails
+                            ? ((passengerData && passengerData.length > 0) ? passengerData.length : (numberOfVouchers || 1))
+                            : (currentBookingPassengerCount || 1);
+
+                        if (selectedDate && selectedTime) {
+                            const timesForSelection = isGiftVoucherDetails
+                                ? getTimesForDate(selectedDate, true)
+                                : getTimesForDate(selectedDate);
+
+                            const selectedSlot = timesForSelection.find((s) => {
+                                if (!s?.time) return false;
+                                if (s.time === selectedTime) return true;
+                                // Handle "HH:mm" vs "HH:mm:ss" mismatch.
+                                const slotTime = String(s.time);
+                                return slotTime.includes(':') && slotTime.substring(0, 5) === selectedTime;
+                            });
+
+                            if (selectedSlot) {
+                                const availableForSelection = getAvailableSeatsForSlot(selectedSlot);
+                                if (availableForSelection < passengerCountForSelection) {
+                                    setError(`Insufficient space: This time slot has only ${availableForSelection} space${availableForSelection !== 1 ? 's' : ''} available, but you have ${passengerCountForSelection} passenger${passengerCountForSelection !== 1 ? 's' : ''}. Please select a different time slot with enough space.`);
+                                    return;
+                                }
+                            }
+                        }
+
                         onSlotSelect(
                             selectedDate, 
                             selectedTime, 

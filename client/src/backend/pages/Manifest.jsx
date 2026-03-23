@@ -33,6 +33,7 @@ import {
     InputAdornment,
     useTheme,
     useMediaQuery,
+    Collapse,
 } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon } from "@mui/icons-material";
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -238,6 +239,8 @@ const Manifest = () => {
     const [groupMessageEmailChecked, setGroupMessageEmailChecked] = useState(true);
     const [groupMessageSmsChecked, setGroupMessageSmsChecked] = useState(true);
     const [groupAddLink, setGroupAddLink] = useState(false);
+    const [groupMessageEmailPreviewOpen, setGroupMessageEmailPreviewOpen] = useState(false);
+    const [groupMessageSmsPreviewOpen, setGroupMessageSmsPreviewOpen] = useState(false);
     const [groupSmsForm, setGroupSmsForm] = useState({ to: '', message: '', template: 'custom' });
     const [messagesModalOpen, setMessagesModalOpen] = useState(false);
     const [messagesLoading, setMessagesLoading] = useState(false);
@@ -539,6 +542,8 @@ const Manifest = () => {
         setGroupActionMode('message');
         setGroupMessageEmailChecked(true);
         setGroupMessageSmsChecked(true);
+        setGroupMessageEmailPreviewOpen(false);
+        setGroupMessageSmsPreviewOpen(false);
         setGroupSmsForm({ to: '', message: '', template: 'custom' });
     };
 
@@ -8077,15 +8082,36 @@ const Manifest = () => {
                         {/* Email Template Preview */}
                         {groupMessageEmailChecked && (
                             <Grid item xs={12}>
-                                <Box sx={{ 
-                                    border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
-                                    borderRadius: isMobile ? 2 : '8px', 
-                                    p: isMobile ? 1 : 2,
-                                    backgroundColor: '#f9f9f9',
-                                    position: 'relative',
-                                    overflow: 'auto',
-                                    maxHeight: isMobile ? '300px' : '600px'
-                                }}>
+                                <Box sx={{ mb: 1 }}>
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'space-between', 
+                                        mb: 0.5
+                                    }}>
+                                        <Typography variant="caption" sx={{ color: '#374151', fontWeight: 600, fontSize: 12 }}>
+                                            Email Preview
+                                        </Typography>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ textTransform: 'none', fontSize: 12 }}
+                                            onClick={() => setGroupMessageEmailPreviewOpen(v => !v)}
+                                        >
+                                            {groupMessageEmailPreviewOpen ? 'Hide' : 'Show'}
+                                        </Button>
+                                    </Box>
+
+                                    <Collapse in={groupMessageEmailPreviewOpen} timeout={200} unmountOnExit>
+                                        <Box sx={{ 
+                                            border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                            borderRadius: isMobile ? 2 : '8px', 
+                                            p: isMobile ? 1 : 2,
+                                            backgroundColor: '#f9f9f9',
+                                            position: 'relative',
+                                            overflow: 'auto',
+                                            maxHeight: isMobile ? '300px' : '600px'
+                                        }}>
                                     {/* Email Header */}
                                     <Box sx={{ 
                                         display: 'flex', 
@@ -8201,20 +8227,42 @@ const Manifest = () => {
                                         />
                                     </Box>
                                 </Box>
+                            </Collapse>
+                        </Box>
                             </Grid>
                         )}
                         {/* SMS Template Preview */}
                         {groupMessageSmsChecked && (
                             <Grid item xs={12}>
-                                <Box sx={{ 
-                                    border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
-                                    borderRadius: isMobile ? 2 : '8px', 
-                                    p: isMobile ? 1 : 2,
-                                    backgroundColor: '#f9f9f9',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'flex-start'
-                                }}>
+                                <Box sx={{ mb: 1 }}>
+                                    <Box sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'space-between', 
+                                        mb: 0.5
+                                    }}>
+                                        <Typography variant="caption" sx={{ color: '#374151', fontWeight: 600, fontSize: 12 }}>
+                                            SMS Preview
+                                        </Typography>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ textTransform: 'none', fontSize: 12 }}
+                                            onClick={() => setGroupMessageSmsPreviewOpen(v => !v)}
+                                        >
+                                            {groupMessageSmsPreviewOpen ? 'Hide' : 'Show'}
+                                        </Button>
+                                    </Box>
+                                    <Collapse in={groupMessageSmsPreviewOpen} timeout={200} unmountOnExit>
+                                        <Box sx={{ 
+                                            border: isMobile ? '1px solid #e0e0e0' : '1px solid #e5e7eb', 
+                                            borderRadius: isMobile ? 2 : '8px', 
+                                            p: isMobile ? 1 : 2,
+                                            backgroundColor: '#f9f9f9',
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'flex-start'
+                                        }}>
                                     {/* Mobile Device Preview */}
                                     <Box sx={{ 
                                         width: isMobile ? '240px' : '320px',
@@ -8292,6 +8340,8 @@ const Manifest = () => {
                                             </Box>
                                         </Box>
                                     </Box>
+                                        </Box>
+                                    </Collapse>
                                 </Box>
                             </Grid>
                         )}
