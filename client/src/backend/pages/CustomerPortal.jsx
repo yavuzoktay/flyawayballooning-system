@@ -144,6 +144,7 @@ const CustomerPortal = () => {
     const [selectedNewLocation, setSelectedNewLocation] = useState('');
     const [changingLocation, setChangingLocation] = useState(false);
     const [locationAvailabilities, setLocationAvailabilities] = useState([]);
+    const [allLocationAvailabilities, setAllLocationAvailabilities] = useState([]);
     const [loadingAvailabilities, setLoadingAvailabilities] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTime, setSelectedTime] = useState(null);
@@ -1052,6 +1053,93 @@ const CustomerPortal = () => {
         bookingData?.voucher_type_detail,
         bookingData?.book_flight
     ].filter(Boolean).join(' ').toLowerCase().includes('private'));
+    const requiredSeatsForChangeLocation = Math.max(
+        1,
+        bookingData?.passengers?.length || bookingData?.pax || (isPrivateChangeLocationBooking ? 8 : 1)
+    );
+    const normalizeSlotDate = (value) => {
+        if (!value) return '';
+        return String(value).split('T')[0].split(' ')[0].trim();
+    };
+    const normalizeSlotTime = (value) => {
+        if (!value) return '';
+        return String(value).trim();
+    };
+    const parseAvailabilityNumber = (value, fallback = 0) => {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : fallback;
+    };
+    const getRemainingSeatsForChangeLocation = (slot) => {
+        if (!slot) return 0;
+        if (slot.calculated_available !== undefined && slot.calculated_available !== null) {
+            return Math.max(0, parseAvailabilityNumber(slot.calculated_available, 0));
+        }
+        if (typeof slot.actualAvailable === 'number') {
+            return Math.max(0, slot.actualAvailable);
+        }
+        if (typeof slot.available === 'number') {
+            return Math.max(0, slot.available);
+        }
+        if (typeof slot.shared_capacity === 'number' && typeof slot.shared_booked === 'number') {
+            return Math.max(0, slot.shared_capacity - slot.shared_booked);
+        }
+        if (typeof slot.shared_capacity === 'number') {
+            return Math.max(0, slot.shared_capacity);
+        }
+        return 0;
+    };
+    const balloon210InUseByDateTime = React.useMemo(() => {
+        const source = allLocationAvailabilities.length > 0 ? allLocationAvailabilities : locationAvailabilities;
+        const map = new Map();
+        source.forEach((s) => {
+            const dateKey = normalizeSlotDate(s?.date);
+            const timeKey = normalizeSlotTime(s?.time);
+            if (!dateKey || !timeKey) return;
+            const key = `${dateKey}|${timeKey}`;
+            const balloon210LockedAny = Number(s?.balloon210_locked || s?.shared_slots_used || 0) > 0;
+            const sharedBookedAny = Number(s?.shared_booked || s?.shared_consumed_pax || 0);
+            if (balloon210LockedAny || sharedBookedAny > 0) {
+                map.set(key, true);
+            }
+        });
+        return map;
+    }, [allLocationAvailabilities, locationAvailabilities]);
+    const getAvailableSeatsForChangeLocation = (slot) => {
+        if (!slot) return 0;
+
+        const baseAvailable = getRemainingSeatsForChangeLocation(slot);
+        const balloon210Locked = Number(slot.balloon210_locked || slot.shared_slots_used || 0) > 0;
+        const sharedBooked = Number(slot.shared_booked || slot.shared_consumed_pax || 0);
+        const isSmallPrivateSelection = isPrivateChangeLocationBooking && requiredSeatsForChangeLocation <= 4;
+
+        // Shared uses Balloon 210. If locked, this slot is not selectable.
+        if (!isPrivateChangeLocationBooking) {
+            if (balloon210Locked) return 0;
+            return baseAvailable;
+        }
+
+        // Private 1–4 uses Balloon 105.
+        if (isSmallPrivateSelection) {
+            const remaining105 = (typeof slot.private_charter_small_remaining === 'number')
+                ? slot.private_charter_small_remaining
+                : (Number(slot.private_charter_small_bookings || 0) > 0 ? 0 : 4);
+            if (remaining105 <= 0) return 0;
+            return remaining105 >= requiredSeatsForChangeLocation ? remaining105 : 0;
+        }
+
+        // Private 5–8 uses Balloon 210. Block if Balloon 210 is already consumed globally at same date+time.
+        const slotDateKey = normalizeSlotDate(slot?.date);
+        const slotTimeKey = normalizeSlotTime(slot?.time);
+        const balloon210InUseGlobally = slotDateKey && slotTimeKey
+            ? Boolean(balloon210InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
+            : false;
+
+        if (balloon210Locked || sharedBooked > 0 || balloon210InUseGlobally) {
+            return 0;
+        }
+
+        return baseAvailable >= requiredSeatsForChangeLocation ? baseAvailable : 0;
+    };
 
     return (
             <>
@@ -2239,6 +2327,7 @@ const CustomerPortal = () => {
                     setSelectedDate(null);
                     setSelectedTime(null);
                     setLocationAvailabilities([]);
+                    setAllLocationAvailabilities([]);
                     setSelectedActivityId(null);
                     setError(null);
                 }}
@@ -2294,6 +2383,21 @@ const CustomerPortal = () => {
                                                 if (activitiesResponse.data?.success) {
                                                     const activities = Array.isArray(activitiesResponse.data.data) ? activitiesResponse.data.data : [];
                                                     const activityForLocation = activities.find(a => a.location === location && a.status === 'Live');
+                                                    const liveActivities = activities.filter(a => a?.status === 'Live' && a?.id);
+
+                                                    // Build global resource view (all locations) so Balloon 105/210 locks are respected.
+                                                    const allAvailabilityResults = await Promise.all(
+                                                        liveActivities.map(async (act) => {
+                                                            try {
+                                                                const resp = await axios.get(`/api/activity/${act.id}/availabilities`);
+                                                                return Array.isArray(resp.data?.data) ? resp.data.data : [];
+                                                            } catch (fetchErr) {
+                                                                console.warn('Failed to fetch availabilities for activity:', act?.id, fetchErr?.message || fetchErr);
+                                                                return [];
+                                                            }
+                                                        })
+                                                    );
+                                                    setAllLocationAvailabilities(allAvailabilityResults.flat());
 
                                                     if (activityForLocation) {
                                                         setSelectedActivityId(activityForLocation.id);
@@ -2428,6 +2532,7 @@ const CustomerPortal = () => {
                                         setSelectedDate(null);
                                         setSelectedTime(null);
                                         setLocationAvailabilities([]);
+                                        setAllLocationAvailabilities([]);
                                         setSelectedActivityId(null);
                                     }}
                                     sx={{ mt: 1, textTransform: 'none' }}
@@ -2507,7 +2612,11 @@ const CustomerPortal = () => {
                                                         const slotDate = a.date.includes('T') ? a.date.split('T')[0] : a.date;
                                                         return slotDate === dateStr;
                                                     });
-                                                    const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || Number(s.calculated_available) || 0), 0);
+                                                    const slotsWithSelectionAvailability = slots.map(slot => ({
+                                                        ...slot,
+                                                        availableForSelection: getAvailableSeatsForChangeLocation(slot)
+                                                    }));
+                                                    const totalAvailable = slotsWithSelectionAvailability.reduce((acc, s) => acc + s.availableForSelection, 0);
                                                     // Get passenger count from booking data
                                                     const passengerCount = bookingData?.passengers?.length || bookingData?.pax || 1;
                                                     // Check if there's enough space for all passengers
@@ -2674,7 +2783,7 @@ const CustomerPortal = () => {
                                                     const passengerCount = bookingData?.passengers?.length || bookingData?.pax || 1;
                                                     
                                                     return times.map(slot => {
-                                                        const availableSpaces = Number(slot.available) || Number(slot.calculated_available) || 0;
+                                                        const availableSpaces = getAvailableSeatsForChangeLocation(slot);
                                                         const isAvailable = availableSpaces > 0;
                                                         // Check if there's enough space for all passengers
                                                         const hasEnoughSpace = availableSpaces >= passengerCount;
@@ -2755,6 +2864,7 @@ const CustomerPortal = () => {
                             setSelectedDate(null);
                             setSelectedTime(null);
                             setLocationAvailabilities([]);
+                            setAllLocationAvailabilities([]);
                             setSelectedActivityId(null);
                             setError(null);
                         }}
@@ -2784,7 +2894,7 @@ const CustomerPortal = () => {
                                 });
 
                                 if (selectedSlot) {
-                                    const availableSpaces = Number(selectedSlot.available) || Number(selectedSlot.calculated_available) || 0;
+                                    const availableSpaces = getAvailableSeatsForChangeLocation(selectedSlot);
                                     if (availableSpaces < passengerCount) {
                                         setError(`Insufficient space: This time slot has only ${availableSpaces} space${availableSpaces !== 1 ? 's' : ''} available, but you have ${passengerCount} passenger${passengerCount !== 1 ? 's' : ''}. Please select a different time slot with enough space.`);
                                         return;
@@ -2810,6 +2920,7 @@ const CustomerPortal = () => {
                                         setSelectedDate(null);
                                         setSelectedTime(null);
                                         setLocationAvailabilities([]);
+                                        setAllLocationAvailabilities([]);
                                     } else {
                                         setError(response.data.message || 'Failed to change location. Please try again.');
                                     }
