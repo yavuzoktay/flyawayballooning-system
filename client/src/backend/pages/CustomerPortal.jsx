@@ -1045,7 +1045,13 @@ const CustomerPortal = () => {
         !isFullyRefunded &&
         hasScheduledFlightDate
     );
-    const isPrivateChangeLocationBooking = ((bookingData?.flight_type || bookingData?.experience || '').toLowerCase().includes('private'));
+    const isPrivateChangeLocationBooking = ([
+        bookingData?.flight_type,
+        bookingData?.experience,
+        bookingData?.voucher_type,
+        bookingData?.voucher_type_detail,
+        bookingData?.book_flight
+    ].filter(Boolean).join(' ').toLowerCase().includes('private'));
 
     return (
             <>

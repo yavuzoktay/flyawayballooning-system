@@ -345,7 +345,12 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
             booking.flight_type,
             booking.experience,
             voucher.experience_type,
-            voucher.flight_type
+            voucher.flight_type,
+            booking.voucher_type,
+            voucher.voucher_type,
+            voucher.voucher_type_detail,
+            booking.book_flight,
+            voucher.book_flight
         ].filter(Boolean).join(' ').toLowerCase();
 
         const flightDefaults = [];
@@ -654,12 +659,26 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         return 0;
     }, [bookingDetail]);
 
-    // Determine if current booking is private or shared
-    const isCurrentBookingPrivate = useMemo(() => {
-        if (!bookingDetail?.booking) return false;
-        const flightType = (bookingDetail.booking.experience || bookingDetail.booking.flight_type || '').toLowerCase();
-        return flightType.includes('private');
+    // Determine if current booking is private or shared (include voucher metadata fallback).
+    const bookingFlowDescriptor = useMemo(() => {
+        const booking = bookingDetail?.booking || {};
+        const voucher = bookingDetail?.voucher || {};
+        return [
+            booking.experience,
+            booking.flight_type,
+            booking.voucher_type,
+            booking.book_flight,
+            voucher.experience_type,
+            voucher.flight_type,
+            voucher.voucher_type,
+            voucher.voucher_type_detail,
+            voucher.book_flight
+        ].filter(Boolean).join(' ').toLowerCase();
     }, [bookingDetail]);
+
+    const isCurrentBookingPrivate = useMemo(() => {
+        return bookingFlowDescriptor.includes('private');
+    }, [bookingFlowDescriptor]);
 
     const isCurrentBookingSmallPrivate = useMemo(() => {
         return isCurrentBookingPrivate && currentBookingPassengerCount > 0 && currentBookingPassengerCount <= 4;
@@ -669,8 +688,14 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const shouldHideSpacesForPrivate = useMemo(() => {
         if (isCurrentBookingPrivate) return true;
         const normalizedTypes = (selectedFlightTypes || []).map((t) => String(t || '').trim().toLowerCase());
-        return normalizedTypes.includes('private') && !normalizedTypes.includes('shared');
-    }, [isCurrentBookingPrivate, selectedFlightTypes]);
+        if (normalizedTypes.includes('private') && !normalizedTypes.includes('shared')) return true;
+
+        // Flight voucher flows can arrive with both checkboxes selected initially;
+        // if a private voucher type is selected, still treat as private UI.
+        const privateOptionKeys = new Set((privateVoucherTypeOptions || []).map(normalizeVoucherKey));
+        const selectedVoucherKeys = (selectedVoucherTypes || []).map(normalizeVoucherKey);
+        return selectedVoucherKeys.some((key) => privateOptionKeys.has(key));
+    }, [isCurrentBookingPrivate, selectedFlightTypes, selectedVoucherTypes, privateVoucherTypeOptions]);
 
     // Balloon 210 global usage tracking (same as Live Availability)
     const normalizeSlotDate = (value) => {
