@@ -3069,7 +3069,7 @@ const Settings = () => {
                                     e.stopPropagation();
                                     setShowExperiencesForm(true);
                                 }}
-                                style={{ margin: 0}}
+                                style={{ margin: 0, minWidth: 260 }}
                             >
                                 <Plus size={20} />
                                 Create Experience
@@ -3114,6 +3114,7 @@ const Settings = () => {
                                         <button 
                                             className="btn btn-primary"
                                             onClick={() => setShowExperiencesForm(true)}
+                                        style={{ margin: 0, minWidth: 260 }}
                                         >
                                             <Plus size={20} />
                                             Create First Experience
@@ -3236,7 +3237,7 @@ const Settings = () => {
                                 e.stopPropagation();
                                 setShowAddToBookingForm(true);
                             }}
-                            style={{ margin: 0}}
+                                style={{ margin: 0, minWidth: 260 }}
                         >
                             <Plus size={20} />
                             Create Item
@@ -3287,6 +3288,7 @@ const Settings = () => {
                                     <button 
                                         className="btn btn-primary"
                                         onClick={() => setShowAddToBookingForm(true)}
+                                        style={{ margin: 0, minWidth: 260 }}
                                     >
                                         <Plus size={20} />
                                         Create First Item
