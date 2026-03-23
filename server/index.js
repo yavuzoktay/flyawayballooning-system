@@ -2557,6 +2557,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 const initialStatus = (bookingDateTime && bookingDateTime !== null && bookingDateTime !== '' && bookingDateTime !== '0000-00-00 00:00:00') 
                     ? 'Scheduled' 
                     : 'Open';
+                const voucherTypeForExperience = String(resolvedVoucherType || '').toLowerCase();
+                const forcePrivateCharterExperience = voucherTypeForExperience.includes('private') || voucherTypeForExperience.includes('proposal');
+                const normalizedExperienceForBooking = forcePrivateCharterExperience
+                    ? 'Private Charter'
+                    : (chooseFlightType.type || 'Shared Flight');
 
                 // For redeem voucher bookings, use the NEWLY GENERATED voucher code (generatedVoucherCode) in booking.voucher_code
                 // This is the voucher code that will be displayed in the All Bookings table (e.g., BAT26RMJ)
@@ -2564,7 +2569,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 const voucherCodeForBooking = generatedVoucherCode || cleanVoucherCode;
                 const bookingValues = [
                     passengerName,
-                    chooseFlightType.type || 'Shared Flight',
+                    normalizedExperienceForBooking,
                     bookingDateTime,
                     actualPaxCount, // Use actual passenger count instead of chooseFlightType.passengerCount
                     chooseLocation,
@@ -2601,7 +2606,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     'Redeem Voucher', // flight_type_source (always 'Redeem Voucher' for this endpoint)
                     resolvedVoucherType || null,
                     null,
-                    chooseFlightType.type || 'Shared Flight' // experience field - should match the selected experience (Private Charter or Shared Flight)
+                    normalizedExperienceForBooking // experience field - align with voucher type for private/proposal flows
                 ];
 
                 console.log('=== REDEEM BOOKING SQL ===');
@@ -9334,6 +9339,40 @@ app.get('/api/getAllBookingData', (req, res) => {
                 }
             }
 
+            // Private/Proposal voucher types must be treated as Private Charter in booking activity/experience.
+            const voucherSignals = [
+                finalVoucherType,
+                rest.voucher_type_detail,
+                rest.voucher_type,
+                original_voucher_type
+            ].filter(Boolean).join(' ').toLowerCase();
+            const shouldForcePrivateCharter = voucherSignals.includes('private') || voucherSignals.includes('proposal');
+            const normalizedExperience = shouldForcePrivateCharter
+                ? 'Private Charter'
+                : (rest.experience || rest.flight_type || null);
+            const normalizedFlightType = shouldForcePrivateCharter
+                ? 'Private Charter'
+                : (rest.flight_type || rest.experience || null);
+
+            if (shouldForcePrivateCharter && rest.id) {
+                const currentExperience = String(rest.experience || '').toLowerCase();
+                const currentFlightType = String(rest.flight_type || '').toLowerCase();
+                const needsBackfill =
+                    !currentExperience.includes('private') ||
+                    !currentFlightType.includes('private');
+
+                if (needsBackfill) {
+                    try {
+                        await con.promise().query(
+                            'UPDATE all_booking SET experience = ?, flight_type = ? WHERE id = ?',
+                            ['Private Charter', 'Private Charter', rest.id]
+                        );
+                    } catch (activityBackfillErr) {
+                        console.warn('Failed to backfill Private Charter fields for booking', rest.id, activityBackfillErr.message);
+                    }
+                }
+            }
+
             // For bookings created from redeem voucher, flight_attempts should start from 0, not 1
             // Check if this is a redeem voucher booking (has voucher_code that exists in all_vouchers)
             // Initialize with fallback to voucher_flight_attempts if flight_attempts is null/undefined
@@ -9582,6 +9621,9 @@ app.get('/api/getAllBookingData', (req, res) => {
 
             return {
                 ...rest,
+                activity: shouldForcePrivateCharter ? 'Private Charter' : (rest.experience || rest.flight_type || null),
+                experience: normalizedExperience,
+                flight_type: normalizedFlightType,
                 phone: rest.phone, // Ensure phone with country code is included
                 status: finalStatus,
                 voucher_type: finalVoucherType,
@@ -16776,6 +16818,36 @@ app.get('/api/getBookingDetail', async (req, res) => {
                 }
             } catch (usageErr) {
                 console.warn('⚠️ getBookingDetail - Could not fetch voucher_type via voucher_code_usage:', usageErr.message);
+            }
+        }
+
+        // Private/Proposal voucher types must always display as Private Charter activity/experience.
+        const bookingVoucherSignals = [
+            booking.voucher_type,
+            booking.voucher_type_detail,
+            booking.book_flight
+        ].filter(Boolean).join(' ').toLowerCase();
+        const shouldForcePrivateCharter = bookingVoucherSignals.includes('private') || bookingVoucherSignals.includes('proposal');
+        if (shouldForcePrivateCharter) {
+            booking.activity = 'Private Charter';
+            booking.experience = 'Private Charter';
+            booking.flight_type = 'Private Charter';
+
+            const currentExperience = String(bookingRows[0]?.experience || '').toLowerCase();
+            const currentFlightType = String(bookingRows[0]?.flight_type || '').toLowerCase();
+            const needsBackfill =
+                !currentExperience.includes('private') ||
+                !currentFlightType.includes('private');
+
+            if (needsBackfill) {
+                try {
+                    await con.promise().query(
+                        'UPDATE all_booking SET experience = ?, flight_type = ? WHERE id = ?',
+                        ['Private Charter', 'Private Charter', booking_id]
+                    );
+                } catch (backfillErr) {
+                    console.warn('⚠️ getBookingDetail - Failed to backfill private charter fields:', backfillErr.message);
+                }
             }
         }
 
