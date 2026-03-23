@@ -6504,23 +6504,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const session_id = session.id;
             console.log('Using session ID:', session_id);
 
-            let storeData = stripeSessionStore[session_id];
-            console.log('Store data found (RAM):', !!storeData);
-            console.log('Store data content (RAM):', storeData);
-
-            if (!storeData) {
-                // Try to load persisted payload (multi-instance/LB restart safety)
-                try {
-                    const loaded = await loadStripeSessionStore(session_id);
-                    if (loaded) {
-                        console.log('Loaded stripe session payload from DB fallback:', session_id);
-                        stripeSessionStore[session_id] = loaded;
-                        storeData = loaded;
-                    }
-                } catch (e) {
-                    console.error('Failed loading stripe session payload from DB:', session_id, e?.message || e);
-                }
-            }
+            const storeData = stripeSessionStore[session_id];
+            console.log('Store data found:', !!storeData);
+            console.log('Store data content:', storeData);
 
             if (!storeData) {
                 console.error('Stripe session store data not found for session_id:', session_id);
@@ -6569,14 +6555,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                                 }
                             }
                         );
-                            // Ensure processed state is persisted so fallback won't recreate.
-                            storeData.processed = true;
-                            try {
-                                await upsertStripeSessionStore(session_id, storeData, true);
-                            } catch (e) {
-                                console.error('Failed to persist stripe session processed state (booking early-return):', session_id, e?.message || e);
-                            }
-                            return res.json({ received: true });
+                        return res.json({ received: true });
                     }
                     console.log('Creating booking via webhook:', storeData.bookingData);
                     // Pass userSessionData to bookingData for createBookingFromWebhook
@@ -6641,13 +6620,6 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     storeData.processed = true;
                     if (!storeData.bookingData) storeData.bookingData = {};
                     storeData.bookingData.booking_id = bookingId;
-
-                    // Persist processed flag + booking_id so fallback/other instances don't recreate.
-                    try {
-                        await upsertStripeSessionStore(session_id, storeData, true);
-                    } catch (e) {
-                        console.error('Failed to persist stripe session processed state (booking):', session_id, e?.message || e);
-                    }
                     return res.json({ received: true });
                 } else if (storeData.type === 'voucher') {
                     console.log('Creating voucher via webhook:', storeData.voucherData);
@@ -6666,13 +6638,6 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Check if voucher was already created to prevent duplicate creation
                     if (storeData.voucherData?.voucher_id) {
                         console.log('Webhook: voucher already created for session, skipping. ID:', storeData.voucherData.voucher_id);
-                        // Ensure processed state is persisted so fallback won't recreate.
-                        storeData.processed = true;
-                        try {
-                            await upsertStripeSessionStore(session_id, storeData, true);
-                        } catch (e) {
-                            console.error('Failed to persist stripe session processed state (voucher early-return):', session_id, e?.message || e);
-                        }
                         return res.json({ received: true });
                     }
 
@@ -6892,13 +6857,6 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     // Mark session as processed to prevent duplicate calls
                     storeData.processed = true;
 
-                    // Persist processed flag + voucher_id so fallback/other instances don't recreate.
-                    try {
-                        await upsertStripeSessionStore(session_id, storeData, true);
-                    } catch (e) {
-                        console.error('Failed to persist stripe session processed state (voucher):', session_id, e?.message || e);
-                    }
-
                     // Webhook does NOT generate voucher code - this will be done by createBookingFromSession
                     console.log('Voucher code generation skipped in webhook - will be done by createBookingFromSession');
 
@@ -6913,12 +6871,6 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     const upsellResult = await applyCustomerPortalUpsell(session, storeData);
                     console.log('✅ Webhook: Customer portal upsell applied:', upsellResult);
                     storeData.processed = true;
-
-                    try {
-                        await upsertStripeSessionStore(session_id, storeData, true);
-                    } catch (e) {
-                        console.error('Failed to persist stripe session processed state (customer portal upsell):', session_id, e?.message || e);
-                    }
                     return res.json({ received: true });
                 } else if (storeData.type === 'extend_voucher') {
                     console.log('🔄 Webhook: Extending voucher via webhook');
@@ -7100,13 +7052,6 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
                         // Mark session as processed
                         storeData.processed = true;
-
-                        // Persist processed flag so fallback won't recreate.
-                        try {
-                            await upsertStripeSessionStore(session_id, storeData, true);
-                        } catch (e) {
-                            console.error('Failed to persist stripe session processed state (extend voucher):', session_id, e?.message || e);
-                        }
                         return res.json({ received: true });
                     } catch (error) {
                         console.error('❌ Error extending voucher via webhook:', error);
@@ -27475,83 +27420,6 @@ app.delete('/api/date-requests/:id', (req, res) => {
 // Geçici Stripe session verisi için bellek içi bir store
 const stripeSessionStore = {};
 
-// Persist checkout payload so webhook/fallback works across server instances/restarts.
-// This prevents "session data not found" -> no voucher insertion -> no success popup.
-const STRIPE_SESSION_STORE_TABLE = 'stripe_checkout_session_store';
-
-function ensureStripeSessionStoreTable() {
-    const sql = `
-        CREATE TABLE IF NOT EXISTS ${STRIPE_SESSION_STORE_TABLE} (
-            session_id VARCHAR(255) NOT NULL,
-            session_type VARCHAR(50) NOT NULL,
-            processed TINYINT(1) NOT NULL DEFAULT 0,
-            payload_json LONGTEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (session_id)
-        )
-    `;
-    con.query(sql, (err) => {
-        if (err) {
-            console.error('Error creating stripe_checkout_session_store table:', err);
-        } else {
-            console.log('✅ stripe_checkout_session_store table ready');
-        }
-    });
-}
-
-ensureStripeSessionStoreTable();
-
-async function upsertStripeSessionStore(session_id, storeData, processedOverride) {
-    if (!session_id || !storeData) return;
-    const payload = {
-        ...storeData,
-        // Keep payload JSON compact by removing any cleanup timer handles (if present)
-        cleanupAt: undefined
-    };
-    const processedValue = typeof processedOverride === 'boolean'
-        ? (processedOverride ? 1 : 0)
-        : (storeData.processed ? 1 : 0);
-
-    const session_type = storeData.type || 'booking';
-    const payload_json = JSON.stringify(payload);
-
-    const sql = `
-        INSERT INTO ${STRIPE_SESSION_STORE_TABLE} (session_id, session_type, processed, payload_json)
-        VALUES (?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            session_type = VALUES(session_type),
-            processed = VALUES(processed),
-            payload_json = VALUES(payload_json)
-    `;
-
-    await con.promise().query(sql, [session_id, session_type, processedValue, payload_json]);
-}
-
-async function loadStripeSessionStore(session_id) {
-    if (!session_id) return null;
-    const sql = `
-        SELECT session_id, session_type, processed, payload_json
-        FROM ${STRIPE_SESSION_STORE_TABLE}
-        WHERE session_id = ?
-        LIMIT 1
-    `;
-    const [rows] = await con.promise().query(sql, [session_id]);
-    if (!rows || rows.length === 0) return null;
-
-    const row = rows[0];
-    let payload = null;
-    try {
-        payload = JSON.parse(row.payload_json);
-    } catch (e) {
-        console.error('Failed to parse payload_json for stripe session:', session_id, e?.message || e);
-        payload = {};
-    }
-    payload.type = payload.type || row.session_type;
-    payload.processed = !!row.processed;
-    return payload;
-}
-
 // Webhook için booking oluşturma fonksiyonu
 async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
     return new Promise((resolve, reject) => {
@@ -28915,14 +28783,6 @@ app.post('/api/create-checkout-session', async (req, res) => {
             totalPrice: Number(totalPrice) || 0, // For conversion_data in session-status
             timestamp: Date.now() // Add timestamp for debugging
         };
-        // Persist payload (DB) so webhook/fallback works even if this server instance restarts.
-        // If this write fails, we still proceed with the old RAM store, but webhook/popups may break.
-        try {
-            await upsertStripeSessionStore(session_id, stripeSessionStore[session_id], false);
-        } catch (e) {
-            console.error('Failed to persist stripe session payload to DB:', e?.message || e);
-        }
-
         // File logging for saved session voucherData
         try {
             logToFile('SESSION STORE SAVE', {
@@ -29317,24 +29177,10 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Session ID is required' });
         }
 
-        let storeData = stripeSessionStore[session_id];
+        const storeData = stripeSessionStore[session_id];
         if (!storeData) {
             console.error('Session data not found for session_id:', session_id);
-            // Try to load persisted payload (in case server instance changed/restarted)
-            try {
-                const loaded = await loadStripeSessionStore(session_id);
-                if (loaded) {
-                    console.log('Loaded stripe session payload from DB fallback:', session_id);
-                    stripeSessionStore[session_id] = loaded;
-                    storeData = loaded;
-                }
-            } catch (e) {
-                console.error('Failed loading stripe session payload from DB:', session_id, e?.message || e);
-            }
-        }
-
-        if (!storeData) {
-            // Try to fetch directly from Stripe as a fallback (in case server restart and DB payload missing)
+            // Try to fetch directly from Stripe as a fallback (in case server was restarted)
             try {
                 const session = await stripe.checkout.sessions.retrieve(session_id);
                 if (session && session.metadata && session.metadata.session_id === session_id) {
@@ -32255,23 +32101,10 @@ app.get('/api/debug/vouchers-table-structure', (req, res) => {
 
 // Session status endpoint to avoid duplicate creation from client
 // When processed, also returns conversion_data for client-side Google Ads conversion tracking
-app.get('/api/session-status', async (req, res) => {
+app.get('/api/session-status', (req, res) => {
     const { session_id } = req.query;
     if (!session_id) return res.status(400).json({ processed: false, message: 'session_id is required' });
-    let data = stripeSessionStore[session_id];
-    if (!data) {
-        try {
-            const loaded = await loadStripeSessionStore(session_id);
-            if (loaded) {
-                stripeSessionStore[session_id] = loaded;
-                data = loaded;
-                console.log('Session-status loaded stripe session payload from DB:', session_id);
-            }
-        } catch (e) {
-            // Ignore; fallback behavior is still safe.
-            console.warn('Session-status DB load failed:', session_id, e?.message || e);
-        }
-    }
+    const data = stripeSessionStore[session_id];
     const processed = !!(data && (data.processed || data.processing));
     const result = { processed, type: data?.type || null };
 
