@@ -6146,6 +6146,7 @@ setBookingDetail(finalVoucherDetail);
                                             status: item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1).toLowerCase() : '',
                                             paid: item.paid || '',
                                             due: item.due || '',
+                                            redeemed: item.redeemed ?? item.redeemed_voucher ?? item.voucher_redeemed ?? '',
                                             voucher_code: item.voucher_code || '',
                                             flight_attempts: item.flight_attempts ?? 0,
                                             expires: item.expires || '',

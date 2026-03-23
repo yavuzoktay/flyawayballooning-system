@@ -1112,16 +1112,26 @@ const PaginatedTable = ({
                                                     </span>
                                                 ) : ''
                                                             ) : id === 'paid' ? (
-                                                                // Show paid amount: red for full refund, green for normal payment
+                                                                // Paid: show visual state (refund/redeemed)
                                                                 (() => {
                                                                     const paidValue = parseFloat(item[id] || 0);
                                                                     const hasRefund = item.has_refund === 1 || item.has_refund === true;
                                                                     const isFullyRefunded = hasRefund && paidValue <= 0.01;
                                                                     const hasNormalPayment = !hasRefund && paidValue > 0.01;
-                                                                    
+
+                                                                    // For redeemed vouchers/bookings, always grey out the paid value
+                                                                    // so it's clear this amount came from a voucher redemption (sale already counted).
+                                                                    if (isVoucherRedeemed(item)) {
+                                                                        return (
+                                                                            <span style={{ color: '#9ca3af', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
+                                                                                {item[id]}
+                                                                            </span>
+                                                                        );
+                                                                    }
+
                                                                     let color = 'inherit';
                                                                     let fontWeight = 'normal';
-                                                                    
+
                                                                     if (isFullyRefunded) {
                                                                         // Full refund: red
                                                                         color = '#dc3545';
@@ -1131,11 +1141,11 @@ const PaginatedTable = ({
                                                                         color = '#28a745';
                                                                         fontWeight = 'normal';
                                                                     }
-                                                                    
+
                                                                     return (
                                                                         <span style={{ color, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
-                                                                    {item[id]}
-                                                                </span>
+                                                                            {item[id]}
+                                                                        </span>
                                                                     );
                                                                 })()
                                                             ) : item[id]}

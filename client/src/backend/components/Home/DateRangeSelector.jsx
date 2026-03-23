@@ -254,9 +254,18 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             }, 0);
             
             // Total Sales:
-            // Sum Paid from all bookings + all vouchers in the selected date range
-            // Includes everything purchased, regardless of redeemed/flown status
-            const bookingSales = data?.reduce((sum, item) => sum + parseMoney(item?.paid), 0) || 0;
+            // We count voucher sale at the time the voucher is created.
+            // When a voucher is redeemed into a booking, the booking's `paid` reflects that same purchase,
+            // so we must NOT add redeemed-voucher bookings again to avoid double-counting.
+            const bookingSales = data?.reduce((sum, item) => {
+                const redeemedLike =
+                    isRedeemedLikeYes(item?.redeemed_voucher) ||
+                    isRedeemedLikeYes(item?.voucher_redeemed) ||
+                    isRedeemedLikeYes(item?.is_voucher_redeemed);
+
+                if (redeemedLike) return sum;
+                return sum + parseMoney(item?.paid);
+            }, 0) || 0;
             const voucherSales = (vouchers || []).reduce((sum, item) => {
                 return sum + parseMoney(item?.paid);
             }, 0);
