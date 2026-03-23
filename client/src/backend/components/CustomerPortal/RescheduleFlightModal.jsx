@@ -1160,7 +1160,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             PaperProps={{
                 sx: {
                     borderRadius: 3,
-                    maxHeight: '90vh',
+                    maxHeight: isMobile ? '84vh' : '90vh',
                     ...(isMobile ? {
                         margin: '8px',
                         width: 'calc(100% - 16px)',
@@ -1177,7 +1177,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }}>
                 Reschedule Your Flight
             </DialogTitle>
-            <DialogContent sx={{ padding: isMobile ? '12px 16px' : '24px' }}>
+            <DialogContent sx={{ padding: isMobile ? '12px 16px 6px' : '24px' }}>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                         {error}
@@ -1355,10 +1355,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 )}
             </DialogContent>
             <DialogActions sx={{ 
-                p: isMobile ? 2 : 3, 
-                pt: isMobile ? 1.5 : 2, 
+                p: isMobile ? 1 : 3, 
+                pt: isMobile ? 0.5 : 2, 
                 justifyContent: 'flex-end',
-                padding: isMobile ? '12px 16px' : '16px 24px'
+                padding: isMobile ? '6px 16px 10px' : '16px 24px'
             }}>
                 <Button
                     onClick={handleConfirm}
