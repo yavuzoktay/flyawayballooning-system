@@ -1291,6 +1291,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                             const isPastTime = slotDateTime.isBefore(dayjs());
                                             const isDisabled = !isAvailable || isPastTime || !hasEnoughSpace;
 
+                                            // If the slot would show an "Insufficient..." message (and it's grey/disabled),
+                                            // hide it completely so customers only see selectable options.
+                                            if (!isPrivateSelection && !hasEnoughSpace) return null;
+
                                             return (
                                                 <Button
                                                     key={slot.id}

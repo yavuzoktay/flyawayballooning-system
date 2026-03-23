@@ -1184,7 +1184,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         const isSelected = selectedTime === slot.time || selectedTime === timeForComparison;
                                                         const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                                         const isPastTime = slotDateTime.isBefore(dayjs());
-                                                        const isDisabled = !isAvailable || isPastTime || !hasEnoughSpace;
+                                                    // If slot has capacity but not enough for the whole passenger group,
+                                                    // hide it entirely (do not show "Insufficient..." disabled buttons).
+                                                    if (isAvailable && !hasEnoughSpace) return null;
+                                                    const isDisabled = !isAvailable || isPastTime;
                                                         return (
                                                             <Button
                                                                 key={slot.id}
@@ -1234,10 +1237,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {timeDisplay} ({availableSeats} Spaces
-                                                                {hasEnoughSpace
-                                                                    ? ')'
-                                                                    : ` - Insufficient for ${passengerCountForSelection} passenger${passengerCountForSelection > 1 ? 's' : ''})`}
+                                                                {timeDisplay} ({availableSeats} Spaces)
                                                             </Button>
                                                         );
                                                     })}
@@ -1555,7 +1555,10 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                         const isSelected = selectedTime === slot.time;
                                                         const slotDateTime = dayjs(`${dayjs(selectedDate).format('YYYY-MM-DD')} ${slot.time}`);
                                                         const isPastTime = slotDateTime.isBefore(dayjs());
-                                                        const isDisabled = !isAvailable || isPastTime || !hasEnoughSpace;
+                                                        // If slot has capacity but not enough for the whole passenger group,
+                                                        // hide it entirely (do not show "Insufficient..." disabled buttons).
+                                                        if (isAvailable && !hasEnoughSpace) return null;
+                                                        const isDisabled = !isAvailable || isPastTime;
                                                         return (
                                                             <Button
                                                                 key={slot.id}
@@ -1599,10 +1602,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                                                                     }
                                                                 }}
                                                             >
-                                                                {slot.time} ({availableSeats} Spaces
-                                                                {hasEnoughSpace
-                                                                    ? ')'
-                                                                    : ` - Insufficient for ${passengerCountForSelection} passenger${passengerCountForSelection > 1 ? 's' : ''})`}
+                                                                {slot.time} ({availableSeats} Spaces)
                                                             </Button>
                                                         );
                                                     })}
