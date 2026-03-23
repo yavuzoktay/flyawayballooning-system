@@ -13519,6 +13519,12 @@ app.post('/api/createBooking', (req, res) => {
         // Check if this is a Redeem Voucher operation OR a rebook with a Gift Voucher
         const isRedeemVoucherOperation = activitySelect === 'Redeem Voucher';
         const isRebookWithGiftVoucher = isRebook && voucher_code;
+        // Voucher context used to keep booking activity/experience aligned with redeemed voucher.
+        const voucherContext = {
+            experience_type: null,
+            voucher_type: null,
+            preferred_location: null
+        };
         
         // For rebook operations, preserve the existing booking's paid amount (don't change it)
         if (isRebook && rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
@@ -13560,7 +13566,7 @@ app.post('/api/createBooking', (req, res) => {
             // but we need to find the voucher by voucher_ref (e.g., GAT0GP3L9)
             // First try direct voucher_ref match, then try via voucher_code_usage
             const getVoucherPaidSql = `
-                SELECT v.paid, v.voucher_ref, v.book_flight
+                SELECT v.paid, v.voucher_ref, v.book_flight, v.experience_type, v.voucher_type, v.preferred_location
                 FROM all_vouchers v
                 WHERE UPPER(v.voucher_ref) = UPPER(?)
                 LIMIT 1
@@ -13571,14 +13577,20 @@ app.post('/api/createBooking', (req, res) => {
                 return new Promise((resolve) => {
                     // First try direct voucher_ref match
                     con.query(getVoucherPaidSql, [voucher_code.trim()], (err, result) => {
-                        if (!err && result.length > 0 && result[0].paid != null && result[0].paid > 0) {
-                            finalPaidAmount = parseFloat(result[0].paid) || 0;
+                        if (!err && result.length > 0) {
+                            if (result[0].paid != null && !isNaN(parseFloat(result[0].paid))) {
+                                finalPaidAmount = parseFloat(result[0].paid) || 0;
+                            }
+                            voucherContext.experience_type = result[0].experience_type || null;
+                            voucherContext.voucher_type = result[0].voucher_type || null;
+                            voucherContext.preferred_location = result[0].preferred_location || null;
                             console.log('✅ [createBooking] Found original voucher price from all_vouchers.paid:', finalPaidAmount);
+                            console.log('✅ [createBooking] Voucher context loaded:', voucherContext);
                             resolve(finalPaidAmount);
                         } else if (isRebook && rebook_from_booking_id) {
                             // For rebook, try to find voucher via voucher_code_usage
                             const rebookVoucherLookupSql = `
-                                SELECT v.paid, v.voucher_ref, v.book_flight
+                                SELECT v.paid, v.voucher_ref, v.book_flight, v.experience_type, v.voucher_type, v.preferred_location
                                 FROM all_booking ab2
                                 INNER JOIN voucher_code_usage vcu ON vcu.booking_id = ab2.id
                                 INNER JOIN voucher_codes vc2 ON vc2.id = vcu.voucher_code_id
@@ -13587,14 +13599,20 @@ app.post('/api/createBooking', (req, res) => {
                                 LIMIT 1
                             `;
                             con.query(rebookVoucherLookupSql, [parseInt(rebook_from_booking_id)], (rebookErr, rebookResult) => {
-                                if (!rebookErr && rebookResult.length > 0 && rebookResult[0].paid != null && rebookResult[0].paid > 0) {
-                                    finalPaidAmount = parseFloat(rebookResult[0].paid) || 0;
+                                if (!rebookErr && rebookResult.length > 0) {
+                                    if (rebookResult[0].paid != null && !isNaN(parseFloat(rebookResult[0].paid))) {
+                                        finalPaidAmount = parseFloat(rebookResult[0].paid) || 0;
+                                    }
+                                    voucherContext.experience_type = rebookResult[0].experience_type || voucherContext.experience_type;
+                                    voucherContext.voucher_type = rebookResult[0].voucher_type || voucherContext.voucher_type;
+                                    voucherContext.preferred_location = rebookResult[0].preferred_location || voucherContext.preferred_location;
                                     console.log('✅ [createBooking] Found voucher price via voucher_code_usage for rebook:', finalPaidAmount);
+                                    console.log('✅ [createBooking] Voucher context loaded (rebook):', voucherContext);
                                     resolve(finalPaidAmount);
                                 } else if (isRebook && rebook_from_booking_id) {
                                     // Fallback: Try metadata matching with booking info
                                     const metadataMatchSql = `
-                                        SELECT v.paid, v.voucher_ref, v.book_flight
+                                        SELECT v.paid, v.voucher_ref, v.book_flight, v.experience_type, v.voucher_type, v.preferred_location
                                         FROM all_booking ab2
                                         INNER JOIN all_vouchers v ON (
                                             (ab2.email IS NOT NULL AND ab2.email != '' AND (
@@ -13623,9 +13641,15 @@ app.post('/api/createBooking', (req, res) => {
                                         LIMIT 1
                                     `;
                                     con.query(metadataMatchSql, [parseInt(rebook_from_booking_id)], (metadataErr, metadataResult) => {
-                                        if (!metadataErr && metadataResult.length > 0 && metadataResult[0].paid != null && metadataResult[0].paid > 0) {
-                                            finalPaidAmount = parseFloat(metadataResult[0].paid) || 0;
+                                        if (!metadataErr && metadataResult.length > 0) {
+                                            if (metadataResult[0].paid != null && !isNaN(parseFloat(metadataResult[0].paid))) {
+                                                finalPaidAmount = parseFloat(metadataResult[0].paid) || 0;
+                                            }
+                                            voucherContext.experience_type = metadataResult[0].experience_type || voucherContext.experience_type;
+                                            voucherContext.voucher_type = metadataResult[0].voucher_type || voucherContext.voucher_type;
+                                            voucherContext.preferred_location = metadataResult[0].preferred_location || voucherContext.preferred_location;
                                             console.log('✅ [createBooking] Found voucher price via metadata matching for rebook:', finalPaidAmount);
+                                            console.log('✅ [createBooking] Voucher context loaded (metadata):', voucherContext);
                                             resolve(finalPaidAmount);
                                         } else {
                                             // Use frontend-provided paid value if available (from voucher.paid)
@@ -13661,6 +13685,22 @@ app.post('/api/createBooking', (req, res) => {
         }
         
         function insertBookingWithFinalPaid() {
+        // For redeem flow, always align booking flight type with the redeemed voucher's experience.
+        // This prevents Private Charter vouchers from being stored/displayed as Shared Flight.
+        const normalizedChooseFlightType = (chooseFlightType && typeof chooseFlightType === 'object')
+            ? chooseFlightType
+            : { type: chooseFlightType || '' };
+        const voucherExperienceType = isRedeemVoucherOperation ? (voucherContext.experience_type || null) : null;
+        const effectiveFlightType = voucherExperienceType || normalizedChooseFlightType.type || experience || '';
+        const effectiveIsSharedFlight = typeof effectiveFlightType === 'string' &&
+            (effectiveFlightType === 'Shared Flight' || effectiveFlightType.includes('Shared'));
+        const effectiveWeatherRefundTotal = effectiveIsSharedFlight ? weather_refund_total_price : 0;
+        if (voucherExperienceType) {
+            chooseFlightType = { ...normalizedChooseFlightType, type: voucherExperienceType };
+            experience = voucherExperienceType;
+            console.log('🔒 [createBooking] Redeem flow forcing flight type from voucher context:', voucherExperienceType);
+        }
+
         // Ensure voucher_code exists in voucher_codes table before inserting booking
         // This prevents foreign key constraint errors
         if (voucher_code && voucher_code.trim() !== '') {
@@ -13711,7 +13751,7 @@ app.post('/api/createBooking', (req, res) => {
         // For INSERT operations, include created_at
         const bookingValues = isRebook ? [
             passengerName,
-            chooseFlightType.type,
+            effectiveFlightType,
             bookingDateTime,
             actualPaxCount,
             chooseLocation,
@@ -13737,7 +13777,7 @@ app.post('/api/createBooking', (req, res) => {
             finalFlightAttempts, // flight_attempts (0 for redeem voucher, otherwise from request or 0)
             req.body.activity_id || null, // activity_id
             selectedTime || null, // time_slot
-            experience || chooseFlightType.type, // experience (use from req.body if provided, otherwise use flight type)
+            experience || effectiveFlightType, // redeem flow is forced from voucher context when available
             // voucher_type: use from req.body if provided and not empty, and not an experience value
             // If voucher_type is empty or experience value, try to infer from voucher code or leave as null
             // Never use chooseFlightType.type as voucher_type (it's an experience value, not a voucher type)
@@ -13766,15 +13806,15 @@ app.post('/api/createBooking', (req, res) => {
             0, // voucher_discount
             base_original_amount, // original_amount (base price excluding add-ons and weather refund)
             add_on_total_price, // add_to_booking_items_total_price
-            weather_refund_total_price, // weather_refund_total_price
+            effectiveWeatherRefundTotal, // weather_refund_total_price
             flight_type_source,
-            getAssignedResource(chooseFlightType.type || experience, actualPaxCount),
+            getAssignedResource(effectiveFlightType || experience, actualPaxCount),
             null, // google_calendar_event_id (will be set after event creation)
             season_saver, // season_saver flag
             parseInt(rebook_from_booking_id) // WHERE id = ? for UPDATE
         ] : [
             passengerName,
-            chooseFlightType.type,
+            effectiveFlightType,
             bookingDateTime,
             actualPaxCount,
             chooseLocation,
@@ -13801,7 +13841,7 @@ app.post('/api/createBooking', (req, res) => {
             finalFlightAttempts,
             req.body.activity_id || null,
             selectedTime || null,
-            experience || chooseFlightType.type,
+            experience || effectiveFlightType,
             (voucher_type && voucher_type.trim() !== '' && !isGenericExperienceValue(voucher_type)) 
                 ? voucher_type 
                 : (() => {
@@ -13825,9 +13865,9 @@ app.post('/api/createBooking', (req, res) => {
             0, // voucher_discount
             base_original_amount,
             add_on_total_price,
-            weather_refund_total_price,
+            effectiveWeatherRefundTotal,
             flight_type_source,
-            getAssignedResource(chooseFlightType.type || experience, actualPaxCount),
+            getAssignedResource(effectiveFlightType || experience, actualPaxCount),
             null, // google_calendar_event_id
             season_saver // season_saver flag
         ];
