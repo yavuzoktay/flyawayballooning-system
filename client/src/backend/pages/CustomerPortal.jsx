@@ -2867,11 +2867,6 @@ const CustomerPortal = () => {
                                                     });
                                                 })()}
                                             </Box>
-                                            <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#22c55e' }}>
-                                                <Typography variant="body2" sx={{ fontSize: 14 }}>
-                                                    ✓ Times are set according to sunrise and sunset.
-                                                </Typography>
-                                            </Box>
                                         </Box>
                                     )}
                                 </>
@@ -2879,7 +2874,7 @@ const CustomerPortal = () => {
                         </>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'flex-end' }}>
+                <DialogActions sx={{ p: 3, pt: 1, justifyContent: 'flex-end' }}>
                     <Button
                         onClick={() => {
                             setChangeLocationModalOpen(false);
