@@ -168,6 +168,25 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return map;
     }, [availabilities]);
 
+    // Balloon 105 is also a global resource across locations for small private/proposal (1-4 pax).
+    const balloon105InUseByDateTime = React.useMemo(() => {
+        const map = new Map();
+        (availabilities || []).forEach((s) => {
+            const dateKey = normalizeSlotDate(s?.date);
+            const timeKey = normalizeSlotTime(s?.time);
+            if (!dateKey || !timeKey) return;
+            const key = `${dateKey}|${timeKey}`;
+            const smallPrivateBookings = Number(s?.private_charter_small_bookings || s?.small_private_bookings || 0);
+            const hasSmallPrivateBooking = smallPrivateBookings > 0;
+            const remaining105 = typeof s?.private_charter_small_remaining === 'number' ? s.private_charter_small_remaining : null;
+            const remainingIndicatesUsage = Number.isFinite(remaining105) ? remaining105 < 4 : false;
+            if (hasSmallPrivateBooking || remainingIndicatesUsage) {
+                map.set(key, true);
+            }
+        });
+        return map;
+    }, [availabilities]);
+
     const getAvailableSeatsForSelection = (slot) => {
         if (!slot) return 0;
 
@@ -188,11 +207,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
         // PRIVATE FLOW (1–4 pax uses Balloon 105)
         if (isSmallPrivateSelection) {
+            const slotDateKey = normalizeSlotDate(slot?.date);
+            const slotTimeKey = normalizeSlotTime(slot?.time);
+            const balloon105InUseGlobally = slotDateKey && slotTimeKey
+                ? Boolean(balloon105InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
+                : false;
             const remaining105 = (typeof slot.private_charter_small_remaining === 'number')
                 ? slot.private_charter_small_remaining
                 : (Number(slot.private_charter_small_bookings || 0) > 0 ? 0 : 4);
 
-            if (remaining105 <= 0) return 0;
+            if (balloon105InUseGlobally || remaining105 <= 0) return 0;
             return remaining105 >= requiredSeats ? remaining105 : 0;
         }
 

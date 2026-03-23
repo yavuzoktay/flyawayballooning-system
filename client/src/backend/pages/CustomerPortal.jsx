@@ -1104,6 +1104,24 @@ const CustomerPortal = () => {
         });
         return map;
     })();
+    const balloon105InUseByDateTime = (() => {
+        const source = allLocationAvailabilities.length > 0 ? allLocationAvailabilities : locationAvailabilities;
+        const map = new Map();
+        source.forEach((s) => {
+            const dateKey = normalizeSlotDate(s?.date);
+            const timeKey = normalizeSlotTime(s?.time);
+            if (!dateKey || !timeKey) return;
+            const key = `${dateKey}|${timeKey}`;
+            const smallPrivateBookings = Number(s?.private_charter_small_bookings || s?.small_private_bookings || 0);
+            const hasSmallPrivateBooking = smallPrivateBookings > 0;
+            const remaining105 = typeof s?.private_charter_small_remaining === 'number' ? s.private_charter_small_remaining : null;
+            const remainingIndicatesUsage = Number.isFinite(remaining105) ? remaining105 < 4 : false;
+            if (hasSmallPrivateBooking || remainingIndicatesUsage) {
+                map.set(key, true);
+            }
+        });
+        return map;
+    })();
     const getAvailableSeatsForChangeLocation = (slot) => {
         if (!slot) return 0;
 
@@ -1120,10 +1138,15 @@ const CustomerPortal = () => {
 
         // Private 1–4 uses Balloon 105.
         if (isSmallPrivateSelection) {
+            const slotDateKey = normalizeSlotDate(slot?.date);
+            const slotTimeKey = normalizeSlotTime(slot?.time);
+            const balloon105InUseGlobally = slotDateKey && slotTimeKey
+                ? Boolean(balloon105InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
+                : false;
             const remaining105 = (typeof slot.private_charter_small_remaining === 'number')
                 ? slot.private_charter_small_remaining
                 : (Number(slot.private_charter_small_bookings || 0) > 0 ? 0 : 4);
-            if (remaining105 <= 0) return 0;
+            if (balloon105InUseGlobally || remaining105 <= 0) return 0;
             return remaining105 >= requiredSeatsForChangeLocation ? remaining105 : 0;
         }
 

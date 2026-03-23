@@ -723,6 +723,25 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         return map;
     }, [availabilities]);
 
+    // Balloon 105 global usage tracking for small private/proposal (1-4 pax) across locations.
+    const balloon105InUseByDateTime = useMemo(() => {
+        const map = new Map();
+        (availabilities || []).forEach((s) => {
+            const dateKey = normalizeSlotDate(s?.date);
+            const timeKey = normalizeSlotTime(s?.time);
+            if (!dateKey || !timeKey) return;
+            const key = `${dateKey}|${timeKey}`;
+            const smallPrivateBookings = Number(s?.private_charter_small_bookings || s?.small_private_bookings || 0);
+            const hasSmallPrivateBooking = smallPrivateBookings > 0;
+            const remaining105 = typeof s?.private_charter_small_remaining === 'number' ? s.private_charter_small_remaining : null;
+            const remainingIndicatesUsage = Number.isFinite(remaining105) ? remaining105 < 4 : false;
+            if (hasSmallPrivateBooking || remainingIndicatesUsage) {
+                map.set(key, true);
+            }
+        });
+        return map;
+    }, [availabilities]);
+
     // Get available seats for a slot based on resource usage (same logic as Live Availability)
     const getAvailableSeatsForSlot = (slot) => {
         if (!slot) return 0;
@@ -744,12 +763,17 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
 
         // PRIVATE FLOW
         if (isCurrentBookingSmallPrivate) {
+            const slotDateKey = normalizeSlotDate(slot?.date);
+            const slotTimeKey = normalizeSlotTime(slot?.time);
+            const balloon105InUseGlobally = slotDateKey && slotTimeKey
+                ? Boolean(balloon105InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
+                : false;
             // 1–4 pax private charter uses Balloon 105 resource
             const remaining105 = (typeof slot.private_charter_small_remaining === 'number')
                 ? slot.private_charter_small_remaining
                 : (Number(slot.private_charter_small_bookings || 0) > 0 ? 0 : 4);
 
-            if (remaining105 <= 0) {
+            if (balloon105InUseGlobally || remaining105 <= 0) {
                 return 0;
             }
 
