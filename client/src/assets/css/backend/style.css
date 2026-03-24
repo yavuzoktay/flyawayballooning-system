@@ -53,15 +53,38 @@ body {
 .home-filter-data-table {
     flex: 1;
 }
+.home-page-wrap .heading-wrap h2 {
+    font-size: 36px;
+    margin-bottom: 8px;
+    letter-spacing: 0.01em;
+}
+
+.home-page-wrap .heading-wrap hr {
+    border: none;
+    height: 1px;
+    background: #e5ebf5;
+    margin-bottom: 26px;
+}
+
+.home-page-wrap .home-body-wrap {
+    background: #f4f7fc;
+    border-radius: 22px;
+    padding: 30px;
+}
+
 .home-filter-data-wrap>div {
-    background: rgb(235 235 235 / 52%);
+    background: #ffffff;
     padding: 20px;
-    box-shadow: 0 0 10px rgb(209 209 209 / 75%);
-    border-radius: 10px;
+    border-radius: 14px;
+    border: 1px solid #e1e8f3;
+    box-shadow: none;
 }
 
 .home-filter-data-table h3 {
     margin-top: 0;
+    color: #1c3458;
+    font-size: 24px;
+    letter-spacing: 0.01em;
 }
 
 .filter-data-right-card {
@@ -91,27 +114,67 @@ body {
     cursor: pointer;
 }
 
+.date-range-selector-container .totals-table {
+    border: 0 !important;
+    border-spacing: 0;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.date-range-selector-container .totals-table thead th {
+    background: #2d69c5;
+    color: #ffffff;
+    font-size: 13px !important;
+    font-weight: 600;
+    padding: 12px 10px !important;
+}
+
+.date-range-selector-container .totals-table tbody td {
+    font-size: 14px !important;
+    color: #465a79;
+    padding: 10px 10px !important;
+    border-bottom: 1px solid #ebf0f8;
+    background: #ffffff;
+}
+
 /* Mobile Responsive Styles for Home Page - Only for mobile devices */
 @media screen and (max-width: 768px) {
-    /* Date Range Selector Container */
-    .date-range-selector-container {
-        padding: 15px !important;
-        border-radius: 15px !important;
+    .home-page-wrap .home-body-wrap {
+        padding: 12px 10px !important;
+        border-radius: 14px !important;
     }
 
-    /* Date Inputs - Side by side on mobile */
+    .home-page-wrap .home-body-wrap > * {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Date Range Selector Container */
+    .date-range-selector-container {
+        padding: 14px !important;
+        border-radius: 14px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        margin-left: 2px !important;
+        margin-right: 2px !important;
+        width: calc(100% - 4px) !important;
+    }
+
+    /* Date Inputs - Two columns + full width filter button */
     .date-inputs-container {
         flex-direction: row !important;
         align-items: flex-end !important;
-        gap: 20px !important;
-        flex-wrap: nowrap !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
     }
 
     .date-inputs-container label {
-        flex: 1 1 auto !important;
+        flex: 1 1 calc(50% - 4px) !important;
         min-width: 0 !important;
         margin-left: 0 !important;
         margin-right: 0 !important;
+        max-width: calc(50% - 4px) !important;
     }
 
     .date-inputs-container label:first-of-type {
@@ -124,8 +187,10 @@ body {
 
     .date-inputs-container button {
         margin-left: 0 !important;
-        flex-shrink: 0 !important;
-        min-width: auto !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
     }
 
     .date-inputs-container input[type="date"] {
@@ -150,14 +215,15 @@ body {
     .date-inputs-container button {
         flex-shrink: 0 !important;
         margin-left: 0 !important;
-        align-self: flex-end !important;
+        align-self: stretch !important;
         white-space: nowrap !important;
-        padding: 8px 16px !important;
+        padding: 10px 12px !important;
+        margin-top: 2px !important;
     }
 
-    /* Quick Links Buttons - Horizontal scroll on mobile (Tripworks style) */
+    /* Quick Links Buttons - wrap on mobile to avoid clipping */
     .filter-range-btns {
-        margin-top: 20px !important;
+        margin-top: 14px !important;
     }
 
     .filter-range-btns h3 {
@@ -167,12 +233,12 @@ body {
 
     .filter-range-btns > div {
         display: flex !important;
-        flex-wrap: nowrap !important;
+        flex-wrap: wrap !important;
         gap: 8px !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        padding-bottom: 4px !important;
-        scrollbar-width: thin !important;
+        overflow-x: visible !important;
+        -webkit-overflow-scrolling: auto !important;
+        padding-bottom: 0 !important;
+        width: 100% !important;
     }
 
     .filter-range-btns > div::-webkit-scrollbar {
@@ -192,27 +258,27 @@ body {
     .filter-range-btns button {
         margin-right: 0 !important;
         margin-bottom: 0 !important;
-        flex: 0 0 auto !important;
-        min-width: auto !important;
-        max-width: none !important;
-        padding: 8px 16px !important;
-        font-size: 14px !important;
-        white-space: nowrap !important;
-        border-radius: 20px !important;
-        border: 1px solid #e0e0e0 !important;
-        background: #f5f5f5 !important;
-        color: #3274b4 !important;
+        flex: 1 1 calc(33.333% - 6px) !important;
+        min-width: calc(33.333% - 6px) !important;
+        max-width: calc(33.333% - 6px) !important;
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        white-space: normal !important;
+        border-radius: 10px !important;
+        border: 1px solid #d4deec !important;
+        background: #e8eef8 !important;
+        color: #35547f !important;
         transition: all 0.2s ease !important;
     }
 
     .filter-range-btns button:hover {
-        background: #e8e8e8 !important;
+        background: #dbe5f4 !important;
     }
 
     .filter-range-btns button:active {
-        background: #3274b4 !important;
+        background: #2d69c5 !important;
         color: #fff !important;
-        border-color: #3274b4 !important;
+        border-color: #2d69c5 !important;
     }
 
     /* Totals Container - Stack on mobile */
@@ -220,6 +286,7 @@ body {
         flex-direction: column !important;
         align-items: stretch !important;
         gap: 20px !important;
+        padding-right: 2px !important;
     }
 
     .home-filter-data-table {
@@ -232,17 +299,32 @@ body {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
         width: 100% !important;
+        border-radius: 10px !important;
     }
 
     .totals-table {
-        min-width: 500px !important;
-        font-size: 12px !important;
+        min-width: 560px !important;
+        width: 100% !important;
+        table-layout: auto !important;
+        font-size: 11px !important;
     }
 
     .totals-table th,
     .totals-table td {
-        padding: 6px 4px !important;
-        font-size: 12px !important;
+        padding: 8px 6px !important;
+        font-size: 11px !important;
+        word-break: normal !important;
+        line-height: 1.2 !important;
+        text-align: center !important;
+    }
+
+    .totals-table th {
+        white-space: nowrap !important;
+        overflow: visible !important;
+    }
+
+    .totals-table td {
+        white-space: normal !important;
     }
 
     /* Manual Booking Button - Full width on mobile */
@@ -255,14 +337,28 @@ body {
         align-items: stretch !important;
         padding-left: 0 !important;
         padding-right: 0 !important;
+        justify-content: stretch !important;
     }
 
-    .manual-booking-button-container a {
-        width: auto !important;
-        max-width: 150px !important;
-        padding: 8px 12px !important;
+    .home-filter-data-wrap {
+        padding-left: 2px !important;
+        padding-right: 2px !important;
+        box-sizing: border-box !important;
+    }
+
+    .home-filter-data-wrap > div {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .manual-booking-button-container button {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 10px 12px !important;
         font-size: 12px !important;
-        border-radius: 4px !important;
+        border-radius: 10px !important;
     }
 
     /* Home Page Wrap - Prevent overflow */
@@ -280,39 +376,39 @@ body {
 
     /* Container adjustments */
     .home-page-wrap .MuiContainer-root {
-        padding-left: 10px !important;
-        padding-right: 10px !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
         max-width: 100% !important;
     }
 
     /* Heading adjustments */
-    .heading-wrap h2 {
+    .home-page-wrap .heading-wrap h2 {
         font-size: 20px !important;
         word-wrap: break-word !important;
     }
 
     /* Analytics Dashboard - Ensure cards stack properly */
-    .MuiGrid-container {
+    .home-page-wrap .MuiGrid-container {
         margin: 0 !important;
         width: 100% !important;
     }
 
-    .MuiGrid-item {
-        padding: 8px !important;
+    .home-page-wrap .MuiGrid-item {
+        padding: 6px !important;
     }
 
     /* Ensure cards don't overflow */
-    .MuiCard-root {
+    .home-page-wrap .MuiCard-root {
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
     }
 
-    .MuiCardContent-root {
+    .home-page-wrap .MuiCardContent-root {
         padding: 12px !important;
     }
 
-    .MuiTypography-h6 {
+    .home-page-wrap .MuiTypography-h6 {
         font-size: 14px !important;
         margin-bottom: 8px !important;
     }

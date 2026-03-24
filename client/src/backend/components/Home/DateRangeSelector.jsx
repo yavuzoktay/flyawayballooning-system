@@ -323,78 +323,109 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         }
     };
 
+    const primaryButtonStyle = {
+        background: "linear-gradient(135deg, #2d69c5 0%, #1f57ad 100%)",
+        color: "#FFF",
+        border: "none",
+        cursor: "pointer",
+        padding: isMobile ? '10px 14px' : '10px 18px',
+        borderRadius: '10px',
+        whiteSpace: 'nowrap',
+        fontSize: isMobile ? '12px' : '12px',
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        height: isMobile ? '40px' : '40px',
+        boxShadow: '0 8px 20px rgba(31, 87, 173, 0.2)'
+    };
+
+    const quickFilterButtonStyle = {
+        padding: isMobile ? '8px 12px' : '10px 14px',
+        borderRadius: '10px',
+        border: '1px solid #d4deec',
+        background: '#e8eef8',
+        color: '#35547f',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+        fontSize: isMobile ? '12px' : '12px',
+        fontWeight: 700,
+        letterSpacing: '0.02em',
+        textTransform: 'uppercase'
+    };
+
     return (
-        <div style={{ padding: "20px", background: "#f9f9f9", borderRadius: "20px" }} className="date-range-selector-container">
+        <div style={{ padding: isMobile ? "16px" : "24px", background: "#f4f7fc", borderRadius: "22px", border: "1px solid #e1e8f3" }} className="date-range-selector-container">
             {/* Date Inputs */}
             <div style={{
                 display: 'flex',
                 flexDirection: 'row',
                 flexWrap: 'wrap',
-                gap: isMobile ? '6px' : '20px',
-                alignItems: 'center'
+                gap: isMobile ? '10px' : '14px',
+                alignItems: 'flex-end'
             }} className="date-inputs-container">
-                <label style={{ 
+                <label style={{
                     display: 'flex', 
                     flexDirection: 'column', 
                     gap: isMobile ? '2px' : '5px', 
-                    flex: '0 0 auto', 
-                    minWidth: isMobile ? '80px' : '90px',
-                    maxWidth: isMobile ? 'none' : '90px',
-                    fontSize: isMobile ? '10px' : '12px'
+                    flex: isMobile ? '1 1 calc(50% - 5px)' : '0 0 250px',
+                    minWidth: isMobile ? '0' : '250px',
+                    maxWidth: isMobile ? 'calc(50% - 5px)' : '250px',
+                    fontSize: isMobile ? '11px' : '12px',
+                    fontWeight: 600,
+                    color: '#5e7393'
                 }}>
                     Start Date:
                     <input
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        style={{ 
+                        style={{
                             width: '100%', 
-                            padding: isMobile ? '4px' : '5px', 
-                            borderRadius: '4px', 
-                            border: '1px solid #ccc',
+                            padding: isMobile ? '6px 8px' : '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #d8e3f2',
+                            background: '#ffffff',
                             fontSize: isMobile ? '16px' : '12px', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '25px' : '25px'
+                            height: isMobile ? '36px' : '40px',
+                            boxSizing: 'border-box'
                         }}
                     />
                 </label>
-                <label style={{ 
+                <label style={{
                     display: 'flex', 
                     flexDirection: 'column', 
                     gap: isMobile ? '2px' : '5px', 
-                    flex: '0 0 auto', 
-                    minWidth: isMobile ? '80px' : '90px',
-                    maxWidth: isMobile ? 'none' : '90px',
-                    fontSize: isMobile ? '10px' : '12px'
+                    flex: isMobile ? '1 1 calc(50% - 5px)' : '0 0 250px',
+                    minWidth: isMobile ? '0' : '250px',
+                    maxWidth: isMobile ? 'calc(50% - 5px)' : '250px',
+                    fontSize: isMobile ? '11px' : '12px',
+                    fontWeight: 600,
+                    color: '#5e7393'
                 }}>
                     End Date:
                     <input
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        style={{ 
+                        style={{
                             width: '100%', 
-                            padding: isMobile ? '4px' : '5px', 
-                            borderRadius: '4px', 
-                            border: '1px solid #ccc',
+                            padding: isMobile ? '6px 8px' : '8px 10px',
+                            borderRadius: '10px',
+                            border: '1px solid #d8e3f2',
+                            background: '#ffffff',
                             fontSize: isMobile ? '16px' : '12px', // Keep 16px for iOS zoom prevention
-                            height: isMobile ? '25px' : '25px'
+                            height: isMobile ? '36px' : '40px',
+                            boxSizing: 'border-box'
                         }}
                     />
                 </label>
                 <button 
                     onClick={handleFilter} 
                     style={{ 
-                        background: "#3274b4", 
-                        color: "#FFF", 
-                        border: "1px solid #3274b4", 
-                        cursor: "pointer",
-                        padding: isMobile ? '4px 10px' : '5px 16px',
-                        borderRadius: '4px',
-                        alignSelf: isMobile ? 'flex-end' : 'flex-start',
-                        whiteSpace: 'nowrap',
-                        fontSize: isMobile ? '11px' : 'inherit',
-                        height: isMobile ? '35px' : '36px',
-                        marginTop: isMobile ? 0 : '20px'
+                        ...primaryButtonStyle,
+                        alignSelf: 'flex-end',
+                        marginTop: 0,
+                        marginLeft: isMobile ? 0 : '2px'
                     }}
                 >
                     Filter
@@ -409,60 +440,12 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                     gap: '8px',
                     marginTop: '10px'
                 }}>
-                    <button onClick={quickLinks.allTime} style={{ 
-                        marginRight: "10px",
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                    }}>All Time</button>
-                    <button onClick={quickLinks.last12Months} style={{ 
-                        marginRight: "10px",
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                    }}>Last 12 Months</button>
-                    <button onClick={quickLinks.quarter1} style={{ 
-                        marginRight: "10px",
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                    }}>Q1</button>
-                    <button onClick={quickLinks.quarter2} style={{ 
-                        marginRight: "10px",
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                    }}>Q2</button>
-                    <button onClick={quickLinks.quarter3} style={{ 
-                        marginRight: "10px",
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                    }}>Q3</button>
-                    <button onClick={quickLinks.quarter4} style={{ 
-                        marginRight: "10px",
-                        padding: '8px 12px',
-                        borderRadius: '4px',
-                        border: '1px solid #ccc',
-                        background: '#fff',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap'
-                    }}>Q4</button>
+                    <button onClick={quickLinks.allTime} style={quickFilterButtonStyle}>All Time</button>
+                    <button onClick={quickLinks.last12Months} style={quickFilterButtonStyle}>Last 12 Months</button>
+                    <button onClick={quickLinks.quarter1} style={quickFilterButtonStyle}>Q1</button>
+                    <button onClick={quickLinks.quarter2} style={quickFilterButtonStyle}>Q2</button>
+                    <button onClick={quickLinks.quarter3} style={quickFilterButtonStyle}>Q3</button>
+                    <button onClick={quickLinks.quarter4} style={quickFilterButtonStyle}>Q4</button>
                 </div>
             </div>
 
@@ -474,8 +457,8 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                             <h3 style={{ fontFamily: "Gilroy Light" }}>Totals:</h3>
                             {Object.keys(summary).length > 0 ? (
                                 <div style={{ overflowX: 'auto', width: '100%' }} className="totals-table-wrapper">
-                                    <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", minWidth: '500px' }} className="totals-table">
-                                        <thead style={{ background: "#3274b4", color: "#FFF" }}>
+                                    <table border="0" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "separate", borderSpacing: 0, minWidth: '500px' }} className="totals-table">
+                                        <thead style={{ background: "#2d69c5", color: "#FFF" }}>
                                             <tr>
                                                 <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Pax Flown</th>
                                                 <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Flights Completed</th>
@@ -506,17 +489,19 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                                 disabled={isLaunchingManualBooking}
                                 style={{
                                     display: 'inline-block',
-                                    background: '#3274b4',
+                                    background: 'linear-gradient(135deg, #2d69c5 0%, #1f57ad 100%)',
                                     color: '#fff',
                                     border: 'none',
-                                    borderRadius: 8,
-                                    padding: '10px 24px',
-                                    fontSize: 18,
-                                    fontWeight: 600,
+                                    borderRadius: 10,
+                                    padding: '10px 20px',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    letterSpacing: '0.04em',
+                                    textTransform: 'uppercase',
                                     textAlign: 'center',
                                     textDecoration: 'none',
                                     cursor: isLaunchingManualBooking ? 'wait' : 'pointer',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+                                    boxShadow: '0 8px 20px rgba(31, 87, 173, 0.2)',
                                     width: '100%',
                                     maxWidth: 200,
                                     opacity: isLaunchingManualBooking ? 0.75 : 1

@@ -41,7 +41,7 @@ const Index = () => {
     }, []);
     return (
         <div className="home-page-wrap">
-            <Container maxWidth="xl">
+            <Container maxWidth={false}>
                 <div className="heading-wrap">
                     <h2>
                         FLY AWAY BALLOONING
