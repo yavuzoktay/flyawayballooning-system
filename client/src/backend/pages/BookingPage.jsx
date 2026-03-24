@@ -8347,30 +8347,6 @@ setBookingDetail(finalVoucherDetail);
                                                         minWidth: isMobile ? '500px' : 'auto',
                                                         fontSize: isMobile ? '12px' : 'inherit'
                                                     }}>
-                                                        <TableHead>
-                                                            <TableRow>
-                                                                <TableCell sx={{ 
-                                                                    fontSize: isMobile ? '11px' : 'inherit',
-                                                                    padding: isMobile ? '6px 4px' : '16px',
-                                                                    fontWeight: 600
-                                                                }}>Booking Date</TableCell>
-                                                                <TableCell sx={{ 
-                                                                    fontSize: isMobile ? '11px' : 'inherit',
-                                                                    padding: isMobile ? '6px 4px' : '16px',
-                                                                    fontWeight: 600
-                                                                }}>Activity Type</TableCell>
-                                                                <TableCell sx={{ 
-                                                                    fontSize: isMobile ? '11px' : 'inherit',
-                                                                    padding: isMobile ? '6px 4px' : '16px',
-                                                                    fontWeight: 600
-                                                                }}>Location</TableCell>
-                                                                <TableCell sx={{ 
-                                                                    fontSize: isMobile ? '11px' : 'inherit',
-                                                                    padding: isMobile ? '6px 4px' : '16px',
-                                                                    fontWeight: 600
-                                                                }}>Status</TableCell>
-                                                            </TableRow>
-                                                        </TableHead>
                                                         <TableBody>
                                                             {historyRows.map((h, i) => (
                                                                 <TableRow key={i}>
@@ -8835,14 +8811,6 @@ setBookingDetail(finalVoucherDetail);
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
                                                 <TableContainer component={Box} className="booking-history-table-container" sx={{ maxHeight: 280, overflowY: 'auto', overflowX: 'auto' }}>
                                                 <Table className="booking-history-table">
-                                                    <TableHead>
-                                                        <TableRow>
-                                                            <TableCell>Booking Date</TableCell>
-                                                            <TableCell>Activity Type</TableCell>
-                                                            <TableCell>Location</TableCell>
-                                                            <TableCell>Status</TableCell>
-                                                        </TableRow>
-                                                    </TableHead>
                                                     <TableBody>
                                                         {historyRows.map((h, i) => (
                                                             <TableRow key={i}>
