@@ -63,6 +63,24 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     }
     const experience = bookingData?.experience || bookingData?.flight_type || bookingData?.flight_type_source;
     const pax = Number(bookingData?.pax || bookingData?.passengers?.length || 0);
+    const privateExperienceTerms = ['private charter', 'private', 'proposal flight', 'proposal'];
+    const sharedExperienceTerms = ['shared flight', 'shared', 'any day flight', 'weekday morning', 'flexible weekday', 'anytime', 'any day'];
+    const bookingExperienceSignals = [
+        experience,
+        bookingData?.voucher_type_detail,
+        bookingData?.voucher_type,
+        bookingData?.voucher?.voucher_type,
+        bookingData?.voucher?.actual_voucher_type,
+        bookingData?.book_flight
+    ]
+        .map((value) => String(value || '').toLowerCase().trim())
+        .filter(Boolean);
+    const hasPrivateExperienceSignal = bookingExperienceSignals.some(signal =>
+        privateExperienceTerms.some(term => signal.includes(term))
+    );
+    const hasSharedExperienceSignal = bookingExperienceSignals.some(signal =>
+        sharedExperienceTerms.some(term => signal.includes(term))
+    );
     
     // Debug logging
     console.log('RescheduleFlightModal - Booking Data:', {
@@ -118,7 +136,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
     const getSlotStatus = (slot) => (slot?.calculated_status || slot?.status || '').toLowerCase();
 
-    const isPrivateSelection = (experience || '').toLowerCase().includes('private');
+    const isPrivateSelection = hasPrivateExperienceSignal;
     const requiredSeats = Math.max(1, pax || (isPrivateSelection ? 8 : 1));
 
     const getRemainingSeats = (slot) => {
@@ -292,6 +310,17 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         // But ONLY if the slot's voucher_types match shared or private voucher types
         // This is a fallback - ideally we'd have the real voucher type from bookingData
         if (isBookFlightValue) {
+            // For generic book_flight labels (Flight/Gift Voucher), rely on booking-level signals first.
+            if (isPrivateSelection) {
+                expectedExperience = 'private';
+            } else if (hasSharedExperienceSignal) {
+                expectedExperience = 'shared';
+            }
+
+            if (expectedExperience) {
+                return expectedExperience === 'private' ? slotIsPrivate : slotIsShared;
+            }
+
             // Use slot's voucher_types to determine experience
             // If slot has shared voucher types only, expect shared experience
             // If slot has private voucher types only, expect private experience
@@ -647,7 +676,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             // This assumes the booking is for a shared voucher type like "Any Day Flight"
             // If slot has both shared and private, show it (it's available for shared)
             // If slot has only private, don't show it
-            matchesVoucher = slotIsShared; // Show if slot has any shared voucher types
+            // For Flight/Gift Voucher bookings, respect booking's private/shared context.
+            // Private bookings must only see private-eligible slots.
+            matchesVoucher = isPrivateSelection ? slotIsPrivate : slotIsShared;
         }
         // Only apply voucher type filtering if voucherType is a real voucher type (not book_flight value)
         else if (voucherType && !isBookFlightValue) {
