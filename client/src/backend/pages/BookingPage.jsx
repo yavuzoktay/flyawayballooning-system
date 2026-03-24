@@ -4007,7 +4007,7 @@ setBookingDetail(finalVoucherDetail);
     };
 
     const getVoucherDetailsTitle = (voucher) => {
-        return isGiftVoucherDetails(voucher) ? 'Gift Voucher Details' : 'Flight Voucher Details';
+        return isGiftVoucherDetails(voucher) ? 'Gift Voucher' : 'Flight Voucher';
     };
 
     const handleRebook = () => {
