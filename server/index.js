@@ -7966,6 +7966,8 @@ const getCustomerPortalUpsellDiscount = (voucherTitle) => {
     return null;
 };
 
+const CUSTOMER_PORTAL_PRIVATE_UPGRADE_TARGET_PRICE = 1800;
+
 const buildCustomerPortalPrivateUpgradeDescription = (amount) =>
     `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional £${roundCurrency(amount).toFixed(2)}.`;
 
@@ -8270,9 +8272,14 @@ const buildCustomerPortalUpsellOffer = async ({
         !slotMetrics.hasOtherBookings;
 
     if (shouldShowPrivateUpgrade) {
-        const privateEightPrice = regularSeatPrice != null
-            ? roundCurrency(regularSeatPrice * BALLOON_210_CAPACITY)
-            : resolveCustomerPortalPrivateEightPassengerPrice(effectiveVoucherType, effectiveLocation);
+        // Private upgrade must always target the fixed 8-passenger private charter price.
+        // Do not derive this from shared seat pricing, otherwise amounts drift (e.g. £1600 instead of £1800).
+        const resolvedPrivateEightPrice = resolveCustomerPortalPrivateEightPassengerPrice('Private Charter', effectiveLocation);
+        const privateEightPrice = roundCurrency(
+            Number.isFinite(Number(resolvedPrivateEightPrice))
+                ? Number(resolvedPrivateEightPrice)
+                : CUSTOMER_PORTAL_PRIVATE_UPGRADE_TARGET_PRICE
+        );
         const privateUpgradeDifference = privateEightPrice != null
             ? roundCurrency(Math.max(privateEightPrice - currentBookingPaidTotal, 0))
             : null;
