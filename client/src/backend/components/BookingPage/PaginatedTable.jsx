@@ -982,11 +982,11 @@ const PaginatedTable = ({
                                                     return (
                                                         <span
                                                             style={{
-                                                                color: '#3274b4',
+                                                                color: '#2d69c5',
                                                                 textDecoration: 'none',
                                                                 cursor: 'pointer',
                                                                 fontWeight: 'normal',
-                                                                fontSize: '16px',
+                                                                fontSize: '14px',
                                                                 fontFamily: "'Gilroy', sans-serif"
                                                             }}
                                                             onClick={() => onVoucherRefClick(item)}
