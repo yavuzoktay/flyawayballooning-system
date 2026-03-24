@@ -994,6 +994,40 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 console.log('🔄 Flight Voucher reschedule - Using redeem booking flow');
                 console.log('Voucher Ref:', voucherRef);
 
+                // Preserve additional information from the original voucher booking.
+                // Without this, redeemed bookings show up in All Bookings but lose
+                // "Additional Information & Notes" in Booking Details.
+                let additionalInfoPayload = {};
+                try {
+                    const sourceBookingId = bookingData?.id || bookingData?.booking_id || pendingRescheduleData.bookingId;
+                    if (sourceBookingId) {
+                        const additionalInfoResponse = await axios.get(`/api/booking/${sourceBookingId}/additional-information`);
+                        const additionalInfoData = additionalInfoResponse?.data?.data || {};
+                        const jsonInfo = additionalInfoData?.additional_information_json || {};
+                        const legacyInfo = additionalInfoData?.legacy || {};
+                        const answers = Array.isArray(additionalInfoData?.answers) ? additionalInfoData.answers : [];
+
+                        additionalInfoPayload = {
+                            ...(jsonInfo && typeof jsonInfo === 'object' ? jsonInfo : {})
+                        };
+
+                        answers.forEach((item) => {
+                            const questionId = item?.question_id;
+                            const answer = item?.answer;
+                            if (questionId && answer !== undefined && answer !== null && String(answer).trim() !== '') {
+                                additionalInfoPayload[`question_${questionId}`] = answer;
+                            }
+                        });
+
+                        if (!additionalInfoPayload.notes && legacyInfo?.additional_notes) {
+                            additionalInfoPayload.notes = legacyInfo.additional_notes;
+                        }
+                    }
+                } catch (additionalInfoErr) {
+                    console.warn('⚠️ Could not load additional information for redeem reschedule flow:', additionalInfoErr);
+                    additionalInfoPayload = {};
+                }
+
                 // Prepare passenger data from booking
                 // Use passengers in the order they come from backend (already sorted by ORDER BY id ASC)
                 // This ensures Passenger 1 is first, Passenger 2 is second, etc.
@@ -1044,12 +1078,13 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     chooseLocation: pendingRescheduleData.selectedLocation,
                     chooseFlightType: chooseFlightType,
                     passengerData: passengerData,
-                    additionalInfo: {},
+                    additionalInfo: additionalInfoPayload,
                     selectedDate: datePart,
                     selectedTime: timePart,
                     voucher_code: voucherRef,
                     totalPrice: 0,
-                    activity_id: pendingRescheduleData.finalActivityId
+                    activity_id: pendingRescheduleData.finalActivityId,
+                    source_booking_id: bookingData?.id || bookingData?.booking_id || pendingRescheduleData.bookingId
                 };
 
                 console.log('🔄 Redeem Booking Payload:', redeemBookingPayload);
