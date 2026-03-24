@@ -5395,6 +5395,40 @@ setBookingDetail(finalVoucherDetail);
         setSmsSending(false);
     };
 
+    const desktopActionButtonSx = {
+        height: 40,
+        borderRadius: '10px',
+        textTransform: 'uppercase',
+        fontSize: '12px',
+        fontWeight: 700,
+        letterSpacing: '0.04em'
+    };
+
+    const tabButtonBaseStyle = {
+        color: "#1f3f6f",
+        padding: isMobile ? "8px 10px" : "10px 18px",
+        border: "none",
+        cursor: "pointer",
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: isMobile ? "center" : "flex-start",
+        gap: "6px",
+        borderRadius: "10px",
+        fontSize: isMobile ? "12px" : "13px",
+        fontWeight: "700",
+        letterSpacing: "0.02em",
+        transition: "all 0.2s ease",
+        flex: isMobile ? "1" : "none"
+    };
+
+    const getTabButtonStyle = (isActive) => ({
+        ...tabButtonBaseStyle,
+        marginRight: isMobile ? "0" : "10px",
+        background: isActive ? "#2d69c5" : "#d4deec",
+        color: isActive ? "#ffffff" : "#35547f"
+    });
+
     return (
         <div className="booking-page-wrap">
             <Container maxWidth={false}>
@@ -5404,7 +5438,10 @@ setBookingDetail(finalVoucherDetail);
                     </h2>
                     <hr />
                 </div>
-                <div style={{ padding: "40px", background: "#f9f9f9", borderRadius: "20px" }} className="booking-page-content">
+                <div
+                    style={{ padding: "34px", background: "#f4f7fc", borderRadius: "20px" }}
+                    className="booking-page-content"
+                >
                     {/* Desktop: Section headings above tabs */}
                     {!isMobile && activeTab === "bookings" && (
                         <div style={{
@@ -5420,7 +5457,7 @@ setBookingDetail(finalVoucherDetail);
                                     color="primary" 
                                     onClick={handleExportCSV} 
                                     startIcon={<FileDownloadIcon />}
-                                    style={{ height: 40 }}
+                                    sx={desktopActionButtonSx}
                                 >
                                     Export
                                 </Button>
@@ -5430,7 +5467,7 @@ setBookingDetail(finalVoucherDetail);
                                     onClick={handleDeleteSelected}
                                     disabled={!selectedBookingIds || selectedBookingIds.length === 0}
                                     startIcon={<DeleteIcon />}
-                                    style={{ height: 40 }}
+                                    sx={desktopActionButtonSx}
                                 >
                                     Delete
                                 </Button>
@@ -5439,7 +5476,7 @@ setBookingDetail(finalVoucherDetail);
                                     color="secondary"
                                     onClick={() => setFilterDialogOpen(true)}
                                     startIcon={<FilterListIcon />}
-                                    style={{ height: 40 }}
+                                    sx={desktopActionButtonSx}
                                 >
                                     Filter
                                 </Button>
@@ -5460,7 +5497,7 @@ setBookingDetail(finalVoucherDetail);
                                     color="primary" 
                                     onClick={handleExportCSV} 
                                     startIcon={<FileDownloadIcon />}
-                                    style={{ height: 40 }}
+                                    sx={desktopActionButtonSx}
                                 >
                                     Export
                                 </Button>
@@ -5470,7 +5507,7 @@ setBookingDetail(finalVoucherDetail);
                                     onClick={handleDeleteSelected}
                                     disabled={!selectedVoucherIds || selectedVoucherIds.length === 0}
                                     startIcon={<DeleteIcon />}
-                                    style={{ height: 40 }}
+                                    sx={desktopActionButtonSx}
                                 >
                                     Delete
                                 </Button>
@@ -5497,24 +5534,7 @@ setBookingDetail(finalVoucherDetail);
                     }} className="booking-page-tabs">
                         <button
                             onClick={() => handleTabChange("bookings")}
-                            style={{
-                                marginRight: isMobile ? "0" : "10px",
-                                background: activeTab === "bookings" ? "#3274b4" : "#A6A6A6",
-                                color: "#FFF",
-                                padding: isMobile ? "6px 10px" : "8px 16px",
-                                border: "none",
-                                cursor: "pointer",
-                                position: "relative",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: isMobile ? "center" : "flex-start",
-                                gap: "6px",
-                                borderRadius: "4px",
-                                fontSize: isMobile ? "12px" : "14px",
-                                fontWeight: "500",
-                                transition: "all 0.3s ease",
-                                flex: isMobile ? "1" : "none"
-                            }}
+                            style={getTabButtonStyle(activeTab === "bookings")}
                         >
                             ALL BOOKINGS
                             {hasNewBookings && (
@@ -5540,24 +5560,7 @@ setBookingDetail(finalVoucherDetail);
                         </button>
                         <button
                             onClick={() => handleTabChange("vouchers")}
-                            style={{
-                                marginRight: isMobile ? "0" : "10px",
-                                background: activeTab === "vouchers" ? "#3274b4" : "#A6A6A6",
-                                color: "#FFF",
-                                padding: isMobile ? "6px 10px" : "8px 16px",
-                                border: "none",
-                                cursor: "pointer",
-                                position: "relative",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: isMobile ? "center" : "flex-start",
-                                gap: "6px",
-                                borderRadius: "4px",
-                                fontSize: isMobile ? "12px" : "14px",
-                                fontWeight: "500",
-                                transition: "all 0.3s ease",
-                                flex: isMobile ? "1" : "none"
-                            }}
+                            style={getTabButtonStyle(activeTab === "vouchers")}
                         >
                             ALL VOUCHERS
                             {hasNewVouchers && (
@@ -5583,24 +5586,7 @@ setBookingDetail(finalVoucherDetail);
                         </button>
                         <button
                             onClick={() => handleTabChange("dateRequests")}
-                            style={{
-                                marginRight: isMobile ? "0" : "10px",
-                                background: activeTab === "dateRequests" ? "#3274b4" : "#A6A6A6",
-                                color: "#FFF",
-                                padding: isMobile ? "6px 10px" : "8px 16px",
-                                border: "none",
-                                cursor: "pointer",
-                                position: "relative",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: isMobile ? "center" : "flex-start",
-                                gap: "6px",
-                                borderRadius: "4px",
-                                fontSize: isMobile ? "12px" : "14px",
-                                fontWeight: "500",
-                                transition: "all 0.3s ease",
-                                flex: isMobile ? "1" : "none"
-                            }}
+                            style={getTabButtonStyle(activeTab === "dateRequests")}
                         >
                             DATE REQUESTS
                             {hasNewDateRequests && (
@@ -6767,23 +6753,49 @@ setBookingDetail(finalVoucherDetail);
                         )}
                     </div>
                 </div>
-                <Dialog open={detailDialogOpen} onClose={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} maxWidth="md" fullWidth>
-                    <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: 22 }}>
-                        {activeTab === 'vouchers' ? 
-                            (() => {
-                                const voucher = bookingDetail?.voucher;
-                                const title = getVoucherDetailsTitle(voucher);
-                                console.log('🎯 Dialog title check:', {
-                                    book_flight: voucher?.book_flight,
-                                    voucher_type: voucher?.voucher_type,
-                                    isGiftVoucher: isGiftVoucherDetails(voucher),
-                                    resolvedTitle: title
-                                });
-                                return title;
-                            })()
-                            : 'Booking Details'}
+                <Dialog
+                    open={detailDialogOpen}
+                    onClose={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }}
+                    maxWidth="xl"
+                    fullWidth
+                    PaperProps={{
+                        sx: {
+                            ...(isMobile ? {
+                                margin: '8px',
+                                maxHeight: 'calc(100% - 16px)',
+                                height: 'calc(100% - 16px)',
+                                width: 'calc(100vw - 16px)',
+                                maxWidth: 'calc(100vw - 16px)'
+                            } : {}),
+                            borderRadius: isMobile ? '14px' : '18px',
+                            overflow: 'hidden',
+                            border: '1px solid #dce2f7',
+                            boxShadow: '0 20px 50px rgba(20, 27, 43, 0.18)'
+                        }
+                    }}
+                >
+                    <DialogTitle sx={{ background: '#ffffff', borderBottom: '1px solid #e5ebf5', py: 2.5, px: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                            <Box>
+                                <Typography sx={{ fontWeight: 800, fontSize: isMobile ? 28 : 40, lineHeight: 1, color: '#0053db' }}>
+                                    {activeTab === 'vouchers' ? 
+                                        (() => {
+                                            const voucher = bookingDetail?.voucher;
+                                            const title = getVoucherDetailsTitle(voucher);
+                                            return title;
+                                        })()
+                                        : 'Booking Details'}
+                                </Typography>
+                                <Typography sx={{ mt: 0.5, color: '#6b7280', fontWeight: 600, fontSize: isMobile ? 14 : 18 }}>
+                                    Reference ID: {bookingDetail?.booking?.id || bookingDetail?.voucher?.id || '-'}
+                                </Typography>
+                            </Box>
+                            <IconButton onClick={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }}>
+                                <Typography sx={{ fontSize: 32, lineHeight: 1, color: '#111827' }}>x</Typography>
+                            </IconButton>
+                        </Box>
                     </DialogTitle>
-                    <DialogContent style={{ background: '#f7f7f7', minHeight: 500 }}>
+                    <DialogContent style={{ background: '#ffffff', minHeight: isMobile ? 'auto' : 520, paddingTop: 0, paddingLeft: 0, paddingRight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
                         {loadingDetail ? (
                             <Typography>Loading...</Typography>
                         ) : detailError ? (
@@ -6809,21 +6821,84 @@ setBookingDetail(finalVoucherDetail);
                                         </Grid>
                                     </Box>
                                 ) : null}
-                            <Box>
+                            <Box sx={{ display: 'flex', width: '100%', minWidth: 0, overflowX: 'hidden' }}>
+                                {!isMobile && (
+                                    <Box sx={{ width: 230, background: '#f2f4ff', borderRight: '1px solid #e4e9f5', p: 2 }}>
+                                        <Typography sx={{ color: '#7a8194', fontWeight: 800, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 2 }}>
+                                            Quick Actions
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                                            <Button variant="contained" onClick={handleRebook} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#0f9f75', '&:hover': { background: '#0b8a64' } }}>
+                                                {(() => {
+                                                    const v = bookingDetail?.voucher || {};
+                                                    return v?.book_flight === 'Gift Voucher' ? 'Redeem' : 'Rebook';
+                                                })()}
+                                            </Button>
+                                            <Button variant="contained" onClick={handleAddGuestClick} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#189c99', '&:hover': { background: '#147f7d' } }}>
+                                                Add Guest
+                                            </Button>
+                                            <Button variant="contained" onClick={handleCancelFlight} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#e11d48', '&:hover': { background: '#be123c' } }}>
+                                                Cancel Flight
+                                            </Button>
+                                            <Button variant="contained" onClick={() => {
+                                                const v = bookingDetail?.voucher || {};
+                                                const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+                                                const isFlightVoucher = !isGiftVoucher && (v?.book_flight === 'Flight Voucher' || (v?.voucher_type && typeof v.voucher_type === 'string' && v.voucher_type.toLowerCase().includes('flight')));
+                                                const emailHandler = isGiftVoucher ? handleGiftVoucherEmail : isFlightVoucher ? handleEmailFlightVoucher : handleEmailBooking;
+                                                emailHandler();
+                                            }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#2563eb', '&:hover': { background: '#1d4ed8' } }}>
+                                                Email | SMS
+                                            </Button>
+                                            <Button variant="contained" onClick={() => {
+                                                const v = bookingDetail?.voucher || {};
+                                                const isGiftVoucher = v?.book_flight === 'Gift Voucher';
+                                                const isFlightVoucher = !isGiftVoucher && (v?.book_flight === 'Flight Voucher' || (v?.voucher_type && typeof v.voucher_type === 'string' && v.voucher_type.toLowerCase().includes('flight')));
+                                                const messageHandler = (isGiftVoucher || isFlightVoucher) && bookingDetail?.voucher ? handleVoucherMessagesClick : handleMessagesClick;
+                                                const target = (isGiftVoucher || isFlightVoucher) && bookingDetail?.voucher ? bookingDetail.voucher : bookingDetail?.booking;
+                                                if (target) messageHandler(target);
+                                            }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#7c3aed', '&:hover': { background: '#6d28d9' } }}>
+                                                Messages
+                                            </Button>
+                                            <Button variant="contained" onClick={() => {
+                                                const voucherId = bookingDetail?.voucher?.id;
+                                                const voucherRef = bookingDetail?.voucher?.voucher_ref;
+                                                const voucherIdOrRef = voucherId || voucherRef;
+                                                const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
+                                                setPaymentHistory([]);
+                                                setPaymentHistoryModalOpen(true);
+                                                fetchPaymentHistory(linkedBookingId || null, voucherIdOrRef || null);
+                                            }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#c026d3', '&:hover': { background: '#a21caf' } }}>
+                                                Payment History
+                                            </Button>
+                                            <Button variant="contained" onClick={() => {
+                                                const linkedBookingId = bookingDetail?.voucher?.booking_id || bookingDetail?.booking?.id;
+                                                if (linkedBookingId) {
+                                                    setUserSessionModalOpen(true);
+                                                    fetchUserSession(linkedBookingId);
+                                                }
+                                            }} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#64748b', '&:hover': { background: '#475569' } }}>
+                                                More
+                                            </Button>
+                                        </Box>
+                                    </Box>
+                                )}
+                                <Box sx={{ flex: 1, p: isMobile ? 2 : 3, minWidth: 0 }}>
                                 <Grid container spacing={2}>
                                     {/* Personal Details */}
                                     <Grid item xs={12} md={4}>
-                                        <Box sx={{ 
-                                            background: '#fff', 
-                                            borderRadius: 2, 
-                                            p: isMobile ? 1 : 1, 
-                                            mb: 0.75, 
-                                            boxShadow: 1 
+                                        <Box sx={{
+                                            background: '#f7f9ff',
+                                            borderRadius: 3,
+                                            p: isMobile ? 1.25 : 1.5,
+                                            mb: 1,
+                                            border: '1px solid #dce2f7',
+                                            boxShadow: 'none'
                                         }}>
-                                            <Typography variant="h6" sx={{ 
-                                                fontWeight: 700, 
+                                            <Typography variant="h6" sx={{
+                                                fontWeight: 800,
                                                 mb: isMobile ? 0.25 : 0,
-                                                fontSize: isMobile ? '16px' : 'inherit'
+                                                color: '#142347',
+                                                fontSize: isMobile ? '16px' : '18px'
                                             }}>
                                                 {(() => {
                                                     const v = bookingDetail.voucher || {};
@@ -7666,13 +7741,17 @@ setBookingDetail(finalVoucherDetail);
                                                         </>
                                                     )}
                                                 </Box>
-                                                <Box sx={{ 
-                                                    display: 'flex', 
-                                                    flexDirection: isMobile ? 'row' : 'column', 
-                                                    flexWrap: isMobile ? 'wrap' : 'nowrap',
-                                                    gap: isMobile ? '8px' : 1, 
+                                                <Box sx={{
+                                                    display: isMobile ? 'flex' : 'none',
+                                                    flexDirection: 'column',
+                                                    flexWrap: 'nowrap',
+                                                    gap: isMobile ? '10px' : 1, 
                                                     minWidth: isMobile ? 'auto' : 140,
-                                                    width: isMobile ? '100%' : 'auto'
+                                                    width: isMobile ? '100%' : 'auto',
+                                                    background: isMobile ? 'transparent' : '#eef2ff',
+                                                    borderRadius: isMobile ? 0 : 3,
+                                                    padding: isMobile ? 0 : '10px',
+                                                    border: isMobile ? 'none' : '1px solid #dbe4ff'
                                                 }}>
                                                     {(() => {
                                                         const v = bookingDetail?.voucher || {};
@@ -7686,10 +7765,10 @@ setBookingDetail(finalVoucherDetail);
                                                                 color="primary" 
                                                                 sx={{ 
                                                                     mb: isMobile ? 0 : 1, 
-                                                                    borderRadius: 2, 
-                                                                    fontWeight: 600, 
+                                                                    borderRadius: 2.5, 
+                                                                    fontWeight: 700, 
                                                                     textTransform: 'none',
-                                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                                    flex: isMobile ? '1 1 100%' : 'none',
                                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                                     fontSize: isMobile ? '12px' : '14px',
                                                                     padding: isMobile ? '6px 8px' : '8px 16px',
@@ -7709,10 +7788,10 @@ setBookingDetail(finalVoucherDetail);
                                                         color="primary" 
                                                         sx={{ 
                                                             mb: isMobile ? 0 : 1, 
-                                                            borderRadius: 2, 
-                                                            fontWeight: 600, 
+                                                            borderRadius: 2.5, 
+                                                            fontWeight: 700, 
                                                             textTransform: 'none',
-                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            flex: isMobile ? '1 1 100%' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
@@ -7730,11 +7809,11 @@ setBookingDetail(finalVoucherDetail);
                                                         color="info" 
                                                         sx={{ 
                                                             mb: isMobile ? 0 : 1, 
-                                                            borderRadius: 2, 
-                                                            fontWeight: 600, 
+                                                            borderRadius: 2.5, 
+                                                            fontWeight: 700, 
                                                             textTransform: 'none', 
                                                             background: '#E74C3C',
-                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            flex: isMobile ? '1 1 100%' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
@@ -7773,12 +7852,12 @@ setBookingDetail(finalVoucherDetail);
                                                                 variant="contained"
                                                                 color="success"
                                                                 sx={{ 
-                                                                    borderRadius: 2, 
-                                                                    fontWeight: 600, 
+                                                                    borderRadius: 2.5, 
+                                                                    fontWeight: 700, 
                                                                     textTransform: 'none', 
                                                                     background: '#3498DB',
                                                                     mb: isMobile ? 0 : 1,
-                                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                                    flex: isMobile ? '1 1 100%' : 'none',
                                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                                     fontSize: isMobile ? '12px' : '14px',
                                                                     padding: isMobile ? '6px 8px' : '8px 16px',
@@ -7818,12 +7897,12 @@ setBookingDetail(finalVoucherDetail);
                                                         variant="contained"
                                                         color="secondary"
                                                         sx={{ 
-                                                            borderRadius: 2, 
-                                                            fontWeight: 600, 
+                                                            borderRadius: 2.5, 
+                                                            fontWeight: 700, 
                                                             textTransform: 'none', 
                                                             background: '#5B6CFF',
                                                             mb: isMobile ? 0 : 1,
-                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            flex: isMobile ? '1 1 100%' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
@@ -7840,13 +7919,13 @@ setBookingDetail(finalVoucherDetail);
                                                         variant="contained"
                                                         color="info"
                                                         sx={{ 
-                                                            borderRadius: 2, 
-                                                            fontWeight: 600, 
+                                                            borderRadius: 2.5, 
+                                                            fontWeight: 700, 
                                                             textTransform: 'none', 
                                                             background: '#8E44AD', 
                                                             mt: isMobile ? 0 : 1,
                                                             mb: isMobile ? 0 : 1,
-                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            flex: isMobile ? '1 1 100%' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
@@ -7879,12 +7958,12 @@ setBookingDetail(finalVoucherDetail);
                                                         variant="contained"
                                                         color="info"
                                                         sx={{ 
-                                                            borderRadius: 2, 
-                                                            fontWeight: 600, 
+                                                            borderRadius: 2.5, 
+                                                            fontWeight: 700, 
                                                             textTransform: 'none', 
                                                             background: '#7F8C8D', 
                                                             mt: isMobile ? 0 : 1,
-                                                            flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                            flex: isMobile ? '1 1 100%' : 'none',
                                                             minWidth: isMobile ? 'auto' : 'auto',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
@@ -8260,9 +8339,9 @@ setBookingDetail(finalVoucherDetail);
                                                         fontSize: isMobile ? '16px' : 'inherit'
                                                     }}>History</Typography>
                                                     <TableContainer component={Box} className="booking-history-table-container" sx={{
-                                                        maxHeight: isMobile ? '300px' : 'none',
-                                                        overflowX: isMobile ? 'auto' : 'visible',
-                                                        overflowY: isMobile ? 'auto' : 'visible'
+                                                        maxHeight: 280,
+                                                        overflowX: 'auto',
+                                                        overflowY: 'auto'
                                                     }}>
                                                     <Table className="booking-history-table" sx={{
                                                         minWidth: isMobile ? '500px' : 'auto',
@@ -8406,7 +8485,9 @@ setBookingDetail(finalVoucherDetail);
                                                         allNotes
                                                     });
                                                     
-                                                    return allNotes.length > 0 ? allNotes.map((n, i) => (
+                                                    return (
+                                                        <Box sx={{ maxHeight: 220, overflowY: 'auto', pr: 0.5 }}>
+                                                            {allNotes.length > 0 ? allNotes.map((n, i) => (
                                                     <Box key={n.id || i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0, position: 'relative' }}>
                                                         <Typography variant="body2" sx={{ color: '#888', fontSize: 12, pr: '80px' }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
                                                         {editingNoteId === n.id ? (
@@ -8445,7 +8526,9 @@ setBookingDetail(finalVoucherDetail);
                                                             </>
                                                         )}
                                                     </Box>
-                                                )) : <Typography>No notes</Typography>;
+                                                )) : <Typography>No notes</Typography>}
+                                                        </Box>
+                                                    );
                                                 })()}
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
@@ -8469,7 +8552,7 @@ setBookingDetail(finalVoucherDetail);
                                                     {additionalInfoLoading ? (
                                                         <Typography>Loading additional information...</Typography>
                                                     ) : (
-                                                        <Box>
+                                                        <Box sx={{ maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
                                                             {(() => {
                                                                 const notesFromBooking = bookingDetail.booking?.additional_notes;
                                                                 const notesFromAdditional = additionalInformation?.additional_information_json?.notes;
@@ -8750,7 +8833,7 @@ setBookingDetail(finalVoucherDetail);
                                             {!isMobile && activeTab !== 'vouchers' && (
                                             <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }} className="booking-history-section">
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
-                                                <TableContainer component={Box} className="booking-history-table-container">
+                                                <TableContainer component={Box} className="booking-history-table-container" sx={{ maxHeight: 280, overflowY: 'auto', overflowX: 'auto' }}>
                                                 <Table className="booking-history-table">
                                                     <TableHead>
                                                         <TableRow>
@@ -8800,6 +8883,7 @@ setBookingDetail(finalVoucherDetail);
                                         ) : null;
                                     })()}
                                 </Grid>
+                                </Box>
                             </Box>
                             </>
                         ) : (
@@ -8819,8 +8903,15 @@ setBookingDetail(finalVoucherDetail);
                             </Box>
                         )}
                     </DialogContent>
-                    <DialogActions sx={{ background: '#f7f7f7' }}>
-                        <Button onClick={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }} color="primary" variant="contained">Close</Button>
+                    <DialogActions sx={{ background: '#f1f3ff', borderTop: '1px solid #dce2f7', px: 3, py: 1.5 }}>
+                        <Button
+                            onClick={() => { setDetailDialogOpen(false); setSelectedBookingId(null); }}
+                            color="primary"
+                            variant="contained"
+                            sx={{ borderRadius: 2.5, fontWeight: 700, textTransform: 'none', px: 3 }}
+                        >
+                            Close
+                        </Button>
                     </DialogActions>
                 </Dialog>
                 {/* Advanced Filter Dialog for All Bookings */}
@@ -8829,68 +8920,115 @@ setBookingDetail(finalVoucherDetail);
                     onClose={() => setFilterDialogOpen(false)}
                     maxWidth="sm"
                     fullWidth
+                    PaperProps={{
+                        sx: {
+                            borderRadius: '14px',
+                            overflow: 'hidden',
+                            boxShadow: '0 12px 32px rgba(20,27,43,0.10)'
+                        }
+                    }}
                 >
-                    <DialogTitle sx={{ fontWeight: 700, fontSize: 22 }}>
-                        Filter Bookings
+                    <DialogTitle sx={{ px: 3, py: 2.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: '34px', color: '#141b2b', lineHeight: 1 }}>
+                                Filter Bookings
+                            </Typography>
+                            <IconButton
+                                onClick={() => setFilterDialogOpen(false)}
+                                sx={{ color: '#737686' }}
+                                size="small"
+                            >
+                                <Typography sx={{ fontSize: '24px', lineHeight: 1 }}>x</Typography>
+                            </IconButton>
+                        </Box>
                     </DialogTitle>
-                    <DialogContent dividers>
-                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                    <DialogContent sx={{ px: 3, pb: 3, pt: 0, maxHeight: '70vh' }}>
+                        <Typography sx={{ mb: 1.5, mt: 1, fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>
                             Booking status
                         </Typography>
-                        <FormGroup sx={{ mb: 2 }}>
+                        <FormGroup sx={{ mb: 3, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
                             {bookingStatusOptions.map(status => (
                                 <FormControlLabel
                                     key={status}
                                     control={
                                         <Checkbox
+                                            size="small"
                                             checked={filters.statusMulti.includes(status)}
                                             onChange={() => handleCheckboxFilterChange('statusMulti', status)}
+                                            sx={{
+                                                color: '#c3c6d7',
+                                                '&.Mui-checked': { color: '#004ac6' }
+                                            }}
                                         />
                                     }
-                                    label={status}
+                                    label={<Typography sx={{ fontWeight: 500, color: '#434655' }}>{status}</Typography>}
+                                    sx={{ m: 0, py: 0.5 }}
                                 />
                             ))}
                         </FormGroup>
 
-                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                        <Typography sx={{ mb: 1.5, fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>
                             Voucher type
                         </Typography>
-                        <FormGroup sx={{ mb: 2 }}>
+                        <FormGroup sx={{ mb: 3, gap: 0.5 }}>
                             {bookingVoucherTypeOptions.map(type => (
                                 <FormControlLabel
                                     key={type}
                                     control={
                                         <Checkbox
+                                            size="small"
                                             checked={filters.voucherTypeMulti.includes(type)}
                                             onChange={() => handleCheckboxFilterChange('voucherTypeMulti', type)}
+                                            sx={{
+                                                color: '#c3c6d7',
+                                                '&.Mui-checked': { color: '#004ac6' }
+                                            }}
                                         />
                                     }
-                                    label={type}
+                                    label={<Typography sx={{ fontWeight: 500, color: '#434655' }}>{type}</Typography>}
+                                    sx={{ m: 0, py: 0.5 }}
                                 />
                             ))}
                         </FormGroup>
 
-                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                        <Typography sx={{ mb: 1.5, fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#737686' }}>
                             Location
                         </Typography>
-                        <FormGroup>
+                        <FormGroup sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
                             {bookingLocationOptions.map(loc => (
                                 <FormControlLabel
                                     key={loc}
                                     control={
                                         <Checkbox
+                                            size="small"
                                             checked={filters.locationMulti.includes(loc)}
                                             onChange={() => handleCheckboxFilterChange('locationMulti', loc)}
+                                            sx={{
+                                                color: '#c3c6d7',
+                                                '&.Mui-checked': { color: '#004ac6' }
+                                            }}
                                         />
                                     }
-                                    label={loc}
+                                    label={<Typography sx={{ fontWeight: 500, color: '#434655' }}>{loc}</Typography>}
+                                    sx={{ m: 0, py: 0.5 }}
                                 />
                             ))}
                         </FormGroup>
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={handleClearAdvancedFilters}>Clear</Button>
-                        <Button onClick={() => setFilterDialogOpen(false)} variant="contained" color="primary">
+                    <DialogActions sx={{ px: 3, py: 2, background: '#f1f3ff', justifyContent: 'flex-end', gap: 1.5 }}>
+                        <Button onClick={handleClearAdvancedFilters} sx={{ fontWeight: 800, color: '#004ac6' }}>
+                            CLEAR
+                        </Button>
+                        <Button
+                            onClick={() => setFilterDialogOpen(false)}
+                            variant="contained"
+                            sx={{
+                                borderRadius: 2,
+                                px: 3,
+                                fontWeight: 800,
+                                background: 'linear-gradient(135deg, #004ac6 0%, #2563eb 100%)'
+                            }}
+                        >
                             Apply
                         </Button>
                     </DialogActions>

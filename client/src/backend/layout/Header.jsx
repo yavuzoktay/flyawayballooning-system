@@ -3,14 +3,8 @@ import {
   AppBar,
   Toolbar,
   Grid,
-  IconButton,
   Box,
-  InputBase,
   MenuItem,
-  Drawer,
-  List,
-  ListItem,
-  ListItemText,
   useTheme,
   useMediaQuery,
   Container,
@@ -18,9 +12,7 @@ import {
   BottomNavigationAction,
   Badge,
 } from '@mui/material';
-import { 
-  Menu as MenuIcon, 
-  Search as SearchIcon,
+import {
   Home as HomeIcon,
   Description as BookingIcon,
   FlightTakeoff as FlownFlightsIcon,
@@ -34,7 +26,6 @@ import axios from 'axios';
 
 const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => {
   const [activeMenuItem, setActiveMenuItem] = useState('Home'); // Track active menu
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [hasNewBookings, setHasNewBookings] = useState(false);
   const [hasNewVouchers, setHasNewVouchers] = useState(false);
   const theme = useTheme();
@@ -53,16 +44,11 @@ const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => 
     }
     
     navigate(path); // Navigate to the corresponding path
-    setDrawerOpen(false); // Close drawer (for mobile)
-    
+
     // Call external handler if provided (for bottom nav)
     if (externalOnMenuClick) {
       externalOnMenuClick(menuItem, path);
     }
-  };
-
-  const handleDrawerToggle = () => {
-    setDrawerOpen(!drawerOpen);
   };
 
   // Check for new bookings and vouchers
@@ -192,9 +178,16 @@ const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => 
           }
         `}
       </style>
-      <AppBar position="sticky">
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          background: '#f7f9fc',
+          borderBottom: '1px solid #dce4f2'
+        }}
+      >
         <Container maxWidth="xl">
-          <Toolbar>
+          <Toolbar sx={{ minHeight: isMobile ? '62px' : '68px' }}>
           <Grid container alignItems="center" justifyContent="space-between">
             {/* Left/Right spacer on mobile, right-aligned logo on desktop */}
             {!isMobile && (
@@ -222,15 +215,25 @@ const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => 
             ) : (
               <Grid item>
                 <div className="header-nav-wrap">
-                  <Box display="flex" justifyContent="center" alignItems="center">
+                  <Box display="flex" justifyContent="center" alignItems="center" sx={{ gap: 0.25 }}>
                     {menuItems.map((item, index) => (
                       <MenuItem
                         key={index}
                         onClick={() => handleMenuClick(item.label, item.path)}
                         sx={{
-                          fontWeight: location.pathname === item.path ? 'bold' : 'normal',
-                          color: '#000',
+                          minHeight: 38,
+                          borderRadius: '9px',
+                          px: 2.1,
+                          fontSize: '13px',
+                          fontWeight: location.pathname === item.path ? 700 : 500,
+                          color: location.pathname === item.path ? '#15335c' : '#4e6282',
+                          background: location.pathname === item.path ? '#eaf1fd' : 'transparent',
                           position: 'relative',
+                          transition: 'all .2s ease',
+                          '&:hover': {
+                            background: location.pathname === item.path ? '#e1ebfb' : '#edf2fb',
+                            color: '#15335c'
+                          }
                         }}
                       >
                         {item.label}
@@ -238,13 +241,13 @@ const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => 
                         {item.label === 'Booking' && (hasNewBookings || hasNewVouchers) && (
                           <span style={{
                             position: "absolute",
-                            top: "8px",
-                            right: "8px",
-                            width: "12px",
-                            height: "12px",
+                            top: "5px",
+                            right: "5px",
+                            width: "10px",
+                            height: "10px",
                             background: "#ff0000",
                             borderRadius: "50%",
-                            border: "2px solid white",
+                            border: "2px solid #f7f9fc",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -271,7 +274,6 @@ const Header = ({ onMenuClick: externalOnMenuClick, onNotificationsChange }) => 
                   onClick={() => {
                     setActiveMenuItem('Home');
                     navigate('/');
-                    setDrawerOpen(false);
                   }}
                 />
               </Grid>

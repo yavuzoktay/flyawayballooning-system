@@ -461,7 +461,7 @@ const PaginatedTable = ({
             )}
             
             <div style={{ width: '100%', overflowX: 'auto' }} className="paginated-table-wrapper">
-            <table border="1" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "collapse", tableLayout: "fixed" }} className="booking-table">
+            <table border="0" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "separate", borderSpacing: 0, tableLayout: "fixed" }} className="booking-table">
                 <colgroup>
                     {selectable && <col style={{ width: '40px', minWidth: '40px', maxWidth: '40px' }} />}
                     {columns.map((col) => {
@@ -557,11 +557,11 @@ const PaginatedTable = ({
                         );
                     })}
                 </colgroup>
-                <thead style={{ background: "#3274b4", color: "#FFF" }}>
+                <thead style={{ background: "#2d69c5", color: "#FFF" }}>
                     <tr>
                         {selectable && (
                             <th style={{ 
-                                padding: "8px",
+                                padding: "12px 10px",
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textAlign: "left"
@@ -578,13 +578,13 @@ const PaginatedTable = ({
                             const colId = getColId(columns[index]);
                             return (
                                 <th key={index} style={{ 
-                                    padding: "8px",
+                                    padding: "12px 10px",
                                     whiteSpace: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "normal" : "nowrap",
                                     overflow: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "visible" : "hidden",
                                     textOverflow: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "clip" : "ellipsis",
                                     wordWrap: (colId === 'aircraft_defects' || colId === 'vehicle_trailer_defects') ? "break-word" : "normal",
-                                    fontSize: "16px",
-                                    fontWeight: "normal",
+                                    fontSize: "13px",
+                                    fontWeight: 600,
                                     fontFamily: "'Gilroy', sans-serif",
                                     textAlign: "left"
                                 }}>{col}</th>
@@ -595,12 +595,14 @@ const PaginatedTable = ({
                 <tbody>
                     {visibleData.map((item, idx) => {
                         return (
-                            <tr key={idx}>
+                            <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fbff' }}>
                                 {selectable && (
                                     <td style={{ 
                                         textAlign: "center",
                                         whiteSpace: "nowrap",
-                                        overflow: "hidden"
+                                        overflow: "hidden",
+                                        padding: "10px 8px",
+                                        borderBottom: "1px solid #ebf0f8"
                                     }}>
                                         <input
                                             type="checkbox"
@@ -614,7 +616,7 @@ const PaginatedTable = ({
                                                     return (
                                                         <td key={id} style={{ 
                                                             textAlign: "left", 
-                                                            padding: "8px", 
+                                                            padding: "10px 10px", 
                                                             whiteSpace: (id === 'aircraft_defects' || id === 'vehicle_trailer_defects') ? "normal" : "nowrap",
                                                             overflow: (id === 'aircraft_defects' || id === 'vehicle_trailer_defects') ? "visible" : "hidden",
                                                             textOverflow: (id === 'aircraft_defects' || id === 'vehicle_trailer_defects') ? "clip" : "ellipsis",
@@ -630,9 +632,11 @@ const PaginatedTable = ({
                                                                      id === 'actual_voucher_type' ? actualVoucherTypeColWidth :
                                                                      id === 'voucher_code' ? "150px" :
                                                                      "200px",
-                                                            fontSize: "16px",
+                                                            fontSize: "14px",
                                                             fontWeight: "normal",
-                                                            fontFamily: "'Gilroy', sans-serif"
+                                                            fontFamily: "'Gilroy', sans-serif",
+                                                            borderBottom: "1px solid #ebf0f8",
+                                                            color: "#465a79"
                                                         }}>
                                                             {id === 'name' ? (
                                                                 (() => {
@@ -640,10 +644,10 @@ const PaginatedTable = ({
 
                                                                     // Keep the name clickable without the browser-style underline.
                                                                     const nameSpanStyles = {
-                                                                        color: '#3274b4',
+                                                                        color: '#2d69c5',
                                                                         cursor: onNameClick ? 'pointer' : 'default',
                                                                         textDecoration: 'none',
-                                                                        fontSize: '16px',
+                                                                        fontSize: '14px',
                                                                         fontWeight: 'normal',
                                                                         fontFamily: "'Gilroy', sans-serif",
                                                                         flex: '1 1 auto',
@@ -674,8 +678,8 @@ const PaginatedTable = ({
                                                                                     style={{
                                                                                         flex: '0 0 auto',
                                                                                         marginLeft: 'auto',
-                                                                                        color: '#3274b4',
-                                                                                        fontSize: '16px',
+                                                                                        color: '#2d69c5',
+                                                                                        fontSize: '14px',
                                                                                         fontWeight: 'normal',
                                                                                         lineHeight: 1
                                                                                     }}
@@ -701,7 +705,7 @@ const PaginatedTable = ({
                                                                                     overflow: 'hidden',
                                                                                     textOverflow: 'ellipsis',
                                                                                     whiteSpace: 'nowrap',
-                                                                                    fontSize: '16px',
+                                                                                    fontSize: '14px',
                                                                                     fontWeight: 'normal',
                                                                                     fontFamily: "'Gilroy', sans-serif"
                                                                                 }}
@@ -714,7 +718,7 @@ const PaginatedTable = ({
                                                                                         flex: '0 0 auto',
                                                                                         marginLeft: 'auto',
                                                                                         color: 'inherit',
-                                                                                        fontSize: '16px',
+                                                                                        fontSize: '14px',
                                                                                         fontWeight: 'normal',
                                                                                         lineHeight: 1
                                                                                     }}
@@ -740,7 +744,7 @@ const PaginatedTable = ({
                                                                                 {bookingIds.map((bookingId, idx) => (
                                                                                     <React.Fragment key={bookingId}>
                                                                                         <span
-                                                                                            style={{ color: '#3274b4', textDecoration: 'underline', cursor: 'pointer', fontSize: '16px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
+                                                                                            style={{ color: '#2d69c5', textDecoration: 'underline', cursor: 'pointer', fontSize: '14px', fontWeight: 'normal', fontFamily: "'Gilroy', sans-serif" }}
                                                                                             onClick={(e) => {
                                                                                                 e.stopPropagation();
                                                                                                 onBookingIdClick({ ...item, clickedBookingId: bookingId });
@@ -866,7 +870,7 @@ const PaginatedTable = ({
                                                             return (
                                                                 <a
                                                                     href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
-                                                                    style={{ color: '#3274b4', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
+                                                                    style={{ color: '#2d69c5', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '14px', fontFamily: "'Gilroy', sans-serif" }}
                                                                     target="_self"
                                                                     rel="noopener noreferrer"
                                                                 >
@@ -924,7 +928,7 @@ const PaginatedTable = ({
                                                         return (
                                                             <a
                                                                 href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
-                                                                style={{ color: '#3274b4', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
+                                                                style={{ color: '#2d69c5', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '14px', fontFamily: "'Gilroy', sans-serif" }}
                                                                 target="_self"
                                                                 rel="noopener noreferrer"
                                                             >
@@ -997,8 +1001,9 @@ const PaginatedTable = ({
                                                 (() => {
                                                     const statusValue = item[id];
                                                     let displayStatus = statusValue;
-                                                    let statusColor = 'inherit';
-                                                    let fontWeight = 'normal';
+                                                    let statusColor = '#46607f';
+                                                    let statusBg = '#eef3fb';
+                                                    let fontWeight = 600;
                                                     
                                                     // Check if booking is expired (only for bookings context)
                                                     if (context === 'bookings' && item.expires) {
@@ -1042,10 +1047,12 @@ const PaginatedTable = ({
                                                                     // If expires date is before today, mark as expired
                                                                     if (expiresStartOfDay.isBefore(today)) {
                                                                         displayStatus = 'Expired';
-                                                                        statusColor = '#dc3545'; // Red
-                                                                        fontWeight = 'normal';
+                                                                        statusColor = '#c64d54';
+                                                                        statusBg = '#fdecef';
+                                                                        fontWeight = 600;
                                                                         return (
-                                                                            <span style={{ color: statusColor, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
+                                                                            <span style={{ color: statusColor, background: statusBg, fontWeight, fontSize: '13px', fontFamily: "'Gilroy', sans-serif", padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
                                                                                 {displayStatus}
                                                                             </span>
                                                                         );
@@ -1060,20 +1067,24 @@ const PaginatedTable = ({
                                                     // Normalize status values (only if not expired)
                                                     if (statusValue === 'Confirmed' || statusValue === 'Scheduled') {
                                                         displayStatus = 'Scheduled';
-                                                        statusColor = '#28a745'; // Green
-                                                        fontWeight = 'normal';
+                                                        statusColor = '#24935b';
+                                                        statusBg = '#e9f8ef';
+                                                        fontWeight = 600;
                                                     } else if (statusValue === 'Cancelled' || statusValue === 'Canceled') {
                                                         displayStatus = 'Cancelled';
-                                                        statusColor = '#fd7e14'; // Orange
-                                                        fontWeight = 'normal';
+                                                        statusColor = '#c64d54';
+                                                        statusBg = '#fdecef';
+                                                        fontWeight = 600;
                                                     } else if (statusValue === 'Flown' || statusValue === 'Completed') {
                                                         displayStatus = 'Flown';
-                                                        statusColor = '#007bff'; // Blue
-                                                        fontWeight = 'normal';
+                                                        statusColor = '#2d69c5';
+                                                        statusBg = '#e9f1ff';
+                                                        fontWeight = 600;
                                                     }
                                                     
                                                     return (
-                                                        <span style={{ color: statusColor, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
+                                                        <span style={{ color: statusColor, background: statusBg, fontWeight, fontSize: '13px', fontFamily: "'Gilroy', sans-serif", padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
                                                             {displayStatus}
                                                         </span>
                                                     );

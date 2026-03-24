@@ -5750,27 +5750,98 @@ const Manifest = () => {
                     )}
                 </Box>
             </Container>
-            <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth
+            <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="xl" fullWidth
                 PaperProps={{
-                    sx: isMobile ? {
-                        margin: '8px',
-                        maxHeight: 'calc(100% - 16px)',
-                        height: 'calc(100% - 16px)'
-                    } : {}
+                    sx: {
+                        ...(isMobile ? {
+                            margin: '8px',
+                            maxHeight: 'calc(100% - 16px)',
+                            height: 'calc(100% - 16px)',
+                            width: 'calc(100vw - 16px)',
+                            maxWidth: 'calc(100vw - 16px)'
+                        } : {}),
+                        borderRadius: isMobile ? '14px' : '18px',
+                        overflow: 'hidden',
+                        border: '1px solid #dce2f7',
+                        boxShadow: '0 20px 50px rgba(20, 27, 43, 0.18)'
+                    }
                 }}
             >
-                <DialogTitle style={{ background: '#2d4263', color: '#fff', fontWeight: 700, fontSize: isMobile ? 18 : 22 }}>Booking Details</DialogTitle>
-                <DialogContent style={{ background: '#f7f7f7', minHeight: isMobile ? 'auto' : 500, padding: isMobile ? '12px' : '24px' }}>
+                <DialogTitle sx={{ background: '#ffffff', borderBottom: '1px solid #e5ebf5', py: 2.5, px: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <Box>
+                            <Typography sx={{ fontWeight: 800, fontSize: isMobile ? 28 : 40, lineHeight: 1, color: '#0053db' }}>
+                                Booking Details
+                            </Typography>
+                            <Typography sx={{ mt: 0.5, color: '#6b7280', fontWeight: 600, fontSize: isMobile ? 14 : 18 }}>
+                                Reference ID: {bookingDetail?.booking?.id || '-'}
+                            </Typography>
+                        </Box>
+                        <IconButton onClick={() => setDetailDialogOpen(false)}>
+                            <Typography sx={{ fontSize: 32, lineHeight: 1, color: '#111827' }}>x</Typography>
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
+                <DialogContent style={{ background: '#ffffff', minHeight: isMobile ? 'auto' : 520, paddingTop: 0, paddingLeft: 0, paddingRight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
                     {loadingDetail ? (
                         <Typography>Loading...</Typography>
                     ) : detailError ? (
                         <Typography color="error">{detailError}</Typography>
                     ) : bookingDetail && bookingDetail.success ? (
-                        <Box>
+                        <Box sx={{ display: 'flex', width: '100%', minWidth: 0, overflowX: 'hidden' }}>
+                            {!isMobile && (
+                                <Box sx={{ width: 230, background: '#f2f4ff', borderRight: '1px solid #e4e9f5', p: 2 }}>
+                                    <Typography sx={{ color: '#7a8194', fontWeight: 800, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', mb: 2 }}>
+                                        Quick Actions
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                                        <Button variant="contained" onClick={handleRebook} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#0f9f75', '&:hover': { background: '#0b8a64' } }}>Rebook</Button>
+                                        <Button variant="contained" onClick={handleAddGuestClick} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#189c99', '&:hover': { background: '#147f7d' } }}>Add Guest</Button>
+                                        <Button variant="contained" onClick={handleCancelFlight} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#e11d48', '&:hover': { background: '#be123c' } }}>Cancel Flight</Button>
+                                        <Button variant="contained" onClick={handleEmailBooking} sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#2563eb', '&:hover': { background: '#1d4ed8' } }}>Email | SMS</Button>
+                                        <Button
+                                            variant="contained"
+                                            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#7c3aed', '&:hover': { background: '#6d28d9' } }}
+                                            onClick={() => bookingDetail?.booking && handleMessagesClick(bookingDetail.booking)}
+                                            disabled={!bookingDetail?.booking}
+                                        >
+                                            Messages
+                                        </Button>
+                                        <Button
+                                            variant="contained"
+                                            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#c026d3', '&:hover': { background: '#a21caf' } }}
+                                            onClick={() => {
+                                                if (bookingDetail?.booking?.id) {
+                                                    setPaymentHistory([]);
+                                                    setPaymentHistoryModalOpen(true);
+                                                    fetchPaymentHistory(bookingDetail.booking.id);
+                                                }
+                                            }}
+                                            disabled={!bookingDetail?.booking}
+                                        >
+                                            Payment History
+                                        </Button>
+                                        <Button
+                                            variant="contained"
+                                            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, background: '#64748b', '&:hover': { background: '#475569' } }}
+                                            onClick={() => {
+                                                if (bookingDetail?.booking?.id) {
+                                                    setUserSessionModalOpen(true);
+                                                    fetchUserSession(bookingDetail.booking.id);
+                                                }
+                                            }}
+                                            disabled={!bookingDetail?.booking}
+                                        >
+                                            More
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            )}
+                            <Box sx={{ flex: 1, p: isMobile ? 2 : 3, minWidth: 0 }}>
                             <Grid container spacing={isMobile ? 1 : 2}>
                                 {/* Personal Details */}
                                 <Grid item xs={12} md={4}>
-                                    <Box sx={{ background: '#fff', borderRadius: 2, p: isMobile ? 1.5 : 2, mb: isMobile ? 1 : 2, boxShadow: 1 }}>
+                                    <Box sx={{ background: '#f7f9ff', borderRadius: 3, p: isMobile ? 1.5 : 2, mb: isMobile ? 1 : 2, border: '1px solid #dce2f7', boxShadow: 'none' }}>
                                         <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Personal Details</Typography>
                                         <Typography><b>Booking Name:</b> {editField === 'name' ? (
                                             <>
@@ -6076,7 +6147,7 @@ const Manifest = () => {
                                     </Box>
                                     {/* Additional section removed - information is now displayed in Additional Information section */}
                                     {/* Add On */}
-                                    <Box sx={{ background: '#fff', borderRadius: 2, p: isMobile ? 1.5 : 2, mb: isMobile ? 1 : 2, boxShadow: 1 }}>
+                                    <Box sx={{ background: '#f7f9ff', borderRadius: 3, p: isMobile ? 1.5 : 2, mb: isMobile ? 1 : 2, border: '1px solid #dce2f7', boxShadow: 'none' }}>
                                         <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Add On's</Typography>
                                         
                                         {/* Display actual add-ons from choose_add_on field */}
@@ -6157,7 +6228,7 @@ const Manifest = () => {
                                 </Grid>
                                 {/* Main Details */}
                                 <Grid item xs={12} md={8}>
-                                    <Box sx={{ background: '#fff', borderRadius: 2, p: isMobile ? 1.5 : 2, boxShadow: 1 }}>
+                                    <Box sx={{ background: '#f8faff', borderRadius: 3, p: isMobile ? 1.5 : 2, border: '1px solid #dce2f7', boxShadow: 'none' }}>
                                         {/* Current Booking */}
                                         <Box sx={{ mb: isMobile ? 1 : 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? 1 : 0 }}>
                                             <Box sx={{ flex: 1 }}>
@@ -6220,21 +6291,25 @@ const Manifest = () => {
                                                     </Box>
                                                 )}
                                             </Box>
-                                            <Box sx={{ 
-                                                display: 'flex', 
-                                                flexDirection: isMobile ? 'row' : 'column', 
-                                                flexWrap: isMobile ? 'wrap' : 'nowrap',
-                                                gap: isMobile ? '8px' : 1, 
+                                            <Box sx={{
+                                                display: isMobile ? 'flex' : 'none',
+                                                flexDirection: 'column',
+                                                flexWrap: 'nowrap',
+                                                gap: isMobile ? '10px' : 1, 
                                                 minWidth: isMobile ? 'auto' : 140,
                                                 width: isMobile ? '100%' : 'auto',
-                                                mt: isMobile ? 1 : 0
+                                                mt: isMobile ? 1 : 0,
+                                                background: isMobile ? 'transparent' : '#eef2ff',
+                                                borderRadius: isMobile ? 0 : 3,
+                                                padding: isMobile ? 0 : '10px',
+                                                border: isMobile ? 'none' : '1px solid #dbe4ff'
                                             }}>
                                                 <Button variant="contained" color="primary" sx={{ 
                                                     mb: isMobile ? 0 : 1, 
-                                                    borderRadius: 2, 
-                                                    fontWeight: 600, 
+                                                    borderRadius: 2.5, 
+                                                    fontWeight: 700, 
                                                     textTransform: 'none',
-                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    flex: isMobile ? '1 1 100%' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
@@ -6245,10 +6320,10 @@ const Manifest = () => {
                                                 }} onClick={handleRebook}>Rebook</Button>
                                                 <Button variant="contained" color="primary" sx={{ 
                                                     mb: isMobile ? 0 : 1, 
-                                                    borderRadius: 2, 
-                                                    fontWeight: 600, 
+                                                    borderRadius: 2.5, 
+                                                    fontWeight: 700, 
                                                     textTransform: 'none',
-                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    flex: isMobile ? '1 1 100%' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
@@ -6259,11 +6334,11 @@ const Manifest = () => {
                                                 }} onClick={handleAddGuestClick}>Add Guest</Button>
                                                 <Button variant="contained" color="info" sx={{ 
                                                     mb: isMobile ? 0 : 1, 
-                                                    borderRadius: 2, 
-                                                    fontWeight: 600, 
+                                                    borderRadius: 2.5, 
+                                                    fontWeight: 700, 
                                                     textTransform: 'none', 
                                                     background: '#E74C3C',
-                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    flex: isMobile ? '1 1 100%' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
@@ -6272,12 +6347,12 @@ const Manifest = () => {
                                                     }
                                                 }} onClick={handleCancelFlight}>Cancel Flight</Button>
                                                 <Button variant="contained" color="success" sx={{ 
-                                                    borderRadius: 2, 
-                                                    fontWeight: 600, 
+                                                    borderRadius: 2.5, 
+                                                    fontWeight: 700, 
                                                     textTransform: 'none', 
                                                     background: '#3498DB',
                                                     mb: isMobile ? 0 : 1,
-                                                    flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                    flex: isMobile ? '1 1 100%' : 'none',
                                                     minWidth: isMobile ? 'auto' : 'auto',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
@@ -6289,12 +6364,12 @@ const Manifest = () => {
                                                     variant="contained"
                                                     color="secondary"
                                                     sx={{ 
-                                                        borderRadius: 2, 
-                                                        fontWeight: 600, 
+                                                        borderRadius: 2.5, 
+                                                        fontWeight: 700, 
                                                         textTransform: 'none', 
                                                         background: '#5B6CFF',
                                                         mb: isMobile ? 0 : 1,
-                                                        flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                        flex: isMobile ? '1 1 100%' : 'none',
                                                         minWidth: isMobile ? 'auto' : 'auto',
                                                         fontSize: isMobile ? '12px' : '14px',
                                                         padding: isMobile ? '6px 8px' : '8px 16px',
@@ -6311,13 +6386,13 @@ const Manifest = () => {
                                                     variant="contained"
                                                     color="info"
                                                     sx={{ 
-                                                        borderRadius: 2, 
-                                                        fontWeight: 600, 
+                                                        borderRadius: 2.5, 
+                                                        fontWeight: 700, 
                                                         textTransform: 'none', 
                                                         background: '#8E44AD',
                                                         mt: isMobile ? 0 : 1,
                                                         mb: isMobile ? 0 : 1,
-                                                        flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                        flex: isMobile ? '1 1 100%' : 'none',
                                                         minWidth: isMobile ? 'auto' : 'auto',
                                                         fontSize: isMobile ? '12px' : '14px',
                                                         padding: isMobile ? '6px 8px' : '8px 16px',
@@ -6341,12 +6416,12 @@ const Manifest = () => {
                                                     variant="contained"
                                                     color="info"
                                                     sx={{ 
-                                                        borderRadius: 2, 
-                                                        fontWeight: 600, 
+                                                        borderRadius: 2.5, 
+                                                        fontWeight: 700, 
                                                         textTransform: 'none', 
                                                         background: '#7F8C8D',
                                                         mt: isMobile ? 0 : 1,
-                                                        flex: isMobile ? '1 1 calc(50% - 4px)' : 'none',
+                                                        flex: isMobile ? '1 1 100%' : 'none',
                                                         minWidth: isMobile ? 'auto' : 'auto',
                                                         fontSize: isMobile ? '12px' : '14px',
                                                         padding: isMobile ? '6px 8px' : '8px 16px',
@@ -6526,7 +6601,7 @@ const Manifest = () => {
                                                 <Divider sx={{ my: 1 }} />
                                                 <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 1, mt: 1, mb: 1 }} className="booking-history-section">
                                                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, fontSize: '16px' }}>History</Typography>
-                                                    <TableContainer component={Box} className="booking-history-table-container">
+                                                    <TableContainer component={Box} className="booking-history-table-container" sx={{ maxHeight: 280, overflowY: 'auto', overflowX: 'auto' }}>
                                                         <Table className="booking-history-table">
                                                             <TableHead>
                                                                 <TableRow>
@@ -6581,12 +6656,14 @@ const Manifest = () => {
                                                     {addingNote ? 'Adding...' : 'Add Note'}
                                                 </Button>
                                             </Box>
+                                            <Box sx={{ maxHeight: 220, overflowY: 'auto', pr: 0.5 }}>
                                             {bookingDetail.notes && bookingDetail.notes.length > 0 ? bookingDetail.notes.map((n, i) => (
                                                 <Box key={i} sx={{ mb: 1, p: 1, background: '#fff', borderRadius: 1, boxShadow: 0 }}>
                                                     <Typography variant="body2" sx={{ color: '#888', fontSize: 12 }}>{n.date ? dayjs(n.date).format('DD/MM/YYYY HH:mm') : ''}</Typography>
                                                     <Typography>{n.notes}</Typography>
                                                 </Box>
                                             )) : <Typography>No notes</Typography>}
+                                            </Box>
                                         </Box>
                                         <Divider sx={{ my: isMobile ? 1 : 2 }} />
                                         {/* Additional Information Section */}
@@ -6596,7 +6673,7 @@ const Manifest = () => {
                                                 {additionalInfoLoading ? (
                                                     <Typography>Loading additional information...</Typography>
                                                 ) : (
-                                                                                                            <Box>
+                                                                                                            <Box sx={{ maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
                                                         {(() => {
                                                             const notesFromBooking = bookingDetail.booking?.additional_notes;
                                                             const notesFromAdditional = additionalInformation?.additional_information_json?.notes;
@@ -6701,7 +6778,7 @@ const Manifest = () => {
                                         {!isMobile && (
                                             <Box sx={{ background: '#e0e0e0', borderRadius: 2, p: 2, mt: 2, mb: 2 }} className="booking-history-section">
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>History</Typography>
-                                                <TableContainer component={Box} className="booking-history-table-container">
+                                                <TableContainer component={Box} className="booking-history-table-container" sx={{ maxHeight: 280, overflowY: 'auto', overflowX: 'auto' }}>
                                                     <Table className="booking-history-table">
                                                         <TableHead>
                                                             <TableRow>
@@ -6733,11 +6810,12 @@ const Manifest = () => {
                                     </Box>
                                 </Grid>
                             </Grid>
+                            </Box>
                         </Box>
                     ) : null}
                 </DialogContent>
-                <DialogActions sx={{ background: '#f7f7f7' }}>
-                    <Button onClick={() => setDetailDialogOpen(false)} color="primary" variant="contained">Close</Button>
+                <DialogActions sx={{ background: '#f1f3ff', borderTop: '1px solid #dce2f7', px: 3, py: 1.5 }}>
+                    <Button onClick={() => setDetailDialogOpen(false)} color="primary" variant="contained" sx={{ borderRadius: 2.5, fontWeight: 700, textTransform: 'none', px: 3 }}>Close</Button>
                 </DialogActions>
             </Dialog>
             <Dialog open={addGuestDialogOpen} onClose={() => setAddGuestDialogOpen(false)} maxWidth="sm" fullWidth>

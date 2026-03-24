@@ -26,24 +26,19 @@ body {
 
 /* Start Header */
 .topbar-wrap header {
-    background-color: #FFF;
+    background-color: #f7f9fc;
 }
 .header-nav-wrap li.MuiButtonBase-root:not(:last-child):after {
-    position: absolute;
-    content: "";
-    width: 1px;
-    height: 100%;
-    right: 0;
-    top: 0;
-    background: #ffffff;
+    display: none;
 }
 
 .header-nav-wrap li.MuiButtonBase-root {
     position: relative;
-    padding: 6px 40px;
+    padding: 8px 16px;
+    margin: 0 2px;
 }
 .topbar-wrap svg.MuiSvgIcon-root {
-    color: var(--dark-blue);
+    color: #36547a;
 }
 
 /* End Header */
@@ -332,8 +327,60 @@ body {
 
 /* Start Booking Page */
 
+.booking-page-wrap .heading-wrap h2 {
+    font-size: 36px;
+    margin-bottom: 8px;
+    letter-spacing: 0.01em;
+}
+
+.booking-page-wrap .heading-wrap hr {
+    border: none;
+    height: 1px;
+    background: #e5ebf5;
+    margin-bottom: 26px;
+}
+
+.booking-page-wrap .booking-page-content {
+    background: #f4f7fc !important;
+    border-radius: 22px !important;
+}
+
+.booking-page-wrap .booking-page-content h3 {
+    color: #1c3458;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.booking-page-wrap .booking-page-content .MuiButton-root {
+    border-radius: 10px;
+    box-shadow: none;
+}
+
+.booking-page-wrap .booking-page-content .MuiOutlinedInput-root {
+    background: #ffffff;
+    border-radius: 10px;
+}
+
+.booking-page-wrap .booking-page-content .MuiOutlinedInput-notchedOutline {
+    border-color: #d8e3f2;
+}
+
+.booking-page-wrap .booking-page-content .Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: #2d69c5;
+}
+
+.booking-page-wrap .booking-page-content .MuiInputLabel-root {
+    color: #5e7393;
+}
+
+.booking-page-wrap .booking-page-content .MuiChip-root {
+    border-radius: 999px;
+}
+
 .booking-top-wrap {
     justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 10px;
 }
 
 .booking-filter-wrap, .booking-top-wrap {
@@ -347,6 +394,17 @@ body {
 
 .booking-search-booking input {
     padding: 10px 15px;
+}
+
+.booking-page-wrap .paginated-table-wrapper {
+    border: 1px solid #e1e8f3;
+    border-radius: 14px;
+    background: #ffffff;
+    margin-top: 10px;
+}
+
+.booking-page-wrap .booking-table {
+    margin-top: 0 !important;
 }
 
 .booking-filter-field a {
@@ -381,7 +439,7 @@ body {
         flex: 1 1 auto !important;
         min-width: calc(33.333% - 6px) !important;
         max-width: calc(33.333% - 6px) !important;
-        padding: 10px 8px !important;
+        padding: 8px 8px !important;
         font-size: 12px !important;
         white-space: nowrap !important;
         overflow: hidden !important;
