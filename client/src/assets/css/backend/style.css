@@ -1122,6 +1122,130 @@ a.edit-activity svg {
 }
 /* End Activity Page */
 
+/* Start Manifest Page */
+.final-menifest-wrap .heading-wrap h2 {
+    font-size: 36px;
+    margin-bottom: 8px;
+    letter-spacing: 0.01em;
+}
+
+.final-menifest-wrap .heading-wrap hr {
+    border: none;
+    height: 1px;
+    background: #e5ebf5;
+    margin-bottom: 26px;
+}
+
+.final-menifest-wrap .manifest-date-selector .MuiInputBase-root {
+    background: #ffffff;
+    border-radius: 10px;
+}
+
+.final-menifest-wrap .manifest-date-selector .MuiOutlinedInput-notchedOutline {
+    border-color: #d8e3f2;
+}
+
+.final-menifest-wrap .manifest-date-selector .MuiInputLabel-root {
+    color: #5e7393;
+}
+
+.final-menifest-wrap .manifest-nav-buttons {
+    border-radius: 10px;
+    color: #35547f;
+}
+
+.final-menifest-wrap .manifest-flight-card {
+    border: 1px solid #e1e8f3;
+    border-radius: 14px;
+    box-shadow: none;
+    background: #ffffff;
+}
+
+.final-menifest-wrap .manifest-flight-header .MuiTypography-h6 {
+    color: #1c3458;
+    font-weight: 700;
+}
+
+.final-menifest-wrap .manifest-flight-details .MuiTypography-body1 {
+    color: #465a79;
+}
+
+.final-menifest-wrap .manifest-flight-actions .MuiButton-root {
+    height: 40px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    box-shadow: none;
+}
+
+.final-menifest-wrap .manifest-flight-actions .MuiButton-containedPrimary,
+.final-menifest-wrap .manifest-flight-actions .MuiButton-contained {
+    background: #2d69c5;
+}
+
+.final-menifest-wrap .manifest-flight-actions .MuiButton-outlinedPrimary,
+.final-menifest-wrap .manifest-flight-actions .MuiButton-outlined {
+    border-color: #2d69c5;
+    color: #2d69c5;
+}
+
+.final-menifest-wrap .manifest-flight-actions .MuiSelect-select,
+.final-menifest-wrap .manifest-flight-actions .MuiInputBase-input {
+    font-size: 13px;
+    color: #35547f;
+}
+
+.final-menifest-wrap .manifest-table-container {
+    border: 1px solid #e1e8f3;
+    border-radius: 14px;
+    box-shadow: none;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.final-menifest-wrap .manifest-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.final-menifest-wrap .manifest-table thead {
+    background: #2d69c5;
+}
+
+.final-menifest-wrap .manifest-table thead .MuiTableCell-root {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 10px;
+    border-bottom: none;
+}
+
+.final-menifest-wrap .manifest-table tbody .MuiTableCell-root {
+    color: #465a79;
+    font-size: 14px;
+    padding: 10px 10px;
+    border-bottom: 1px solid #ebf0f8;
+    background: #ffffff;
+}
+
+.final-menifest-wrap .manifest-table tbody .MuiTableRow-root:nth-of-type(even) .MuiTableCell-root {
+    background: #f8fbff;
+}
+
+.final-menifest-wrap .manifest-table .MuiTableCell-root a {
+    color: #2d69c5;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.final-menifest-wrap .manifest-total-price-mobile {
+    color: #1c3458;
+    font-weight: 700;
+}
+/* End Manifest Page */
+
 /* Start Manifest Page Mobile Responsive Styles - Only for mobile devices */
 @media screen and (max-width: 768px) {
     /* Manifest Page Container */
@@ -1332,7 +1456,7 @@ a.edit-activity svg {
 
     .final-menifest-wrap .manifest-flight-header .MuiIconButton-root .MuiSvgIcon-root {
         font-size: 18px !important;
-        color: #3274b4 !important;
+        color: #2d69c5 !important;
     }
 
     .final-menifest-wrap .MuiTypography-body1 {
@@ -1473,7 +1597,7 @@ a.edit-activity svg {
 
     /* Table Head - Better on mobile */
     .final-menifest-wrap .MuiTableHead-root {
-        background: #3274b4 !important;
+        background: #2d69c5 !important;
     }
 
     .final-menifest-wrap .MuiTableHead-root .MuiTableCell-root {
@@ -1565,7 +1689,7 @@ a.edit-activity svg {
         font-size: 10px !important;
         font-weight: 600 !important;
         white-space: nowrap !important;
-        background: #3274b4 !important;
+        background: #2d69c5 !important;
         color: #ffffff !important;
         text-align: center !important;
     }
