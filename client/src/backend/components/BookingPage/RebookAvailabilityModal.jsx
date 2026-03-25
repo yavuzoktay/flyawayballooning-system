@@ -497,26 +497,29 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     const privateVoucherTypeOptions = useMemo(() => {
         const values = privateVoucherTypeRawValues;
 
-        // If activity stores IDs (common), map them to titles using /api/private-charter-voucher-types
+        // 1) Options coming from activity config (may be partial / incomplete)
+        let optionsFromActivity = [];
         if (values.length > 0 && values.every(isNumericId) && privateCharterVoucherTypes.length > 0) {
             const byId = new Map(privateCharterVoucherTypes.map(vt => [String(vt.id), vt.title]));
-            const mapped = values
+            optionsFromActivity = values
                 .map(id => byId.get(String(id)) || null)
                 .filter(Boolean);
-            // If we have raw IDs but none map (schema mismatch / unexpected ids),
-            // fall back to showing all private voucher type titles we fetched so UI isn't empty.
-            if (mapped.length === 0) {
-                return privateCharterVoucherTypes.map(vt => vt.title).filter(Boolean);
-            }
-            return mapped;
+        } else if (values.length > 0) {
+            // Activity stores titles (or a partial list of titles)
+            optionsFromActivity = values;
         }
 
-        // Otherwise assume activity already stores titles
-        if (values.length > 0) return values;
+        if (optionsFromActivity.length === 0 && privateCharterVoucherTypes.length > 0 && values.length > 0) {
+            // If activity config has unexpected IDs/titles, still keep UI from being empty.
+            optionsFromActivity = privateCharterVoucherTypes.map(vt => vt.title).filter(Boolean);
+        }
 
-        // Fallback (more robust): infer from availabilities voucher types when activity config is missing.
+        // 2) Inferred options from availabilities (source of truth for which proposal dates exist)
         // Availability records include voucher_types / voucher_types_array (titles).
-        if (privateCharterVoucherTypes.length > 0 && Array.isArray(availabilities) && availabilities.length > 0) {
+        const inferredFromAvailabilities = (() => {
+            if (privateCharterVoucherTypes.length === 0) return [];
+            if (!Array.isArray(availabilities) || availabilities.length === 0) return [];
+
             const privateTitles = new Set(privateCharterVoucherTypes.map(vt => normalizeVoucherKey(vt.title)));
             const inferred = new Set();
             availabilities.forEach(a => {
@@ -531,10 +534,22 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
                 });
             });
             return Array.from(inferred);
-        }
+        })();
 
-        return [];
-    }, [privateVoucherTypeRawValues, privateCharterVoucherTypes]);
+        // Merge (preserve activity order first, then add any missing inferred types)
+        const merged = [];
+        const seen = new Set();
+        const addUnique = (t) => {
+            const k = normalizeVoucherKey(t);
+            if (!k || seen.has(k)) return;
+            seen.add(k);
+            merged.push(t);
+        };
+
+        optionsFromActivity.forEach(addUnique);
+        inferredFromAvailabilities.forEach(addUnique);
+        return merged;
+    }, [privateVoucherTypeRawValues, privateCharterVoucherTypes, availabilities]);
 
 
     const sharedVoucherTypeOptions = useMemo(() => ([
@@ -543,7 +558,7 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         { key: 'any day flight', label: 'Any Day Flight' }
     ]), []);
 
-    // When switching to private selection, default-select the first private voucher type for this activity if none are selected yet.
+    // When switching to private selection, default-select a sensible private voucher type if none are selected yet.
     useEffect(() => {
         if (!open) return;
         if (!selectedFlightTypes.includes('private')) return;
@@ -553,10 +568,20 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         const privateKeys = privateVoucherTypeOptions.map(normalizeVoucherKey);
         const hasAnyPrivateSelected = privateKeys.some(k => selectedKeys.has(k));
         if (!hasAnyPrivateSelected) {
-            // Select only the first private voucher type (single selection)
-            setSelectedVoucherTypes([privateVoucherTypeOptions[0]]);
+            // Prefer the booking's voucher type if it's one of the private/proposal options.
+            const bookingVoucherTypeRaw =
+                bookingDetail?.booking?.voucher_type ||
+                bookingDetail?.booking?.voucher_type_detail ||
+                bookingDetail?.voucher?.voucher_type_detail ||
+                bookingDetail?.voucher?.voucher_type ||
+                '';
+
+            const bookingKey = normalizeVoucherKey(bookingVoucherTypeRaw);
+            const matched = privateVoucherTypeOptions.find(t => normalizeVoucherKey(t) === bookingKey);
+
+            setSelectedVoucherTypes([matched || privateVoucherTypeOptions[0]]);
         }
-    }, [open, selectedFlightTypes, privateVoucherTypeOptions, selectedVoucherTypes]);
+    }, [open, selectedFlightTypes, privateVoucherTypeOptions, selectedVoucherTypes, bookingDetail]);
 
     // Flight type değişince sadece filtrele ve voucher types'ı temizle
     useEffect(() => {
@@ -571,7 +596,16 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         }
 
         // When flight type changes, clear voucher types that don't match the new flight type
-        const normalizeType = t => t.replace(' Flight', '').replace(' Charter', '').trim().toLowerCase();
+        const normalizeType = (t) => {
+            const normalized = String(t || '')
+                .replace(' Flight', '')
+                .replace(' Charter', '')
+                .trim()
+                .toLowerCase();
+            // Proposal is treated as a private/proposal flow in the rebook popup.
+            if (normalized === 'proposal') return 'private';
+            return normalized;
+        };
         const selectedTypes = selectedFlightTypes.map(t => normalizeType(t));
         
         // Clear voucher types that don't match current flight type
@@ -677,7 +711,9 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
     }, [bookingDetail]);
 
     const isCurrentBookingPrivate = useMemo(() => {
-        return bookingFlowDescriptor.includes('private');
+        // Proposal Flight is a private/proposal flow even if the descriptor doesn't contain the word "private".
+        // This impacts resource usage calculation and which slots are considered selectable.
+        return bookingFlowDescriptor.includes('private') || bookingFlowDescriptor.includes('proposal');
     }, [bookingFlowDescriptor]);
 
     const isCurrentBookingSmallPrivate = useMemo(() => {
@@ -851,7 +887,16 @@ const RebookAvailabilityModal = ({ open, onClose, location, onSlotSelect, flight
         });
         
         // Apply flight type filtering if needed (but keep all slots for resource calculation)
-        const normalizeType = t => t.replace(' Flight', '').replace(' Charter', '').trim().toLowerCase();
+        const normalizeType = (t) => {
+            const normalized = String(t || '')
+                .replace(' Flight', '')
+                .replace(' Charter', '')
+                .trim()
+                .toLowerCase();
+            // Proposal is treated as a private/proposal flow in the rebook popup.
+            if (normalized === 'proposal') return 'private';
+            return normalized;
+        };
         const selectedTypes = selectedFlightTypes.length > 0 ? selectedFlightTypes.map(t => normalizeType(t)) : [];
         
         // Filter slots by flight type if flight types are selected

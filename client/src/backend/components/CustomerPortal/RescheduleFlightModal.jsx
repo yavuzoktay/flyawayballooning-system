@@ -358,7 +358,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
             const typeKeywords = {
                 shared: normalizedType.includes('shared'),
-                private: normalizedType.includes('private'),
+                // Proposal slots are effectively "private/proposal" in the customer portal.
+                // Some activities may label them as "proposal" without the word "private".
+                private: normalizedType.includes('private') || normalizedType.includes('proposal'),
                 charter: normalizedType.includes('charter'),
             };
 
@@ -375,7 +377,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         if (availability?.flight_types) {
             const flightTypesStr = String(availability.flight_types).toLowerCase();
             const isShared = flightTypesStr.includes('shared');
-            const isPrivate = flightTypesStr.includes('private');
+            const isPrivate = flightTypesStr.includes('private') || flightTypesStr.includes('proposal');
             
             // If expectedExperience is set from voucher type, use it
             if (expectedExperience) {
