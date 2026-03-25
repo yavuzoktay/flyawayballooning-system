@@ -2226,6 +2226,42 @@ const Manifest = () => {
         }
     };
 
+    // History/timezone fix:
+    // Server often stores flight_date as "YYYY-MM-DD HH:mm:ss" without timezone info.
+    // JS/Dayjs may parse that as UTC -> causing hour shifts on display.
+    const parseLocalNoTzDateTime = (value) => {
+        if (!value) return null;
+        if (typeof value !== 'string') return null;
+
+        const localNoTz = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?$/;
+        const looksZOrOffset = /Z$/i.test(value) || /([+-]\d{2}):?(\d{2})$/.test(value);
+        if (!localNoTz.test(value) || looksZOrOffset) return null;
+
+        const [datePart, timePart] = value.split(/[ T]/);
+        if (!datePart || !timePart) return null;
+        const [yearStr, monthStr, dayStr] = datePart.split('-');
+        const [hourStr, minuteStr, secondStr] = timePart.split(':');
+
+        const year = Number(yearStr);
+        const month = Number(monthStr) - 1;
+        const day = Number(dayStr);
+        const hour = Number(hourStr);
+        const minute = Number(minuteStr);
+        const second = secondStr ? Number(secondStr.split('.')[0]) : 0;
+
+        const d = new Date(year, month, day, hour, minute, Number.isFinite(second) ? second : 0);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const formatHistoryDateTime = (value, formatStr) => {
+        const localDate = parseLocalNoTzDateTime(value);
+        if (localDate) return dayjs(localDate).format(formatStr);
+        return value ? dayjs(value).format(formatStr) : '-';
+    };
+
+    const formatHistoryDateKey = (value) => formatHistoryDateTime(value, 'YYYY-MM-DD HH:mm');
+    const formatHistoryDateDisplay = (value) => formatHistoryDateTime(value, 'DD/MM/YYYY HH:mm');
+
     const buildDisplayedHistoryRows = () => {
         // Build history from booking_status_history and current booking
         const historyEntries = Array.isArray(bookingHistory) ? [...bookingHistory] : [];
@@ -2256,13 +2292,13 @@ const Manifest = () => {
             if (isCancelled) {
                     // Cancelled: Find the last Scheduled entry with the same flight_date and update it
                     // Use the Cancelled entry's own flight_date to find matching Scheduled entry
-                    const cancelledDateKey = dayjs(entryFlightDate).format('YYYY-MM-DD HH:mm');
+                    const cancelledDateKey = formatHistoryDateKey(entryFlightDate);
                     
                     // Search from the end to find the most recent Scheduled entry for this date
                     let foundScheduled = false;
                     for (let i = processedRows.length - 1; i >= 0; i--) {
                         const row = processedRows[i];
-                        const rowDateKey = row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD HH:mm') : '';
+                        const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
                         if (rowDateKey === cancelledDateKey && row.status && row.status.toLowerCase() !== 'cancelled') {
                             // Update this Scheduled entry to Cancelled, but keep the Scheduled entry's original flight_date
                             // This way the Cancelled row shows the same date as the Scheduled row it replaced
@@ -2288,12 +2324,12 @@ const Manifest = () => {
                     }
                 } else {
                     // Scheduled or other non-Cancelled status: Check for duplicates before adding
-                    const entryDateKey = dayjs(entryFlightDate).format('YYYY-MM-DD HH:mm');
+                    const entryDateKey = formatHistoryDateKey(entryFlightDate);
                     const entryStatus = status.toLowerCase();
                     
                     // Check if an entry with the same flight_date and status already exists
                     const duplicateExists = processedRows.some(row => {
-                        const rowDateKey = row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD HH:mm') : '';
+                        const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
                         const rowStatus = row.status ? row.status.toLowerCase() : '';
                         return rowDateKey === entryDateKey && rowStatus === entryStatus;
                     });
@@ -2315,12 +2351,12 @@ const Manifest = () => {
         if (bookingDetail?.booking?.flight_date) {
             const currentFlightDate = bookingDetail.booking.flight_date;
             const currentStatus = bookingDetail.booking.status || 'Scheduled';
-            const dateKey = dayjs(currentFlightDate).format('YYYY-MM-DD HH:mm');
+            const dateKey = formatHistoryDateKey(currentFlightDate);
             const isCancelled = currentStatus.toLowerCase() === 'cancelled';
             
             // Check if current booking's status and flight_date already exists in processed rows
             const alreadyExists = processedRows.some(row => {
-                const rowDateKey = row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD HH:mm') : '';
+                const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
                 const rowStatus = row.status || '';
                 return rowDateKey === dateKey && rowStatus.toLowerCase() === currentStatus.toLowerCase();
             });
@@ -2333,7 +2369,7 @@ const Manifest = () => {
                     let foundScheduled = false;
                     for (let i = processedRows.length - 1; i >= 0; i--) {
                         const row = processedRows[i];
-                        const rowDateKey = row.flight_date ? dayjs(row.flight_date).format('YYYY-MM-DD HH:mm') : '';
+                        const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
                         if (rowDateKey === dateKey && row.status && row.status.toLowerCase() !== 'cancelled') {
                             // Update this Scheduled entry to Cancelled, but keep its original flight_date
                             processedRows[i] = {
@@ -2373,7 +2409,7 @@ const Manifest = () => {
         processedRows.forEach(row => {
             if (!row || !row.flight_date || !row.status) return;
             
-            const dateKey = dayjs(row.flight_date).format('YYYY-MM-DD HH:mm');
+            const dateKey = formatHistoryDateKey(row.flight_date);
             const statusKey = row.status.toLowerCase();
             const uniqueKey = `${dateKey}|${statusKey}`;
             
@@ -6614,7 +6650,7 @@ const Manifest = () => {
                                                             <TableBody>
                                                                 {historyRows.map((h, i) => (
                                                                     <TableRow key={i}>
-                                                                        <TableCell>{h.flight_date ? dayjs(h.flight_date).format('DD/MM/YYYY HH:mm') : (h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-')}</TableCell>
+                                                                        <TableCell>{h.flight_date ? formatHistoryDateDisplay(h.flight_date) : (h.changed_at ? formatHistoryDateDisplay(h.changed_at) : '-')}</TableCell>
                                                                         <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                                         <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
                                                                         <TableCell>{getStatusWithEmoji(h.status || 'Scheduled')}</TableCell>
@@ -6791,7 +6827,7 @@ const Manifest = () => {
                                                         <TableBody>
                                                             {historyRows.map((h, i) => (
                                                                 <TableRow key={i}>
-                                                                    <TableCell>{h.flight_date ? dayjs(h.flight_date).format('DD/MM/YYYY HH:mm') : (h.changed_at ? dayjs(h.changed_at).format('DD/MM/YYYY HH:mm') : '-')}</TableCell>
+                                                                    <TableCell>{h.flight_date ? formatHistoryDateDisplay(h.flight_date) : (h.changed_at ? formatHistoryDateDisplay(h.changed_at) : '-')}</TableCell>
                                                                     <TableCell>{bookingDetail.booking.flight_type || '-'}</TableCell>
                                                                     <TableCell>{bookingDetail.booking.location || '-'}</TableCell>
                                                                     <TableCell>{getStatusWithEmoji(h.status || 'Scheduled')}</TableCell>
