@@ -1030,6 +1030,62 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     additionalInfoPayload = {};
                 }
 
+                // Fallback: when booking-level additional info isn't available yet (common for Flight Voucher pre-redeem),
+                // pull from voucher-level additional information already present in Customer Portal bookingData.
+                try {
+                    const voucher = bookingData?.voucher;
+                    const voucherAdditionalInfoJsonRaw =
+                        voucher?.additional_information_json ??
+                        voucher?.additional_information?.additional_information_json ??
+                        voucher?.additional_information?.additional_information_json;
+                    const voucherLegacyNotes =
+                        voucher?.additional_information?.legacy?.additional_notes ??
+                        voucher?.additional_notes ??
+                        voucher?.legacy?.additional_notes ??
+                        null;
+                    const voucherAnswers = Array.isArray(voucher?.additional_information?.answers)
+                        ? voucher.additional_information.answers
+                        : [];
+
+                    const parsedVoucherJson =
+                        typeof voucherAdditionalInfoJsonRaw === 'string'
+                            ? (() => {
+                                try {
+                                    return JSON.parse(voucherAdditionalInfoJsonRaw);
+                                } catch (e) {
+                                    return {};
+                                }
+                            })()
+                            : (voucherAdditionalInfoJsonRaw && typeof voucherAdditionalInfoJsonRaw === 'object'
+                                ? voucherAdditionalInfoJsonRaw
+                                : {});
+
+                    // Merge voucher json into payload if payload is empty or missing notes.
+                    if (Object.keys(additionalInfoPayload || {}).length === 0) {
+                        additionalInfoPayload = parsedVoucherJson || {};
+                    } else {
+                        additionalInfoPayload = {
+                            ...(parsedVoucherJson || {}),
+                            ...(additionalInfoPayload || {})
+                        };
+                    }
+
+                    // Ensure answers array is mapped into question_XX keys.
+                    voucherAnswers.forEach((item) => {
+                        const questionId = item?.question_id;
+                        const answer = item?.answer;
+                        if (questionId && answer !== undefined && answer !== null && String(answer).trim() !== '') {
+                            additionalInfoPayload[`question_${questionId}`] = answer;
+                        }
+                    });
+
+                    if (!additionalInfoPayload.notes && voucherLegacyNotes) {
+                        additionalInfoPayload.notes = voucherLegacyNotes;
+                    }
+                } catch (fallbackAdditionalErr) {
+                    console.warn('⚠️ Could not fallback voucher additional info for redeem reschedule flow:', fallbackAdditionalErr);
+                }
+
                 // Prepare passenger data from booking
                 // Use passengers in the order they come from backend (already sorted by ORDER BY id ASC)
                 // This ensures Passenger 1 is first, Passenger 2 is second, etc.
@@ -1117,6 +1173,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 const bookingDetail = bookingResponse.data?.data || bookingResponse.data;
                 // Handle nested structure (bookingDetail.booking) or flat structure
                 const newBooking = bookingDetail?.booking || bookingDetail;
+                const additionalInformationFromBookingDetail = bookingDetail?.additional_information || null;
 
                 // Format flight_date to ISO format for consistency with backend
                 // selectedDateTime is in "YYYY-MM-DD HH:mm" format, convert to ISO
@@ -1164,6 +1221,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     // Preserve expiry date from original voucher
                     expires: bookingData?.expires || newBooking?.expires
                 };
+
+                // Ensure booking details dialog has access to additional info.
+                // Some UI flows rely on `bookingData.additional_information` (not only booking.additional_information_json).
+                if (additionalInformationFromBookingDetail) {
+                    enhancedBooking.additional_information = additionalInformationFromBookingDetail;
+                }
                 
                 console.log('✅ RescheduleFlightModal - Enhanced booking for Flight Voucher redeem:', {
                     newBookingId,
