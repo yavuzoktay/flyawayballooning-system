@@ -756,7 +756,7 @@ const FlownFlights = () => {
             </Box>
 
             {/* Search - always visible */}
-            <Box sx={{ mb: isMobile ? 1 : 0 }}>
+            <Box sx={{ mb: isMobile ? 1 : 2 }}>
                 <TextField
                     placeholder="Search..."
                     value={searchTerm}
@@ -768,7 +768,15 @@ const FlownFlights = () => {
                             </InputAdornment>
                         ),
                     }}
-                    sx={{ width: '100%', minWidth: isMobile ? '100%' : 200, ...(isMobile ? { '& .MuiOutlinedInput-input': { padding: '6px 8px', fontSize: '16px' }, '& .MuiOutlinedInput-root': { height: '36px' } } : {}) }}
+                    sx={{
+                        width: '100%',
+                        minWidth: isMobile ? '100%' : 200,
+                        maxWidth: isMobile ? '100%' : 420,
+                        ...(isMobile ? {
+                            '& .MuiOutlinedInput-input': { padding: '6px 8px', fontSize: '16px' },
+                            '& .MuiOutlinedInput-root': { height: '36px' }
+                        } : {})
+                    }}
                     size="small"
                 />
             </Box>
