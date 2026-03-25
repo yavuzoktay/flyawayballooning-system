@@ -4155,6 +4155,12 @@ setBookingDetail(finalVoucherDetail);
                     const recipientEmail = voucher.recipient_email || '';
                     
                     // Prepare booking payload
+                    const flightVoucherAdditionalInfo = parseAdditionalInfoJson(
+                        bookingDetail?.voucher?.additional_information_json
+                    ) || parseAdditionalInfoJson(
+                        additionalInformation?.additional_information_json
+                    ) || null;
+
                     const bookingPayloadBase = {
                         activitySelect: 'Redeem Voucher',
                         chooseLocation: selectedLocationForBooking,
@@ -4441,7 +4447,7 @@ setBookingDetail(finalVoucherDetail);
                         paid: paidAmount, // Add paid amount from Flight Voucher Details
                         ...(voucherCode ? { voucher_code: voucherCode } : {}),
                         flight_attempts: 0,
-                        additionalInfo: {},
+                        additionalInfo: flightVoucherAdditionalInfo || {},
                         choose_add_on: [],
                         activity_id: finalActivityId, // Add activity_id for backend
                         experience: experience, // Add experience from voucher
