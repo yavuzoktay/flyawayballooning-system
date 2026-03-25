@@ -4431,6 +4431,12 @@ setBookingDetail(finalVoucherDetail);
                         existingBookingId: existingBookingId,
                         isRebook: !!existingBookingId
                     });
+
+                    // Persist the "Additional Information & Notes" entered in Flight Voucher flow.
+                    // Store as additionalInfo so backend can write booking.additional_information_json.
+                    const flightVoucherAdditionalInfo = parseAdditionalInfoJson(
+                        bookingDetail?.voucher?.additional_information_json
+                    ) || parseAdditionalInfoJson(additionalInformation?.additional_information_json) || null;
                     
                     // Prepare booking payload
                     const bookingPayloadBase = {
