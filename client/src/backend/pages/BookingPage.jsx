@@ -2871,7 +2871,7 @@ setBookingDetail(finalVoucherDetail);
         // Recalculate passenger prices based on paid + due
         const booking = res.data.booking;
         const passengers = res.data.passengers || [];
-        
+
         if (booking && passengers.length > 0) {
             const paid = parseFloat(booking.paid) || 0;
             const due = parseFloat(booking.due) || 0;
@@ -2908,6 +2908,7 @@ setBookingDetail(finalVoucherDetail);
                 
                 // Refetch to get updated data
                 const updatedRes = await axios.get(`/api/getBookingDetail?booking_id=${bookingId}`);
+
                 setBookingDetail(updatedRes.data);
                 
                 // Set additional information
@@ -4437,7 +4438,7 @@ setBookingDetail(finalVoucherDetail);
                     const flightVoucherAdditionalInfo = parseAdditionalInfoJson(
                         bookingDetail?.voucher?.additional_information_json
                     ) || parseAdditionalInfoJson(additionalInformation?.additional_information_json) || null;
-                    
+
                     // Prepare booking payload
                     const bookingPayloadBase = {
                         activitySelect: 'Redeem Voucher',
@@ -4461,7 +4462,7 @@ setBookingDetail(finalVoucherDetail);
                         selectedVoucherType: { title: voucherType }, // Add selectedVoucherType for backend compatibility
                         ...(existingBookingId ? { rebook_from_booking_id: existingBookingId } : {}) // Add rebook_from_booking_id if existing booking exists
                     };
-                    
+
                     console.log('Flight Voucher Booking Payload:', bookingPayloadBase);
                     
                     const tryCreateFlight = async (payload, skipVoucherCode) => {

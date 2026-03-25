@@ -14516,6 +14516,83 @@ app.post('/api/createBooking', (req, res) => {
                     // Availability is already updated by updateSpecificAvailability function
                     // No need to call updateAvailabilityStatus() here
 
+                    // Persist "Additional Information & Notes" when provided.
+                    // Without this, Booking Details' "Additional Information & Notes" shows questions
+                    // but answers render as empty because `additional_information_json` remains NULL.
+                    if (additionalInfo && typeof additionalInfo === 'object') {
+                        try {
+                            const { notes, __requiredKeys, ...answers } = additionalInfo || {};
+
+                            const legacyAnswers = [];
+                            const newAnswers = [];
+                            const jsonData = {};
+
+                            if (typeof notes === 'string' && notes.trim().length > 0) {
+                                jsonData.notes = notes.trim();
+                            }
+
+                            Object.keys(answers).forEach(questionKey => {
+                                const answer = answers[questionKey];
+                                if (answer === undefined || answer === null) return;
+
+                                const answerStr = String(answer).trim();
+                                if (answerStr === '') return;
+
+                                if (!questionKey.startsWith('question_')) return;
+                                const questionIdStr = questionKey.replace('question_', '');
+                                const questionId = parseInt(questionIdStr, 10);
+                                if (!questionId || isNaN(questionId)) return;
+
+                                legacyAnswers.push([bookingId, questionId, answer]);
+                                newAnswers.push([bookingId, questionId, answer]);
+                                jsonData[questionKey] = answer;
+                            });
+
+                            // Clear old answers first (important for rebook/update flows)
+                            con.query(
+                                'DELETE FROM additional_info_answers WHERE booking_id = ?',
+                                [bookingId],
+                                () => {}
+                            );
+                            con.query(
+                                'DELETE FROM additional_information_answers WHERE booking_id = ?',
+                                [bookingId],
+                                () => {}
+                            );
+
+                            if (legacyAnswers.length > 0) {
+                                con.query(
+                                    'INSERT INTO additional_info_answers (booking_id, question_id, answer) VALUES ?',
+                                    [legacyAnswers],
+                                    (legacyErr) => {
+                                        if (legacyErr) console.error('Error saving legacy additional_info_answers:', legacyErr);
+                                    }
+                                );
+                            }
+
+                            if (newAnswers.length > 0) {
+                                con.query(
+                                    'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?',
+                                    [newAnswers],
+                                    (newErr) => {
+                                        if (newErr) console.error('Error saving additional_information_answers:', newErr);
+                                    }
+                                );
+                            }
+
+                            const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
+                            con.query(
+                                'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
+                                [jsonPayload, bookingId],
+                                (jsonErr) => {
+                                    if (jsonErr) console.error('Error updating all_booking.additional_information_json (createBooking):', jsonErr);
+                                }
+                            );
+                        } catch (e) {
+                            console.error('Error while saving createBooking additionalInfo:', e);
+                        }
+                    }
+
                     // For Redeem Voucher bookings, ensure voucher_code is set
                     if (activitySelect === 'Redeem Voucher') {
                         if (!voucher_code || !voucher_code.trim()) {

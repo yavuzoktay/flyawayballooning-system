@@ -140,7 +140,7 @@ body {
 /* Mobile Responsive Styles for Home Page - Only for mobile devices */
 @media screen and (max-width: 768px) {
     .home-page-wrap .home-body-wrap {
-        padding: 12px 10px !important;
+        padding: 12px 0px !important;
         border-radius: 14px !important;
     }
 
@@ -156,9 +156,11 @@ body {
         width: 100% !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
-        margin-left: 2px !important;
-        margin-right: 2px !important;
-        width: calc(100% - 4px) !important;
+        /* Prevent subtle left/right shift on mobile */
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        margin: 0 auto !important;
+        width: 100% !important;
     }
 
     /* Date Inputs - Two columns + full width filter button */
@@ -197,6 +199,7 @@ body {
         font-size: 16px !important;
         color: #333 !important;
         background-color: #fff !important;
+        appearance: none !important;
         -webkit-appearance: none !important;
         -moz-appearance: textfield !important;
     }
@@ -376,6 +379,8 @@ body {
 
     /* Container adjustments */
     .home-page-wrap .MuiContainer-root {
+        margin-left: auto !important;
+        margin-right: auto !important;
         padding-left: 8px !important;
         padding-right: 8px !important;
         max-width: 100% !important;
