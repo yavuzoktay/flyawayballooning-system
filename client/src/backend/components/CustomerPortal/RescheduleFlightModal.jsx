@@ -642,7 +642,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         const matchesLoc = normalizedSelectedLocations.length === 0 || !normalizedAvailabilityLocation || normalizedSelectedLocations.includes(normalizedAvailabilityLocation);
         
         // Experience filter - if no experience specified, allow all
-        const matchesExp = !experience || matchesExperience(a);
+        // Always call matchesExperience when either experience or voucherType is available
+        // matchesExperience can derive expected experience from voucherType even when experience is null
+        const matchesExp = (!experience && !voucherType) || matchesExperience(a);
 
         // Keep only future slots
         const slotDateTime = dayjs(`${a.date} ${a.time}`);
