@@ -3022,6 +3022,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
 
                     // Update all_booking.additional_information_json so getAllBookingData / getAllVoucherData can see answers
                     const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
+
                     con.query(
                         'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
                         [jsonPayload, bookingId],
@@ -3081,7 +3082,7 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     if (global.redeemBookingRequests) {
                         global.redeemBookingRequests.delete(duplicateKey);
                     }
-                    
+
                     res.json({
                         success: true,
                         message: 'Booking created successfully',

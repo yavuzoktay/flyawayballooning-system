@@ -1000,12 +1000,24 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 // Without this, redeemed bookings show up in All Bookings but lose
                 // "Additional Information & Notes" in Booking Details.
                 let additionalInfoPayload = {};
+
                 try {
                     const sourceBookingId = bookingData?.id || bookingData?.booking_id || pendingRescheduleData.bookingId;
                     if (sourceBookingId) {
                         const additionalInfoResponse = await axios.get(`/api/booking/${sourceBookingId}/additional-information`);
                         const additionalInfoData = additionalInfoResponse?.data?.data || {};
-                        const jsonInfo = additionalInfoData?.additional_information_json || {};
+                        const rawJsonInfo = additionalInfoData?.additional_information_json;
+                        const jsonType = rawJsonInfo === null ? 'null' : typeof rawJsonInfo;
+                        let parsedJsonKeysCount = 0;
+                        if (typeof rawJsonInfo === 'string') {
+                            try {
+                                const parsed = JSON.parse(rawJsonInfo);
+                                parsedJsonKeysCount = parsed && typeof parsed === 'object' ? Object.keys(parsed).length : 0;
+                            } catch (e) {
+                                parsedJsonKeysCount = -1; // indicate parse failure
+                            }
+                        }
+                        const jsonInfo = rawJsonInfo || {};
                         const legacyInfo = additionalInfoData?.legacy || {};
                         const answers = Array.isArray(additionalInfoData?.answers) ? additionalInfoData.answers : [];
 
@@ -1084,6 +1096,57 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     }
                 } catch (fallbackAdditionalErr) {
                     console.warn('⚠️ Could not fallback voucher additional info for redeem reschedule flow:', fallbackAdditionalErr);
+                }
+
+                // Fallback #2: Flight Voucher pre-redeem often has no booking-level additional info.
+                // In that case, fetch voucher-level "additional_information_json" directly via /api/getVoucherDetail.
+                if (Object.keys(additionalInfoPayload || {}).length === 0 && voucherRef) {
+                    try {
+                        const voucherDetailRes = await axios.get('/api/getVoucherDetail', {
+                            params: { voucher_ref: voucherRef }
+                        });
+                        const voucher = voucherDetailRes?.data?.voucher || {};
+
+                        const rawVoucherAiJson =
+                            voucher?.additional_information_json ??
+                            voucher?.additional_information?.additional_information_json ??
+                            null;
+
+                        const parsedVoucherAiJson =
+                            typeof rawVoucherAiJson === 'string'
+                                ? (() => {
+                                    try {
+                                        return JSON.parse(rawVoucherAiJson);
+                                    } catch (e) {
+                                        return {};
+                                    }
+                                })()
+                                : (rawVoucherAiJson && typeof rawVoucherAiJson === 'object' ? rawVoucherAiJson : {});
+
+                        // Build a backend-safe additionalInfoPayload: only `notes` and `question_*` keys.
+                        const notesCandidate = typeof parsedVoucherAiJson?.notes === 'string' ? parsedVoucherAiJson.notes : null;
+                        const nextPayload = {};
+                        if (notesCandidate) nextPayload.notes = notesCandidate;
+
+                        Object.keys(parsedVoucherAiJson || {}).forEach((k) => {
+                            if (k.startsWith('question_')) {
+                                const v = parsedVoucherAiJson[k];
+                                if (v !== undefined && v !== null && String(v).trim() !== '') {
+                                    nextPayload[k] = v;
+                                }
+                            }
+                        });
+
+                        // If voucher JSON has no notes but bookingData has legacy additional_notes, keep that as notes fallback.
+                        if (!nextPayload.notes && bookingData?.additional_notes) {
+                            const legacyNotesStr = String(bookingData.additional_notes).trim();
+                            if (legacyNotesStr) nextPayload.notes = legacyNotesStr;
+                        }
+
+                        additionalInfoPayload = nextPayload;
+                    } catch (voucherDetailErr) {
+                        console.warn('⚠️ Could not fetch voucher additional info via getVoucherDetail:', voucherDetailErr);
+                    }
                 }
 
                 // Prepare passenger data from booking
