@@ -22,6 +22,7 @@ jobs:
         SSH_HOST_SINGLE: ${{ secrets.SSH_HOST }}
         EC2_HOST: ${{ secrets.EC2_HOST }}
         EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+        DEFAULT_DEPLOY_HOST: 34.205.25.8
       run: |
         set -euo pipefail
 
@@ -34,8 +35,8 @@ jobs:
         fi
 
         if [ -z "$HOSTS" ]; then
-          echo "Missing deployment host secret. Set SSH_HOSTS, SSH_HOST, or EC2_HOST."
-          exit 1
+          HOSTS="$DEFAULT_DEPLOY_HOST"
+          echo "WARNING: No deploy host secret set. Falling back to ${HOSTS}."
         fi
 
         USERNAME="${EC2_USERNAME:-ec2-user}"
