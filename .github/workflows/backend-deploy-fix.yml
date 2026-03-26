@@ -14,47 +14,46 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
-        
-    - name: Get EC2 instance information
-      id: ec2-info
+
+    - name: Resolve deployment target
+      id: deploy-target
+      env:
+        SSH_HOSTS: ${{ secrets.SSH_HOSTS }}
+        SSH_HOST_SINGLE: ${{ secrets.SSH_HOST }}
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
       run: |
-        # Get EC2 instance information
-        INSTANCE_INFO=$(aws ec2 describe-instances \
-          --filters "Name=instance-state-name,Values=running" \
-          --query 'Reservations[*].Instances[*].[InstanceId,PublicIpAddress,KeyName]' \
-          --output text | head -1)
-        
-        if [ -z "$INSTANCE_INFO" ]; then
-          echo "No running EC2 instances found"
+        set -euo pipefail
+
+        HOSTS="${SSH_HOSTS:-}"
+        if [ -z "$HOSTS" ] && [ -n "${SSH_HOST_SINGLE:-}" ]; then
+          HOSTS="$SSH_HOST_SINGLE"
+        fi
+        if [ -z "$HOSTS" ] && [ -n "${EC2_HOST:-}" ]; then
+          HOSTS="$EC2_HOST"
+        fi
+
+        if [ -z "$HOSTS" ]; then
+          echo "Missing deployment host secret. Set SSH_HOSTS, SSH_HOST, or EC2_HOST."
           exit 1
         fi
-        
-        INSTANCE_ID=$(echo $INSTANCE_INFO | cut -f1)
-        PUBLIC_IP=$(echo $INSTANCE_INFO | cut -f2)
-        KEY_NAME=$(echo $INSTANCE_INFO | cut -f3)
-        
-        echo "Instance ID: $INSTANCE_ID"
-        echo "Public IP: $PUBLIC_IP"
-        echo "Key Name: $KEY_NAME"
-        
-        echo "::set-output name=instance-id::$INSTANCE_ID"
-        echo "::set-output name=public-ip::$PUBLIC_IP"
-        echo "::set-output name=key-name::$KEY_NAME"
-        
+
+        USERNAME="${EC2_USERNAME:-ec2-user}"
+
+        echo "hosts=$HOSTS" >> "$GITHUB_OUTPUT"
+        echo "username=$USERNAME" >> "$GITHUB_OUTPUT"
+
+        echo "Resolved deploy hosts: $HOSTS"
+        echo "Resolved deploy username: $USERNAME"
+
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.5
       with:
-        host: ${{ steps.ec2-info.outputs.public-ip }}
-        username: ec2-user
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        host: ${{ steps.deploy-target.outputs.hosts }}
+        username: ${{ steps.deploy-target.outputs.username }}
+        key: ${{ secrets.SSH_PRIVATE_KEY || secrets.EC2_SSH_KEY }}
         port: 22
+        sync: true
         script: |
           echo "=== Starting Backend Deployment Fix ==="
           
