@@ -1,5 +1,6 @@
 import { TextareaAutosize } from "@mui/material";
 import React from "react";
+import { bookingHasWeatherRefund } from "../../utils/weatherRefund";
 
 const AdditionInfo = ({ detail, bookingNote, setBookingNote }) => {
 
@@ -24,7 +25,7 @@ const AdditionInfo = ({ detail, bookingNote, setBookingNote }) => {
                 <h2>Add On's</h2>
 
                 <div className="additional-fields">
-                    <p><b>WX Refundable:</b> {detail?.passengers?.[0]?.weather_insurance}</p>
+                    <p><b>WX Refundable:</b> {bookingHasWeatherRefund(detail) ? 'Yes' : 'No'}</p>
                 </div>
                 {/* <div className="addition-add-on-btn">
                     <Button>+ Add On</Button>

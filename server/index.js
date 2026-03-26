@@ -1793,7 +1793,7 @@ app.get('/api/voucher-codes/:id/usage', (req, res) => {
 
 // Simple booking creation for Redeem Voucher
 app.post('/api/createRedeemBooking', (req, res) => {
-    const {
+    let {
         activitySelect,
         chooseLocation,
         chooseFlightType,
@@ -1804,8 +1804,11 @@ app.post('/api/createRedeemBooking', (req, res) => {
         voucher_code: reqVoucherCode,
         totalPrice = 0,
         activity_id,
-        userSessionData
+        userSessionData,
+        source_booking_id
     } = req.body;
+
+    additionalInfo = normalizeAdditionalInfoPayload(additionalInfo);
 
     // Basic validation
     if (!chooseLocation || !chooseFlightType || !passengerData || !passengerData[0]) {
@@ -2161,6 +2164,12 @@ app.post('/api/createRedeemBooking', (req, res) => {
         console.log('selectedTime:', selectedTime);
         console.log('Final bookingDateTime:', bookingDateTime);
 
+        let sourceBookingAdditionalInfo = null;
+        const sourceBookingId = source_booking_id && !isNaN(parseInt(source_booking_id, 10))
+            ? parseInt(source_booking_id, 10)
+            : null;
+
+        const continueCreateRedeemBooking = () => {
 
         // Get voucher information (created_at, voucher_type, experience_type) and price
         if (cleanVoucherCodeForValidation) {
@@ -2960,80 +2969,99 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     console.log('=== SAVING ADDITIONAL INFO ===');
                     console.log('Additional Info:', additionalInfo);
 
-                    // Remove non-answer fields
-                    const { notes, __requiredKeys, ...answers } = additionalInfo;
+                    const { __requiredKeys, ...rawAdditionalInfo } = normalizeAdditionalInfoPayload(additionalInfo);
+                    const meaningfulEntries = Object.entries(rawAdditionalInfo).filter(([, value]) =>
+                        hasMeaningfulAdditionalInfoValue(value)
+                    );
+                    const redeemAdditionalInfoColumns = resolveBookingAdditionalInfoColumns({
+                        additionalInfo,
+                        existingBookingRow: sourceBookingAdditionalInfo,
+                        preserveExistingLegacy: !!sourceBookingAdditionalInfo
+                    });
 
-                    // ------------------------------------------------------------------
-                    // 1) Legacy table: additional_info_answers (kept for backward compat)
-                    // ------------------------------------------------------------------
-                    Object.keys(answers).forEach(questionKey => {
-                        const answer = answers[questionKey];
-                        if (answer !== undefined && answer !== null && answer !== '') {
-                            const answerSql = `
-                        INSERT INTO additional_info_answers (booking_id, question_id, answer)
-                        VALUES (?, ?, ?)
-                    `;
+                    if (meaningfulEntries.length > 0) {
+                        const legacyAnswerRows = [];
+                        const additionalInformationAnswers = [];
+                        const jsonData = {};
 
-                            // Extract question number from key (e.g., "question_14" -> 14)
-                            const questionId = questionKey.replace('question_', '');
+                        meaningfulEntries.forEach(([key, value]) => {
+                            if (!hasMeaningfulAdditionalInfoValue(value)) return;
 
-                            con.query(answerSql, [bookingId, questionId, answer], (answerErr) => {
-                                if (answerErr) {
-                                    console.error(`Error saving answer for ${questionKey} into additional_info_answers:`, answerErr);
+                            let normalizedValue = value;
+                            if (typeof value === 'string') {
+                                normalizedValue = value.trim();
+                            } else if (Array.isArray(value)) {
+                                normalizedValue = [...value];
+                            } else if (value && typeof value === 'object') {
+                                normalizedValue = { ...value };
+                            }
+
+                            jsonData[key] = normalizedValue;
+
+                            if (!key.startsWith('question_')) {
+                                return;
+                            }
+
+                            const questionId = parseInt(key.replace('question_', ''), 10);
+                            if (!questionId || isNaN(questionId)) {
+                                return;
+                            }
+
+                            legacyAnswerRows.push([bookingId, questionId, normalizedValue]);
+                            additionalInformationAnswers.push([bookingId, questionId, normalizedValue]);
+                        });
+
+                        if (legacyAnswerRows.length > 0) {
+                            const legacySql = 'INSERT INTO additional_info_answers (booking_id, question_id, answer) VALUES ?';
+                            con.query(legacySql, [legacyAnswerRows], (legacyErr) => {
+                                if (legacyErr) {
+                                    console.error('Error storing additional_info_answers for redeem booking:', legacyErr);
                                 } else {
-                                    console.log(`Answer saved for question ${questionId} into additional_info_answers`);
+                                    console.log('additional_info_answers stored successfully for redeem booking:', bookingId);
                                 }
                             });
                         }
-                    });
 
-                    // ------------------------------------------------------------------
-                    // 2) New schema: additional_information_answers + JSON column
-                    //    This powers Booking / Voucher "Additional Information & Notes"
-                    // ------------------------------------------------------------------
-                    const additionalInformationAnswers = [];
-                    const jsonData = {};
-
-                    // Persist notes (if any) into JSON under "notes" key
-                    if (typeof notes === 'string' && notes.trim().length > 0) {
-                        jsonData.notes = notes.trim();
-                    }
-
-                    Object.keys(answers).forEach(questionKey => {
-                        const answer = answers[questionKey];
-                        if (answer !== undefined && answer !== null && String(answer).trim() !== '') {
-                            const questionId = questionKey.replace('question_', '');
-                            additionalInformationAnswers.push([bookingId, questionId, answer]);
-                            jsonData[questionKey] = answer;
+                        if (additionalInformationAnswers.length > 0) {
+                            const sql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
+                            con.query(sql, [additionalInformationAnswers], (err) => {
+                                if (err) {
+                                    console.error('Error storing additional_information_answers for redeem booking:', err);
+                                } else {
+                                    console.log('additional_information_answers stored successfully for redeem booking:', bookingId);
+                                }
+                            });
                         }
-                    });
 
-                    // Insert into additional_information_answers if we have any rows
-                    if (additionalInformationAnswers.length > 0) {
-                        const sql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
-                        con.query(sql, [additionalInformationAnswers], (err) => {
-                            if (err) {
-                                console.error('Error storing additional_information_answers for redeem booking:', err);
-                            } else {
-                                console.log('additional_information_answers stored successfully for redeem booking:', bookingId);
+                        const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
+
+                        con.query(
+                            `UPDATE all_booking
+                             SET additional_notes = ?,
+                                 hear_about_us = ?,
+                                 ballooning_reason = ?,
+                                 prefer = ?,
+                                 additional_information_json = ?
+                             WHERE id = ?`,
+                            [
+                                redeemAdditionalInfoColumns.additional_notes,
+                                redeemAdditionalInfoColumns.hear_about_us,
+                                redeemAdditionalInfoColumns.ballooning_reason,
+                                redeemAdditionalInfoColumns.prefer,
+                                jsonPayload,
+                                bookingId
+                            ],
+                            (err) => {
+                                if (err) {
+                                    console.error('Error updating redeem booking additional info fields:', err);
+                                } else {
+                                    console.log('Redeem booking additional info fields updated successfully:', bookingId);
+                                }
                             }
-                        });
+                        );
+                    } else {
+                        console.log('ℹ️ No meaningful additional info payload found for redeem booking.');
                     }
-
-                    // Update all_booking.additional_information_json so getAllBookingData / getAllVoucherData can see answers
-                    const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
-
-                    con.query(
-                        'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
-                        [jsonPayload, bookingId],
-                        (err) => {
-                            if (err) {
-                                console.error('Error updating all_booking.additional_information_json for redeem booking:', err);
-                            } else {
-                                console.log('all_booking.additional_information_json updated for redeem booking:', bookingId);
-                            }
-                        }
-                    );
                 }
 
                 // Update voucher_codes table to mark as Used
@@ -3150,6 +3178,35 @@ app.post('/api/createRedeemBooking', (req, res) => {
                 });
             } // end of createBookingWithGeneratedCode
         } // end of createBookingWithPrice
+        };
+
+        if (sourceBookingId) {
+            loadBookingAdditionalInfoSnapshot({
+                connection: con,
+                bookingId: sourceBookingId,
+                callback: (sourceBookingErr, sourceBookingSnapshot) => {
+                    if (sourceBookingErr) {
+                        console.warn('⚠️ createRedeemBooking could not load source booking additional info:', sourceBookingErr.message);
+                    } else if (sourceBookingSnapshot?.bookingRow) {
+                        sourceBookingAdditionalInfo = sourceBookingSnapshot.bookingRow;
+                        additionalInfo = mergeRebookAdditionalInfoPayload({
+                            incomingAdditionalInfo: additionalInfo,
+                            existingBookingRow: sourceBookingAdditionalInfo,
+                            existingAnswerPayload: sourceBookingSnapshot.answerPayload
+                        });
+                        console.log('✅ createRedeemBooking merged source booking additional info:', {
+                            sourceBookingId,
+                            additionalInfoKeys: Object.keys(additionalInfo || {})
+                        });
+                    }
+
+                    continueCreateRedeemBooking();
+                }
+            });
+            return;
+        }
+
+        continueCreateRedeemBooking();
     } // end of createRedeemBookingLogic
 });
 
@@ -7400,6 +7457,370 @@ const tryParseJson = (raw) => {
     } catch (_) {
         return raw;
     }
+};
+
+const normalizeAdditionalInfoPayload = (value) => {
+    const parsedValue = tryParseJson(value);
+    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+        return {};
+    }
+    return { ...parsedValue };
+};
+
+const hasMeaningfulAdditionalInfoValue = (value) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'string') return value.trim() !== '';
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (typeof value === 'boolean') return true;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return false;
+};
+
+const trimStringOrNull = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed || null;
+};
+
+const getAdditionalInfoValue = (additionalInfo, keys = []) => {
+    const normalized = normalizeAdditionalInfoPayload(additionalInfo);
+
+    for (const key of keys) {
+        const value = normalized[key];
+        if (!hasMeaningfulAdditionalInfoValue(value)) continue;
+        if (typeof value === 'string') {
+            return value.trim();
+        }
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            return { ...value };
+        }
+        if (Array.isArray(value)) {
+            return [...value];
+        }
+        return value;
+    }
+
+    return null;
+};
+
+const normalizePreferForStorage = (value) => {
+    if (!hasMeaningfulAdditionalInfoValue(value)) {
+        return null;
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const selectedValues = Object.keys(value).filter(key => value[key]);
+        return selectedValues.length > 0 ? selectedValues.join(', ') : null;
+    }
+
+    if (typeof value === 'string') {
+        return value.trim() || null;
+    }
+
+    return String(value).trim() || null;
+};
+
+const buildExistingBookingAdditionalInfoPayload = (bookingRow) => {
+    const existingPayload = normalizeAdditionalInfoPayload(bookingRow?.additional_information_json);
+
+    if (!hasMeaningfulAdditionalInfoValue(existingPayload.notes) && trimStringOrNull(bookingRow?.additional_notes)) {
+        existingPayload.notes = trimStringOrNull(bookingRow.additional_notes);
+    }
+    if (
+        !hasMeaningfulAdditionalInfoValue(existingPayload.hearAboutUs) &&
+        !hasMeaningfulAdditionalInfoValue(existingPayload.hear_about_us) &&
+        trimStringOrNull(bookingRow?.hear_about_us)
+    ) {
+        existingPayload.hearAboutUs = trimStringOrNull(bookingRow.hear_about_us);
+    }
+    if (
+        !hasMeaningfulAdditionalInfoValue(existingPayload.reason) &&
+        !hasMeaningfulAdditionalInfoValue(existingPayload.ballooning_reason) &&
+        trimStringOrNull(bookingRow?.ballooning_reason)
+    ) {
+        existingPayload.reason = trimStringOrNull(bookingRow.ballooning_reason);
+    }
+    if (!hasMeaningfulAdditionalInfoValue(existingPayload.prefer) && trimStringOrNull(bookingRow?.prefer)) {
+        existingPayload.prefer = trimStringOrNull(bookingRow.prefer);
+    }
+
+    return existingPayload;
+};
+
+const buildAdditionalInfoAnswerPayloadFromRows = (rows = []) => {
+    return rows.reduce((payload, row) => {
+        const questionId = parsePositiveInt(row?.question_id);
+        if (!questionId || !hasMeaningfulAdditionalInfoValue(row?.answer)) {
+            return payload;
+        }
+
+        const key = `question_${questionId}`;
+        if (payload[key] !== undefined) {
+            return payload;
+        }
+
+        payload[key] = typeof row.answer === 'string' ? row.answer.trim() : row.answer;
+        return payload;
+    }, {});
+};
+
+const loadBookingAdditionalInfoSnapshot = ({ connection, bookingId, callback }) => {
+    const parsedBookingId = parsePositiveInt(bookingId);
+    if (!parsedBookingId) {
+        callback(null, {
+            bookingRow: null,
+            answerPayload: {}
+        });
+        return;
+    }
+
+    connection.query(
+        `SELECT
+            paid,
+            additional_notes,
+            hear_about_us,
+            ballooning_reason,
+            prefer,
+            additional_information_json
+        FROM all_booking
+        WHERE id = ?`,
+        [parsedBookingId],
+        (bookingErr, bookingRows = []) => {
+            if (bookingErr) {
+                callback(bookingErr, {
+                    bookingRow: null,
+                    answerPayload: {}
+                });
+                return;
+            }
+
+            connection.query(
+                `SELECT question_id, answer
+                FROM additional_information_answers
+                WHERE booking_id = ?`,
+                [parsedBookingId],
+                (newAnswersErr, newAnswerRows = []) => {
+                    if (newAnswersErr) {
+                        console.warn('⚠️ loadBookingAdditionalInfoSnapshot could not load additional_information_answers:', newAnswersErr.message);
+                        callback(null, {
+                            bookingRow: bookingRows[0] || null,
+                            answerPayload: {}
+                        });
+                        return;
+                    }
+
+                    connection.query(
+                        `SELECT question_id, answer
+                        FROM additional_info_answers
+                        WHERE booking_id = ?`,
+                        [parsedBookingId],
+                        (legacyAnswersErr, legacyAnswerRows = []) => {
+                            if (legacyAnswersErr) {
+                                console.warn('⚠️ loadBookingAdditionalInfoSnapshot could not load additional_info_answers:', legacyAnswersErr.message);
+                            }
+
+                            callback(null, {
+                                bookingRow: bookingRows[0] || null,
+                                answerPayload: buildAdditionalInfoAnswerPayloadFromRows([
+                                    ...newAnswerRows,
+                                    ...(legacyAnswersErr ? [] : legacyAnswerRows)
+                                ])
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
+};
+
+const mergeRebookAdditionalInfoPayload = ({ incomingAdditionalInfo, existingBookingRow, existingAnswerPayload = {} }) => {
+    return {
+        ...buildExistingBookingAdditionalInfoPayload(existingBookingRow),
+        ...normalizeAdditionalInfoPayload(existingAnswerPayload),
+        ...normalizeAdditionalInfoPayload(incomingAdditionalInfo)
+    };
+};
+
+const persistBookingAdditionalInfoPayload = ({
+    connection,
+    bookingId,
+    additionalInfo,
+    logPrefix = '[additionalInfo]'
+}, callback = () => {}) => {
+    if (!additionalInfo || typeof additionalInfo !== 'object') {
+        callback();
+        return;
+    }
+
+    try {
+        const { __requiredKeys, ...rawAdditionalInfo } = normalizeAdditionalInfoPayload(additionalInfo);
+        const meaningfulEntries = Object.entries(rawAdditionalInfo).filter(([, value]) =>
+            hasMeaningfulAdditionalInfoValue(value)
+        );
+
+        if (meaningfulEntries.length === 0) {
+            console.log(`ℹ️ ${logPrefix} No meaningful additionalInfo payload to persist; existing booking additional info left unchanged.`);
+            callback();
+            return;
+        }
+
+        const legacyAnswers = [];
+        const newAnswers = [];
+        const jsonData = {};
+
+        meaningfulEntries.forEach(([key, value]) => {
+            if (!hasMeaningfulAdditionalInfoValue(value)) return;
+
+            if (key.startsWith('question_')) {
+                const questionId = parsePositiveInt(key.replace('question_', ''));
+                if (!questionId) return;
+
+                const normalizedAnswer = typeof value === 'string' ? value.trim() : value;
+                legacyAnswers.push([bookingId, questionId, normalizedAnswer]);
+                newAnswers.push([bookingId, questionId, normalizedAnswer]);
+                jsonData[key] = normalizedAnswer;
+                return;
+            }
+
+            if (typeof value === 'string') {
+                jsonData[key] = value.trim();
+                return;
+            }
+
+            if (Array.isArray(value)) {
+                jsonData[key] = [...value];
+                return;
+            }
+
+            if (value && typeof value === 'object') {
+                jsonData[key] = { ...value };
+                return;
+            }
+
+            jsonData[key] = value;
+        });
+
+        const finalizeJsonUpdate = () => {
+            const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
+            connection.query(
+                'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
+                [jsonPayload, bookingId],
+                (jsonErr) => {
+                    if (jsonErr) {
+                        console.error(`Error updating all_booking.additional_information_json ${logPrefix}:`, jsonErr);
+                    }
+                    callback();
+                }
+            );
+        };
+
+        const insertNewAnswers = () => {
+            if (newAnswers.length === 0) {
+                finalizeJsonUpdate();
+                return;
+            }
+
+            connection.query(
+                'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?',
+                [newAnswers],
+                (newErr) => {
+                    if (newErr) {
+                        console.error(`Error saving additional_information_answers ${logPrefix}:`, newErr);
+                    }
+                    finalizeJsonUpdate();
+                }
+            );
+        };
+
+        const insertLegacyAnswers = () => {
+            if (legacyAnswers.length === 0) {
+                insertNewAnswers();
+                return;
+            }
+
+            connection.query(
+                'INSERT INTO additional_info_answers (booking_id, question_id, answer) VALUES ?',
+                [legacyAnswers],
+                (legacyErr) => {
+                    if (legacyErr) {
+                        console.error(`Error saving legacy additional_info_answers ${logPrefix}:`, legacyErr);
+                    }
+                    insertNewAnswers();
+                }
+            );
+        };
+
+        if (legacyAnswers.length > 0 || newAnswers.length > 0) {
+            connection.query(
+                'DELETE FROM additional_info_answers WHERE booking_id = ?',
+                [bookingId],
+                (deleteLegacyErr) => {
+                    if (deleteLegacyErr) {
+                        console.error(`Error clearing legacy additional_info_answers ${logPrefix}:`, deleteLegacyErr);
+                    }
+
+                    connection.query(
+                        'DELETE FROM additional_information_answers WHERE booking_id = ?',
+                        [bookingId],
+                        (deleteNewErr) => {
+                            if (deleteNewErr) {
+                                console.error(`Error clearing additional_information_answers ${logPrefix}:`, deleteNewErr);
+                            }
+                            insertLegacyAnswers();
+                        }
+                    );
+                }
+            );
+            return;
+        }
+
+        console.log(`ℹ️ ${logPrefix} No question_* answers in payload; existing additional info answer rows left unchanged.`);
+        finalizeJsonUpdate();
+    } catch (error) {
+        console.error(`Error while saving ${logPrefix} additionalInfo:`, error);
+        callback();
+    }
+};
+
+const resolveBookingAdditionalInfoColumns = ({
+    additionalInfo,
+    existingBookingRow = null,
+    preserveExistingLegacy = false
+} = {}) => {
+    const existingAdditionalNotes = trimStringOrNull(existingBookingRow?.additional_notes);
+    const existingHearAboutUs = trimStringOrNull(existingBookingRow?.hear_about_us);
+    const existingReason = trimStringOrNull(existingBookingRow?.ballooning_reason);
+    const existingPrefer = trimStringOrNull(existingBookingRow?.prefer);
+
+    const resolvedNotes = getAdditionalInfoValue(additionalInfo, ['notes']);
+    const resolvedHearAboutUs = getAdditionalInfoValue(additionalInfo, ['hearAboutUs', 'hear_about_us']);
+    const resolvedReason = getAdditionalInfoValue(additionalInfo, ['reason', 'ballooning_reason']);
+    const resolvedPrefer = normalizePreferForStorage(getAdditionalInfoValue(additionalInfo, ['prefer']));
+
+    return {
+        additional_notes:
+            (preserveExistingLegacy && existingAdditionalNotes) ||
+            trimStringOrNull(resolvedNotes) ||
+            existingAdditionalNotes ||
+            null,
+        hear_about_us:
+            (preserveExistingLegacy && existingHearAboutUs) ||
+            trimStringOrNull(resolvedHearAboutUs) ||
+            existingHearAboutUs ||
+            null,
+        ballooning_reason:
+            (preserveExistingLegacy && existingReason) ||
+            trimStringOrNull(resolvedReason) ||
+            existingReason ||
+            null,
+        prefer:
+            (preserveExistingLegacy && existingPrefer) ||
+            resolvedPrefer ||
+            existingPrefer ||
+            null
+    };
 };
 
 const safeArrayLength = (value) => {
@@ -13194,6 +13615,109 @@ app.post("/api/updateActivityData", (req, res) => {
 });
 
 // Add this new endpoint to handle booking creation
+const WEATHER_REFUND_PRICE_GBP = 47.5;
+
+const isWeatherRefundSelectedValue = (value) =>
+    value === true || value === 1 || value === '1';
+
+const hasPassengerWeatherRefundSelected = (passengers = []) =>
+    Array.isArray(passengers) &&
+    passengers.some((passenger) =>
+        isWeatherRefundSelectedValue(passenger?.weatherRefund) ||
+        isWeatherRefundSelectedValue(passenger?.weather_refund)
+    );
+
+const isPrivateCharterTypeValue = (value = '') => {
+    const normalized = String(value || '').trim().toLowerCase();
+    return (
+        normalized === 'private' ||
+        normalized === 'private flight' ||
+        normalized.includes('private charter') ||
+        normalized.includes('proposal')
+    );
+};
+
+const roundCurrencyAmount = (value) =>
+    Math.round((Number(value) || 0) * 100) / 100;
+
+const normalizePassengerWeatherRefundState = ({ passengerData, forceWeatherRefund = false }) => {
+    if (!Array.isArray(passengerData)) return [];
+    if (!forceWeatherRefund) return passengerData;
+
+    return passengerData.map((passenger) => ({
+        ...passenger,
+        weatherRefund: true,
+        weather_refund: 1
+    }));
+};
+
+const resolveSelectedVoucherBaseTotal = ({
+    selectedVoucherType,
+    passengerData,
+    chooseFlightType,
+    totalPrice,
+    addOnTotalPrice = 0
+}) => {
+    const selected = selectedVoucherType || {};
+    const directTotal = Number(selected?.totalPrice ?? selected?.price ?? 0);
+    if (directTotal > 0) {
+        return roundCurrencyAmount(directTotal);
+    }
+
+    const basePrice = Number(selected?.basePrice ?? selected?.price ?? 0);
+    const quantityRaw = selected?.quantity ?? passengerData?.length ?? chooseFlightType?.passengerCount ?? 1;
+    const parsedQuantity = parseInt(quantityRaw, 10);
+    const quantity = Number.isNaN(parsedQuantity) || parsedQuantity <= 0 ? 1 : parsedQuantity;
+
+    if (basePrice > 0) {
+        return roundCurrencyAmount(basePrice * quantity);
+    }
+
+    const grossTotal = Number(totalPrice) || 0;
+    const netTotal = grossTotal - (Number(addOnTotalPrice) || 0);
+    if (netTotal > 0) {
+        return roundCurrencyAmount(netTotal / 1.1);
+    }
+
+    return 0;
+};
+
+const resolvePrivateWeatherRefundTotal = ({
+    privateCharterWeatherRefund,
+    passengerData,
+    selectedVoucherType,
+    chooseFlightType,
+    totalPrice,
+    addOnTotalPrice = 0
+}) => {
+    const weatherRefundSelected =
+        isWeatherRefundSelectedValue(privateCharterWeatherRefund) ||
+        hasPassengerWeatherRefundSelected(passengerData);
+
+    if (!weatherRefundSelected) {
+        return 0;
+    }
+
+    const voucherBaseTotal = resolveSelectedVoucherBaseTotal({
+        selectedVoucherType,
+        passengerData,
+        chooseFlightType,
+        totalPrice,
+        addOnTotalPrice
+    });
+
+    if (voucherBaseTotal <= 0) {
+        return 0;
+    }
+
+    return roundCurrencyAmount(voucherBaseTotal * 0.1);
+};
+
+const bookingHasWeatherRefund = (booking, passengers = []) => {
+    const bookingWeatherRefundTotal = Number(booking?.weather_refund_total_price) || 0;
+    return bookingWeatherRefundTotal > 0 || hasPassengerWeatherRefundSelected(passengers);
+};
+
 app.post('/api/createBooking', (req, res) => {
     let {
         activitySelect,
@@ -13215,6 +13739,7 @@ app.post('/api/createBooking', (req, res) => {
         preferred_day,
         email_template_override,
         email_template_type_override,
+        privateCharterWeatherRefund,
         created_at, // Preserve original created_at for rebook operations
         rebook_from_booking_id // Old booking ID for payment history transfer during rebook
     } = req.body;
@@ -13252,6 +13777,15 @@ app.post('/api/createBooking', (req, res) => {
         // Ensure each add-on has name and price
         choose_add_on = choose_add_on.filter(a => a && a.name);
     }
+
+    additionalInfo = normalizeAdditionalInfoPayload(additionalInfo);
+
+    passengerData = normalizePassengerWeatherRefundState({
+        passengerData,
+        forceWeatherRefund:
+            isPrivateCharterTypeValue(chooseFlightType?.type) &&
+            isWeatherRefundSelectedValue(privateCharterWeatherRefund)
+    });
 
     // Debug log for choose_add_on
     console.log('choose_add_on received:', choose_add_on, 'Type:', typeof choose_add_on);
@@ -13361,6 +13895,7 @@ app.post('/api/createBooking', (req, res) => {
     function insertBookingAndPassengers(expiresDateFinal) {
         // Check if this is a rebook operation (define early to avoid TDZ issues)
         const isRebook = rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id));
+        let existingRebookBooking = null;
         
         // Use provided created_at if available (for rebook operations), otherwise use current date
         const nowDate = created_at ? moment(created_at).format('YYYY-MM-DD HH:mm:ss') : moment().format('YYYY-MM-DD HH:mm:ss');
@@ -13529,18 +14064,28 @@ app.post('/api/createBooking', (req, res) => {
         // Use actual passenger count from passengerData array
         const actualPaxCount = (Array.isArray(passengerData) && passengerData.length > 0) ? passengerData.length : (parseInt(chooseFlightType.passengerCount) || 1);
 
-        // Calculate weather refund total price (only for Shared Flight)
-        const WEATHER_REFUND_PRICE = 47.5;
+        // Calculate weather refund total price for both Shared Flight and Private Charter
         const isSharedFlight = chooseFlightType && (chooseFlightType.type === 'Shared Flight' || chooseFlightType.type?.includes('Shared'));
+        const isPrivateCharter = isPrivateCharterTypeValue(chooseFlightType?.type);
         let weather_refund_total_price = 0;
         if (isSharedFlight && Array.isArray(passengerData)) {
             weather_refund_total_price = passengerData.reduce((sum, p) => {
-                const hasWeatherRefund = p.weatherRefund === true || p.weatherRefund === 1 || p.weatherRefund === '1';
-                return sum + (hasWeatherRefund ? WEATHER_REFUND_PRICE : 0);
+                const hasWeatherRefund = isWeatherRefundSelectedValue(p?.weatherRefund) || isWeatherRefundSelectedValue(p?.weather_refund);
+                return sum + (hasWeatherRefund ? WEATHER_REFUND_PRICE_GBP : 0);
             }, 0);
+        } else if (isPrivateCharter) {
+            weather_refund_total_price = resolvePrivateWeatherRefundTotal({
+                privateCharterWeatherRefund,
+                passengerData,
+                selectedVoucherType: req.body.selectedVoucherType || bookingData.selectedVoucherType,
+                chooseFlightType,
+                totalPrice,
+                addOnTotalPrice: add_on_total_price
+            });
         }
         console.log('=== WEATHER REFUND CALCULATION ===');
         console.log('Is Shared Flight:', isSharedFlight);
+        console.log('Is Private Charter:', isPrivateCharter);
         console.log('Passenger Count:', actualPaxCount);
         console.log('Weather Refund Total Price:', weather_refund_total_price);
 
@@ -13579,13 +14124,28 @@ app.post('/api/createBooking', (req, res) => {
         // For rebook operations, preserve the existing booking's paid amount (don't change it)
         if (isRebook && rebook_from_booking_id && !isNaN(parseInt(rebook_from_booking_id))) {
             // Get current booking's paid value to preserve it during rebook
-            con.query(
-                'SELECT paid FROM all_booking WHERE id = ?',
-                [parseInt(rebook_from_booking_id)],
-                (currentBookingErr, currentBookingResult) => {
-                    if (!currentBookingErr && currentBookingResult.length > 0 && currentBookingResult[0].paid != null) {
-                        finalPaidAmount = parseFloat(currentBookingResult[0].paid) || 0;
+            loadBookingAdditionalInfoSnapshot({
+                connection: con,
+                bookingId: parseInt(rebook_from_booking_id),
+                callback: (currentBookingErr, currentBookingSnapshot) => {
+                    const currentBookingRow = currentBookingSnapshot?.bookingRow || null;
+
+                    if (!currentBookingErr && currentBookingRow) {
+                        existingRebookBooking = currentBookingRow;
+                        additionalInfo = mergeRebookAdditionalInfoPayload({
+                            incomingAdditionalInfo: additionalInfo,
+                            existingBookingRow: existingRebookBooking,
+                            existingAnswerPayload: currentBookingSnapshot.answerPayload
+                        });
+                    }
+
+                    if (!currentBookingErr && currentBookingRow && currentBookingRow.paid != null) {
+                        finalPaidAmount = parseFloat(currentBookingRow.paid) || 0;
                         console.log('✅ [createBooking] Preserving existing booking paid amount for rebook:', finalPaidAmount);
+                        console.log('✅ [createBooking] Preserving additional info for rebook:', {
+                            bookingId: parseInt(rebook_from_booking_id),
+                            additionalInfoKeys: Object.keys(additionalInfo || {})
+                        });
                         // Continue with booking insertion using preserved paid amount
                         insertBookingWithFinalPaid();
                     } else {
@@ -13599,7 +14159,7 @@ app.post('/api/createBooking', (req, res) => {
                         }
                     }
                 }
-            );
+            });
             return; // Exit early, will continue in callback
         }
         
@@ -13744,7 +14304,19 @@ app.post('/api/createBooking', (req, res) => {
         const effectiveFlightType = voucherExperienceType || normalizedChooseFlightType.type || experience || '';
         const effectiveIsSharedFlight = typeof effectiveFlightType === 'string' &&
             (effectiveFlightType === 'Shared Flight' || effectiveFlightType.includes('Shared'));
-        const effectiveWeatherRefundTotal = effectiveIsSharedFlight ? weather_refund_total_price : 0;
+        const effectiveIsPrivateCharter = isPrivateCharterTypeValue(effectiveFlightType);
+        const effectiveWeatherRefundTotal = effectiveIsSharedFlight
+            ? weather_refund_total_price
+            : (effectiveIsPrivateCharter
+                ? resolvePrivateWeatherRefundTotal({
+                    privateCharterWeatherRefund,
+                    passengerData,
+                    selectedVoucherType: req.body.selectedVoucherType || bookingData.selectedVoucherType,
+                    chooseFlightType: { ...normalizedChooseFlightType, type: effectiveFlightType },
+                    totalPrice: totalPrice || finalPaidAmount || paid || 0,
+                    addOnTotalPrice: add_on_total_price
+                })
+                : 0);
         if (voucherExperienceType) {
             chooseFlightType = { ...normalizedChooseFlightType, type: voucherExperienceType };
             experience = voucherExperienceType;
@@ -13797,6 +14369,12 @@ app.post('/api/createBooking', (req, res) => {
         }
         
         function proceedWithBookingInsert() {
+        const bookingAdditionalInfoColumns = resolveBookingAdditionalInfoColumns({
+            additionalInfo,
+            existingBookingRow: existingRebookBooking,
+            preserveExistingLegacy: !!isRebook
+        });
+
         // For rebook operations, exclude created_at from UPDATE (preserve original created_at)
         // For INSERT operations, include created_at
         const bookingValues = isRebook ? [
@@ -13811,12 +14389,10 @@ app.post('/api/createBooking', (req, res) => {
             voucher_code || null,
             expiresDateFinal,
             0, // manual_status_override
-            (additionalInfo && additionalInfo.notes) || null,
-            (additionalInfo && additionalInfo.hearAboutUs) || null,
-            (additionalInfo && additionalInfo.reason) || null,
-            (additionalInfo && additionalInfo.prefer && typeof additionalInfo.prefer === 'object' && Object.keys(additionalInfo.prefer).length > 0
-                ? Object.keys(additionalInfo.prefer).filter(k => additionalInfo.prefer[k]).join(', ')
-                : (typeof additionalInfo?.prefer === 'string' && additionalInfo.prefer ? additionalInfo.prefer : null)),
+            bookingAdditionalInfoColumns.additional_notes,
+            bookingAdditionalInfoColumns.hear_about_us,
+            bookingAdditionalInfoColumns.ballooning_reason,
+            bookingAdditionalInfoColumns.prefer,
             mainPassenger.weight || null,
             bookingEmail || mainPassenger.email || null, // Use bookingEmail (from any passenger) or fallback to mainPassenger.email
             mainPassengerPhone || null, // Use combined countryCode + phone
@@ -13875,12 +14451,10 @@ app.post('/api/createBooking', (req, res) => {
             nowDate,
             expiresDateFinal,
             0, // manual_status_override
-            (additionalInfo && additionalInfo.notes) || null,
-            (additionalInfo && additionalInfo.hearAboutUs) || null,
-            (additionalInfo && additionalInfo.reason) || null,
-            (additionalInfo && additionalInfo.prefer && typeof additionalInfo.prefer === 'object' && Object.keys(additionalInfo.prefer).length > 0
-                ? Object.keys(additionalInfo.prefer).filter(k => additionalInfo.prefer[k]).join(', ')
-                : (typeof additionalInfo?.prefer === 'string' && additionalInfo.prefer ? additionalInfo.prefer : null)),
+            bookingAdditionalInfoColumns.additional_notes,
+            bookingAdditionalInfoColumns.hear_about_us,
+            bookingAdditionalInfoColumns.ballooning_reason,
+            bookingAdditionalInfoColumns.prefer,
             mainPassenger.weight || null,
             bookingEmail || mainPassenger.email || null,
             mainPassengerPhone || null,
@@ -14496,7 +15070,7 @@ app.post('/api/createBooking', (req, res) => {
                         p.email || null,
                         passengerPhone,
                         p.ticketType || null,
-                        p.weatherRefund ? 1 : 0
+                        isWeatherRefundSelectedValue(p?.weatherRefund) || isWeatherRefundSelectedValue(p?.weather_refund) ? 1 : 0
                     ];
                 });
 
@@ -14517,85 +15091,8 @@ app.post('/api/createBooking', (req, res) => {
                     // Availability is already updated by updateSpecificAvailability function
                     // No need to call updateAvailabilityStatus() here
 
-                    // Persist "Additional Information & Notes" when provided.
-                    // Without this, Booking Details' "Additional Information & Notes" shows questions
-                    // but answers render as empty because `additional_information_json` remains NULL.
-                    if (additionalInfo && typeof additionalInfo === 'object') {
-                        try {
-                            const { notes, __requiredKeys, ...answers } = additionalInfo || {};
-
-                            const legacyAnswers = [];
-                            const newAnswers = [];
-                            const jsonData = {};
-
-                            if (typeof notes === 'string' && notes.trim().length > 0) {
-                                jsonData.notes = notes.trim();
-                            }
-
-                            Object.keys(answers).forEach(questionKey => {
-                                const answer = answers[questionKey];
-                                if (answer === undefined || answer === null) return;
-
-                                const answerStr = String(answer).trim();
-                                if (answerStr === '') return;
-
-                                if (!questionKey.startsWith('question_')) return;
-                                const questionIdStr = questionKey.replace('question_', '');
-                                const questionId = parseInt(questionIdStr, 10);
-                                if (!questionId || isNaN(questionId)) return;
-
-                                legacyAnswers.push([bookingId, questionId, answer]);
-                                newAnswers.push([bookingId, questionId, answer]);
-                                jsonData[questionKey] = answer;
-                            });
-
-                            // Clear old answers first (important for rebook/update flows)
-                            con.query(
-                                'DELETE FROM additional_info_answers WHERE booking_id = ?',
-                                [bookingId],
-                                () => {}
-                            );
-                            con.query(
-                                'DELETE FROM additional_information_answers WHERE booking_id = ?',
-                                [bookingId],
-                                () => {}
-                            );
-
-                            if (legacyAnswers.length > 0) {
-                                con.query(
-                                    'INSERT INTO additional_info_answers (booking_id, question_id, answer) VALUES ?',
-                                    [legacyAnswers],
-                                    (legacyErr) => {
-                                        if (legacyErr) console.error('Error saving legacy additional_info_answers:', legacyErr);
-                                    }
-                                );
-                            }
-
-                            if (newAnswers.length > 0) {
-                                con.query(
-                                    'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?',
-                                    [newAnswers],
-                                    (newErr) => {
-                                        if (newErr) console.error('Error saving additional_information_answers:', newErr);
-                                    }
-                                );
-                            }
-
-                            const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
-                            con.query(
-                                'UPDATE all_booking SET additional_information_json = ? WHERE id = ?',
-                                [jsonPayload, bookingId],
-                                (jsonErr) => {
-                                    if (jsonErr) console.error('Error updating all_booking.additional_information_json (createBooking):', jsonErr);
-                                }
-                            );
-                        } catch (e) {
-                            console.error('Error while saving createBooking additionalInfo:', e);
-                        }
-                    }
-
-                    // For Redeem Voucher bookings, ensure voucher_code is set
-                    if (activitySelect === 'Redeem Voucher') {
+	                    // For Redeem Voucher bookings, ensure voucher_code is set
+	                    if (activitySelect === 'Redeem Voucher') {
                         if (!voucher_code || !voucher_code.trim()) {
                             console.warn('⚠️ Warning: Redeem Voucher booking created without voucher_code. Booking ID:', bookingId);
                         } else {
@@ -15471,21 +15968,32 @@ app.post('/api/createBooking', (req, res) => {
                         if (onComplete) onComplete();
                     });
                 });
-            }
+	            }
 
-            // Eğer voucher_code boşsa, booking'in kendi ID'sini voucher_code olarak güncelle
-            if (!voucher_code) {
-                const updateVoucherSql = 'UPDATE all_booking SET voucher_code = ? WHERE id = ?';
-                con.query(updateVoucherSql, [bookingId, bookingId], (err) => {
-                    if (err) {
-                        console.error('Error updating voucher_code:', err);
-                    }
-                    insertPassengers();
-                });
-            } else {
-                insertPassengers();
-            }
-        } // End of handleBookingInsertSuccess function
+	            const continueWithPassengersAfterAdditionalInfo = () => {
+	                persistBookingAdditionalInfoPayload({
+	                    connection: con,
+	                    bookingId,
+	                    additionalInfo,
+	                    logPrefix: '[createBooking]'
+	                }, () => {
+	                    insertPassengers();
+	                });
+	            };
+
+	            // Eğer voucher_code boşsa, booking'in kendi ID'sini voucher_code olarak güncelle
+	            if (!voucher_code) {
+	                const updateVoucherSql = 'UPDATE all_booking SET voucher_code = ? WHERE id = ?';
+	                con.query(updateVoucherSql, [bookingId, bookingId], (err) => {
+	                    if (err) {
+	                        console.error('Error updating voucher_code:', err);
+	                    }
+	                    continueWithPassengersAfterAdditionalInfo();
+	                });
+	            } else {
+	                continueWithPassengersAfterAdditionalInfo();
+	            }
+	        } // End of handleBookingInsertSuccess function
         } // End of proceedWithBookingInsert function
         } // End of insertBookingWithFinalPaid function
     } // End of insertBookingAndPassengers function
@@ -17650,6 +18158,15 @@ app.get('/api/getBookingDetail', async (req, res) => {
 
         if (originalRedeemedVoucherCode) {
             booking.originalRedeemedVoucherCode = originalRedeemedVoucherCode;
+        }
+
+        booking.has_weather_refund = bookingHasWeatherRefund(booking, passengers);
+        if (!booking.has_weather_refund && booking.stripe_session_id) {
+            const sessionStoreData = stripeSessionStore[booking.stripe_session_id];
+            const sessionBookingData = sessionStoreData?.bookingData || {};
+            booking.has_weather_refund =
+                isWeatherRefundSelectedValue(sessionBookingData?.privateCharterWeatherRefund) ||
+                hasPassengerWeatherRefundSelected(sessionBookingData?.passengerData || []);
         }
 
         res.json({
@@ -21099,6 +21616,15 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             isVoucherRedeemed
         });
 
+        let customerPortalHasWeatherRefund = bookingHasWeatherRefund(booking, finalPassengerRows);
+        if (!customerPortalHasWeatherRefund && booking.stripe_session_id) {
+            const sessionStoreData = stripeSessionStore[booking.stripe_session_id];
+            const sessionBookingData = sessionStoreData?.bookingData || {};
+            customerPortalHasWeatherRefund =
+                isWeatherRefundSelectedValue(sessionBookingData?.privateCharterWeatherRefund) ||
+                hasPassengerWeatherRefundSelected(sessionBookingData?.passengerData || []);
+        }
+
         // Format the response
         const response = {
             success: true,
@@ -21129,6 +21655,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
                     : (booking.expires || (voucherInfo && voucherInfo.voucher_expires) || null),
                 created_at: formattedCreatedAt,
                 additional_notes: booking.additional_notes,
+                weather_refund_total_price: Number(booking.weather_refund_total_price) || 0,
+                has_weather_refund: customerPortalHasWeatherRefund,
                 flight_attempts: finalFlightAttempts,
                 activity_id: booking.activity_id || null,
                 book_flight: finalBookFlight, // Add book_flight to identify Flight Voucher
@@ -21908,6 +22436,8 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             ? flightAttemptsCount
             : (isRedeemVoucher ? 0 : updatedBooking.flight_attempts || 0);
 
+        const responseAdditionalInfo = buildExistingBookingAdditionalInfoPayload(updatedBooking);
+        const responseHasWeatherRefund = bookingHasWeatherRefund(updatedBooking, passengerRows || []);
         const response = {
             success: true,
             data: {
@@ -21932,6 +22462,14 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
                 expires: updatedBooking.expires,
                 created_at: updatedBooking.created_at,
                 additional_notes: updatedBooking.additional_notes,
+                weather_refund_total_price: Number(updatedBooking.weather_refund_total_price) || 0,
+                has_weather_refund: responseHasWeatherRefund,
+                additional_information_json: Object.keys(responseAdditionalInfo).length > 0
+                    ? responseAdditionalInfo
+                    : null,
+                short_notice_opt_out: Boolean(
+                    getAdditionalInfoValue(responseAdditionalInfo, ['shortNoticeAvailabilityOptOut', 'short_notice_opt_out'])
+                ),
                 flight_attempts: flightAttemptsCount,
                 activity_id: updatedBooking.activity_id || null
             }
@@ -22220,6 +22758,7 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
             console.error('Error counting flight attempts:', historyErr);
         }
 
+        const responseHasWeatherRefund = bookingHasWeatherRefund(updatedBooking, passengerRows || []);
         const response = {
             success: true,
             data: {
@@ -22244,6 +22783,8 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
                 expires: updatedBooking.expires,
                 created_at: updatedBooking.created_at,
                 additional_notes: updatedBooking.additional_notes,
+                weather_refund_total_price: Number(updatedBooking.weather_refund_total_price) || 0,
+                has_weather_refund: responseHasWeatherRefund,
                 flight_attempts: flightAttemptsCount,
                 activity_id: updatedBooking.activity_id || null
             }
@@ -27648,6 +28189,7 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
             preferred_location,
             preferred_time,
             preferred_day,
+            privateCharterWeatherRefund,
             manualBooking = false,
             manualQuotedTotal = null
         } = bookingData;
@@ -27661,6 +28203,13 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
         } else {
             choose_add_on = choose_add_on.filter(a => a && a.name);
         }
+
+        passengerData = normalizePassengerWeatherRefundState({
+            passengerData,
+            forceWeatherRefund:
+                isPrivateCharterTypeValue(chooseFlightType?.type) &&
+                isWeatherRefundSelectedValue(privateCharterWeatherRefund)
+        });
 
         // Basic validation (relaxed to tolerate optional fields)
         // Previously required passengerData strictly; now handle empty/undefined gracefully
@@ -27928,18 +28477,28 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                 }, 0);
             }
 
-            // Calculate weather refund total price (only for Shared Flight)
-            const WEATHER_REFUND_PRICE = 47.5;
+            // Calculate weather refund total price for both Shared Flight and Private Charter
             const isSharedFlight = chooseFlightType && (chooseFlightType.type === 'Shared Flight' || chooseFlightType.type?.includes('Shared'));
+            const isPrivateCharter = isPrivateCharterTypeValue(chooseFlightType?.type);
             let weather_refund_total_price = 0;
             if (isSharedFlight && Array.isArray(passengerData)) {
                 weather_refund_total_price = passengerData.reduce((sum, p) => {
-                    const hasWeatherRefund = p.weatherRefund === true || p.weatherRefund === 1 || p.weatherRefund === '1';
-                    return sum + (hasWeatherRefund ? WEATHER_REFUND_PRICE : 0);
+                    const hasWeatherRefund = isWeatherRefundSelectedValue(p?.weatherRefund) || isWeatherRefundSelectedValue(p?.weather_refund);
+                    return sum + (hasWeatherRefund ? WEATHER_REFUND_PRICE_GBP : 0);
                 }, 0);
+            } else if (isPrivateCharter) {
+                weather_refund_total_price = resolvePrivateWeatherRefundTotal({
+                    privateCharterWeatherRefund,
+                    passengerData,
+                    selectedVoucherType: bookingData.selectedVoucherType,
+                    chooseFlightType,
+                    totalPrice: manualQuotedTotal || totalPrice || actualPaidAmount || 0,
+                    addOnTotalPrice: add_on_total_price
+                });
             }
             console.log('=== WEBHOOK WEATHER REFUND CALCULATION ===');
             console.log('Is Shared Flight:', isSharedFlight);
+            console.log('Is Private Charter:', isPrivateCharter);
             console.log('Weather Refund Total Price:', weather_refund_total_price);
 
             // Use actual passenger count from passengerData array
@@ -28143,7 +28702,7 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                             (p.email === '' ? null : p.email || null),
                             (passengerPhone === '' ? null : passengerPhone || null),
                             p.ticketType || chooseFlightType.type,
-                            p.weatherRefund ? 1 : 0
+                            isWeatherRefundSelectedValue(p?.weatherRefund) || isWeatherRefundSelectedValue(p?.weather_refund) ? 1 : 0
                         ];
                     });
 
@@ -33414,15 +33973,27 @@ app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
     const { answers } = req.body;
 
     try {
-        // Validate booking exists
-        const bookingExists = await new Promise((resolve, reject) => {
-            con.query('SELECT id FROM all_booking WHERE id = ?', [bookingId], (err, result) => {
-                if (err) reject(err);
-                else resolve(result.length > 0);
-            });
+        // Validate booking exists and preserve existing non-question metadata.
+        const existingBooking = await new Promise((resolve, reject) => {
+            con.query(
+                `SELECT
+                    id,
+                    additional_notes,
+                    hear_about_us,
+                    ballooning_reason,
+                    prefer,
+                    additional_information_json
+                 FROM all_booking
+                 WHERE id = ?`,
+                [bookingId],
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result[0] || null);
+                }
+            );
         });
 
-        if (!bookingExists) {
+        if (!existingBooking) {
             return res.status(404).json({
                 success: false,
                 message: 'Booking not found'
@@ -33455,10 +34026,16 @@ app.post('/api/booking/:bookingId/additional-information', async (req, res) => {
         }
 
         // Also update the JSON field in all_booking for backward compatibility
-        const jsonData = answers ? answers.reduce((acc, answer) => {
-            acc[`question_${answer.question_id}`] = answer.answer;
-            return acc;
-        }, {}) : {};
+        const jsonData = buildExistingBookingAdditionalInfoPayload(existingBooking);
+        if (answers && Array.isArray(answers)) {
+            answers.forEach((answer) => {
+                if (!answer?.question_id || !hasMeaningfulAdditionalInfoValue(answer?.answer)) {
+                    return;
+                }
+                jsonData[`question_${answer.question_id}`] =
+                    typeof answer.answer === 'string' ? answer.answer.trim() : answer.answer;
+            });
+        }
 
         await new Promise((resolve, reject) => {
             con.query(

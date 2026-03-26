@@ -34,6 +34,7 @@ import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import PaginatedTable from "../components/BookingPage/PaginatedTable";
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
+import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
 const FlownFlights = () => {
     const theme = useTheme();
@@ -1472,26 +1473,12 @@ const FlownFlights = () => {
                                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Add On's</Typography>
                                         <Typography>
                                             <b>WX Refundable:</b>{' '}
-                                            {(() => {
-                                                let weatherRefundTotalPrice = 0;
-                                                const rawValue = bookingDetail.booking?.weather_refund_total_price || null;
-                                                if (rawValue !== null && rawValue !== undefined) {
-                                                    const parsed = parseFloat(rawValue);
-                                                    if (!isNaN(parsed)) {
-                                                        weatherRefundTotalPrice = parsed;
-                                                    }
-                                                }
-                                                if (weatherRefundTotalPrice > 0) {
-                                                    return (
-                                                        <span>
-                                                            <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
-                                                            Yes
-                                                        </span>
-                                                    );
-                                                } else {
-                                                    return 'No';
-                                                }
-                                            })()}
+                                            {bookingHasWeatherRefund(bookingDetail) ? (
+                                                <span>
+                                                    <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
+                                                    Yes
+                                                </span>
+                                            ) : 'No'}
                                         </Typography>
                                     </Box>
                                 </Grid>

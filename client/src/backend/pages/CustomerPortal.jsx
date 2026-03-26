@@ -15,6 +15,7 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import SmsIcon from '@mui/icons-material/Sms';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
 import CustomerPortalUpsellModal from '../components/CustomerPortal/CustomerPortalUpsellModal';
+import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
 const getApiBaseUrl = () => {
     if (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim()) {
@@ -1387,7 +1388,7 @@ const CustomerPortal = () => {
                                 })()}
                             </Box>
                         </Box>
-                        <Box sx={mobileBookingDetailSx(7, { gridColumn: '1 / -1' })}>
+                        <Box sx={mobileBookingDetailSx(8, { gridColumn: '1 / -1' })}>
                             <Typography variant="body2" color="text.secondary">Flight Attempts</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: shouldInlineFlightAttemptMessage ? 0.35 : 2 }}>
                                 {bookingData.flight_attempts !== undefined && bookingData.flight_attempts !== null
@@ -1472,6 +1473,12 @@ const CustomerPortal = () => {
                                     }
                                 })()}
                                 {(bookingData.season_saver === 1 || bookingData.season_saver === '1' || bookingData.season_saver === true) && ' ☘️'}
+                            </Typography>
+                        </Box>
+                        <Box sx={mobileBookingDetailSx(7)}>
+                            <Typography variant="body2" color="text.secondary">WX Refundable</Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
+                                {bookingHasWeatherRefund(bookingData) ? 'Yes' : 'No'}
                             </Typography>
                         </Box>
                         <Box sx={mobileBookingDetailSx(5)}>

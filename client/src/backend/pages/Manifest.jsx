@@ -58,6 +58,8 @@ import {
     buildEmailHtml
 } from '../utils/emailTemplateUtils';
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
+import { buildPreservedAdditionalInfoPayload } from '../utils/additionalInfo';
+import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -3386,6 +3388,12 @@ const Manifest = () => {
             // Preserve original created_at to maintain table position after rebook
             const originalCreatedAt = bookingDetail.booking.created_at || bookingDetail.booking.createdAt || null;
 
+            const preservedAdditionalInfo = buildPreservedAdditionalInfoPayload({
+                additionalInformation,
+                booking: bookingDetail?.booking,
+                voucher: bookingDetail?.voucher
+            });
+
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
@@ -3394,7 +3402,7 @@ const Manifest = () => {
                 passengerData: passengerData,
                 selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
                 totalPrice: totalPrice,
-                additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
+                additionalInfo: preservedAdditionalInfo,
                 voucher_code: bookingDetail.booking.voucher_code || null,
                 flight_attempts: currentAttempts, // Preserve attempts value during rebook
                 status: 'Scheduled', // Set status to Scheduled for rebook operations
@@ -6222,42 +6230,12 @@ const Manifest = () => {
                                         
                                         <Typography>
                                             <b>WX Refundable:</b>{' '}
-                                            {(() => {
-                                                // For both Private Charter and Shared Flight: check weather_refund_total_price
-                                                // Handle both string and number types, and check for null/undefined
-                                                let weatherRefundTotalPrice = 0;
-                                                const rawValue = bookingDetail.booking?.weather_refund_total_price || 
-                                                                bookingDetail.weather_refund_total_price || 
-                                                                null;
-                                                
-                                                if (rawValue !== null && rawValue !== undefined) {
-                                                    // Convert to number, handling both string and number types
-                                                    const parsed = parseFloat(rawValue);
-                                                    if (!isNaN(parsed)) {
-                                                        weatherRefundTotalPrice = parsed;
-                                                    }
-                                                }
-                                                
-                                                // Debug logging
-                                                console.log('WX Refundable Check (Manifest):', {
-                                                    rawValue,
-                                                    weatherRefundTotalPrice,
-                                                    bookingDetailBooking: bookingDetail.booking,
-                                                    bookingDetail: bookingDetail
-                                                });
-                                                
-                                                // Check weather_refund_total_price for both Private Charter and Shared Flight
-                                                if (weatherRefundTotalPrice > 0) {
-                                                    return (
-                                                        <span>
-                                                            <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
-                                                            Yes
-                                                        </span>
-                                                    );
-                                                } else {
-                                                    return 'No';
-                                                }
-                                            })()}
+                                            {bookingHasWeatherRefund(bookingDetail) ? (
+                                                <span>
+                                                    <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
+                                                    Yes
+                                                </span>
+                                            ) : 'No'}
                                         </Typography>
 
                                     </Box>

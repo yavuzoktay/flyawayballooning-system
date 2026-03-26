@@ -20,6 +20,11 @@ import {
     replaceSmsPrompts
 } from '../utils/emailTemplateUtils';
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
+import {
+    buildPreservedAdditionalInfoPayload,
+    parseAdditionalInfoJson
+} from '../utils/additionalInfo';
+import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
 const SHORT_NOTICE_QUESTION_TEXT = 'Would you like to receive short notice flight availability?';
 
@@ -36,18 +41,6 @@ const isShortNoticeQuestion = (value = '') =>
 
 const isShortNoticeOptOutAnswer = (value = '') =>
     value.toString().trim().toLowerCase() === 'no';
-
-const parseAdditionalInfoJson = (value) => {
-    if (!value) return null;
-    if (typeof value === 'string') {
-        try {
-            return JSON.parse(value);
-        } catch (error) {
-            return null;
-        }
-    }
-    return typeof value === 'object' ? value : null;
-};
 
 const getShortNoticeAvailabilityOptOut = (item) => {
     const parsedAdditionalInfoJson = parseAdditionalInfoJson(item?.additional_information_json);
@@ -4156,11 +4149,11 @@ setBookingDetail(finalVoucherDetail);
                     const recipientEmail = voucher.recipient_email || '';
                     
                     // Prepare booking payload
-                    const flightVoucherAdditionalInfo = parseAdditionalInfoJson(
-                        bookingDetail?.voucher?.additional_information_json
-                    ) || parseAdditionalInfoJson(
-                        additionalInformation?.additional_information_json
-                    ) || null;
+                    const preservedAdditionalInfo = buildPreservedAdditionalInfoPayload({
+                        additionalInformation,
+                        booking: bookingDetail?.booking,
+                        voucher: bookingDetail?.voucher
+                    });
 
                     const bookingPayloadBase = {
                         activitySelect: 'Redeem Voucher',
@@ -4184,7 +4177,7 @@ setBookingDetail(finalVoucherDetail);
                         paid: paidAmount, // Add paid amount from Gift Voucher Details
                         ...(voucherCode ? { voucher_code: voucherCode } : {}),
                         flight_attempts: 0,
-                        additionalInfo: {},
+                        additionalInfo: preservedAdditionalInfo,
                         choose_add_on: [],
                         activity_id: finalActivityId, // Add activity_id for backend
                         experience: experience, // Add experience from voucher
@@ -4435,9 +4428,11 @@ setBookingDetail(finalVoucherDetail);
 
                     // Persist the "Additional Information & Notes" entered in Flight Voucher flow.
                     // Store as additionalInfo so backend can write booking.additional_information_json.
-                    const flightVoucherAdditionalInfo = parseAdditionalInfoJson(
-                        bookingDetail?.voucher?.additional_information_json
-                    ) || parseAdditionalInfoJson(additionalInformation?.additional_information_json) || null;
+                    const preservedAdditionalInfo = buildPreservedAdditionalInfoPayload({
+                        additionalInformation,
+                        booking: bookingDetail?.booking,
+                        voucher: bookingDetail?.voucher
+                    });
 
                     // Prepare booking payload
                     const bookingPayloadBase = {
@@ -4454,7 +4449,7 @@ setBookingDetail(finalVoucherDetail);
                         paid: paidAmount, // Add paid amount from Flight Voucher Details
                         ...(voucherCode ? { voucher_code: voucherCode } : {}),
                         flight_attempts: 0,
-                        additionalInfo: flightVoucherAdditionalInfo || {},
+                        additionalInfo: preservedAdditionalInfo,
                         choose_add_on: [],
                         activity_id: finalActivityId, // Add activity_id for backend
                         experience: experience, // Add experience from voucher
@@ -4726,6 +4721,12 @@ setBookingDetail(finalVoucherDetail);
             
             console.log('🔄 Rebook - Flight Type:', flightType, 'Experience:', experience);
             
+            const preservedAdditionalInfo = buildPreservedAdditionalInfoPayload({
+                additionalInformation,
+                booking: bookingDetail?.booking,
+                voucher: bookingDetail?.voucher
+            });
+
             const payload = {
                 activitySelect: flightType,
                 chooseLocation: selectedLocation || bookingDetail.booking.location,
@@ -4734,7 +4735,7 @@ setBookingDetail(finalVoucherDetail);
                 passengerData: passengerData,
                 selectedDate: dayjs(date).format('YYYY-MM-DD') + ' ' + time,
                 totalPrice: totalPrice,
-                additionalInfo: { notes: bookingDetail.booking.additional_notes || '' },
+                additionalInfo: preservedAdditionalInfo,
                 voucher_code: bookingDetail.booking.voucher_code || null,
                 flight_attempts: currentAttempts, // Preserve attempts count when rebooking
                 status: 'Scheduled', // Set status to Scheduled for rebook operations
@@ -7639,44 +7640,14 @@ setBookingDetail(finalVoucherDetail);
                                             })()}
                                             
                                             <Typography>
-    <b>WX Refundable:</b>{' '}
-    {(() => {
-        // For both Private Charter and Shared Flight: check weather_refund_total_price
-        // Handle both string and number types, and check for null/undefined
-        let weatherRefundTotalPrice = 0;
-        const rawValue = bookingDetail.booking?.weather_refund_total_price || 
-                        bookingDetail.weather_refund_total_price || 
-                        null;
-        
-        if (rawValue !== null && rawValue !== undefined) {
-            // Convert to number, handling both string and number types
-            const parsed = parseFloat(rawValue);
-            if (!isNaN(parsed)) {
-                weatherRefundTotalPrice = parsed;
-            }
-        }
-        
-        // Debug logging
-        console.log('WX Refundable Check:', {
-            rawValue,
-            weatherRefundTotalPrice,
-            bookingDetailBooking: bookingDetail.booking,
-            bookingDetail: bookingDetail
-        });
-        
-        // Check weather_refund_total_price for both Private Charter and Shared Flight
-        if (weatherRefundTotalPrice > 0) {
-        return (
-            <span>
-                <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
-                    Yes
-            </span>
-        );
-        } else {
-            return 'No';
-        }
-    })()}
-</Typography>
+                                                <b>WX Refundable:</b>{' '}
+                                                {bookingHasWeatherRefund(bookingDetail) ? (
+                                                    <span>
+                                                        <span style={{ color: '#10b981', fontWeight: 'bold', marginRight: '4px' }}>✔</span>
+                                                        Yes
+                                                    </span>
+                                                ) : 'No'}
+                                            </Typography>
 
                                         </Box>
                                         )}
