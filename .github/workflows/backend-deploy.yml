@@ -67,8 +67,6 @@ jobs:
         env:
           SSH_HOSTS: ${{ secrets.SSH_HOSTS }}
           SSH_HOST_SINGLE: ${{ secrets.SSH_HOST }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          DEFAULT_DEPLOY_HOST: 34.205.25.8
         run: |
           set -e
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > deploy_key
@@ -77,19 +75,15 @@ jobs:
           # Debug: Check if secrets are available
           echo "SSH_HOSTS: ${SSH_HOSTS:-'NOT_SET'}"
           echo "SSH_HOST_SINGLE: ${SSH_HOST_SINGLE:-'NOT_SET'}"
-          echo "EC2_HOST: ${EC2_HOST:-'NOT_SET'}"
           
-          # Fallbacks when SSH_HOSTS is not provided: use SSH_HOST, then EC2_HOST, then default to current production host
+          # Fallbacks when SSH_HOSTS is not provided: use SSH_HOST (single), otherwise default to current production host
           if [ -z "$SSH_HOSTS" ]; then
             if [ -n "$SSH_HOST_SINGLE" ]; then
               SSH_HOSTS="$SSH_HOST_SINGLE"
               echo "INFO: Using SSH_HOST single target: $SSH_HOSTS"
-            elif [ -n "$EC2_HOST" ]; then
-              SSH_HOSTS="$EC2_HOST"
-              echo "INFO: Using EC2_HOST target: $SSH_HOSTS"
             else
-              SSH_HOSTS="$DEFAULT_DEPLOY_HOST"
-              echo "WARNING: SSH_HOSTS, SSH_HOST, and EC2_HOST are empty. Falling back to $DEFAULT_DEPLOY_HOST"
+              SSH_HOSTS="54.174.83.100"
+              echo "WARNING: SSH_HOSTS and SSH_HOST are empty. Falling back to 54.174.83.100"
             fi
           fi
           
