@@ -10,6 +10,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
     const [isLaunchingManualBooking, setIsLaunchingManualBooking] = useState(false);
+    const [isLaunchingHotelManualBooking, setIsLaunchingHotelManualBooking] = useState(false);
     const API_BASE_URL = config.API_BASE_URL;
 
     const getBookingBaseUrl = () => {
@@ -294,32 +295,56 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         }
     };
 
-    const handleManualBookingClick = async () => {
-        if (isLaunchingManualBooking) {
-            return;
+    const requestManualBookingToken = async () => {
+        const response = await axios.post(
+            `${API_BASE_URL}/api/admin/manual-booking-token`,
+            ADMIN_MANUAL_BOOKING_AUTH
+        );
+
+        const token = response.data?.token;
+        if (!response.data?.success || !token) {
+            throw new Error(response.data?.message || 'Could not start manual booking.');
         }
+
+        return token;
+    };
+
+    const navigateToManualBooking = (path, token) => {
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        const bookingUrl = `${getBookingBaseUrl()}${normalizedPath}?manualBooking=1&source=admin&manualBookingToken=${encodeURIComponent(token)}`;
+
+        if (typeof window !== 'undefined') {
+            window.location.assign(bookingUrl);
+        }
+    };
+
+    const handleManualBookingClick = async () => {
+        if (isLaunchingManualBooking) return;
 
         try {
             setIsLaunchingManualBooking(true);
-            const response = await axios.post(
-                `${API_BASE_URL}/api/admin/manual-booking-token`,
-                ADMIN_MANUAL_BOOKING_AUTH
-            );
-
-            const token = response.data?.token;
-            if (!response.data?.success || !token) {
-                throw new Error(response.data?.message || 'Could not start manual booking.');
-            }
-
-            const bookingUrl = `${getBookingBaseUrl()}/?manualBooking=1&source=admin&manualBookingToken=${encodeURIComponent(token)}`;
-            if (typeof window !== 'undefined') {
-                window.location.assign(bookingUrl);
-            }
+            const token = await requestManualBookingToken();
+            navigateToManualBooking('/', token);
         } catch (error) {
             console.error('Error starting manual booking:', error);
             alert(error?.response?.data?.message || error.message || 'Could not start manual booking.');
         } finally {
             setIsLaunchingManualBooking(false);
+        }
+    };
+
+    const handleHotelManualBookingClick = async () => {
+        if (isLaunchingHotelManualBooking) return;
+
+        try {
+            setIsLaunchingHotelManualBooking(true);
+            const token = await requestManualBookingToken();
+            navigateToManualBooking('/hotel-manual-booking', token);
+        } catch (error) {
+            console.error('Error starting hotel manual booking:', error);
+            alert(error?.response?.data?.message || error.message || 'Could not start hotel manual booking.');
+        } finally {
+            setIsLaunchingHotelManualBooking(false);
         }
     };
 
@@ -482,7 +507,33 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                                 <p>No data found for the selected range.</p>
                             )}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 180, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, minWidth: 210, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
+                            <button
+                                type="button"
+                                onClick={handleHotelManualBookingClick}
+                                disabled={isLaunchingHotelManualBooking}
+                                style={{
+                                    display: 'inline-block',
+                                    background: 'linear-gradient(135deg, #15746d 0%, #115e59 100%)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 10,
+                                    padding: '10px 20px',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    letterSpacing: '0.04em',
+                                    textTransform: 'uppercase',
+                                    textAlign: 'center',
+                                    textDecoration: 'none',
+                                    cursor: isLaunchingHotelManualBooking ? 'wait' : 'pointer',
+                                    boxShadow: '0 8px 20px rgba(17, 94, 89, 0.18)',
+                                    width: '100%',
+                                    maxWidth: 210,
+                                    opacity: isLaunchingHotelManualBooking ? 0.75 : 1
+                                }}
+                            >
+                                {isLaunchingHotelManualBooking ? 'Opening...' : 'Hotel Manual Booking'}
+                            </button>
                             <button
                                 type="button"
                                 onClick={handleManualBookingClick}
@@ -503,7 +554,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                                     cursor: isLaunchingManualBooking ? 'wait' : 'pointer',
                                     boxShadow: '0 8px 20px rgba(31, 87, 173, 0.2)',
                                     width: '100%',
-                                    maxWidth: 200,
+                                    maxWidth: 210,
                                     opacity: isLaunchingManualBooking ? 0.75 : 1
                                 }}
                             >

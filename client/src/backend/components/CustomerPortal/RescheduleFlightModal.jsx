@@ -447,6 +447,16 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return String(loc).trim().toLowerCase();
     };
 
+    const findLiveActivityForLocation = (targetLocation) => {
+        const normalizedTargetLocation = normalizeLocation(targetLocation);
+        if (!normalizedTargetLocation) return null;
+
+        return activities.find((activity) =>
+            activity?.status === 'Live' &&
+            normalizeLocation(activity?.location) === normalizedTargetLocation
+        ) || null;
+    };
+
     // Fetch activities / locations when modal opens (Flight Voucher style)
     useEffect(() => {
         if (!open) {
@@ -567,15 +577,25 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 const collected = [];
 
                 for (const loc of targetLocations) {
-                    // Resolve activity id for location
+                    // Flight vouchers can switch between locations, so we must always
+                    // resolve the live activity from the selected location instead of
+                    // reusing the booking's original activity_id.
+                    const resolvedActivity = findLiveActivityForLocation(loc);
                     let finalActivityId = activityId;
-                    if (!finalActivityId) {
-                        const act = activities.find(a => a.location === loc && a.status === 'Live');
-                        if (act) {
-                            finalActivityId = act.id;
-                            console.log('RescheduleFlightModal - Found activity for location:', loc, 'activityId:', finalActivityId);
+
+                    if (isFlightVoucher && !hasFixedLocation) {
+                        if (!resolvedActivity) {
+                            console.warn('RescheduleFlightModal - No live activity found for selected flight voucher location:', loc, 'available activities:', activities.map(a => ({ location: a.location, id: a.id, status: a.status })));
+                            continue;
+                        }
+                        finalActivityId = resolvedActivity.id;
+                        console.log('RescheduleFlightModal - Resolved activity for location:', loc, 'activityId:', finalActivityId);
+                    } else if (!finalActivityId) {
+                        if (resolvedActivity) {
+                            finalActivityId = resolvedActivity.id;
+                            console.log('RescheduleFlightModal - Resolved fallback activity for location:', loc, 'activityId:', finalActivityId);
                         } else {
-                            console.warn('RescheduleFlightModal - No activity found for location:', loc, 'available activities:', activities.map(a => ({ location: a.location, id: a.id, status: a.status })));
+                            console.warn('RescheduleFlightModal - No live activity found for location:', loc, 'available activities:', activities.map(a => ({ location: a.location, id: a.id, status: a.status })));
                         }
                     }
 
@@ -590,18 +610,19 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
                             // Preserve location on slots (fallback to loc)
                             // Normalize location to ensure consistent matching
-                            const normalizedLoc = normalizeLocation(loc);
+                            const resolvedLocation = resolvedActivity?.location || loc;
+                            const normalizedLoc = normalizeLocation(resolvedLocation);
                             const withLoc = data.map(d => {
-                                const slotLocation = d.location || loc;
+                                const slotLocation = d.location || resolvedLocation;
                                 return {
-                                ...d,
+                                    ...d,
                                     location: slotLocation,
                                     normalized_location: normalizeLocation(slotLocation), // Store normalized for easier debugging
-                                activity_id: d.activity_id || finalActivityId
+                                    activity_id: d.activity_id || finalActivityId
                                 };
                             });
                             collected.push(...withLoc);
-                            console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', loc, 'activityId:', finalActivityId, 'normalized:', normalizedLoc);
+                            console.log('RescheduleFlightModal - Loaded availabilities:', data.length, 'for location:', resolvedLocation, 'activityId:', finalActivityId, 'normalized:', normalizedLoc);
                         } else {
                             console.warn('RescheduleFlightModal - Failed to fetch availabilities for location:', loc, 'response:', availResponse.data);
                         }
@@ -640,7 +661,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         // Location filter (selected checkboxes). If none selected, allow all.
         const normalizedSelectedLocations = selectedLocations.map(normalizeLocation);
         const normalizedAvailabilityLocation = normalizeLocation(a?.location);
-        const matchesLoc = normalizedSelectedLocations.length === 0 || !normalizedAvailabilityLocation || normalizedSelectedLocations.includes(normalizedAvailabilityLocation);
+        const matchesLoc = normalizedSelectedLocations.length === 0
+            ? true
+            : Boolean(normalizedAvailabilityLocation) && normalizedSelectedLocations.includes(normalizedAvailabilityLocation);
         
         // Experience filter - if no experience specified, allow all
         // Always call matchesExperience when either experience or voucherType is available
@@ -939,12 +962,18 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             return;
         }
 
-        // Find matching availability to get activity_id
-        const slotMatch = availabilities.find(a => {
-            const aDate = dayjs(a.date).format('YYYY-MM-DD');
-            return aDate === formattedDate && a.time === selectedTime && (a.location === selectedLocation);
+        // Find matching availability to get activity_id using the same
+        // location-filtered list rendered in the calendar.
+        const normalizedSelectedLocation = normalizeLocation(selectedLocation);
+        const slotMatch = getTimesForDate(selectedDate).find((slot) => {
+            const slotDate = dayjs(slot?.date).format('YYYY-MM-DD');
+            const slotTime = String(slot?.time || '').trim();
+            const matchesTime = slotTime === selectedTime || slotTime.substring(0, 5) === selectedTime;
+            const matchesLocation = !normalizedSelectedLocation || normalizeLocation(slot?.location) === normalizedSelectedLocation;
+            return slotDate === formattedDate && matchesTime && matchesLocation;
         });
-        const finalActivityId = slotMatch?.activity_id || activityId;
+        const resolvedSelectedActivity = findLiveActivityForLocation(selectedLocation);
+        const finalActivityId = slotMatch?.activity_id || resolvedSelectedActivity?.id || (hasFixedLocation ? activityId : null);
         if (!finalActivityId) {
             setError('Activity ID not found for selected location.');
             return;
