@@ -31,6 +31,53 @@ const getFirstMeaningfulValue = (...candidates) => {
     return null;
 };
 
+export const getManualBookingProfileFromSources = (...sources) => {
+    for (const source of sources) {
+        const parsedSource = parseAdditionalInfoJson(source);
+        if (!parsedSource || typeof parsedSource !== 'object') continue;
+
+        const parsedProfile = parseAdditionalInfoJson(parsedSource.manual_booking_profile);
+        if (parsedProfile && typeof parsedProfile === 'object') {
+            return parsedProfile;
+        }
+    }
+
+    return null;
+};
+
+export const getManualBookingFieldRows = (profile) => {
+    if (!profile || typeof profile !== 'object') {
+        return [];
+    }
+
+    return [
+        {
+            label: 'Hotel / Accommodation Name',
+            value: getFirstMeaningfulValue(
+                profile.accommodation_name,
+                profile.accommodationName,
+                profile.hotel_name,
+                profile.hotelName
+            )
+        },
+        {
+            label: 'Email Address',
+            value: getFirstMeaningfulValue(
+                profile.contact_email,
+                profile.contactEmail,
+                profile.email
+            )
+        },
+        {
+            label: 'Staff Name',
+            value: getFirstMeaningfulValue(
+                profile.staff_name,
+                profile.staffName
+            )
+        }
+    ].filter((field) => hasMeaningfulValue(field.value));
+};
+
 const buildQuestionAnswerPayload = (answers = []) => {
     const payload = {};
 

@@ -22,6 +22,8 @@ import {
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 import {
     buildPreservedAdditionalInfoPayload,
+    getManualBookingFieldRows,
+    getManualBookingProfileFromSources,
     parseAdditionalInfoJson
 } from '../utils/additionalInfo';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
@@ -621,6 +623,16 @@ const BookingPage = () => {
     // Additional information state
     const [additionalInformation, setAdditionalInformation] = useState(null);
     const [additionalInfoLoading, setAdditionalInfoLoading] = useState(false);
+    const manualBookingFields = useMemo(() => {
+        const manualBookingProfile = getManualBookingProfileFromSources(
+            additionalInformation?.additional_information_json,
+            bookingDetail?.booking?.additional_information_json,
+            bookingDetail?.additional_information?.additional_information_json,
+            bookingDetail?.voucher?.additional_information_json
+        );
+
+        return getManualBookingFieldRows(manualBookingProfile);
+    }, [additionalInformation, bookingDetail]);
 
     // Email modal state
     const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -7758,6 +7770,18 @@ setBookingDetail(finalVoucherDetail);
                                                             <Typography variant="body2" color="text.secondary">
                                                                 {assignedResource.assignmentType}
                                                             </Typography>
+                                                        </Box>
+                                                    )}
+                                                    {manualBookingFields.length > 0 && (
+                                                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, border: '1px solid #e0e7ff', background: '#f7f9ff' }}>
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1d4ed8', mb: 0.75 }}>
+                                                                Hotel Manual Booking Details
+                                                            </Typography>
+                                                            {manualBookingFields.map((field) => (
+                                                                <Typography key={field.label} sx={{ mb: 0.5 }}>
+                                                                    <b>{field.label}:</b> {field.value}
+                                                                </Typography>
+                                                            ))}
                                                         </Box>
                                                     )}
                                                         </>

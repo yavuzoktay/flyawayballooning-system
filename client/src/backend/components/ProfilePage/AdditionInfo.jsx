@@ -1,51 +1,18 @@
 import { TextareaAutosize } from "@mui/material";
 import React from "react";
+import {
+    getManualBookingFieldRows,
+    getManualBookingProfileFromSources
+} from "../../utils/additionalInfo";
 import { bookingHasWeatherRefund } from "../../utils/weatherRefund";
 
 const AdditionInfo = ({ detail, bookingNote, setBookingNote }) => {
-    const parseManualBookingProfile = () => {
-        const possibleSources = [
-            detail?.additional_information?.additional_information_json,
-            detail?.additional_information_json,
-            detail?.voucher?.additional_information_json
-        ];
-
-        for (const source of possibleSources) {
-            if (!source) continue;
-
-            let parsedSource = source;
-
-            if (typeof parsedSource === "string") {
-                try {
-                    parsedSource = JSON.parse(parsedSource);
-                } catch (error) {
-                    parsedSource = null;
-                }
-            }
-
-            const profile = parsedSource?.manual_booking_profile;
-            if (!profile) continue;
-
-            if (typeof profile === "string") {
-                try {
-                    return JSON.parse(profile);
-                } catch (error) {
-                    return null;
-                }
-            }
-
-            return profile;
-        }
-
-        return null;
-    };
-
-    const manualBookingProfile = parseManualBookingProfile();
-    const manualBookingFields = [
-        { label: "Hotel / Accommodation Name", value: manualBookingProfile?.accommodation_name },
-        { label: "Email Address", value: manualBookingProfile?.contact_email },
-        { label: "Staff Name", value: manualBookingProfile?.staff_name }
-    ].filter((field) => field.value);
+    const manualBookingProfile = getManualBookingProfileFromSources(
+        detail?.additional_information?.additional_information_json,
+        detail?.additional_information_json,
+        detail?.voucher?.additional_information_json
+    );
+    const manualBookingFields = getManualBookingFieldRows(manualBookingProfile);
 
     // Handle Booking Note Change
     function handleBookingChange(e) {
