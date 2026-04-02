@@ -751,6 +751,78 @@ const BookingPage = () => {
         }
     };
 
+    const normalizeVoucherContextId = (value) => {
+        if (value === null || value === undefined) return '';
+        const normalized = String(value).trim();
+        if (!normalized) return '';
+        return normalized.replace(/^voucher-/i, '');
+    };
+
+    const getVoucherContextIds = (entity) => {
+        if (!entity) return [];
+
+        const rawIds = [];
+        if (Array.isArray(entity.voucherIds)) {
+            rawIds.push(...entity.voucherIds);
+        }
+        if (entity.contextId) {
+            rawIds.push(...String(entity.contextId).split(','));
+        }
+        if (entity.voucherId || entity.voucher_id) {
+            rawIds.push(entity.voucherId || entity.voucher_id);
+        }
+        if (entity.contextType === 'voucher' || entity.book_flight || entity.voucher_type) {
+            rawIds.push(entity.id);
+        }
+
+        return Array.from(new Set(rawIds.map(normalizeVoucherContextId).filter(Boolean)));
+    };
+
+    const getPrimaryVoucherContextId = (entity) => getVoucherContextIds(entity)[0] || '';
+
+    const buildBulkVoucherContext = (voucher, voucherIds = []) => {
+        const originalVoucher = voucher?._original || voucher || {};
+        const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
+        const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
+        const email = isFlightVoucher
+            ? (originalVoucher.purchaser_email || voucher?.email || '')
+            : (isGiftVoucher
+                ? (originalVoucher.recipient_email || voucher?.email || '')
+                : (voucher?.email || ''));
+        const phone = isFlightVoucher
+            ? (originalVoucher.purchaser_phone || originalVoucher.purchaser_mobile || voucher?.phone || voucher?.mobile || '')
+            : (isGiftVoucher
+                ? (originalVoucher.recipient_phone || originalVoucher.recipient_mobile || voucher?.phone || voucher?.mobile || '')
+                : (voucher?.phone || voucher?.mobile || ''));
+        const name = isFlightVoucher
+            ? (originalVoucher.purchaser_name || voucher?.name || '')
+            : (isGiftVoucher
+                ? (originalVoucher.recipient_name || voucher?.name || '')
+                : (voucher?.name || ''));
+        const normalizedVoucherIds = Array.from(
+            new Set(
+                (Array.isArray(voucherIds) ? voucherIds : [originalVoucher.id || voucher?.id])
+                    .map(normalizeVoucherContextId)
+                    .filter(Boolean)
+            )
+        );
+        const primaryVoucherId = normalizedVoucherIds[0] || normalizeVoucherContextId(originalVoucher.id || voucher?.id);
+
+        return {
+            ...voucher,
+            email: String(email || '').trim(),
+            phone: String(phone || '').trim(),
+            name: name || 'Voucher Recipient',
+            contextType: 'voucher',
+            contextId: normalizedVoucherIds.join(',') || primaryVoucherId,
+            voucherId: primaryVoucherId,
+            voucher_id: primaryVoucherId,
+            voucherIds: normalizedVoucherIds,
+            is_flight_voucher: isFlightVoucher,
+            book_flight: isFlightVoucher ? 'Flight Voucher' : (isGiftVoucher ? 'Gift Voucher' : (originalVoucher.book_flight || voucher?.book_flight || ''))
+        };
+    };
+
     const fetchMessageLogs = async ({ bookingId, recipientEmail, contextId } = {}) => {
         if (!bookingId && !recipientEmail && !contextId) return;
         setMessagesLoading(true);
@@ -793,9 +865,10 @@ const BookingPage = () => {
         const isFlightVoucher = !isGiftVoucher && 
             (voucher?.book_flight === 'Flight Voucher' ||
             (voucher?.voucher_type && typeof voucher.voucher_type === 'string' && voucher.voucher_type.toLowerCase().includes('flight')));
+        const voucherContextId = normalizeVoucherContextId(voucher?.voucherId || voucher?.voucher_id || voucher?.id || voucher?.contextId) || `${Date.now()}`;
         
         const fauxBooking = {
-            id: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            id: voucherContextId,
             name: voucher.name || (isGiftVoucher ? voucher.recipient_name : voucher.purchaser_name) || 'Voucher Recipient',
             email: email,
             phone: isGiftVoucher 
@@ -806,7 +879,9 @@ const BookingPage = () => {
             flight_type: voucher.flight_type || voucher.voucher_type || '',
             location: isFlightVoucher ? '-' : (voucher.location || voucher.preferred_location || ''), // Flight Voucher için "-"
             contextType: 'voucher',
-            contextId: voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`,
+            contextId: voucherContextId,
+            voucherId: voucherContextId,
+            voucher_id: voucherContextId,
             is_flight_voucher: isFlightVoucher, // Flight Voucher işareti
             book_flight: isFlightVoucher ? 'Flight Voucher' : voucher.book_flight || '' // Flight Voucher işareti
         };
@@ -1219,6 +1294,7 @@ const BookingPage = () => {
         const isBulkVoucher = selectedVoucherIds && selectedVoucherIds.length > 1;
         const isBulk = isBulkBooking || isBulkVoucher;
         const isVoucher = selectedBookingForEmail?.contextType === 'voucher' || isBulkVoucher;
+        const primaryVoucherContextId = getPrimaryVoucherContextId(selectedBookingForEmail);
 
         // Check if at least one checkbox is selected
         if (!sendMessageEmailChecked && !sendMessageSmsChecked) {
@@ -1300,7 +1376,7 @@ const BookingPage = () => {
                 if (addLink && selectedBookingForEmail) {
                     try {
                         const portalRes = await axios.post('/api/customerPortalShortLink', {
-                            bookingId: selectedBookingForEmail.id,
+                            bookingId: isVoucher ? primaryVoucherContextId : selectedBookingForEmail.id,
                             contextType: isVoucher ? 'voucher' : 'booking'
                         });
                         const portalLink = portalRes.data?.shortUrl;
@@ -1334,7 +1410,7 @@ const BookingPage = () => {
                 if (isBulk) {
                     if (isBulkVoucher) {
                         // Bulk email to selected vouchers
-                        const recipients = filteredData
+                        const voucherRecipients = filteredData
                             .filter(v => selectedVoucherIds.includes(v.id))
                             .map(v => {
                                 const originalVoucher = v._original || v;
@@ -1345,11 +1421,14 @@ const BookingPage = () => {
                                     : (isGiftVoucher 
                                         ? (originalVoucher.recipient_email || v.email || '')
                                         : (v.email || ''));
-                                return email.trim();
+                                const voucherId = normalizeVoucherContextId(originalVoucher.id || v.id);
+                                const trimmedEmail = email.trim();
+                                if (!voucherId || !trimmedEmail) return null;
+                                return { voucherId, to: trimmedEmail };
                             })
-                            .filter(e => !!e);
+                            .filter(Boolean);
 
-                        if (recipients.length === 0) {
+                        if (voucherRecipients.length === 0) {
                             if (!sendMessageSmsChecked) {
                                 alert('No valid email addresses found for selected vouchers.');
                                 setSendingEmail(false);
@@ -1359,7 +1438,7 @@ const BookingPage = () => {
                             emailPromises.push(
                                 axios.post('/api/sendBulkVoucherEmail', {
                                     voucherIds: selectedVoucherIds,
-                                    to: recipients,
+                                    voucherRecipients,
                                     subject: emailForm.subject,
                                     message: finalHtml,
                                     messageText: finalText,
@@ -1398,7 +1477,7 @@ const BookingPage = () => {
                     if (isVoucher) {
                         emailPromises.push(
                             axios.post('/api/sendVoucherEmail', {
-                                voucherId: selectedBookingForEmail.id,
+                                voucherId: primaryVoucherContextId,
                                 to: emailForm.to,
                                 subject: emailForm.subject,
                                 message: finalHtml,
@@ -1476,7 +1555,7 @@ const BookingPage = () => {
                 if (addLink && selectedBookingForEmail) {
                     try {
                         const portalRes = await axios.post('/api/customerPortalShortLink', {
-                            bookingId: selectedBookingForEmail.id,
+                            bookingId: isVoucher ? primaryVoucherContextId : selectedBookingForEmail.id,
                             contextType: isVoucher ? 'voucher' : 'booking'
                         });
                         const portalLink = portalRes.data?.shortUrl;
@@ -1511,7 +1590,7 @@ const BookingPage = () => {
                     if (isBulk) {
                     if (isBulkVoucher) {
                         // Bulk SMS to selected vouchers
-                        const recipients = filteredData
+                        const voucherRecipients = filteredData
                             .filter(v => selectedVoucherIds.includes(v.id))
                             .map(v => {
                                 const originalVoucher = v._original || v;
@@ -1523,15 +1602,17 @@ const BookingPage = () => {
                                         ? (originalVoucher.recipient_phone || v.phone || '')
                                         : (v.phone || ''));
                                 const cleanedPhone = cleanPhoneNumber(phone);
-                                return cleanedPhone && cleanedPhone.startsWith('+') ? cleanedPhone : null;
+                                const voucherId = normalizeVoucherContextId(originalVoucher.id || v.id);
+                                if (!voucherId || !cleanedPhone || !cleanedPhone.startsWith('+')) return null;
+                                return { voucherId, to: cleanedPhone };
                             })
-                            .filter(p => p !== null);
+                            .filter(Boolean);
 
-                        if (recipients.length > 0) {
+                        if (voucherRecipients.length > 0) {
                             smsPromises.push(
                                 axios.post('/api/sendBulkVoucherSms', {
                                     voucherIds: selectedVoucherIds,
-                                    to: recipients,
+                                    voucherRecipients,
                                     body: smsMessageToSend,
                                     templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null)
                                 })
@@ -1575,7 +1656,7 @@ const BookingPage = () => {
                         if (isVoucher) {
                             smsPromises.push(
                                 axios.post('/api/sendVoucherSms', {
-                                    voucherId: selectedBookingForEmail?.id || bookingDetail?.booking?.id,
+                                    voucherId: primaryVoucherContextId,
                                     to: cleanedPhone,
                                     body: smsMessageToSend,
                                     templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null),
@@ -1615,18 +1696,24 @@ const BookingPage = () => {
             let errorMessages = [];
 
             emailResults.forEach((result, index) => {
-                if (result.status === 'fulfilled' && result.value.data.success) {
-                    successMessages.push('Email sent successfully!');
+                if (result.status === 'fulfilled' && (result.value.data.success || result.value.data.partialSuccess)) {
+                    successMessages.push(result.value.data.message || 'Email sent successfully!');
+                    if (result.value.data.partialSuccess && Array.isArray(result.value.data.failures) && result.value.data.failures.length > 0) {
+                        errorMessages.push(`Some email deliveries failed: ${result.value.data.failures.map((failure) => failure.to || failure.voucherId || failure.phone || 'unknown').join(', ')}`);
+                    }
                 } else {
-                    errorMessages.push('Failed to send email: ' + (result.reason?.response?.data?.message || result.reason?.message || 'Unknown error'));
+                    errorMessages.push('Failed to send email: ' + (result.value?.data?.message || result.reason?.response?.data?.message || result.reason?.message || 'Unknown error'));
                 }
             });
 
             smsResults.forEach((result, index) => {
-                if (result.status === 'fulfilled' && result.value.data.success) {
-                    successMessages.push('SMS sent successfully!');
+                if (result.status === 'fulfilled' && (result.value.data.success || result.value.data.partialSuccess)) {
+                    successMessages.push(result.value.data.message || 'SMS sent successfully!');
+                    if (result.value.data.partialSuccess && Array.isArray(result.value.data.failures) && result.value.data.failures.length > 0) {
+                        errorMessages.push(`Some SMS deliveries failed: ${result.value.data.failures.map((failure) => failure.phone || failure.to || failure.voucherId || 'unknown').join(', ')}`);
+                    }
                 } else {
-                    errorMessages.push('Failed to send SMS: ' + (result.reason?.response?.data?.message || result.reason?.message || 'Unknown error'));
+                    errorMessages.push('Failed to send SMS: ' + (result.value?.data?.message || result.reason?.response?.data?.message || result.reason?.message || 'Unknown error'));
                 }
             });
 
@@ -3707,7 +3794,11 @@ setBookingDetail(finalVoucherDetail);
     const getEmailLogParamsForEntity = (entity) => {
         if (!entity) return null;
         if (entity.contextType === 'voucher') {
-            return { type: 'voucher', id: entity.contextId || entity.id };
+            const voucherIds = getVoucherContextIds(entity);
+            const voucherContextId =
+                voucherIds.join(',') ||
+                normalizeVoucherContextId(entity.contextId || entity.voucherId || entity.voucher_id || entity.id);
+            return voucherContextId ? { type: 'voucher', id: voucherContextId } : null;
         }
         if (entity.contextType === 'booking') {
             return { type: 'booking', id: entity.id };
@@ -3831,6 +3922,19 @@ setBookingDetail(finalVoucherDetail);
         startEmailLogPolling(params);
     };
 
+    const openBulkVoucherEmailModal = () => {
+        if (!selectedVoucherIds || selectedVoucherIds.length === 0) return;
+
+        const primaryVoucher = filteredData.find(v => v.id === selectedVoucherIds[0]) || filteredData[0];
+        if (!primaryVoucher) return;
+
+        const voucherWithContext = buildBulkVoucherContext(primaryVoucher, selectedVoucherIds);
+        openEmailModalForBooking(voucherWithContext, {
+            contextType: 'voucher',
+            contextId: voucherWithContext.contextId
+        });
+    };
+
     const handleEmailBooking = () => {
         if (!bookingDetail?.booking) return;
         
@@ -3869,6 +3973,7 @@ setBookingDetail(finalVoucherDetail);
 
         const linkedBookingId = voucher.booking_id || voucher.bookingId || null;
         const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
+        const voucherContextId = normalizeVoucherContextId(voucher.id) || syntheticId;
 
         const voucherFlightAttempts = Number.isFinite(parseInt(voucher.flight_attempts, 10))
             ? parseInt(voucher.flight_attempts, 10)
@@ -3910,7 +4015,9 @@ setBookingDetail(finalVoucherDetail);
             customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
             flight_attempts: bookingDetail?.booking?.flight_attempts ?? voucherFlightAttempts,
             contextType: 'voucher',
-            contextId: syntheticId
+            contextId: voucherContextId,
+            voucherId: voucherContextId,
+            voucher_id: voucherContextId
         };
 
         openEmailModalForBooking(fauxBooking, {
@@ -3939,6 +4046,7 @@ setBookingDetail(finalVoucherDetail);
         const fallbackBookingId = bookingDetail?.booking?.id || null;
         const linkedBookingId = voucher.booking_id || fallbackBookingId || null;
         const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
+        const voucherContextId = normalizeVoucherContextId(voucher.id) || syntheticId;
 
         const voucherFlightAttempts = Number.isFinite(parseInt(voucher.flight_attempts, 10))
             ? parseInt(voucher.flight_attempts, 10)
@@ -3972,7 +4080,9 @@ setBookingDetail(finalVoucherDetail);
             customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
             flight_attempts: bookingDetail?.booking?.flight_attempts ?? voucherFlightAttempts,
             contextType: 'voucher',
-            contextId: syntheticId
+            contextId: voucherContextId,
+            voucherId: voucherContextId,
+            voucher_id: voucherContextId
         };
 
         openEmailModalForBooking(fauxBooking, {
@@ -3999,6 +4109,7 @@ setBookingDetail(finalVoucherDetail);
         const fallbackBookingId = bookingDetail?.booking?.id || null;
         const linkedBookingId = voucher.booking_id || fallbackBookingId || null;
         const syntheticId = voucher.id ? `voucher-${voucher.id}` : `voucher-${Date.now()}`;
+        const voucherContextId = normalizeVoucherContextId(voucher.id) || syntheticId;
 
         const voucherFlightAttempts = Number.isFinite(parseInt(voucher.flight_attempts, 10))
             ? parseInt(voucher.flight_attempts, 10)
@@ -4032,7 +4143,9 @@ setBookingDetail(finalVoucherDetail);
             customerPortalToken: voucher.customerPortalToken || voucher.customer_portal_token || voucher.portal_token || '',
             flight_attempts: bookingDetail?.booking?.flight_attempts ?? voucherFlightAttempts,
             contextType: 'voucher',
-            contextId: syntheticId,
+            contextId: voucherContextId,
+            voucherId: voucherContextId,
+            voucher_id: voucherContextId,
             is_flight_voucher: true, // Flight Voucher işareti
             book_flight: 'Flight Voucher' // Flight Voucher işareti
         };
@@ -5327,6 +5440,7 @@ setBookingDetail(finalVoucherDetail);
         const isBulkVoucher = selectedVoucherIds && selectedVoucherIds.length > 1;
         const isBulk = isBulkBooking || isBulkVoucher;
         const isVoucher = selectedBookingForEmail?.contextType === 'voucher' || isBulkVoucher;
+        const primaryVoucherContextId = getPrimaryVoucherContextId(selectedBookingForEmail);
 
         if (!isBulk && !smsForm.to) {
             alert('Please fill phone number');
@@ -5343,7 +5457,7 @@ setBookingDetail(finalVoucherDetail);
             if (isBulk) {
                 if (isBulkVoucher) {
                     // Bulk SMS to selected vouchers
-                    const recipients = filteredData
+                    const voucherRecipients = filteredData
                         .filter(v => selectedVoucherIds.includes(v.id))
                         .map(v => {
                             const originalVoucher = v._original || v;
@@ -5356,11 +5470,13 @@ setBookingDetail(finalVoucherDetail);
                                     : (v.phone || ''));
                             const cleanedPhone = cleanPhoneNumber(phone);
                             // Accept any phone number that starts with + (international format)
-                            return cleanedPhone && cleanedPhone.startsWith('+') ? cleanedPhone : null;
+                            const voucherId = normalizeVoucherContextId(originalVoucher.id || v.id);
+                            if (!voucherId || !cleanedPhone || !cleanedPhone.startsWith('+')) return null;
+                            return { voucherId, to: cleanedPhone };
                         })
-                        .filter(p => p !== null);
+                        .filter(Boolean);
 
-                    if (recipients.length === 0) {
+                    if (voucherRecipients.length === 0) {
                         alert('No valid international phone numbers found for selected vouchers.');
                         setSmsSending(false);
                         return;
@@ -5368,13 +5484,13 @@ setBookingDetail(finalVoucherDetail);
 
                     const response = await axios.post('/api/sendBulkVoucherSms', {
                         voucherIds: selectedVoucherIds,
-                        to: recipients,
+                        voucherRecipients,
                         body: finalMessage,
                         templateId: smsForm.template !== 'custom' ? smsForm.template : null
                     });
 
                     if (response.data.success) {
-                        alert(`SMS sent to ${recipients.length} vouchers successfully!`);
+                        alert(response.data.message || `SMS sent to ${voucherRecipients.length} vouchers successfully!`);
                         setSmsModalOpen(false);
                         setSmsForm({ to: '', message: '', template: 'custom' });
                         setSmsPersonalNote('');
@@ -5425,13 +5541,13 @@ setBookingDetail(finalVoucherDetail);
                 
                 if (isVoucher) {
                     const resp = await axios.post('/api/sendVoucherSms', {
-                        voucherId: selectedBookingForEmail?.id,
+                        voucherId: primaryVoucherContextId,
                         to: cleanedPhone,
                         body: finalMessage,
                         templateId: smsForm.template !== 'custom' ? smsForm.template : null
                     });
                     if (resp.data?.success) {
-                        const logs = await axios.get(`/api/voucherSms/${selectedBookingForEmail?.id}`);
+                        const logs = await axios.get(`/api/voucherSms/${primaryVoucherContextId}`);
                         setSmsLogs(logs.data?.data || []);
                         setSmsModalOpen(false);
                     } else {
@@ -6338,57 +6454,7 @@ setBookingDetail(finalVoucherDetail);
                                                 variant="contained"
                                                 color="primary"
                                                 disabled={selectedVoucherIds.length === 0}
-                                                onClick={() => {
-                                                    if (selectedVoucherIds.length === 0) return;
-                                                    // Çoklu alıcılar için varsayılan voucher'ı kullan (ilk seçilen)
-                                                    const primaryVoucher = filteredData.find(v => v.id === selectedVoucherIds[0]);
-                                                    if (primaryVoucher) {
-                                                        const originalVoucher = primaryVoucher._original || primaryVoucher;
-                                                        const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                        const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                        const email = isFlightVoucher 
-                                                            ? (originalVoucher.purchaser_email || primaryVoucher.email || '')
-                                                            : (isGiftVoucher 
-                                                                ? (originalVoucher.recipient_email || primaryVoucher.email || '')
-                                                                : (primaryVoucher.email || ''));
-                                                        const name = isFlightVoucher 
-                                                            ? (originalVoucher.purchaser_name || primaryVoucher.name || '')
-                                                            : (isGiftVoucher 
-                                                                ? (originalVoucher.recipient_name || primaryVoucher.name || '')
-                                                                : (primaryVoucher.name || ''));
-                                                        const voucherWithContext = {
-                                                            ...primaryVoucher,
-                                                            email,
-                                                            name,
-                                                            contextType: 'bulk',
-                                                            contextId: selectedVoucherIds.join(',')
-                                                        };
-                                                        openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                    } else if (filteredData.length > 0) {
-                                                        const firstVoucher = filteredData[0];
-                                                        const originalVoucher = firstVoucher._original || firstVoucher;
-                                                        const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                        const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                        const email = isFlightVoucher 
-                                                            ? (originalVoucher.purchaser_email || firstVoucher.email || '')
-                                                            : (isGiftVoucher 
-                                                                ? (originalVoucher.recipient_email || firstVoucher.email || '')
-                                                                : (firstVoucher.email || ''));
-                                                        const name = isFlightVoucher 
-                                                            ? (originalVoucher.purchaser_name || firstVoucher.name || '')
-                                                            : (isGiftVoucher 
-                                                                ? (originalVoucher.recipient_name || firstVoucher.name || '')
-                                                                : (firstVoucher.name || ''));
-                                                        const voucherWithContext = {
-                                                            ...firstVoucher,
-                                                            email,
-                                                            name,
-                                                            contextType: 'bulk',
-                                                            contextId: selectedVoucherIds.join(',')
-                                                        };
-                                                        openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                    }
-                                                }}
+                                                onClick={openBulkVoucherEmailModal}
                                                 sx={{
                                                     width: '100%',
                                                     height: 36,
@@ -6405,56 +6471,7 @@ setBookingDetail(finalVoucherDetail);
                                                     variant="contained"
                                                     color="primary"
                                                     disabled={selectedVoucherIds.length === 0}
-                                                    onClick={() => {
-                                                        if (selectedVoucherIds.length === 0) return;
-                                                        const primaryVoucher = filteredData.find(v => v.id === selectedVoucherIds[0]);
-                                                        if (primaryVoucher) {
-                                                            const originalVoucher = primaryVoucher._original || primaryVoucher;
-                                                            const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                            const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                            const email = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_email || primaryVoucher.email || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_email || primaryVoucher.email || '')
-                                                                    : (primaryVoucher.email || ''));
-                                                            const name = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_name || primaryVoucher.name || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_name || primaryVoucher.name || '')
-                                                                    : (primaryVoucher.name || ''));
-                                                            const voucherWithContext = {
-                                                                ...primaryVoucher,
-                                                                email,
-                                                                name,
-                                                                contextType: 'bulk',
-                                                                contextId: selectedVoucherIds.join(',')
-                                                            };
-                                                            openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                        } else if (filteredData.length > 0) {
-                                                            const firstVoucher = filteredData[0];
-                                                            const originalVoucher = firstVoucher._original || firstVoucher;
-                                                            const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
-                                                            const isGiftVoucher = originalVoucher.book_flight === 'Gift Voucher';
-                                                            const email = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_email || firstVoucher.email || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_email || firstVoucher.email || '')
-                                                                    : (firstVoucher.email || ''));
-                                                            const name = isFlightVoucher 
-                                                                ? (originalVoucher.purchaser_name || firstVoucher.name || '')
-                                                                : (isGiftVoucher 
-                                                                    ? (originalVoucher.recipient_name || firstVoucher.name || '')
-                                                                    : (firstVoucher.name || ''));
-                                                            const voucherWithContext = {
-                                                                ...firstVoucher,
-                                                                email,
-                                                                name,
-                                                                contextType: 'bulk',
-                                                                contextId: selectedVoucherIds.join(',')
-                                                            };
-                                                            openEmailModalForBooking(voucherWithContext, { contextType: 'bulk', contextId: selectedVoucherIds.join(',') });
-                                                        }
-                                                    }}
+                                                    onClick={openBulkVoucherEmailModal}
                                                     style={{
                                                         height: 40,
                                                         fontSize: '14px',
@@ -9344,7 +9361,9 @@ setBookingDetail(finalVoucherDetail);
                                 fontSize: isMobile ? 12 : '12px',
                                 fontWeight: isMobile ? 'inherit' : 400
                             }}>
-                                Booking: {selectedBookingForEmail.name} ({selectedBookingForEmail.id})
+                                {selectedBookingForEmail.contextType === 'voucher'
+                                    ? `Voucher: ${selectedBookingForEmail.name} (${selectedBookingForEmail.voucherId || getPrimaryVoucherContextId(selectedBookingForEmail) || selectedBookingForEmail.id})`
+                                    : `Booking: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`}
                             </Typography>
                         )}
                     </DialogTitle>
@@ -10679,7 +10698,7 @@ setBookingDetail(finalVoucherDetail);
                                 ) : (
                                     <>
                                         {selectedBookingForEmail.contextType === 'voucher' 
-                                            ? `Voucher: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`
+                                            ? `Voucher: ${selectedBookingForEmail.name} (${selectedBookingForEmail.voucherId || getPrimaryVoucherContextId(selectedBookingForEmail) || selectedBookingForEmail.id})`
                                             : `Booking: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`
                                         }
                                     </>
@@ -11475,7 +11494,7 @@ setBookingDetail(finalVoucherDetail);
                                 ) : (
                                     <>
                                         {selectedBookingForEmail.contextType === 'voucher' 
-                                            ? `Voucher: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`
+                                            ? `Voucher: ${selectedBookingForEmail.name} (${selectedBookingForEmail.voucherId || getPrimaryVoucherContextId(selectedBookingForEmail) || selectedBookingForEmail.id})`
                                             : `Booking: ${selectedBookingForEmail.name} (${selectedBookingForEmail.id})`
                                         }
                                     </>

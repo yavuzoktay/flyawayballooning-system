@@ -2964,147 +2964,48 @@ app.post('/api/createRedeemBooking', (req, res) => {
                     insertPassengerSequentially(0);
                 }
 
-                // Save additional info answers if provided
-                if (additionalInfo && typeof additionalInfo === 'object') {
-                    console.log('=== SAVING ADDITIONAL INFO ===');
-                    console.log('Additional Info:', additionalInfo);
+                const finalizeRedeemBookingResponse = () => {
+                    // Update voucher_codes table to mark as Used
+                    if (cleanVoucherCode) {
+                        console.log('=== UPDATING VOUCHER_CODES TABLE ===');
+                        console.log('Voucher Code:', cleanVoucherCode);
 
-                    const { __requiredKeys, ...rawAdditionalInfo } = normalizeAdditionalInfoPayload(additionalInfo);
-                    const meaningfulEntries = Object.entries(rawAdditionalInfo).filter(([, value]) =>
-                        hasMeaningfulAdditionalInfoValue(value)
-                    );
-                    const redeemAdditionalInfoColumns = resolveBookingAdditionalInfoColumns({
-                        additionalInfo,
-                        existingBookingRow: sourceBookingAdditionalInfo,
-                        preserveExistingLegacy: !!sourceBookingAdditionalInfo
-                    });
-
-                    if (meaningfulEntries.length > 0) {
-                        const legacyAnswerRows = [];
-                        const additionalInformationAnswers = [];
-                        const jsonData = {};
-
-                        meaningfulEntries.forEach(([key, value]) => {
-                            if (!hasMeaningfulAdditionalInfoValue(value)) return;
-
-                            let normalizedValue = value;
-                            if (typeof value === 'string') {
-                                normalizedValue = value.trim();
-                            } else if (Array.isArray(value)) {
-                                normalizedValue = [...value];
-                            } else if (value && typeof value === 'object') {
-                                normalizedValue = { ...value };
+                        // First, mark in all_vouchers table if exists
+                        const updateAllVouchersSql = `
+                    UPDATE all_vouchers 
+                    SET redeemed = 'Yes', status = 'Used'
+                    WHERE UPPER(voucher_ref) = UPPER(?)
+                `;
+                        con.query(updateAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
+                            if (voucherErr) {
+                                console.warn('Warning: Could not update all_vouchers:', voucherErr.message);
+                            } else {
+                                console.log('all_vouchers update result:', {
+                                    affectedRows: voucherResult.affectedRows,
+                                    changedRows: voucherResult.changedRows
+                                });
                             }
-
-                            jsonData[key] = normalizedValue;
-
-                            if (!key.startsWith('question_')) {
-                                return;
-                            }
-
-                            const questionId = parseInt(key.replace('question_', ''), 10);
-                            if (!questionId || isNaN(questionId)) {
-                                return;
-                            }
-
-                            legacyAnswerRows.push([bookingId, questionId, normalizedValue]);
-                            additionalInformationAnswers.push([bookingId, questionId, normalizedValue]);
                         });
 
-                        if (legacyAnswerRows.length > 0) {
-                            const legacySql = 'INSERT INTO additional_info_answers (booking_id, question_id, answer) VALUES ?';
-                            con.query(legacySql, [legacyAnswerRows], (legacyErr) => {
-                                if (legacyErr) {
-                                    console.error('Error storing additional_info_answers for redeem booking:', legacyErr);
-                                } else {
-                                    console.log('additional_info_answers stored successfully for redeem booking:', bookingId);
-                                }
-                            });
-                        }
-
-                        if (additionalInformationAnswers.length > 0) {
-                            const sql = 'INSERT INTO additional_information_answers (booking_id, question_id, answer) VALUES ?';
-                            con.query(sql, [additionalInformationAnswers], (err) => {
-                                if (err) {
-                                    console.error('Error storing additional_information_answers for redeem booking:', err);
-                                } else {
-                                    console.log('additional_information_answers stored successfully for redeem booking:', bookingId);
-                                }
-                            });
-                        }
-
-                        const jsonPayload = Object.keys(jsonData).length > 0 ? JSON.stringify(jsonData) : null;
-
-                        con.query(
-                            `UPDATE all_booking
-                             SET additional_notes = ?,
-                                 hear_about_us = ?,
-                                 ballooning_reason = ?,
-                                 prefer = ?,
-                                 additional_information_json = ?
-                             WHERE id = ?`,
-                            [
-                                redeemAdditionalInfoColumns.additional_notes,
-                                redeemAdditionalInfoColumns.hear_about_us,
-                                redeemAdditionalInfoColumns.ballooning_reason,
-                                redeemAdditionalInfoColumns.prefer,
-                                jsonPayload,
-                                bookingId
-                            ],
-                            (err) => {
-                                if (err) {
-                                    console.error('Error updating redeem booking additional info fields:', err);
-                                } else {
-                                    console.log('Redeem booking additional info fields updated successfully:', bookingId);
-                                }
+                        // Then, update voucher_codes table (if it exists)
+                        const updateVoucherCodesSql = `
+                    UPDATE voucher_codes 
+                    SET current_uses = COALESCE(current_uses, 0) + 1, 
+                        is_active = 0
+                    WHERE UPPER(code) = UPPER(?)
+                `;
+                        con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
+                            if (codeErr) {
+                                console.warn('Warning: Could not update voucher_codes:', codeErr.message);
+                            } else {
+                                console.log('✅ voucher_codes update result:', {
+                                    affectedRows: codeResult.affectedRows,
+                                    changedRows: codeResult.changedRows,
+                                    message: 'Voucher code marked as inactive'
+                                });
                             }
-                        );
-                    } else {
-                        console.log('ℹ️ No meaningful additional info payload found for redeem booking.');
+                        });
                     }
-                }
-
-                // Update voucher_codes table to mark as Used
-                if (cleanVoucherCode) {
-                    console.log('=== UPDATING VOUCHER_CODES TABLE ===');
-                    console.log('Voucher Code:', cleanVoucherCode);
-
-                    // First, mark in all_vouchers table if exists
-                    const updateAllVouchersSql = `
-                UPDATE all_vouchers 
-                SET redeemed = 'Yes', status = 'Used'
-                WHERE UPPER(voucher_ref) = UPPER(?)
-            `;
-                    con.query(updateAllVouchersSql, [cleanVoucherCode], (voucherErr, voucherResult) => {
-                        if (voucherErr) {
-                            console.warn('Warning: Could not update all_vouchers:', voucherErr.message);
-                        } else {
-                            console.log('all_vouchers update result:', {
-                                affectedRows: voucherResult.affectedRows,
-                                changedRows: voucherResult.changedRows
-                            });
-                        }
-                    });
-
-                    // Then, update voucher_codes table (if it exists)
-                    const updateVoucherCodesSql = `
-                UPDATE voucher_codes 
-                SET current_uses = COALESCE(current_uses, 0) + 1, 
-                    is_active = 0
-                WHERE UPPER(code) = UPPER(?)
-            `;
-                    con.query(updateVoucherCodesSql, [cleanVoucherCode], (codeErr, codeResult) => {
-                        if (codeErr) {
-                            console.warn('Warning: Could not update voucher_codes:', codeErr.message);
-                        } else {
-                            console.log('✅ voucher_codes update result:', {
-                                affectedRows: codeResult.affectedRows,
-                                changedRows: codeResult.changedRows,
-                                message: 'Voucher code marked as inactive'
-                            });
-                        }
-                    });
-                }
 
                     // Remove request from processing map before sending response
                     if (global.redeemBookingRequests) {
@@ -3117,6 +3018,69 @@ app.post('/api/createRedeemBooking', (req, res) => {
                         bookingId: bookingId,
                         voucher_code: generatedVoucherCode // Return the newly generated voucher code
                     });
+                };
+
+                const persistRedeemAdditionalInfoAndRespond = () => {
+                    if (!additionalInfo || typeof additionalInfo !== 'object') {
+                        finalizeRedeemBookingResponse();
+                        return;
+                    }
+
+                    console.log('=== SAVING ADDITIONAL INFO ===');
+                    console.log('Additional Info:', additionalInfo);
+
+                    const { __requiredKeys, ...rawAdditionalInfo } = normalizeAdditionalInfoPayload(additionalInfo);
+                    const meaningfulEntries = Object.entries(rawAdditionalInfo).filter(([, value]) =>
+                        hasMeaningfulAdditionalInfoValue(value)
+                    );
+
+                    if (meaningfulEntries.length === 0) {
+                        console.log('ℹ️ No meaningful additional info payload found for redeem booking.');
+                        finalizeRedeemBookingResponse();
+                        return;
+                    }
+
+                    const redeemAdditionalInfoColumns = resolveBookingAdditionalInfoColumns({
+                        additionalInfo,
+                        existingBookingRow: sourceBookingAdditionalInfo,
+                        preserveExistingLegacy: !!sourceBookingAdditionalInfo
+                    });
+
+                    con.query(
+                        `UPDATE all_booking
+                         SET additional_notes = ?,
+                             hear_about_us = ?,
+                             ballooning_reason = ?,
+                             prefer = ?
+                         WHERE id = ?`,
+                        [
+                            redeemAdditionalInfoColumns.additional_notes,
+                            redeemAdditionalInfoColumns.hear_about_us,
+                            redeemAdditionalInfoColumns.ballooning_reason,
+                            redeemAdditionalInfoColumns.prefer,
+                            bookingId
+                        ],
+                        (legacyUpdateErr) => {
+                            if (legacyUpdateErr) {
+                                console.error('Error updating redeem booking legacy additional info fields:', legacyUpdateErr);
+                            } else {
+                                console.log('Redeem booking legacy additional info fields updated successfully:', bookingId);
+                            }
+
+                            persistBookingAdditionalInfoPayload({
+                                connection: con,
+                                bookingId,
+                                additionalInfo,
+                                logPrefix: '[createRedeemBooking]'
+                            }, () => {
+                                console.log('✅ createRedeemBooking additional info persisted before response:', bookingId);
+                                finalizeRedeemBookingResponse();
+                            });
+                        }
+                    );
+                };
+
+                persistRedeemAdditionalInfoAndRespond();
                 }
 
                 con.query(bookingSql, bookingValues, (err, result) => {
@@ -13713,6 +13677,166 @@ const resolvePrivateWeatherRefundTotal = ({
     return roundCurrencyAmount(voucherBaseTotal * 0.1);
 };
 
+const normalizePrivateCharterPricingKey = (value = '') =>
+    String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/[^a-z0-9\s]/g, '');
+
+const parsePrivateCharterPricingValue = (value) => {
+    if (value == null) return null;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+        const cleaned = value.replace(/[^0-9.\-]/g, '').trim();
+        const parsed = parseFloat(cleaned);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+};
+
+const getPrivateCharterVoucherPriceFromPricing = ({ pricingData, voucherType, pax }) => {
+    if (!pricingData || typeof pricingData !== 'object' || Array.isArray(pricingData)) {
+        return null;
+    }
+
+    const normalizedVoucherType = normalizePrivateCharterPricingKey(voucherType);
+    let voucherPricing = null;
+
+    if (normalizedVoucherType) {
+        for (const [key, value] of Object.entries(pricingData)) {
+            if (normalizePrivateCharterPricingKey(key) === normalizedVoucherType) {
+                voucherPricing = value;
+                break;
+            }
+        }
+    }
+
+    if (!voucherPricing && normalizedVoucherType) {
+        for (const [key, value] of Object.entries(pricingData)) {
+            const normalizedKey = normalizePrivateCharterPricingKey(key);
+            if (
+                normalizedVoucherType.includes(normalizedKey) ||
+                normalizedKey.includes(normalizedVoucherType)
+            ) {
+                voucherPricing = value;
+                break;
+            }
+        }
+    }
+
+    if (!voucherPricing && Object.keys(pricingData).length === 1) {
+        voucherPricing = pricingData[Object.keys(pricingData)[0]];
+    }
+
+    if (!voucherPricing || typeof voucherPricing !== 'object') {
+        return null;
+    }
+
+    const parsedPax = parseInt(pax, 10);
+    const passengerCount = Number.isNaN(parsedPax) ? 0 : parsedPax;
+    if (passengerCount <= 0) return null;
+
+    const directPrice = parsePrivateCharterPricingValue(voucherPricing[String(passengerCount)]);
+    if (directPrice !== null) {
+        return directPrice;
+    }
+
+    for (const [key, value] of Object.entries(voucherPricing)) {
+        const extractedPassengerCount = parseInt(String(key).replace(/[^0-9]/g, ''), 10);
+        if (extractedPassengerCount === passengerCount) {
+            const parsedValue = parsePrivateCharterPricingValue(value);
+            if (parsedValue !== null) {
+                return parsedValue;
+            }
+        }
+    }
+
+    return parsePrivateCharterPricingValue(voucherPricing.price);
+};
+
+const derivePrivateCharterWeatherRefundTotal = async (booking = {}) => {
+    const databaseWeatherRefundTotal = roundCurrencyAmount(booking?.weather_refund_total_price);
+    const privateSignals = [
+        booking?.experience,
+        booking?.flight_type,
+        booking?.voucher_type,
+        booking?.voucher_type_detail
+    ].filter(Boolean);
+    const isPrivateCharterBooking = privateSignals.some(isPrivateCharterTypeValue);
+
+    if (!isPrivateCharterBooking || !booking?.location) {
+        return databaseWeatherRefundTotal;
+    }
+
+    try {
+        const activityRows = await new Promise((resolve, reject) => {
+            con.query(
+                `
+                    SELECT private_charter_pricing
+                    FROM activity
+                    WHERE location = ?
+                    ORDER BY CASE WHEN status = 'Live' THEN 0 ELSE 1 END, id DESC
+                    LIMIT 1
+                `,
+                [booking.location],
+                (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows || []);
+                }
+            );
+        });
+
+        if (!activityRows.length || !activityRows[0]?.private_charter_pricing) {
+            return databaseWeatherRefundTotal;
+        }
+
+        let pricingData = activityRows[0].private_charter_pricing;
+        if (typeof pricingData === 'string') {
+            try {
+                pricingData = JSON.parse(pricingData);
+            } catch (error) {
+                console.warn(`[weather refund] Failed to parse private_charter_pricing for booking ${booking.id}:`, error?.message || error);
+                return databaseWeatherRefundTotal;
+            }
+        }
+
+        const voucherTypePrice = getPrivateCharterVoucherPriceFromPricing({
+            pricingData,
+            voucherType: booking?.voucher_type_detail || booking?.voucher_type || booking?.flight_type || booking?.experience,
+            pax: booking?.pax
+        });
+
+        if (!(voucherTypePrice > 0)) {
+            return databaseWeatherRefundTotal;
+        }
+
+        const paidAmount = Number(booking?.paid) || 0;
+        const addOnTotal = Number(booking?.add_to_booking_items_total_price) || 0;
+        const weatherRefundPrice = roundCurrencyAmount(voucherTypePrice * 0.1);
+        const totalWithoutWeatherRefund = roundCurrencyAmount(voucherTypePrice + addOnTotal);
+        const totalWithWeatherRefund = roundCurrencyAmount(totalWithoutWeatherRefund + weatherRefundPrice);
+
+        if (Math.abs(paidAmount - totalWithWeatherRefund) <= 0.01) {
+            return weatherRefundPrice;
+        }
+
+        if (Math.abs(paidAmount - totalWithoutWeatherRefund) <= 0.01) {
+            return 0;
+        }
+
+        const paymentDifference = roundCurrencyAmount(paidAmount - totalWithoutWeatherRefund);
+        if (paymentDifference > 0 && Math.abs(paymentDifference - weatherRefundPrice) <= 0.01) {
+            return weatherRefundPrice;
+        }
+
+        return databaseWeatherRefundTotal;
+    } catch (error) {
+        console.error(`[weather refund] Error deriving private charter weather refund for booking ${booking?.id}:`, error);
+        return databaseWeatherRefundTotal;
+    }
+};
+
 const bookingHasWeatherRefund = (booking, passengers = []) => {
     const bookingWeatherRefundTotal = Number(booking?.weather_refund_total_price) || 0;
     return bookingWeatherRefundTotal > 0 || hasPassengerWeatherRefundSelected(passengers);
@@ -21616,6 +21740,8 @@ app.get('/api/customer-portal-booking/:token', async (req, res) => {
             isVoucherRedeemed
         });
 
+        booking.weather_refund_total_price = await derivePrivateCharterWeatherRefundTotal(booking);
+
         let customerPortalHasWeatherRefund = bookingHasWeatherRefund(booking, finalPassengerRows);
         if (!customerPortalHasWeatherRefund && booking.stripe_session_id) {
             const sessionStoreData = stripeSessionStore[booking.stripe_session_id];
@@ -22436,6 +22562,8 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             ? flightAttemptsCount
             : (isRedeemVoucher ? 0 : updatedBooking.flight_attempts || 0);
 
+        updatedBooking.weather_refund_total_price = await derivePrivateCharterWeatherRefundTotal(updatedBooking);
+
         const responseAdditionalInfo = buildExistingBookingAdditionalInfoPayload(updatedBooking);
         const responseHasWeatherRefund = bookingHasWeatherRefund(updatedBooking, passengerRows || []);
         const response = {
@@ -22757,6 +22885,8 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         } catch (historyErr) {
             console.error('Error counting flight attempts:', historyErr);
         }
+
+        updatedBooking.weather_refund_total_price = await derivePrivateCharterWeatherRefundTotal(updatedBooking);
 
         const responseHasWeatherRefund = bookingHasWeatherRefund(updatedBooking, passengerRows || []);
         const response = {
@@ -27577,11 +27707,12 @@ app.post('/api/customerPortalShortLink', (req, res) => {
     }
 
     const isVoucher = contextType === 'voucher';
+    const normalizedRecordId = isVoucher ? String(bookingId).trim().replace(/^voucher-/i, '') : bookingId;
     const query = isVoucher
         ? 'SELECT * FROM all_vouchers WHERE id = ? LIMIT 1'
         : 'SELECT * FROM all_booking WHERE id = ? LIMIT 1';
 
-    con.query(query, [bookingId], (err, rows) => {
+    con.query(query, [normalizedRecordId], (err, rows) => {
         if (err) {
             console.error('Error fetching record for portal link:', err);
             return res.status(500).json({ success: false, message: 'Database error' });
@@ -37986,10 +38117,18 @@ app.post('/api/sendBookingEmail', async (req, res) => {
     }
 });
 
+function normalizeVoucherContextId(value) {
+    if (value === null || value === undefined) return '';
+    const normalized = String(value).trim();
+    if (!normalized) return '';
+    return normalized.replace(/^voucher-/i, '');
+}
+
 // Send voucher email via SendGrid (or SMTP fallback)
 app.post('/api/sendVoucherEmail', async (req, res) => {
     console.log('POST /api/sendVoucherEmail called');
     const { voucherId, to, subject, message, template, voucherData } = req.body;
+    const normalizedVoucherId = normalizeVoucherContextId(voucherId);
 
     try {
         // Validate required fields
@@ -38040,8 +38179,10 @@ app.post('/api/sendVoucherEmail', async (req, res) => {
             html: htmlBody,
             // Add custom tracking
             custom_args: {
-                voucher_id: voucherId?.toString() || 'unknown',
-                template_type: template || 'custom'
+                voucher_id: normalizedVoucherId || 'unknown',
+                template_type: template || 'custom',
+                context_type: 'voucher',
+                context_id: normalizedVoucherId || to || 'unknown'
             }
         };
 
@@ -38076,7 +38217,7 @@ app.post('/api/sendVoucherEmail', async (req, res) => {
             `;
             ensureEmailLogsSchema(() => {
                 const contextType = 'voucher';
-                const contextId = voucherId ? String(voucherId) : (to || '');
+                const contextId = normalizedVoucherId || (to || '');
                 const bookingIdValue = null; // vouchers are not bookings
                 con.query(logSql, [
                     bookingIdValue,
@@ -38241,6 +38382,188 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
     }
 });
 
+app.post('/api/sendBulkVoucherEmail', async (req, res) => {
+    console.log('POST /api/sendBulkVoucherEmail called');
+    const { voucherIds, voucherRecipients, to, subject, message, template } = req.body;
+
+    try {
+        if (!subject || !message) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: subject and message are required'
+            });
+        }
+
+        if (!process.env.SENDGRID_API_KEY) {
+            console.error('SendGrid API key not configured');
+            return res.status(500).json({
+                success: false,
+                message: 'Email service not configured'
+            });
+        }
+
+        const containsHtml = typeof message === 'string' && /<\/?[a-z][\s\S]*>/i.test(message);
+        const sanitizeComments = (input) =>
+            input ? input.replace(/<!--[\s\S]*?-->/g, '') : input;
+        const normalizeHtml = (html) => sanitizeComments(html || '');
+        const htmlBody = containsHtml ? normalizeEmailBodyStyles(normalizeHtml(message)) : (message || '').replace(/\n/g, '<br>');
+        const textBody = containsHtml ? convertHtmlToText(htmlBody) : message;
+
+        const fallbackRecipients = Array.isArray(to)
+            ? to.map((recipient, index) => ({
+                voucherId: Array.isArray(voucherIds) ? normalizeVoucherContextId(voucherIds[index]) : '',
+                to: String(recipient || '').trim()
+            }))
+            : [];
+
+        const preparedRecipients = Array.isArray(voucherRecipients) && voucherRecipients.length > 0
+            ? voucherRecipients
+            : fallbackRecipients;
+
+        const normalizedRecipients = Array.from(new Map(
+            preparedRecipients
+                .map((recipient) => {
+                    const voucherContextId = normalizeVoucherContextId(recipient?.voucherId || recipient?.id);
+                    const recipientEmail = String(recipient?.to || '').trim();
+                    if (!voucherContextId || !recipientEmail) return null;
+                    return [`${voucherContextId}:${recipientEmail.toLowerCase()}`, {
+                        voucherId: voucherContextId,
+                        to: recipientEmail
+                    }];
+                })
+                .filter(Boolean)
+        ).values());
+
+        if (normalizedRecipients.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No valid voucher recipients were provided'
+            });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const logSql = `
+            INSERT INTO email_logs (
+                booking_id,
+                recipient_email,
+                subject,
+                template_type,
+                message_html,
+                message_text,
+                sent_at,
+                status,
+                message_id,
+                opens,
+                clicks,
+                last_event,
+                last_event_at,
+                context_type,
+                context_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
+        `;
+
+        const results = await Promise.allSettled(
+            normalizedRecipients.map(async (recipient) => {
+                if (!emailRegex.test(recipient.to)) {
+                    throw new Error(`Invalid email format for ${recipient.to}`);
+                }
+
+                const emailContent = {
+                    to: recipient.to,
+                    from: {
+                        email: 'info@flyawayballooning.com',
+                        name: 'Fly Away Ballooning'
+                    },
+                    subject,
+                    text: textBody,
+                    html: htmlBody,
+                    custom_args: {
+                        voucher_id: recipient.voucherId,
+                        template_type: template || 'custom',
+                        context_type: 'voucher',
+                        context_id: recipient.voucherId
+                    }
+                };
+
+                const { provider, messageId } = await sendEmailWithFallback(emailContent, {
+                    context: 'send_bulk_voucher_email'
+                });
+
+                await new Promise((resolve) => {
+                    ensureEmailLogsSchema(() => {
+                        con.query(logSql, [
+                            null,
+                            recipient.to,
+                            subject,
+                            template || 'custom',
+                            htmlBody,
+                            textBody,
+                            messageId,
+                            'voucher',
+                            recipient.voucherId
+                        ], (err) => {
+                            if (err) {
+                                console.error('Error logging bulk voucher email activity:', err);
+                            }
+                            resolve();
+                        });
+                    });
+                });
+
+                return {
+                    voucherId: recipient.voucherId,
+                    to: recipient.to,
+                    provider,
+                    messageId
+                };
+            })
+        );
+
+        const successes = [];
+        const failures = [];
+        results.forEach((result, index) => {
+            const recipient = normalizedRecipients[index];
+            if (result.status === 'fulfilled') {
+                successes.push(result.value);
+            } else {
+                failures.push({
+                    voucherId: recipient?.voucherId || null,
+                    to: recipient?.to || null,
+                    error: result.reason?.message || 'Unknown error'
+                });
+            }
+        });
+
+        if (successes.length === 0) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to send voucher emails',
+                failures
+            });
+        }
+
+        const partialSuccess = failures.length > 0;
+        return res.json({
+            success: !partialSuccess,
+            partialSuccess,
+            sentCount: successes.length,
+            failedCount: failures.length,
+            failures: partialSuccess ? failures : undefined,
+            message: partialSuccess
+                ? `Email sent to ${successes.length} vouchers. ${failures.length} failed.`
+                : `Email sent to ${successes.length} vouchers successfully!`
+        });
+    } catch (error) {
+        console.error('Error sending bulk voucher email:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to send bulk voucher email',
+            error: error.message
+        });
+    }
+});
+
 // Get email logs for a booking
 app.get('/api/bookingEmails/:bookingId', (req, res) => {
     const { bookingId } = req.params;
@@ -38286,12 +38609,30 @@ app.get('/api/voucherEmails/:contextId', (req, res) => {
     if (!contextId) {
         return res.status(400).json({ success: false, message: 'contextId is required' });
     }
+
+    const normalizedContextIds = Array.from(
+        new Set(
+            String(contextId)
+                .split(',')
+                .map((value) => normalizeVoucherContextId(value))
+                .filter(Boolean)
+        )
+    );
+
+    if (normalizedContextIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'contextId is invalid' });
+    }
+
+    const lookupContextIds = Array.from(new Set(
+        normalizedContextIds.flatMap((value) => [value, `voucher-${value}`])
+    ));
+    const placeholders = lookupContextIds.map(() => '?').join(',');
     const sql = `
         SELECT * FROM email_logs
-        WHERE context_type = 'voucher' AND context_id = ?
+        WHERE context_type = 'voucher' AND context_id IN (${placeholders})
         ORDER BY sent_at DESC
     `;
-    con.query(sql, [contextId], (err, rows) => {
+    con.query(sql, lookupContextIds, (err, rows) => {
         if (err) {
             console.error('Error fetching voucher email logs:', err);
             return res.status(500).json({ success: false, message: err.message });
@@ -38443,6 +38784,7 @@ function ensureSmsLogsSchema(callback) {
 app.post('/api/sendVoucherSms', async (req, res) => {
     try {
         const { voucherId, to, body, templateId, voucherData } = req.body;
+        const normalizedVoucherId = normalizeVoucherContextId(voucherId);
         if (!to || !body) {
             return res.status(400).json({ success: false, message: 'to and body required' });
         }
@@ -38450,10 +38792,10 @@ app.post('/api/sendVoucherSms', async (req, res) => {
 
         // Fetch voucher data to replace placeholders
         let voucher = voucherData && typeof voucherData === 'object' ? voucherData : {};
-        if (voucherId) {
+        if (normalizedVoucherId) {
             try {
                 const voucherQuery = `SELECT * FROM all_vouchers WHERE id = ?`;
-                const [voucherRows] = await con.promise().query(voucherQuery, [voucherId]);
+                const [voucherRows] = await con.promise().query(voucherQuery, [normalizedVoucherId]);
                 if (voucherRows && voucherRows.length > 0) {
                     const dbVoucher = voucherRows[0];
                     // Normalise some fields to look like booking for placeholder replacement
@@ -38537,7 +38879,7 @@ app.post('/api/sendVoucherSms', async (req, res) => {
         ensureSmsLogsSchema(() => {
             const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
             // Reuse booking_id column to store voucherId for voucher messages
-            con.query(sql, [voucherId || null, effectiveTo, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
+            con.query(sql, [normalizedVoucherId || null, effectiveTo, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
                 if (err) console.error('Error logging voucher sms:', err);
             });
         });
@@ -38978,6 +39320,179 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
         });
     } catch (error) {
         console.error('Bulk SMS send error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+app.post('/api/sendBulkVoucherSms', async (req, res) => {
+    console.log('POST /api/sendBulkVoucherSms called');
+    const { voucherIds, voucherRecipients, to, body } = req.body;
+
+    try {
+        if (!body) {
+            return res.status(400).json({
+                success: false,
+                message: 'Message body is required'
+            });
+        }
+
+        const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, TWILIO_MESSAGING_SERVICE_SID } = process.env;
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+            console.error('Twilio not configured');
+            return res.status(500).json({
+                success: false,
+                message: 'SMS service not configured'
+            });
+        }
+
+        const fallbackRecipients = Array.isArray(to)
+            ? to.map((recipient, index) => ({
+                voucherId: Array.isArray(voucherIds) ? normalizeVoucherContextId(voucherIds[index]) : '',
+                to: normalizeUkPhoneForTwilio(String(recipient || '').trim())
+            }))
+            : [];
+
+        const preparedRecipients = Array.isArray(voucherRecipients) && voucherRecipients.length > 0
+            ? voucherRecipients
+            : fallbackRecipients;
+
+        const normalizedRecipients = Array.from(new Map(
+            preparedRecipients
+                .map((recipient) => {
+                    const voucherContextId = normalizeVoucherContextId(recipient?.voucherId || recipient?.id);
+                    const phone = normalizeUkPhoneForTwilio(String(recipient?.to || '').trim());
+                    if (!voucherContextId || !phone) return null;
+                    return [`${voucherContextId}:${phone}`, {
+                        voucherId: voucherContextId,
+                        to: phone
+                    }];
+                })
+                .filter(Boolean)
+        ).values());
+
+        if (normalizedRecipients.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No valid voucher phone numbers were provided'
+            });
+        }
+
+        const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+        const createParams = {
+            statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
+        };
+
+        const hasFromNumber = TWILIO_FROM_NUMBER && typeof TWILIO_FROM_NUMBER === 'string' && TWILIO_FROM_NUMBER.trim() !== '';
+        const hasMessagingService = TWILIO_MESSAGING_SERVICE_SID && typeof TWILIO_MESSAGING_SERVICE_SID === 'string' && TWILIO_MESSAGING_SERVICE_SID.trim() !== '';
+
+        if (hasMessagingService) {
+            createParams.messagingServiceSid = TWILIO_MESSAGING_SERVICE_SID.trim();
+        } else if (!hasFromNumber) {
+            createParams.from = 'FLYAWAY';
+        } else {
+            createParams.from = TWILIO_FROM_NUMBER.trim();
+        }
+
+        const voucherDataMap = new Map();
+        if (Array.isArray(voucherIds) && voucherIds.length > 0) {
+            for (const voucherId of voucherIds) {
+                const normalizedVoucherId = normalizeVoucherContextId(voucherId);
+                if (!normalizedVoucherId) continue;
+                try {
+                    const [voucherRows] = await con.promise().query('SELECT * FROM all_vouchers WHERE id = ?', [normalizedVoucherId]);
+                    if (voucherRows && voucherRows.length > 0) {
+                        const row = voucherRows[0];
+                        voucherDataMap.set(normalizedVoucherId, {
+                            ...row,
+                            name: row.name || row.purchaser_name || row.recipient_name || '',
+                            customer_name: row.name || row.purchaser_name || row.recipient_name || '',
+                            email: row.email || row.purchaser_email || row.recipient_email || '',
+                            phone: row.phone || row.mobile || row.purchaser_phone || row.recipient_phone || '',
+                            voucher_code: row.voucher_ref || row.voucher_code || ''
+                        });
+                    }
+                } catch (err) {
+                    console.warn(`Error fetching voucher ${normalizedVoucherId} for bulk SMS:`, err.message);
+                }
+            }
+        }
+
+        const results = await Promise.allSettled(
+            normalizedRecipients.map(async (recipient) => {
+                const voucher = voucherDataMap.get(recipient.voucherId) || {};
+                if (voucher && Object.keys(voucher).length > 0) {
+                    getCustomerPortalLink(voucher);
+                }
+
+                const bodyWithPrompts = voucher && Object.keys(voucher).length > 0
+                    ? replaceSmsPrompts(body, voucher)
+                    : body;
+
+                const msg = await client.messages.create({
+                    ...createParams,
+                    to: recipient.to,
+                    body: bodyWithPrompts
+                });
+
+                await new Promise((resolve) => {
+                    ensureSmsLogsSchema(() => {
+                        const sql = `INSERT INTO sms_logs (booking_id, to_number, body, status, sid, sent_at) VALUES (?, ?, ?, ?, ?, NOW())`;
+                        con.query(sql, [recipient.voucherId, recipient.to, bodyWithPrompts, msg.status || 'queued', msg.sid], (err) => {
+                            if (err) {
+                                console.error('Error logging bulk voucher sms:', err);
+                            }
+                            resolve();
+                        });
+                    });
+                });
+
+                return {
+                    voucherId: recipient.voucherId,
+                    phone: recipient.to,
+                    sid: msg.sid
+                };
+            })
+        );
+
+        const successes = [];
+        const failures = [];
+        results.forEach((result, index) => {
+            const recipient = normalizedRecipients[index];
+            if (result.status === 'fulfilled') {
+                successes.push(result.value);
+            } else {
+                failures.push({
+                    voucherId: recipient?.voucherId || null,
+                    phone: recipient?.to || null,
+                    error: result.reason?.message || 'Unknown error'
+                });
+            }
+        });
+
+        if (successes.length === 0) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to send voucher SMS messages',
+                failures
+            });
+        }
+
+        const partialSuccess = failures.length > 0;
+        return res.json({
+            success: !partialSuccess,
+            partialSuccess,
+            sentCount: successes.length,
+            failedCount: failures.length,
+            failures: partialSuccess ? failures : undefined,
+            message: partialSuccess
+                ? `SMS sent to ${successes.length} vouchers. ${failures.length} failed.`
+                : `SMS sent to ${successes.length} vouchers successfully!`
+        });
+    } catch (error) {
+        console.error('Bulk voucher SMS send error:', error);
         res.status(500).json({
             success: false,
             message: error.message
@@ -39968,9 +40483,10 @@ app.get('/api/bookingSms/:bookingId', (req, res) => {
 // Fetch SMS logs for a voucher (reuses booking_id column to store voucherId)
 app.get('/api/voucherSms/:voucherId', (req, res) => {
     const { voucherId } = req.params;
+    const normalizedVoucherId = normalizeVoucherContextId(voucherId);
     ensureSmsLogsSchema(() => {
         const sql = `SELECT * FROM sms_logs WHERE booking_id = ? ORDER BY sent_at DESC`;
-        con.query(sql, [voucherId], (err, rows) => {
+        con.query(sql, [normalizedVoucherId], (err, rows) => {
             if (err) return res.status(500).json({ success: false, message: err.message });
             res.json({ success: true, data: rows || [] });
         });
