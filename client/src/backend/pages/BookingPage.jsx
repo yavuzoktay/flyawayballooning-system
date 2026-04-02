@@ -814,7 +814,8 @@ const BookingPage = () => {
             phone: String(phone || '').trim(),
             name: name || 'Voucher Recipient',
             contextType: 'voucher',
-            contextId: normalizedVoucherIds.join(',') || primaryVoucherId,
+            contextId: primaryVoucherId,
+            emailLogContextId: primaryVoucherId,
             voucherId: primaryVoucherId,
             voucher_id: primaryVoucherId,
             voucherIds: normalizedVoucherIds,
@@ -3796,9 +3797,15 @@ setBookingDetail(finalVoucherDetail);
         if (entity.contextType === 'voucher') {
             const voucherIds = getVoucherContextIds(entity);
             const voucherContextId =
-                voucherIds.join(',') ||
+                normalizeVoucherContextId(entity.emailLogContextId || voucherIds[0]) ||
                 normalizeVoucherContextId(entity.contextId || entity.voucherId || entity.voucher_id || entity.id);
-            return voucherContextId ? { type: 'voucher', id: voucherContextId } : null;
+            const recipientEmail = String(
+                entity.recipient_email ||
+                entity.purchaser_email ||
+                entity.email ||
+                ''
+            ).trim();
+            return voucherContextId ? { type: 'voucher', id: voucherContextId, recipientEmail } : null;
         }
         if (entity.contextType === 'booking') {
             return { type: 'booking', id: entity.id };
@@ -3815,17 +3822,28 @@ setBookingDetail(finalVoucherDetail);
         try {
             let url = '';
             if (params.type === 'voucher') {
-                url = `/api/voucherEmails/${encodeURIComponent(params.id)}`;
+                url = `/api/voucherEmails/${encodeURIComponent(params.id)}?summary=1&limit=50`;
             } else if (params.type === 'booking') {
-                url = `/api/bookingEmails/${params.id}`;
+                url = `/api/bookingEmails/${params.id}?summary=1&limit=50`;
             } else if (params.type === 'email') {
-                url = `/api/recipientEmails?email=${encodeURIComponent(params.email)}`;
+                url = `/api/recipientEmails?summary=1&limit=50&email=${encodeURIComponent(params.email)}`;
             } else {
                 return;
             }
             const resp = await axios.get(url);
             setEmailLogs(resp.data?.data || []);
         } catch (error) {
+            if (params.type === 'voucher' && params.recipientEmail) {
+                try {
+                    const fallbackResp = await axios.get(
+                        `/api/recipientEmails?summary=1&limit=50&email=${encodeURIComponent(params.recipientEmail)}`
+                    );
+                    setEmailLogs(fallbackResp.data?.data || []);
+                    return;
+                } catch (fallbackError) {
+                    console.error('Error fetching email logs via recipient fallback:', fallbackError);
+                }
+            }
             console.error('Error fetching email logs:', error);
             setEmailLogs([]);
         } finally {

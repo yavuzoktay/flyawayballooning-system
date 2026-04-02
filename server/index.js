@@ -38567,15 +38567,41 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
 // Get email logs for a booking
 app.get('/api/bookingEmails/:bookingId', (req, res) => {
     const { bookingId } = req.params;
+    const isSummary = req.query?.summary === '1';
+    const parsedLimit = Number.parseInt(req.query?.limit, 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 200) : 50;
+    const selectColumns = isSummary
+        ? `
+            id,
+            booking_id,
+            recipient_email,
+            subject,
+            template_type,
+            sent_at,
+            status,
+            message_id,
+            opens,
+            clicks,
+            last_event,
+            last_event_at,
+            context_type,
+            context_id
+        `
+        : '*';
 
     const sql = `
-        SELECT * FROM email_logs 
+        SELECT ${selectColumns} FROM email_logs 
         WHERE (booking_id = ? AND context_type = 'booking')
            OR (context_type = 'booking' AND context_id = ?)
         ORDER BY sent_at DESC
+        ${isSummary ? 'LIMIT ?' : ''}
     `;
 
-    con.query(sql, [bookingId, String(bookingId)], (err, result) => {
+    const queryParams = isSummary
+        ? [bookingId, String(bookingId), limit]
+        : [bookingId, String(bookingId)];
+
+    con.query(sql, queryParams, (err, result) => {
         if (err) {
             console.error('Error fetching email logs:', err);
             return res.status(500).json({
@@ -38596,8 +38622,36 @@ app.get('/api/bookingEmails/:bookingId', (req, res) => {
 app.get('/api/recipientEmails', (req, res) => {
     const { email } = req.query || {};
     if (!email) return res.status(400).json({ success: false, message: 'email is required' });
-    const sql = `SELECT * FROM email_logs WHERE recipient_email = ? ORDER BY sent_at DESC`;
-    con.query(sql, [email], (err, rows) => {
+    const isSummary = req.query?.summary === '1';
+    const parsedLimit = Number.parseInt(req.query?.limit, 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 200) : 50;
+    const selectColumns = isSummary
+        ? `
+            id,
+            booking_id,
+            recipient_email,
+            subject,
+            template_type,
+            sent_at,
+            status,
+            message_id,
+            opens,
+            clicks,
+            last_event,
+            last_event_at,
+            context_type,
+            context_id
+        `
+        : '*';
+    const sql = `
+        SELECT ${selectColumns}
+        FROM email_logs
+        WHERE recipient_email = ?
+        ORDER BY sent_at DESC
+        ${isSummary ? 'LIMIT ?' : ''}
+    `;
+    const queryParams = isSummary ? [email, limit] : [email];
+    con.query(sql, queryParams, (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: err.message });
         res.json({ success: true, data: rows || [] });
     });
@@ -38609,6 +38663,9 @@ app.get('/api/voucherEmails/:contextId', (req, res) => {
     if (!contextId) {
         return res.status(400).json({ success: false, message: 'contextId is required' });
     }
+    const isSummary = req.query?.summary === '1';
+    const parsedLimit = Number.parseInt(req.query?.limit, 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 200) : 50;
 
     const normalizedContextIds = Array.from(
         new Set(
@@ -38627,12 +38684,32 @@ app.get('/api/voucherEmails/:contextId', (req, res) => {
         normalizedContextIds.flatMap((value) => [value, `voucher-${value}`])
     ));
     const placeholders = lookupContextIds.map(() => '?').join(',');
+    const selectColumns = isSummary
+        ? `
+            id,
+            booking_id,
+            recipient_email,
+            subject,
+            template_type,
+            sent_at,
+            status,
+            message_id,
+            opens,
+            clicks,
+            last_event,
+            last_event_at,
+            context_type,
+            context_id
+        `
+        : '*';
     const sql = `
-        SELECT * FROM email_logs
+        SELECT ${selectColumns} FROM email_logs
         WHERE context_type = 'voucher' AND context_id IN (${placeholders})
         ORDER BY sent_at DESC
+        ${isSummary ? 'LIMIT ?' : ''}
     `;
-    con.query(sql, lookupContextIds, (err, rows) => {
+    const queryParams = isSummary ? [...lookupContextIds, limit] : lookupContextIds;
+    con.query(sql, queryParams, (err, rows) => {
         if (err) {
             console.error('Error fetching voucher email logs:', err);
             return res.status(500).json({ success: false, message: err.message });
