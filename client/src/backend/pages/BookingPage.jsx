@@ -44,6 +44,54 @@ const isShortNoticeQuestion = (value = '') =>
 const isShortNoticeOptOutAnswer = (value = '') =>
     value.toString().trim().toLowerCase() === 'no';
 
+const normalizeExportColumnName = (value = '') =>
+    value
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[_\s]+/g, ' ')
+        .replace(/[^a-z0-9 ]/g, '')
+        .replace(/\s+/g, ' ');
+
+const EXPORT_COLUMN_EXCLUSIONS = new Set([
+    'manual status override',
+    'hear about us',
+    'ballooning reason',
+    'prefer',
+    'preferred location',
+    'preferred time',
+    'preferred day',
+    'voucher type detail',
+    'additional info json',
+    'additional information json',
+    'additional info',
+    'additional information',
+    'stripe session id',
+    'user session id',
+    'resources',
+    'google cal event id',
+    'passenger name'
+].map(normalizeExportColumnName));
+
+const shouldExcludeExportColumn = (columnName = '') => {
+    const normalizedColumn = normalizeExportColumnName(columnName);
+
+    if (!normalizedColumn) {
+        return false;
+    }
+
+    if (EXPORT_COLUMN_EXCLUSIONS.has(normalizedColumn)) {
+        return true;
+    }
+
+    return (
+        normalizedColumn.endsWith('additional info json') ||
+        normalizedColumn.endsWith('additional information json') ||
+        normalizedColumn.endsWith('additional info') ||
+        normalizedColumn.endsWith('additional information')
+    );
+};
+
 const getShortNoticeAvailabilityOptOut = (item) => {
     const parsedAdditionalInfoJson = parseAdditionalInfoJson(item?.additional_information_json);
     const parsedBookingAdditionalInfoJson = parseAdditionalInfoJson(item?.booking_additional_information_json);
@@ -3647,8 +3695,14 @@ setBookingDetail(finalVoucherDetail);
             alert('Export edilecek veri yok!');
             return;
         }
-        // Tüm kolonları otomatik al
-        const columns = Object.keys(filteredData[0]);
+        // Export output should omit internal/sensitive columns while preserving the existing order.
+        const columns = Object.keys(filteredData[0]).filter(column => !shouldExcludeExportColumn(column));
+
+        if (!columns.length) {
+            alert('Export edilecek uygun kolon bulunamadı!');
+            return;
+        }
+
         const csvRows = [columns.join(",")];
         filteredData.forEach(row => {
             const values = columns.map(col => {
