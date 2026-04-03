@@ -207,5 +207,38 @@ export const buildPreservedAdditionalInfoPayload = ({
         payload.prefer = prefer;
     }
 
+    const shortNoticeOptOut = getFirstMeaningfulValue(
+        explicitJson?.shortNoticeAvailabilityOptOut,
+        explicitJson?.short_notice_opt_out,
+        bookingJson?.shortNoticeAvailabilityOptOut,
+        bookingJson?.short_notice_opt_out,
+        additionalJson?.shortNoticeAvailabilityOptOut,
+        additionalJson?.short_notice_opt_out,
+        voucherJson?.shortNoticeAvailabilityOptOut,
+        voucherJson?.short_notice_opt_out,
+        additionalInformation?.shortNoticeAvailabilityOptOut,
+        additionalInformation?.short_notice_opt_out,
+        booking?.shortNoticeAvailabilityOptOut,
+        booking?.short_notice_opt_out,
+        voucher?.shortNoticeAvailabilityOptOut,
+        voucher?.short_notice_opt_out
+    );
+    if (typeof shortNoticeOptOut === 'boolean') {
+        payload.shortNoticeAvailabilityOptOut = shortNoticeOptOut;
+    }
+
+    const manualBookingProfile = normalizePreferValue(
+        explicitJson?.manual_booking_profile,
+        bookingJson?.manual_booking_profile,
+        additionalJson?.manual_booking_profile,
+        voucherJson?.manual_booking_profile,
+        additionalInformation?.manual_booking_profile,
+        booking?.manual_booking_profile,
+        voucher?.manual_booking_profile
+    );
+    if (manualBookingProfile !== null) {
+        payload.manual_booking_profile = manualBookingProfile;
+    }
+
     return payload;
 };

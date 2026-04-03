@@ -1,8 +1,7 @@
-import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import { Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from "@mui/material";
 import React, { useState, useEffect } from "react";
 import ModeEditOutlineOutlinedIcon from '@mui/icons-material/ModeEditOutlineOutlined';
-import {Link, useNavigate} from 'react-router-dom';
-import Button from '@mui/material/Button';
+import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -10,8 +9,6 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
-import dayjs from 'dayjs';
-import EditIcon from '@mui/icons-material/EditOutlined';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHighOutlined';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Checkbox, FormControlLabel, FormGroup, Switch } from '@mui/material';
@@ -141,6 +138,161 @@ const sanitizeActivityFormForSubmit = (formState = {}) => {
     return sanitized;
 };
 
+const DIALOG_TONE_MAP = {
+    neutral: {
+        background: 'linear-gradient(180deg, #ffffff 0%, #f9fbff 100%)',
+        border: 'rgba(203, 213, 225, 0.65)',
+        title: '#334155',
+        description: '#7c8798',
+        iconBackground: '#eef4ff',
+        iconColor: '#355fa8',
+        helperBackground: '#ffffff',
+        helperBorder: 'rgba(203, 213, 225, 0.72)',
+        helperText: '#7c8798',
+        divider: 'linear-gradient(90deg, #2563eb 0%, rgba(37, 99, 235, 0.08) 100%)'
+    },
+    info: {
+        background: 'linear-gradient(180deg, #edf6ff 0%, #e3f0ff 100%)',
+        border: 'rgba(96, 165, 250, 0.34)',
+        title: '#2563eb',
+        description: '#6a97d8',
+        iconBackground: '#ffffff',
+        iconColor: '#2563eb',
+        helperBackground: 'rgba(255,255,255,0.82)',
+        helperBorder: 'rgba(96, 165, 250, 0.24)',
+        helperText: '#5d86c4',
+        divider: 'linear-gradient(90deg, #2563eb 0%, rgba(37, 99, 235, 0.08) 100%)'
+    },
+    warm: {
+        background: 'linear-gradient(180deg, #fff9ea 0%, #fff2cf 100%)',
+        border: 'rgba(245, 158, 11, 0.30)',
+        title: '#a16207',
+        description: '#b7842a',
+        iconBackground: '#ffffff',
+        iconColor: '#b45309',
+        helperBackground: 'rgba(255,255,255,0.9)',
+        helperBorder: 'rgba(245, 158, 11, 0.22)',
+        helperText: '#9a7421',
+        divider: 'linear-gradient(90deg, #f59e0b 0%, rgba(245, 158, 11, 0.08) 100%)'
+    },
+    success: {
+        background: 'linear-gradient(180deg, #eefbf3 0%, #e2f7e8 100%)',
+        border: 'rgba(16, 185, 129, 0.28)',
+        title: '#15803d',
+        description: '#4d8b65',
+        iconBackground: '#ffffff',
+        iconColor: '#15803d',
+        helperBackground: 'rgba(255,255,255,0.88)',
+        helperBorder: 'rgba(16, 185, 129, 0.20)',
+        helperText: '#5b7f68',
+        divider: 'linear-gradient(90deg, #16a34a 0%, rgba(22, 163, 74, 0.08) 100%)'
+    },
+    rose: {
+        background: 'linear-gradient(180deg, #fff4f7 0%, #fee8ef 100%)',
+        border: 'rgba(244, 114, 182, 0.26)',
+        title: '#be185d',
+        description: '#b05e7f',
+        iconBackground: '#ffffff',
+        iconColor: '#be185d',
+        helperBackground: 'rgba(255,255,255,0.9)',
+        helperBorder: 'rgba(244, 114, 182, 0.22)',
+        helperText: '#8f5a70',
+        divider: 'linear-gradient(90deg, #ec4899 0%, rgba(236, 72, 153, 0.08) 100%)'
+    }
+};
+
+const ACTIVITY_FONT_WEIGHTS = {
+    pageTitle: 700,
+    sectionTitle: 700,
+    tableHeader: 700,
+    chip: 700,
+    primaryButton: 700,
+    actionButton: 600,
+    rowTitle: 700,
+    label: 600,
+    subtleLabel: 500,
+    dialogTitle: 700
+};
+
+const ActivityDialogSection = ({ tone = 'neutral', icon, title, description, helper, divider = false, children }) => {
+    const palette = DIALOG_TONE_MAP[tone] || DIALOG_TONE_MAP.neutral;
+
+    return (
+        <Box
+            sx={{
+                mb: 2.5,
+                px: { xs: 2, md: 2.25 },
+                py: { xs: 2, md: 2.35 },
+                borderRadius: '20px',
+                background: palette.background,
+                border: `1px solid ${palette.border}`,
+                boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)'
+            }}
+        >
+            <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ mb: description || divider || helper ? 1.75 : 0.5 }}>
+                <Box
+                    sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '14px',
+                        bgcolor: palette.iconBackground,
+                        color: palette.iconColor,
+                        border: `1px solid ${palette.border}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '18px',
+                        boxShadow: '0 8px 18px rgba(15, 23, 42, 0.05)'
+                    }}
+                >
+                    {icon}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: '16px', fontWeight: ACTIVITY_FONT_WEIGHTS.sectionTitle, color: palette.title, mb: 0.5 }}>
+                        {title}
+                    </Typography>
+                    {description ? (
+                        <Typography sx={{ fontSize: '13px', color: palette.description, fontStyle: 'italic', lineHeight: 1.45 }}>
+                            {description}
+                        </Typography>
+                    ) : null}
+                </Box>
+            </Stack>
+
+            {divider ? (
+                <Box sx={{ height: 3, borderRadius: 999, background: palette.divider, mb: 2 }} />
+            ) : null}
+
+            {helper ? (
+                <Box
+                    sx={{
+                        mb: 2,
+                        px: 1.5,
+                        py: 1.25,
+                        borderRadius: '14px',
+                        background: palette.helperBackground,
+                        border: `1px solid ${palette.helperBorder}`
+                    }}
+                >
+                    <Typography sx={{ fontSize: '13px', color: palette.helperText, fontStyle: 'italic', lineHeight: 1.5 }}>
+                        {helper}
+                    </Typography>
+                </Box>
+            ) : null}
+
+            <Box
+                sx={{
+                    '& .MuiTextField-root': { mb: 1.5 },
+                    '& .MuiFormGroup-root': { mt: 0.25 },
+                    '& .MuiFormControlLabel-root': { mr: 2.5, my: 0.25 }
+                }}
+            >
+                {children}
+            </Box>
+        </Box>
+    );
+};
+
 const ActivityList = ({ activity, setActivity }) => {
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState({
@@ -166,7 +318,6 @@ const ActivityList = ({ activity, setActivity }) => {
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState({
         private_charter_pricing: {},
@@ -245,11 +396,10 @@ const ActivityList = ({ activity, setActivity }) => {
             status: 'Live'
         });
         setError('');
-        setSuccess(false);
     };
     // Update price field label based on flight type
     const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value, checked } = e.target;
         if (name === 'flight_type') {
             let newTypes = [...form.flight_type];
             if (checked) {
@@ -324,7 +474,6 @@ const ActivityList = ({ activity, setActivity }) => {
     const handleSave = async () => {
         setSaving(true);
         setError('');
-        setSuccess(false);
         try {
             const formData = new FormData();
             const sanitizedForm = sanitizeActivityFormForSubmit(form);
@@ -345,7 +494,6 @@ const ActivityList = ({ activity, setActivity }) => {
             });
             const data = await res.json();
             if (data.success) {
-                setSuccess(true);
                 handleClose();
                 window.location.reload();
             } else {
@@ -383,7 +531,7 @@ const ActivityList = ({ activity, setActivity }) => {
     };
     // Update edit price field label based on flight type
     const handleEditChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value, checked } = e.target;
         if (name === 'flight_type') {
             let newTypes = Array.isArray(editForm.flight_type) ? [...editForm.flight_type] : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',') : []);
             if (checked) {
@@ -534,11 +682,6 @@ const ActivityList = ({ activity, setActivity }) => {
         }
     };
     
-    const handleOpenAvailModal = (activity) => {
-        setAvailActivity(activity);
-        setAvailModalOpen(true);
-    };
-
     const handleActivityDragStart = (e, id) => {
         e.dataTransfer.setData('text/plain', String(id));
         e.dataTransfer.effectAllowed = 'move';
@@ -604,79 +747,254 @@ const ActivityList = ({ activity, setActivity }) => {
         }
     };
 
+    const pageActionButtonSx = {
+        height: 44,
+        px: 2.5,
+        borderRadius: '12px',
+        textTransform: 'uppercase',
+        fontSize: '12px',
+        fontWeight: ACTIVITY_FONT_WEIGHTS.primaryButton,
+        letterSpacing: '0.06em',
+        boxShadow: '0 16px 30px rgba(37, 99, 235, 0.22)'
+    };
+
+    const actionButtonSx = {
+        minWidth: 0,
+        borderRadius: '12px',
+        px: 1.5,
+        py: 0.9,
+        fontWeight: ACTIVITY_FONT_WEIGHTS.actionButton,
+        textTransform: 'none',
+        boxShadow: 'none',
+        whiteSpace: 'nowrap'
+    };
+
+    const activityDialogSx = {
+        '& .MuiDialog-paper': {
+            width: '100%',
+            borderRadius: '28px',
+            overflow: 'hidden',
+            background: 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
+            border: '1px solid rgba(203, 213, 225, 0.8)',
+            boxShadow: '0 35px 90px rgba(15, 23, 42, 0.22)'
+        },
+        '& .MuiOutlinedInput-root': {
+            borderRadius: '14px',
+            backgroundColor: '#ffffff',
+            transition: 'all 0.2s ease',
+            '& fieldset': {
+                borderColor: '#d5dfeb'
+            },
+            '&:hover fieldset': {
+                borderColor: '#9eb4d1'
+            },
+            '&.Mui-focused fieldset': {
+                borderColor: '#2563eb',
+                boxShadow: '0 0 0 4px rgba(37, 99, 235, 0.08)'
+            }
+        },
+        '& .MuiInputLabel-root': {
+            color: '#64748b',
+            fontWeight: 600
+        },
+        '& .MuiInputBase-input': {
+            fontWeight: 500
+        },
+        '& .MuiFormControlLabel-label': {
+            color: '#334155',
+            fontWeight: 600
+        },
+        '& .MuiCheckbox-root.Mui-checked': {
+            color: '#2563eb'
+        },
+        '& .MuiSwitch-switchBase.Mui-checked': {
+            color: '#2563eb'
+        },
+        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+            backgroundColor: '#60a5fa'
+        }
+    };
+
+    const dialogTitleSx = {
+        px: { xs: 2.5, md: 3.5 },
+        pt: { xs: 2.5, md: 3.25 },
+        pb: 2,
+        borderBottom: '1px solid rgba(226, 232, 240, 0.9)',
+        background: 'linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(255,255,255,0.95) 100%)'
+    };
+
+    const dialogContentSx = {
+        px: { xs: 2.5, md: 3 },
+        py: { xs: 2.5, md: 3 },
+        background: 'transparent'
+    };
+
+    const dialogActionsSx = {
+        px: { xs: 2.5, md: 3.5 },
+        py: 2.5,
+        gap: 1.25,
+        borderTop: '1px solid rgba(226, 232, 240, 0.95)',
+        background: '#ffffff'
+    };
+
+    const dialogSecondaryButtonSx = {
+        minWidth: 110,
+        height: 44,
+        borderRadius: '14px',
+        px: 2.5,
+        color: '#64748b',
+        fontWeight: ACTIVITY_FONT_WEIGHTS.primaryButton,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        '&:hover': {
+            backgroundColor: '#eef2f7'
+        }
+    };
+
+    const dialogPrimaryButtonSx = {
+        minWidth: 118,
+        height: 44,
+        borderRadius: '14px',
+        px: 2.75,
+        fontWeight: ACTIVITY_FONT_WEIGHTS.primaryButton,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        background: 'linear-gradient(135deg, #004ac6 0%, #2563eb 100%)',
+        boxShadow: '0 16px 28px rgba(37, 99, 235, 0.22)',
+        '&:hover': {
+            background: 'linear-gradient(135deg, #003a9d 0%, #1d4ed8 100%)'
+        }
+    };
+
+    const dialogDangerButtonSx = {
+        minWidth: 120,
+        height: 44,
+        borderRadius: '14px',
+        px: 2.5,
+        fontWeight: ACTIVITY_FONT_WEIGHTS.primaryButton,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        borderColor: 'rgba(225, 29, 72, 0.24)',
+        color: '#be123c',
+        backgroundColor: '#fff1f2',
+        '&:hover': {
+            borderColor: 'rgba(225, 29, 72, 0.35)',
+            backgroundColor: '#ffe4e6'
+        }
+    };
+
+    const getStatusChipSx = (status) => {
+        const normalizedStatus = String(status || 'Live').toLowerCase();
+
+        if (normalizedStatus === 'draft') {
+            return {
+                bgcolor: '#fff7ed',
+                color: '#c2410c',
+                border: '1px solid rgba(251, 146, 60, 0.28)'
+            };
+        }
+
+        if (normalizedStatus === 'closed') {
+            return {
+                bgcolor: '#fef2f2',
+                color: '#b91c1c',
+                border: '1px solid rgba(248, 113, 113, 0.25)'
+            };
+        }
+
+        return {
+            bgcolor: '#ecfdf3',
+            color: '#047857',
+            border: '1px solid rgba(16, 185, 129, 0.24)'
+        };
+    };
+
     return (
         <div className="activity-list-wrap">
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16 }} className="activity-create-button-wrap">
-                <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ backgroundColor: '#1976d2', color: 'white' }}>
-                    CREATE
-                </Button>
-            </div>
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: { xs: 'flex-start', md: 'center' },
+                    flexDirection: { xs: 'column', md: 'row' },
+                    gap: 2,
+                    mb: 3
+                }}
+                className="activity-create-button-wrap"
+            >
+                <Box>
+                    <Typography
+                        sx={{
+                            fontSize: { xs: '20px', md: '24px' },
+                            fontWeight: ACTIVITY_FONT_WEIGHTS.pageTitle,
+                            letterSpacing: '-0.03em',
+                            color: '#0f172a',
+                            mb: 0.5
+                        }}
+                    >
+                        Live Activity Setup
+                    </Typography>
+                    <Typography sx={{ color: '#64748b', fontSize: '14px' }}>
+                        Review your activity rows, update pricing flows and jump into availability setup from a cleaner control table.
+                    </Typography>
+                </Box>
+                <Stack direction="row" spacing={1.25} alignItems="center">
+                    <Chip
+                        label={`${rows.length} activities`}
+                        sx={{
+                            height: 34,
+                            fontWeight: ACTIVITY_FONT_WEIGHTS.label,
+                            bgcolor: '#e8f0ff',
+                            color: '#2450a6',
+                            borderRadius: '999px'
+                        }}
+                    />
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={handleOpen}
+                        sx={{
+                            ...pageActionButtonSx,
+                            background: 'linear-gradient(135deg, #004ac6 0%, #2563eb 100%)',
+                            '&:hover': {
+                                background: 'linear-gradient(135deg, #003a9d 0%, #1d4ed8 100%)'
+                            }
+                        }}
+                    >
+                        Create
+                    </Button>
+                </Stack>
+            </Box>
             
             {/* Create Activity Dialog */}
-            <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-                <DialogTitle>Create Activity</DialogTitle>
-                <DialogContent>
-                    <div style={{ 
-                        marginBottom: 20, 
-                        padding: '16px', 
-                        backgroundColor: '#f8f9fa', 
-                        borderRadius: '8px', 
-                        border: '1px solid #dee2e6' 
-                    }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
-                            color: '#495057',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>📋</span>
-                            Basic Information
-                        </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#6c757d', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
-                        }}>
-                            General activity details and configuration
-                        </div>
+            <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth sx={activityDialogSx}>
+                <DialogTitle sx={dialogTitleSx}>
+                    <Typography sx={{ fontSize: { xs: '24px', md: '28px' }, fontWeight: ACTIVITY_FONT_WEIGHTS.dialogTitle, letterSpacing: '-0.04em', color: '#0f172a', mb: 0.5 }}>
+                        Create Activity
+                    </Typography>
+                    <Typography sx={{ color: '#64748b', fontSize: '14px', maxWidth: '520px' }}>
+                        Add a new location, configure pricing and prepare the activity for live availability in one polished flow.
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={dialogContentSx}>
+                    <ActivityDialogSection
+                        tone="neutral"
+                        icon="📋"
+                        title="Basic Information"
+                        description="General activity details and configuration"
+                    >
                         <TextField margin="dense" label="Activity Name" name="activity_name" value={form.activity_name} onChange={handleChange} fullWidth required />
                         <TextField margin="dense" label="Capacity" name="capacity" value={form.capacity} onChange={handleChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Location" name="location" value={form.location} onChange={handleChange} fullWidth required />
-                    </div>
-                    
-                    <div style={{ 
-                        marginTop: 20, 
-                        marginBottom: 16, 
-                        padding: '16px', 
-                        backgroundColor: '#e3f2fd', 
-                        borderRadius: '8px', 
-                        border: '1px solid #bbdefb' 
-                    }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
-                            color: '#1565c0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>🛩️</span>
-                            Flight Type
-                        </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#1565c0', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
-                        }}>
-                            Select which types of flights this activity supports
-                        </div>
-                        <FormGroup row sx={{ mb: 0, mt: 1 }}>
+                    </ActivityDialogSection>
+
+                    <ActivityDialogSection
+                        tone="info"
+                        icon="🛩️"
+                        title="Flight Type"
+                        description="Select which types of flights this activity supports"
+                    >
+                        <FormGroup row sx={{ mb: 0 }}>
                             <FormControlLabel
                                 control={<Checkbox checked={form.flight_type.includes('Private')} onChange={handleChange} name="flight_type" value="Private" />}
                                 label="Private"
@@ -686,51 +1004,25 @@ const ActivityList = ({ activity, setActivity }) => {
                                 label="Shared"
                             />
                         </FormGroup>
-                    </div>
-                    
-                    {/* Experience: Shared Flight Section */}
-                    <div style={{ 
-                        marginTop: 24, 
-                        marginBottom: 16, 
-                        padding: '20px', 
-                        backgroundColor: '#f8f9fa', 
-                        borderRadius: '12px', 
-                        border: '2px solid #e9ecef',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                    }}>
-                        <div style={{ 
-                            marginBottom: 20, 
-                            fontWeight: 700, 
-                            fontSize: '18px', 
-                            color: '#1976d2',
-                            borderBottom: '3px solid #1976d2',
-                            paddingBottom: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '20px' }}>✈️</span>
-                            Experience: Shared Flight
-                        </div>
-                        <div style={{ 
-                            fontSize: '14px', 
-                            color: '#666', 
-                            marginBottom: '20px', 
-                            fontStyle: 'italic',
-                            padding: '12px',
-                            backgroundColor: '#fff',
-                            borderRadius: '8px',
-                            border: '1px solid #dee2e6'
-                        }}>
-                            ℹ️ These fields are specifically for Shared Flight experiences only. They control pricing and voucher options for shared balloon flights.
-                        </div>
-                        
-                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
+                    </ActivityDialogSection>
+
+                    <ActivityDialogSection
+                        tone="neutral"
+                        icon="✈️"
+                        title="Experience: Shared Flight"
+                        helper="These fields are specifically for Shared Flight experiences only. They control pricing and voucher options for shared balloon flights."
+                        divider
+                    >
+                        <Typography sx={{ mt: 0.5, mb: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            From Price
+                        </Typography>
                         <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={form.shared_flight_from_price} onChange={handleChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Shared Flight Sale Price" name="shared_flight_from_sale_price" value={form.shared_flight_from_sale_price} onChange={handleChange} type="number" fullWidth />
-                        
-                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
-                        <FormGroup row sx={{ mb: 2, mt: 1 }}>
+
+                        <Typography sx={{ mt: 1, mb: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Voucher Type
+                        </Typography>
+                        <FormGroup row sx={{ mb: 1 }}>
                             <FormControlLabel
                                 control={<Checkbox checked={form.voucher_type.includes('Weekday Morning')} onChange={handleChange} name="voucher_type" value="Weekday Morning" />}
                                 label="Weekday Morning"
@@ -743,136 +1035,93 @@ const ActivityList = ({ activity, setActivity }) => {
                                 control={<Checkbox checked={form.voucher_type.includes('Any Day Flight')} onChange={handleChange} name="voucher_type" value="Any Day Flight" />}
                                 label="Any Day Flight"
                             />
-                        </FormGroup> 
-                        
-                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
+                        </FormGroup>
+
+                        <Typography sx={{ mt: 1, mb: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Per Person Pricing
+                        </Typography>
                         <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={form.weekday_morning_price} onChange={handleChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Weekday Morning Sale Price" name="weekday_morning_sale_price" value={form.weekday_morning_sale_price} onChange={handleChange} type="number" fullWidth />
                         <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={form.flexible_weekday_price} onChange={handleChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Flexible Weekday Sale Price" name="flexible_weekday_sale_price" value={form.flexible_weekday_sale_price} onChange={handleChange} type="number" fullWidth />
                         <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={form.any_day_flight_price} onChange={handleChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Any Day Flight Sale Price" name="any_day_flight_sale_price" value={form.any_day_flight_sale_price} onChange={handleChange} type="number" fullWidth />
-                    </div>
-                    
-                    {/* Private Charter From Price - Separate section */}
-                    <div style={{ 
-                        marginTop: 24, 
-                        marginBottom: 16, 
-                        padding: '16px', 
-                        backgroundColor: '#fff3cd', 
-                        borderRadius: '8px', 
-                        border: '1px solid #ffeaa7' 
-                    }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
-                            color: '#856404',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>🎈</span>
-                            Private Charter From Price
-                        </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#856404', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
-                        }}>
-                            This field is for Private Charter experiences only
-                        </div>
+                    </ActivityDialogSection>
+
+                    <ActivityDialogSection
+                        tone="warm"
+                        icon="🎈"
+                        title="Private Charter From Price"
+                        description="This field is for Private Charter experiences only"
+                    >
                         <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={form.private_charter_from_price} onChange={handleChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Private Charter From Sale Price" name="private_charter_from_sale_price" value={form.private_charter_from_sale_price} onChange={handleChange} type="number" fullWidth />
-                    </div>
+                    </ActivityDialogSection>
 
-                    {/* Private Charter Voucher Types Section */}
-                    <div style={{ 
-                        marginTop: 24, 
-                        marginBottom: 16, 
-                        padding: '20px', 
-                        backgroundColor: '#fff3cd', 
-                        borderRadius: '12px', 
-                        border: '2px solid #ffeaa7',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                    }}>
-                        <div style={{ 
-                            marginBottom: 20, 
-                            fontWeight: 700, 
-                            fontSize: '18px', 
-                            color: '#856404',
-                            borderBottom: '3px solid #f39c12',
-                            paddingBottom: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '20px' }}>🎫</span>
-                            Private Charter Voucher Types
-                        </div>
-                        <div style={{ 
-                            fontSize: '14px', 
-                            color: '#856404', 
-                            marginBottom: '20px', 
-                            fontStyle: 'italic',
-                            padding: '12px',
-                            backgroundColor: '#fff',
-                            borderRadius: '8px',
-                            border: '1px solid #ffeaa7'
-                        }}>
-                            ℹ️ Select which private charter voucher types this activity supports. These options come from the Private Charter Voucher Types settings.
-                        </div>
-                        
+                    <ActivityDialogSection
+                        tone="warm"
+                        icon="🎫"
+                        title="Private Charter Voucher Types"
+                        helper="Select which private charter voucher types this activity supports. These options come from the Private Charter Voucher Types settings."
+                        divider
+                    >
                         {privateCharterVoucherTypesLoading ? (
-                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404' }}>
+                            <Typography sx={{ textAlign: 'center', py: 2.5, color: '#9a7421', fontStyle: 'italic' }}>
                                 Loading voucher types...
-                            </div>
+                            </Typography>
                         ) : privateCharterVoucherTypes.length > 0 ? (
                             <>
-                                <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                                <FormGroup row sx={{ mb: 1 }}>
                                     {privateCharterVoucherTypes.map((voucherType) => (
                                         <FormControlLabel
                                             key={voucherType.id}
                                             control={
-                                                <Checkbox 
-                                                    checked={isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)} 
-                                                    onChange={handleChange} 
-                                                    name="private_charter_voucher_types" 
-                                                    value={voucherType.id.toString()} 
+                                                <Checkbox
+                                                    checked={isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)}
+                                                    onChange={handleChange}
+                                                    name="private_charter_voucher_types"
+                                                    value={voucherType.id.toString()}
                                                 />
                                             }
                                             label={voucherType.title}
                                         />
                                     ))}
                                 </FormGroup>
-                                
-                                {/* Individual Pricing Fields */}
-                                <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #ffeaa7' }}>
-                                    <div style={{ marginBottom: '16px', fontWeight: '600', color: '#856404' }}>
+
+                                <Box
+                                    sx={{
+                                        mt: 2,
+                                        p: 2,
+                                        backgroundColor: 'rgba(255,255,255,0.92)',
+                                        borderRadius: '16px',
+                                        border: '1px solid rgba(245, 158, 11, 0.18)'
+                                    }}
+                                >
+                                    <Typography sx={{ mb: 1.5, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#9a7421', fontSize: '14px' }}>
                                         Group Pricing for Selected Voucher Types
-                                    </div>
-                                    {/* Passenger tier selector */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                                        <label style={{ color: '#856404', fontWeight: 500 }}>Passengers</label>
-                                        <TextField select size="small" value={groupPassengerTier} onChange={(e) => setGroupPassengerTier(Number(e.target.value))} style={{ width: 180 }}>
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
+                                        <Typography sx={{ color: '#9a7421', fontWeight: ACTIVITY_FONT_WEIGHTS.label, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                            Passengers
+                                        </Typography>
+                                        <TextField select size="small" value={groupPassengerTier} onChange={(e) => setGroupPassengerTier(Number(e.target.value))} sx={{ width: 200 }}>
                                             <MenuItem value={2}>2 passengers</MenuItem>
                                             <MenuItem value={3}>3 passengers</MenuItem>
                                             <MenuItem value={4}>4 passengers</MenuItem>
                                             <MenuItem value={8}>8 passengers</MenuItem>
                                         </TextField>
-                                    </div>
+                                    </Box>
                                     {privateCharterVoucherTypes.map((voucherType) => (
-                                        <div key={voucherType.id} style={{ marginBottom: '12px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <Checkbox 
-                                                    checked={isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)} 
+                                        <Box key={voucherType.id} sx={{ mb: 1.25 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                                                <Checkbox
+                                                    checked={isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)}
                                                     disabled
-                                                    style={{ color: '#856404' }}
+                                                    sx={{ color: '#9a7421' }}
                                                 />
-                                                <label style={{ fontWeight: '500', color: '#856404', minWidth: '200px' }}>
+                                                <Typography sx={{ fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#8a6518', minWidth: 210 }}>
                                                     Group Pricing: {voucherType.title}
-                                                </label>
+                                                </Typography>
                                                 <TextField
                                                     size="small"
                                                     type="number"
@@ -882,10 +1131,10 @@ const ActivityList = ({ activity, setActivity }) => {
                                                     placeholder="Original"
                                                     min="0"
                                                     step="0.01"
-                                                    style={{ width: '120px' }}
+                                                    sx={{ width: 132, mb: '0 !important' }}
                                                     disabled={!isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)}
                                                 />
-                                                <span style={{ color: '#856404', fontSize: '14px' }}>£</span>
+                                                <Typography sx={{ color: '#8a6518', fontSize: '14px', fontWeight: ACTIVITY_FONT_WEIGHTS.label }}>£</Typography>
                                                 <TextField
                                                     size="small"
                                                     type="number"
@@ -895,103 +1144,134 @@ const ActivityList = ({ activity, setActivity }) => {
                                                     placeholder="Sale"
                                                     min="0"
                                                     step="0.01"
-                                                    style={{ width: '120px' }}
+                                                    sx={{ width: 132, mb: '0 !important' }}
                                                     disabled={!isSelectedPrivateVoucherType(form.private_charter_voucher_types, voucherType.id)}
                                                 />
-                                                <span style={{ color: '#856404', fontSize: '14px' }}>£ sale</span>
-                                            </div>
-                                        </div>
+                                                <Typography sx={{ color: '#8a6518', fontSize: '14px', fontWeight: ACTIVITY_FONT_WEIGHTS.label }}>£ sale</Typography>
+                                            </Box>
+                                        </Box>
                                     ))}
-                                </div>
+                                </Box>
                             </>
                         ) : (
-                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404', fontStyle: 'italic' }}>
+                            <Typography sx={{ textAlign: 'center', py: 2.5, color: '#9a7421', fontStyle: 'italic' }}>
                                 No private charter voucher types available. Please create some in the settings first.
-                            </div>
+                            </Typography>
                         )}
-                    </div>
-                    
-                    <div style={{ 
-                        marginTop: 20, 
-                        marginBottom: 16, 
-                        padding: '16px', 
-                        backgroundColor: '#e8f5e8', 
-                        borderRadius: '8px', 
-                        border: '1px solid #c8e6c9' 
-                    }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
-                            color: '#2e7d32',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>✅</span>
-                            Status & Configuration
-                        </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#2e7d32', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
-                        }}>
-                            Set the activity status and upload any images
-                        </div>
-                        
-                        {/* Sync Pricing Button for Create Form */}
-                        {form.private_charter_pricing && Object.keys(form.private_charter_pricing).length > 0 && (
-                            <div style={{ marginBottom: '16px' }}>
-                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontStyle: 'italic' }}>
-                                    💡 After saving the activity, you can sync the group pricing to voucher types using the edit form
-                                </div>
-                            </div>
-                        )}
-                        
+                    </ActivityDialogSection>
+
+                    <ActivityDialogSection
+                        tone="success"
+                        icon="✅"
+                        title="Status & Configuration"
+                        description="Set the activity status and upload any images"
+                    >
+                        {form.private_charter_pricing && Object.keys(form.private_charter_pricing).length > 0 ? (
+                            <Box sx={{ mb: 2, px: 1.5, py: 1.25, borderRadius: '14px', border: '1px solid rgba(16, 185, 129, 0.18)', bgcolor: 'rgba(255,255,255,0.82)' }}>
+                                <Typography sx={{ fontSize: '13px', color: '#5b7f68', fontStyle: 'italic' }}>
+                                    After saving the activity, you can sync the group pricing to voucher types from the edit form.
+                                </Typography>
+                            </Box>
+                        ) : null}
+
                         <TextField margin="dense" label="Status" name="status" value={form.status} onChange={handleChange} select fullWidth required>
                             <MenuItem value="Live">Live</MenuItem>
                             <MenuItem value="Draft">Draft</MenuItem>
                             <MenuItem value="Closed">Closed</MenuItem>
                         </TextField>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange}
-                            style={{ marginTop: '16px' }}
-                        />
-                        {imagePreview && (
-                            <img
-                                src={imagePreview}
-                                alt="Preview"
-                                style={{ width: '100px', height: '100px', objectFit: 'cover', marginTop: '8px', borderRadius: '4px' }}
+                        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageChange}
+                                style={{ marginTop: '8px' }}
                             />
-                        )}
-                    </div>
-                    {error && <div style={{ color: 'red', marginTop: 8 }}>{error}</div>}
+                            {imagePreview ? (
+                                <Box
+                                    component="img"
+                                    src={imagePreview}
+                                    alt="Preview"
+                                    sx={{
+                                        width: 120,
+                                        height: 120,
+                                        objectFit: 'cover',
+                                        borderRadius: '18px',
+                                        border: '1px solid rgba(148, 163, 184, 0.28)',
+                                        boxShadow: '0 12px 24px rgba(15, 23, 42, 0.10)'
+                                    }}
+                                />
+                            ) : null}
+                        </Box>
+                    </ActivityDialogSection>
+
+                    {error ? (
+                        <Box sx={{ color: '#b91c1c', mt: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, fontSize: '14px' }}>
+                            {error}
+                        </Box>
+                    ) : null}
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClose} disabled={saving}>Cancel</Button>
-                    <Button onClick={handleSave} variant="contained" color="primary" disabled={saving}>Save</Button>
+                <DialogActions sx={dialogActionsSx}>
+                    <Button onClick={handleClose} disabled={saving} sx={dialogSecondaryButtonSx}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSave} variant="contained" disabled={saving} sx={dialogPrimaryButtonSx}>
+                        Save
+                    </Button>
                 </DialogActions>
             </Dialog>
 
             {/* Activity Table */}
             {reorderError ? (
-                <div style={{ color: '#c62828', marginBottom: 12, fontSize: 14 }} role="alert">
+                <Box
+                    role="alert"
+                    sx={{
+                        mb: 2,
+                        px: 2,
+                        py: 1.5,
+                        borderRadius: '14px',
+                        border: '1px solid rgba(248, 113, 113, 0.24)',
+                        bgcolor: '#fef2f2',
+                        color: '#b91c1c',
+                        fontSize: 14,
+                        fontWeight: 600
+                    }}
+                >
                     {reorderError}
-                </div>
+                </Box>
             ) : null}
-            <TableContainer component={Paper} style={{ marginTop: "0px" }} className="activity-table-container">
+            <TableContainer
+                component={Paper}
+                className="activity-table-container"
+                sx={{
+                    mt: 0,
+                    borderRadius: '24px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(148, 163, 184, 0.16)',
+                    boxShadow: '0 20px 46px rgba(15, 23, 42, 0.08)'
+                }}
+            >
                 <Table className="activity-table">
                     <TableHead>
-                        <TableRow>
-                            <TableCell width={120}>S. No.</TableCell>
-                            <TableCell>Activity Name</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Action</TableCell>
-                            <TableCell>Availabilities</TableCell>
-                            <TableCell>Resources</TableCell>
+                        <TableRow
+                            sx={{
+                                '& th': {
+                                    background: 'linear-gradient(135deg, #2f5ea8 0%, #4f82c5 100%)',
+                                    color: '#f8fbff',
+                                    fontSize: '12px',
+                                    fontWeight: ACTIVITY_FONT_WEIGHTS.tableHeader,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    borderBottom: 'none',
+                                    py: 2.25
+                                }
+                            }}
+                        >
+                            <TableCell width={150}>Order</TableCell>
+                            <TableCell>Activity</TableCell>
+                            <TableCell width={160}>Status</TableCell>
+                            <TableCell width={170}>Edit</TableCell>
+                            <TableCell width={190}>Availabilities</TableCell>
+                            <TableCell width={180}>Resources</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1006,36 +1286,135 @@ const ActivityList = ({ activity, setActivity }) => {
                                     draggingId === item.id ? 'activity-table-row--dragging' : '',
                                     dropTargetId === item.id ? 'activity-table-row--drop-target' : '',
                                 ].filter(Boolean).join(' ')}
+                                sx={{
+                                    transition: 'background-color 0.18s ease, transform 0.18s ease',
+                                    '& td': {
+                                        borderBottom: '1px solid rgba(226, 232, 240, 0.9)',
+                                        py: 2.25,
+                                        verticalAlign: 'middle'
+                                    },
+                                    '&:hover': {
+                                        bgcolor: '#f8fbff'
+                                    }
+                                }}
                             >
                                 <TableCell>
-                                    <span
-                                        className="activity-drag-handle"
-                                        draggable
-                                        onDragStart={(e) => handleActivityDragStart(e, item.id)}
-                                        onDragEnd={handleActivityDragEnd}
-                                        title="Drag to reorder"
-                                        aria-label="Drag to reorder row"
-                                    >
-                                        <DragIndicatorIcon fontSize="small" />
-                                    </span>
-                                    {index + 1}
+                                    <Stack direction="row" spacing={1.25} alignItems="center">
+                                        <Box
+                                            component="span"
+                                            className="activity-drag-handle"
+                                            draggable
+                                            onDragStart={(e) => handleActivityDragStart(e, item.id)}
+                                            onDragEnd={handleActivityDragEnd}
+                                            title="Drag to reorder"
+                                            aria-label="Drag to reorder row"
+                                            sx={{
+                                                width: 38,
+                                                height: 38,
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                borderRadius: '12px',
+                                                bgcolor: '#edf4ff',
+                                                color: '#3867b2',
+                                                border: '1px solid rgba(37, 99, 235, 0.10)',
+                                                cursor: 'grab'
+                                            }}
+                                        >
+                                            <DragIndicatorIcon fontSize="small" />
+                                        </Box>
+                                        <Box
+                                            sx={{
+                                                minWidth: 36,
+                                                height: 36,
+                                                borderRadius: '12px',
+                                                bgcolor: '#f8fafc',
+                                                border: '1px solid rgba(148, 163, 184, 0.22)',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: ACTIVITY_FONT_WEIGHTS.label,
+                                                color: '#334155'
+                                            }}
+                                        >
+                                            {index + 1}
+                                        </Box>
+                                    </Stack>
                                 </TableCell>
-                                <TableCell>{item?.activity_name}</TableCell>
-                                <TableCell>{item?.status || 'Live'}</TableCell>
                                 <TableCell>
-                                    <Link to="#" className="edit-activity" onClick={() => openEditModal(item.id)}>
-                                        <ModeEditOutlineOutlinedIcon />
-                                    </Link>
+                                    <Typography sx={{ fontWeight: ACTIVITY_FONT_WEIGHTS.rowTitle, color: '#0f172a', fontSize: '15px', mb: 0.35 }}>
+                                        {item?.activity_name}
+                                    </Typography>
+                                    <Typography sx={{ color: '#64748b', fontSize: '13px' }}>
+                                        {item?.location || 'Location not set'}
+                                    </Typography>
                                 </TableCell>
                                 <TableCell>
-                                    <AutoFixHighIcon
-                                        titleAccess="Edit Availabilities"
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => navigate(`/activity/${item.id}/availabilities`)}
+                                    <Chip
+                                        label={item?.status || 'Live'}
+                                        sx={{
+                                            borderRadius: '999px',
+                                            fontWeight: ACTIVITY_FONT_WEIGHTS.chip,
+                                            fontSize: '12px',
+                                            ...getStatusChipSx(item?.status)
+                                        }}
                                     />
                                 </TableCell>
                                 <TableCell>
-                                    <AutoFixHighIcon style={{ cursor: 'pointer' }} onClick={() => alert(`Resources for activity: ${item.activity_name}`)} />
+                                    <Button
+                                        onClick={() => openEditModal(item.id)}
+                                        startIcon={<ModeEditOutlineOutlinedIcon />}
+                                        variant="outlined"
+                                        sx={{
+                                            ...actionButtonSx,
+                                            color: '#2450a6',
+                                            borderColor: 'rgba(37, 99, 235, 0.25)',
+                                            bgcolor: '#eef4ff',
+                                            '&:hover': {
+                                                borderColor: 'rgba(37, 99, 235, 0.42)',
+                                                bgcolor: '#dfeafe'
+                                            }
+                                        }}
+                                    >
+                                        Edit
+                                    </Button>
+                                </TableCell>
+                                <TableCell>
+                                    <Button
+                                        startIcon={<AutoFixHighIcon />}
+                                        variant="contained"
+                                        onClick={() => navigate(`/activity/${item.id}/availabilities`)}
+                                        sx={{
+                                            ...actionButtonSx,
+                                            background: 'linear-gradient(135deg, #0f9f75 0%, #18b88b 100%)',
+                                            '&:hover': {
+                                                background: 'linear-gradient(135deg, #0d8764 0%, #139a75 100%)'
+                                            }
+                                        }}
+                                    >
+                                        Manage
+                                    </Button>
+                                </TableCell>
+                                <TableCell>
+                                    <Tooltip title="Resource setup area">
+                                        <Button
+                                            startIcon={<AutoFixHighIcon />}
+                                            variant="outlined"
+                                            onClick={() => alert(`Resources for activity: ${item.activity_name}`)}
+                                            sx={{
+                                                ...actionButtonSx,
+                                                color: '#5b21b6',
+                                                borderColor: 'rgba(124, 58, 237, 0.20)',
+                                                bgcolor: '#f6f0ff',
+                                                '&:hover': {
+                                                    borderColor: 'rgba(124, 58, 237, 0.36)',
+                                                    bgcolor: '#efe4ff'
+                                                }
+                                            }}
+                                        >
+                                            Open
+                                        </Button>
+                                    </Tooltip>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -1044,70 +1423,34 @@ const ActivityList = ({ activity, setActivity }) => {
             </TableContainer>
 
             {/* Edit Activity Dialog */}
-            <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Edit Activity</DialogTitle>
-                <DialogContent>
-                    <div style={{ 
-                        marginBottom: 20, 
-                        padding: '16px', 
-                        backgroundColor: '#f8f9fa', 
-                        borderRadius: '8px', 
-                        border: '1px solid #dee2e6' 
-                    }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
-                            color: '#495057',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>📋</span>
-                            Basic Information
-                        </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#6c757d', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
-                        }}>
-                            General activity details and configuration
-                        </div>
+            <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="md" fullWidth sx={activityDialogSx}>
+                <DialogTitle sx={dialogTitleSx}>
+                    <Typography sx={{ fontSize: { xs: '24px', md: '28px' }, fontWeight: ACTIVITY_FONT_WEIGHTS.dialogTitle, letterSpacing: '-0.04em', color: '#0f172a', mb: 0.5 }}>
+                        Edit Activity
+                    </Typography>
+                    <Typography sx={{ color: '#64748b', fontSize: '14px', maxWidth: '560px' }}>
+                        Refine pricing, voucher availability and configuration while keeping the activity layout aligned with the rest of the admin panel.
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={dialogContentSx}>
+                    <ActivityDialogSection
+                        tone="neutral"
+                        icon="📋"
+                        title="Basic Information"
+                        description="General activity details and configuration"
+                    >
                         <TextField margin="dense" label="Activity Name" name="activity_name" value={editForm.activity_name || ''} onChange={handleEditChange} fullWidth required />
                         <TextField margin="dense" label="Capacity" name="capacity" value={editForm.capacity || ''} onChange={handleEditChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Location" name="location" value={editForm.location || ''} onChange={handleEditChange} fullWidth required />
-                    </div>
-                    
-                    <div style={{ 
-                        marginTop: 20, 
-                        marginBottom: 16, 
-                        padding: '16px', 
-                        backgroundColor: '#e3f2fd', 
-                        borderRadius: '8px', 
-                        border: '1px solid #bbdefb' 
-                    }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
-                            color: '#1565c0',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>🛩️</span>
-                            Flight Type
-                        </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#1565c0', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
-                        }}>
-                            Select which types of flights this activity supports
-                        </div>
-                        <FormGroup row sx={{ mb: 0, mt: 1 }}>
+                    </ActivityDialogSection>
+
+                    <ActivityDialogSection
+                        tone="info"
+                        icon="🛩️"
+                        title="Flight Type"
+                        description="Select which types of flights this activity supports"
+                    >
+                        <FormGroup row sx={{ mb: 0 }}>
                             <FormControlLabel
                                 control={<Checkbox checked={Array.isArray(editForm.flight_type) ? editForm.flight_type.includes('Private') : (typeof editForm.flight_type === 'string' ? editForm.flight_type.split(',').includes('Private') : false)} onChange={handleEditChange} name="flight_type" value="Private" />}
                                 label="Private"
@@ -1117,51 +1460,25 @@ const ActivityList = ({ activity, setActivity }) => {
                                 label="Shared"
                             />
                         </FormGroup>
-                    </div>
-                    
-                    {/* Experience: Shared Flight Section */}
-                    <div style={{ 
-                        marginTop: 24, 
-                        marginBottom: 16, 
-                        padding: '20px', 
-                        backgroundColor: '#f8f9fa', 
-                        borderRadius: '12px', 
-                        border: '2px solid #e9ecef',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                    }}>
-                        <div style={{ 
-                            marginBottom: 20, 
-                            fontWeight: 700, 
-                            fontSize: '18px', 
-                            color: '#1976d2',
-                            borderBottom: '3px solid #1976d2',
-                            paddingBottom: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '20px' }}>✈️</span>
-                            Experience: Shared Flight
-                        </div>
-                        <div style={{ 
-                            fontSize: '14px', 
-                            color: '#666', 
-                            marginBottom: '20px', 
-                            fontStyle: 'italic',
-                            padding: '12px',
-                            backgroundColor: '#fff',
-                            borderRadius: '8px',
-                            border: '1px solid #dee2e6'
-                        }}>
-                            ℹ️ These fields are specifically for Shared Flight experiences only. They control pricing and voucher options for shared balloon flights.
-                        </div>
-                        
-                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>From Price</div>
+                    </ActivityDialogSection>
+
+                    <ActivityDialogSection
+                        tone="neutral"
+                        icon="✈️"
+                        title="Experience: Shared Flight"
+                        helper="These fields are specifically for Shared Flight experiences only. They control pricing and voucher options for shared balloon flights."
+                        divider
+                    >
+                        <Typography sx={{ mt: 0.5, mb: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            From Price
+                        </Typography>
                         <TextField margin="dense" label="Shared Flight From Price" name="shared_flight_from_price" value={editForm.shared_flight_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Shared Flight Sale Price" name="shared_flight_from_sale_price" value={editForm.shared_flight_from_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
-                        
-                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Voucher Type</div>
-                        <FormGroup row sx={{ mb: 2, mt: 1 }}>
+
+                        <Typography sx={{ mt: 1, mb: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Voucher Type
+                        </Typography>
+                        <FormGroup row sx={{ mb: 1 }}>
                             <FormControlLabel
                                 control={<Checkbox checked={Array.isArray(editForm.voucher_type) ? editForm.voucher_type.includes('Weekday Morning') : (typeof editForm.voucher_type === 'string' ? editForm.voucher_type.split(',').includes('Weekday Morning') : false)} onChange={handleEditChange} name="voucher_type" value="Weekday Morning" />}
                                 label="Weekday Morning"
@@ -1175,135 +1492,92 @@ const ActivityList = ({ activity, setActivity }) => {
                                 label="Any Day Flight"
                             />
                         </FormGroup>
-                        
-                        <div style={{ marginTop: 16, marginBottom: 8, fontWeight: 500 }}>Per Person Pricing</div>
+
+                        <Typography sx={{ mt: 1, mb: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#475569', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            Per Person Pricing
+                        </Typography>
                         <TextField margin="dense" label="Weekday Morning Price" name="weekday_morning_price" value={editForm.weekday_morning_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Weekday Morning Sale Price" name="weekday_morning_sale_price" value={editForm.weekday_morning_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
                         <TextField margin="dense" label="Flexible Weekday Price" name="flexible_weekday_price" value={editForm.flexible_weekday_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Flexible Weekday Sale Price" name="flexible_weekday_sale_price" value={editForm.flexible_weekday_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
                         <TextField margin="dense" label="Any Day Flight Price" name="any_day_flight_price" value={editForm.any_day_flight_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Any Day Flight Sale Price" name="any_day_flight_sale_price" value={editForm.any_day_flight_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
-                    </div>
-                    
-                    {/* Private Charter From Price - Separate section */}
-                    <div style={{ 
-                        marginTop: 24, 
-                        marginBottom: 16, 
-                        padding: '16px', 
-                        backgroundColor: '#fff3cd', 
-                        borderRadius: '8px', 
-                        border: '1px solid #ffeaa7' 
-                    }}>
-                        <div style={{ 
-                            marginBottom: 12, 
-                            fontWeight: 600, 
-                            fontSize: '16px', 
-                            color: '#856404',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>🎈</span>
-                            Private Charter From Price
-                        </div>
-                        <div style={{ 
-                            fontSize: '13px', 
-                            color: '#856404', 
-                            marginBottom: '12px', 
-                            fontStyle: 'italic' 
-                        }}>
-                            This field is for Private Charter experiences only
-                        </div>
+                    </ActivityDialogSection>
+
+                    <ActivityDialogSection
+                        tone="warm"
+                        icon="🎈"
+                        title="Private Charter From Price"
+                        description="This field is for Private Charter experiences only"
+                    >
                         <TextField margin="dense" label="Private Charter From Price" name="private_charter_from_price" value={editForm.private_charter_from_price || ''} onChange={handleEditChange} type="number" fullWidth required />
                         <TextField margin="dense" label="Private Charter From Sale Price" name="private_charter_from_sale_price" value={editForm.private_charter_from_sale_price || ''} onChange={handleEditChange} type="number" fullWidth />
-                    </div>
+                    </ActivityDialogSection>
 
-                    {/* Private Charter Voucher Types Section */}
-                    <div style={{ 
-                        marginTop: 24, 
-                        marginBottom: 16, 
-                        padding: '20px', 
-                        backgroundColor: '#fff3cd', 
-                        borderRadius: '12px', 
-                        border: '2px solid #ffeaa7',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                    }}>
-                        <div style={{ 
-                            marginBottom: 20, 
-                            fontWeight: 700, 
-                            fontSize: '18px', 
-                            color: '#856404',
-                            borderBottom: '3px solid #f39c12',
-                            paddingBottom: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '20px' }}>🎫</span>
-                            Private Charter Voucher Types
-                        </div>
-                        <div style={{ 
-                            fontSize: '14px', 
-                            color: '#856404', 
-                            marginBottom: '20px', 
-                            fontStyle: 'italic',
-                            padding: '12px',
-                            backgroundColor: '#fff',
-                            borderRadius: '8px',
-                            border: '1px solid #ffeaa7'
-                        }}>
-                            ℹ️ Select which private charter voucher types this activity supports. These options come from the Private Charter Voucher Types settings.
-                        </div>
-                        
+                    <ActivityDialogSection
+                        tone="warm"
+                        icon="🎫"
+                        title="Private Charter Voucher Types"
+                        helper="Select which private charter voucher types this activity supports. These options come from the Private Charter Voucher Types settings."
+                        divider
+                    >
                         {privateCharterVoucherTypesLoading ? (
-                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404' }}>
+                            <Typography sx={{ textAlign: 'center', py: 2.5, color: '#9a7421', fontStyle: 'italic' }}>
                                 Loading voucher types...
-                            </div>
+                            </Typography>
                         ) : privateCharterVoucherTypes.length > 0 ? (
                             <>
-                                <FormGroup row sx={{ mb: 2, mt: 1 }}>
+                                <FormGroup row sx={{ mb: 1 }}>
                                     {privateCharterVoucherTypes.map((voucherType) => (
                                         <FormControlLabel
                                             key={voucherType.id}
                                             control={
-                                                <Checkbox 
-                                                    checked={isSelectedPrivateVoucherType(editForm.private_charter_voucher_types, voucherType.id)} 
-                                                    onChange={handleEditChange} 
-                                                    name="private_charter_voucher_types" 
-                                                    value={voucherType.id.toString()} 
+                                                <Checkbox
+                                                    checked={isSelectedPrivateVoucherType(editForm.private_charter_voucher_types, voucherType.id)}
+                                                    onChange={handleEditChange}
+                                                    name="private_charter_voucher_types"
+                                                    value={voucherType.id.toString()}
                                                 />
                                             }
                                             label={voucherType.title}
                                         />
                                     ))}
                                 </FormGroup>
-                                
-                                {/* Individual Pricing Fields */}
-                                <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #ffeaa7' }}>
-                                    <div style={{ marginBottom: '16px', fontWeight: '600', color: '#856404' }}>
+
+                                <Box
+                                    sx={{
+                                        mt: 2,
+                                        p: 2,
+                                        backgroundColor: 'rgba(255,255,255,0.92)',
+                                        borderRadius: '16px',
+                                        border: '1px solid rgba(245, 158, 11, 0.18)'
+                                    }}
+                                >
+                                    <Typography sx={{ mb: 1.5, fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#9a7421', fontSize: '14px' }}>
                                         Group Pricing for Selected Voucher Types
-                                    </div>
-                                    {/* Passenger tier selector */}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                                        <label style={{ color: '#856404', fontWeight: 500 }}>Passengers</label>
-                                        <TextField select size="small" value={editGroupPassengerTier} onChange={(e) => setEditGroupPassengerTier(Number(e.target.value))} style={{ width: 180 }}>
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
+                                        <Typography sx={{ color: '#9a7421', fontWeight: ACTIVITY_FONT_WEIGHTS.label, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                            Passengers
+                                        </Typography>
+                                        <TextField select size="small" value={editGroupPassengerTier} onChange={(e) => setEditGroupPassengerTier(Number(e.target.value))} sx={{ width: 200 }}>
                                             <MenuItem value={2}>2 passengers</MenuItem>
                                             <MenuItem value={3}>3 passengers</MenuItem>
                                             <MenuItem value={4}>4 passengers</MenuItem>
                                             <MenuItem value={8}>8 passengers</MenuItem>
                                         </TextField>
-                                    </div>
+                                    </Box>
                                     {privateCharterVoucherTypes.map((voucherType) => (
-                                        <div key={voucherType.id} style={{ marginBottom: '12px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <Checkbox 
-                                                    checked={isSelectedPrivateVoucherType(editForm.private_charter_voucher_types, voucherType.id)} 
+                                        <Box key={voucherType.id} sx={{ mb: 1.25 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                                                <Checkbox
+                                                    checked={isSelectedPrivateVoucherType(editForm.private_charter_voucher_types, voucherType.id)}
                                                     disabled
-                                                    style={{ color: '#856404' }}
+                                                    sx={{ color: '#9a7421' }}
                                                 />
-                                                <label style={{ fontWeight: '500', color: '#856404', minWidth: '200px' }}>
+                                                <Typography sx={{ fontWeight: ACTIVITY_FONT_WEIGHTS.label, color: '#8a6518', minWidth: 210 }}>
                                                     Group Pricing: {voucherType.title}
-                                                </label>
+                                                </Typography>
                                                 <TextField
                                                     size="small"
                                                     type="number"
@@ -1313,9 +1587,9 @@ const ActivityList = ({ activity, setActivity }) => {
                                                     placeholder="Original"
                                                     min="0"
                                                     step="0.01"
-                                                    style={{ width: '120px' }}
+                                                    sx={{ width: 132, mb: '0 !important' }}
                                                 />
-                                                <span style={{ color: '#856404', fontSize: '14px' }}>£</span>
+                                                <Typography sx={{ color: '#8a6518', fontSize: '14px', fontWeight: ACTIVITY_FONT_WEIGHTS.label }}>£</Typography>
                                                 <TextField
                                                     size="small"
                                                     type="number"
@@ -1325,50 +1599,27 @@ const ActivityList = ({ activity, setActivity }) => {
                                                     placeholder="Sale"
                                                     min="0"
                                                     step="0.01"
-                                                    style={{ width: '120px' }}
+                                                    sx={{ width: 132, mb: '0 !important' }}
                                                 />
-                                                <span style={{ color: '#856404', fontSize: '14px' }}>£ sale</span>
-                                            </div>
-                                        </div>
+                                                <Typography sx={{ color: '#8a6518', fontSize: '14px', fontWeight: ACTIVITY_FONT_WEIGHTS.label }}>£ sale</Typography>
+                                            </Box>
+                                        </Box>
                                     ))}
-                                </div>
+                                </Box>
                             </>
                         ) : (
-                            <div style={{ textAlign: 'center', padding: '20px', color: '#856404', fontStyle: 'italic' }}>
+                            <Typography sx={{ textAlign: 'center', py: 2.5, color: '#9a7421', fontStyle: 'italic' }}>
                                 No private charter voucher types available. Please create some in the settings first.
-                            </div>
+                            </Typography>
                         )}
-                    </div>
+                    </ActivityDialogSection>
 
-                    {/* Season Saver Settings */}
-                    <div style={{
-                        marginTop: 24,
-                        marginBottom: 16,
-                        padding: '16px',
-                        backgroundColor: '#fce4ec',
-                        borderRadius: '8px',
-                        border: '1px solid #f8bbd0'
-                    }}>
-                        <div style={{
-                            marginBottom: 12,
-                            fontWeight: 600,
-                            fontSize: '16px',
-                            color: '#c62828',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>🏷️</span>
-                            Season Saver
-                        </div>
-                        <div style={{
-                            fontSize: '13px',
-                            color: '#c62828',
-                            marginBottom: '12px',
-                            fontStyle: 'italic'
-                        }}>
-                            Configure Season Saver pricing for this activity
-                        </div>
+                    <ActivityDialogSection
+                        tone="rose"
+                        icon="🏷️"
+                        title="Season Saver"
+                        description="Configure Season Saver pricing for this activity"
+                    >
                         <FormControlLabel
                             control={
                                 <Switch
@@ -1391,83 +1642,97 @@ const ActivityList = ({ activity, setActivity }) => {
                             inputProps={{ step: '0.01', min: '0' }}
                             placeholder="e.g. 175.00"
                         />
-                    </div>
+                    </ActivityDialogSection>
 
-                    <div style={{
-                        marginTop: 20,
-                        marginBottom: 16,
-                        padding: '16px',
-                        backgroundColor: '#e8f5e8',
-                        borderRadius: '8px',
-                        border: '1px solid #c8e6c9'
-                    }}>
-                        <div style={{
-                            marginBottom: 12,
-                            fontWeight: 600,
-                            fontSize: '16px',
-                            color: '#2e7d32',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <span style={{ fontSize: '18px' }}>✅</span>
-                            Status & Configuration
-                        </div>
-                        <div style={{
-                            fontSize: '13px',
-                            color: '#2e7d32',
-                            marginBottom: '12px',
-                            fontStyle: 'italic'
-                        }}>
-                            Set the activity status and upload any images
-                        </div>
-
-                        {/* Sync Pricing Button */}
-                        {editForm.private_charter_pricing && Object.keys(editForm.private_charter_pricing).length > 0 && (
-                            <div style={{ marginBottom: '16px' }}>
+                    <ActivityDialogSection
+                        tone="success"
+                        icon="✅"
+                        title="Status & Configuration"
+                        description="Set the activity status and upload any images"
+                    >
+                        {editForm.private_charter_pricing && Object.keys(editForm.private_charter_pricing).length > 0 ? (
+                            <Box sx={{ mb: 2 }}>
                                 <Button
                                     variant="outlined"
-                                    color="secondary"
                                     onClick={handleSyncPricing}
                                     disabled={editSaving}
                                     startIcon={<span>🔄</span>}
                                     fullWidth
+                                sx={{
+                                        height: 46,
+                                        borderRadius: '14px',
+                                        color: '#15803d',
+                                        borderColor: 'rgba(22, 163, 74, 0.22)',
+                                        bgcolor: 'rgba(255,255,255,0.92)',
+                                        fontWeight: ACTIVITY_FONT_WEIGHTS.primaryButton,
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.05em',
+                                        '&:hover': {
+                                            borderColor: 'rgba(22, 163, 74, 0.34)',
+                                            bgcolor: '#ffffff'
+                                        }
+                                    }}
                                 >
                                     Sync Group Pricing to Voucher Types
                                 </Button>
-                                <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', fontStyle: 'italic' }}>
-                                    This will update the private charter voucher types with the group pricing set above
-                                </div>
-                            </div>
-                        )}
-                        
+                                <Typography sx={{ fontSize: '12px', color: '#5b7f68', mt: 1, fontStyle: 'italic' }}>
+                                    This updates the private charter voucher types with the group pricing set above.
+                                </Typography>
+                            </Box>
+                        ) : null}
+
                         <TextField margin="dense" label="Status" name="status" value={editForm.status || ''} onChange={handleEditChange} select fullWidth required>
                             <MenuItem value="Live">Live</MenuItem>
                             <MenuItem value="Draft">Draft</MenuItem>
                             <MenuItem value="Closed">Closed</MenuItem>
                         </TextField>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleEditImageChange}
-                            style={{ marginTop: '16px' }}
-                        />
-                        {editImagePreview && (
-                            <img
-                                src={editImagePreview}
-                                alt="Preview"
-                                style={{ width: '100px', height: '100px', objectFit: 'cover', marginTop: '8px', borderRadius: '4px' }}
+                        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleEditImageChange}
+                                style={{ marginTop: '8px' }}
                             />
-                        )}
-                    </div>
-                    {editError && <div style={{ color: 'red', marginTop: 8 }}>{editError}</div>}
+                            {editImagePreview ? (
+                                <Box
+                                    component="img"
+                                    src={editImagePreview}
+                                    alt="Preview"
+                                    sx={{
+                                        width: 120,
+                                        height: 120,
+                                        objectFit: 'cover',
+                                        borderRadius: '18px',
+                                        border: '1px solid rgba(148, 163, 184, 0.28)',
+                                        boxShadow: '0 12px 24px rgba(15, 23, 42, 0.10)'
+                                    }}
+                                />
+                            ) : null}
+                        </Box>
+                    </ActivityDialogSection>
+
+                    {editError ? (
+                        <Box sx={{ color: '#b91c1c', mt: 1, fontWeight: ACTIVITY_FONT_WEIGHTS.label, fontSize: '14px' }}>
+                            {editError}
+                        </Box>
+                    ) : null}
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setEditOpen(false)} disabled={editSaving}>Cancel</Button>
-                    <Button onClick={handleDeleteActivity} color="error" startIcon={<DeleteIcon />} disabled={editSaving} style={{marginRight: 'auto'}}>
+                <DialogActions sx={dialogActionsSx}>
+                    <Button onClick={() => setEditOpen(false)} disabled={editSaving} sx={dialogSecondaryButtonSx}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteActivity}
+                        variant="outlined"
+                        startIcon={<DeleteIcon />}
+                        disabled={editSaving}
+                        sx={{ ...dialogDangerButtonSx, mr: 'auto' }}
+                    >
                         Delete
                     </Button>
-                    <Button onClick={handleEditSave} variant="contained" color="primary" disabled={editSaving}>Save</Button>
+                    <Button onClick={handleEditSave} variant="contained" disabled={editSaving} sx={dialogPrimaryButtonSx}>
+                        Save
+                    </Button>
                 </DialogActions>
             </Dialog>
 

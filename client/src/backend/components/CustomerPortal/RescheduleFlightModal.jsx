@@ -26,6 +26,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('768'));
     const [availabilities, setAvailabilities] = useState([]);
+    const [allLocationAvailabilities, setAllLocationAvailabilities] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedTime, setSelectedTime] = useState(null);
@@ -121,6 +122,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return hour < 12; // Morning is before 12:00 PM
     };
 
+    const normalizeLocation = (loc) => {
+        if (!loc) return '';
+        return String(loc).trim().toLowerCase();
+    };
+
     // ---- LiveAvailabilitySection-compatible helpers (adapted for Customer Portal) ----
     const normalizeVoucherName = (value = '') => {
         if (typeof value !== 'string') return '';
@@ -171,9 +177,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         if (!value) return '';
         return String(value).trim();
     };
+    const resourceAvailabilitySource = allLocationAvailabilities.length > 0
+        ? allLocationAvailabilities
+        : availabilities;
     const balloon210InUseByDateTime = React.useMemo(() => {
         const map = new Map();
-        (availabilities || []).forEach(s => {
+        resourceAvailabilitySource.forEach(s => {
             const dateKey = normalizeSlotDate(s?.date);
             const timeKey = normalizeSlotTime(s?.time);
             if (!dateKey || !timeKey) return;
@@ -185,12 +194,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }
         });
         return map;
-    }, [availabilities]);
+    }, [resourceAvailabilitySource]);
 
     // Balloon 105 is also a global resource across locations for small private/proposal (1-4 pax).
     const balloon105InUseByDateTime = React.useMemo(() => {
         const map = new Map();
-        (availabilities || []).forEach((s) => {
+        resourceAvailabilitySource.forEach((s) => {
             const dateKey = normalizeSlotDate(s?.date);
             const timeKey = normalizeSlotTime(s?.time);
             if (!dateKey || !timeKey) return;
@@ -204,7 +213,69 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }
         });
         return map;
-    }, [availabilities]);
+    }, [resourceAvailabilitySource]);
+
+    const balloon210OwnerByDateTime = React.useMemo(() => {
+        const map = new Map();
+
+        resourceAvailabilitySource.forEach((slot) => {
+            const dateKey = normalizeSlotDate(slot?.date);
+            const timeKey = normalizeSlotTime(slot?.time);
+            const locationKey = normalizeLocation(slot?.location);
+            if (!dateKey || !timeKey || !locationKey) return;
+
+            const mapKey = `${dateKey}|${timeKey}`;
+            const explicitOwner = normalizeLocation(slot?.assigned_balloon210_location);
+            if (explicitOwner) {
+                map.set(mapKey, explicitOwner);
+                return;
+            }
+
+            const sharedUsage = Number(
+                slot?.shared_consumed_pax ??
+                slot?.shared_booked ??
+                slot?.shared_booked_for_balloon210 ??
+                0
+            );
+            const privateLargeUsage = Number(slot?.private_large_booked_for_balloon210 || 0);
+            const slotLocked = Number(slot?.balloon210_locked || 0) > 0;
+
+            if (!slotLocked && (sharedUsage > 0 || privateLargeUsage > 0) && !map.has(mapKey)) {
+                map.set(mapKey, locationKey);
+            }
+        });
+
+        return map;
+    }, [resourceAvailabilitySource]);
+
+    const balloon105OwnerByDateTime = React.useMemo(() => {
+        const map = new Map();
+
+        resourceAvailabilitySource.forEach((slot) => {
+            const dateKey = normalizeSlotDate(slot?.date);
+            const timeKey = normalizeSlotTime(slot?.time);
+            const locationKey = normalizeLocation(slot?.location);
+            if (!dateKey || !timeKey || !locationKey) return;
+
+            const mapKey = `${dateKey}|${timeKey}`;
+            const explicitOwner = normalizeLocation(slot?.assigned_balloon105_location);
+            if (explicitOwner) {
+                map.set(mapKey, explicitOwner);
+                return;
+            }
+
+            const smallPrivateBookings = Number(slot?.private_charter_small_bookings || slot?.small_private_bookings || 0);
+            const remaining105 = typeof slot?.private_charter_small_remaining === 'number' ? slot.private_charter_small_remaining : null;
+            const remainingIndicatesUsage = Number.isFinite(remaining105) ? remaining105 < 4 : false;
+            const slotLocked = Number(slot?.balloon105_locked || 0) > 0;
+
+            if (!slotLocked && (smallPrivateBookings > 0 || remainingIndicatesUsage) && !map.has(mapKey)) {
+                map.set(mapKey, locationKey);
+            }
+        });
+
+        return map;
+    }, [resourceAvailabilitySource]);
 
     const getAvailableSeatsForSelection = (slot) => {
         if (!slot) return 0;
@@ -213,12 +284,18 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         const balloon210Locked = Number(slot.balloon210_locked || slot.shared_slots_used || 0) > 0;
         const sharedBooked = Number(slot.shared_booked || slot.shared_consumed_pax || 0);
         const isSmallPrivateSelection = isPrivateSelection && requiredSeats > 0 && requiredSeats <= 4;
+        const slotDateKey = normalizeSlotDate(slot?.date);
+        const slotTimeKey = normalizeSlotTime(slot?.time);
+        const slotLocationKey = normalizeLocation(slot?.location);
+        const slotDateTimeKey = slotDateKey && slotTimeKey ? `${slotDateKey}|${slotTimeKey}` : '';
+        const balloon210Owner = slotDateTimeKey ? balloon210OwnerByDateTime.get(slotDateTimeKey) : '';
+        const balloon105Owner = slotDateTimeKey ? balloon105OwnerByDateTime.get(slotDateTimeKey) : '';
 
         // SHARED FLOW (uses Balloon 210)
         if (!isPrivateSelection) {
             // If Balloon 210 is assigned to a different location, no shared seats are available for this location
             // Shared flights can share Balloon 210 within the same location, but not across different locations
-            if (balloon210Locked) {
+            if (balloon210Locked || (balloon210Owner && slotLocationKey && balloon210Owner !== slotLocationKey)) {
                 return 0;
             }
             return baseAvailable;
@@ -226,8 +303,6 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
 
         // PRIVATE FLOW (1–4 pax uses Balloon 105)
         if (isSmallPrivateSelection) {
-            const slotDateKey = normalizeSlotDate(slot?.date);
-            const slotTimeKey = normalizeSlotTime(slot?.time);
             const balloon105InUseGlobally = slotDateKey && slotTimeKey
                 ? Boolean(balloon105InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
                 : false;
@@ -235,20 +310,18 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 ? slot.private_charter_small_remaining
                 : (Number(slot.private_charter_small_bookings || 0) > 0 ? 0 : 4);
 
-            if (balloon105InUseGlobally || remaining105 <= 0) return 0;
+            if ((balloon105Owner && slotLocationKey && balloon105Owner !== slotLocationKey) || balloon105InUseGlobally || remaining105 <= 0) return 0;
             return remaining105 >= requiredSeats ? remaining105 : 0;
         }
 
         // Large private charter (5–8 pax) uses Balloon 210 exclusively
-        const slotDateKey = normalizeSlotDate(slot?.date);
-        const slotTimeKey = normalizeSlotTime(slot?.time);
         const balloon210InUseGlobally = slotDateKey && slotTimeKey
             ? Boolean(balloon210InUseByDateTime.get(`${slotDateKey}|${slotTimeKey}`))
             : false;
 
         // If Balloon 210 is already consumed by shared at this date+time (any location), block large private.
         // Also block if this specific slot indicates Balloon 210 is locked or shared booked.
-        if (balloon210Locked || sharedBooked > 0 || balloon210InUseGlobally) {
+        if ((balloon210Owner && slotLocationKey && balloon210Owner !== slotLocationKey) || balloon210Locked || sharedBooked > 0 || balloon210InUseGlobally) {
             return 0;
         }
 
@@ -441,12 +514,6 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         return `${year}-${month}-${day}`;
     };
 
-    // Helper function to normalize location names for comparison
-    const normalizeLocation = (loc) => {
-        if (!loc) return '';
-        return String(loc).trim().toLowerCase();
-    };
-
     const findLiveActivityForLocation = (targetLocation) => {
         const normalizedTargetLocation = normalizeLocation(targetLocation);
         if (!normalizedTargetLocation) return null;
@@ -463,6 +530,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             setAvailableLocations([]);
             setSelectedLocations([]);
             setActivities([]);
+            setAllLocationAvailabilities([]);
             return;
         }
 
@@ -538,6 +606,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     useEffect(() => {
         if (!open) {
             setAvailabilities([]);
+            setAllLocationAvailabilities([]);
             setSelectedDate(null);
             setSelectedTime(null);
             setError(null);
@@ -574,6 +643,30 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             setSuccessPayload(null);
 
             try {
+                if (activities.length > 0) {
+                    const globalAvailabilityResults = await Promise.all(
+                        activities
+                            .filter((activity) => activity?.status === 'Live' && activity?.id)
+                            .map(async (activity) => {
+                                try {
+                                    const response = await axios.get(`/api/activity/${activity.id}/availabilities`);
+                                    const data = Array.isArray(response.data?.data) ? response.data.data : [];
+                                    return data.map((slot) => ({
+                                        ...slot,
+                                        location: slot.location || activity.location,
+                                        activity_id: slot.activity_id || activity.id
+                                    }));
+                                } catch (globalErr) {
+                                    console.warn('RescheduleFlightModal - Failed to fetch global availability for activity:', activity?.id, globalErr?.message || globalErr);
+                                    return [];
+                                }
+                            })
+                    );
+                    setAllLocationAvailabilities(globalAvailabilityResults.flat());
+                } else {
+                    setAllLocationAvailabilities([]);
+                }
+
                 const collected = [];
 
                 for (const loc of targetLocations) {
@@ -816,11 +909,14 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             return slotDate === dateStr;
         });
 
-        // Calculate total available - use available or calculated_available directly (like Change Flight Location)
-        // This matches the logic in Change Flight Location modal
-        const totalAvailable = slots.reduce((acc, s) => {
-            const available = Number(s.available) || Number(s.calculated_available) || 0;
-            return acc + available;
+        const slotsWithAvailability = slots.map((slot) => ({
+            ...slot,
+            availableSeats: getAvailableSeatsForSelection(slot)
+        }));
+
+        // Calendar counts must use the same resource-aware availability as the time picker.
+        const totalAvailable = slotsWithAvailability.reduce((acc, slot) => {
+            return acc + (Number(slot.availableSeats) || 0);
         }, 0);
         
         // Get passenger count from booking data
@@ -834,9 +930,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             sharedTotal: totalAvailable,
             sharedSoldOut: soldOut,
             soldOut: soldOut,
-            slots: slots,
+            slots: slotsWithAvailability,
             hasEnoughSpace,
-            allSlots: slots
+            allSlots: slotsWithAvailability
         };
     };
 
