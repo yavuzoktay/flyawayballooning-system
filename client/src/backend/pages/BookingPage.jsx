@@ -1885,7 +1885,8 @@ const BookingPage = () => {
         }
     }, [emailForm.template, emailTemplates, emailForm.message, selectedBookingForEmail]);
 
-    const handleEmailTemplateChange = (templateValue) => {
+    const handleEmailTemplateChange = (templateValue, options = {}) => {
+        const { syncSmsTemplate = true } = options;
         console.log('🎯 handleEmailTemplateChange called with:', templateValue);
         console.log('📚 Available templates:', emailTemplates);
         
@@ -1900,6 +1901,10 @@ const BookingPage = () => {
                 message: '',
                 template: 'custom'
             }));
+
+            if (syncSmsTemplate && smsForm.template !== 'custom') {
+                handleSmsTemplateChange('custom', { syncEmailTemplate: false });
+            }
             return;
         }
 
@@ -5450,7 +5455,8 @@ setBookingDetail(finalVoucherDetail);
         if (!smsModalOpen && smsPollId) { clearInterval(smsPollId); setSmsPollId(null); }
     }, [smsModalOpen]);
 
-    const handleSmsTemplateChange = (templateValue) => {
+    const handleSmsTemplateChange = (templateValue, options = {}) => {
+        const { syncEmailTemplate = true } = options;
         console.log('🔄 SMS template changed to:', templateValue);
         console.log('📚 Available templates:', smsTemplates);
         console.log('📋 Current smsForm:', smsForm);
@@ -5463,6 +5469,10 @@ setBookingDetail(finalVoucherDetail);
                 template: 'custom'
                 // Don't clear message - let user keep what they typed
             }));
+
+            if (syncEmailTemplate && emailForm.template !== 'custom') {
+                handleEmailTemplateChange('custom', { syncSmsTemplate: false });
+            }
             return;
         }
         

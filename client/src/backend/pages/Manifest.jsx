@@ -736,9 +736,24 @@ const Manifest = () => {
         }
     }, [emailForm.template, emailTemplates, emailForm.message, selectedBookingForEmail]);
 
-    const handleEmailTemplateChange = (templateValue) => {
+    const handleEmailTemplateChange = (templateValue, options = {}) => {
+        const { syncSmsTemplate = true } = options;
         let subject = '';
         let message = '';
+
+        if (templateValue === 'custom') {
+            setEmailForm(prev => ({
+                ...prev,
+                subject: '🎈 From Fly Away',
+                message: '',
+                template: 'custom'
+            }));
+
+            if (syncSmsTemplate && smsForm.template !== 'custom') {
+                handleSmsTemplateChange('custom', { syncEmailTemplate: false });
+            }
+            return;
+        }
 
         const dbTemplate = emailTemplates.find(t => t.id.toString() === templateValue.toString());
         const templateName = resolveTemplateName(templateValue, dbTemplate);
@@ -1756,7 +1771,8 @@ const Manifest = () => {
         })();
     };
 
-    const handleSmsTemplateChange = (templateValue) => {
+    const handleSmsTemplateChange = (templateValue, options = {}) => {
+        const { syncEmailTemplate = true } = options;
         console.log('🔄 SMS template changed to:', templateValue);
         console.log('📚 Available templates:', smsTemplates);
         console.log('📋 Current smsForm:', smsForm);
@@ -1767,6 +1783,10 @@ const Manifest = () => {
                 template: 'custom', 
                 message: '' 
             }));
+
+            if (syncEmailTemplate && emailForm.template !== 'custom') {
+                handleEmailTemplateChange('custom', { syncSmsTemplate: false });
+            }
             return;
         }
         
