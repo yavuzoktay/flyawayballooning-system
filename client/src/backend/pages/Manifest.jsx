@@ -389,13 +389,18 @@ const Manifest = () => {
         handleGlobalMenuClose();
     };
 
-    const handleGroupSmsTemplateChange = (templateValue) => {
+    const handleGroupSmsTemplateChange = (templateValue, options = {}) => {
+        const { syncEmailTemplate = true } = options;
         if (!templateValue || templateValue === 'custom') {
             setGroupSmsForm(prev => ({ 
                 ...prev, 
                 template: 'custom', 
                 message: '' 
             }));
+
+            if (syncEmailTemplate && groupMessageForm.template !== 'custom') {
+                handleGroupTemplateChange('custom', { syncSmsTemplate: false });
+            }
             return;
         }
         
@@ -415,9 +420,24 @@ const Manifest = () => {
         }
     };
 
-    const handleGroupTemplateChange = (templateValue) => {
+    const handleGroupTemplateChange = (templateValue, options = {}) => {
+        const { syncSmsTemplate = true } = options;
         let subject = '';
         let message = '';
+
+        if (templateValue === 'custom') {
+            setGroupMessageForm(prev => ({
+                ...prev,
+                subject: '🎈 From Fly Away',
+                message: '',
+                template: 'custom'
+            }));
+
+            if (syncSmsTemplate && groupSmsForm.template !== 'custom') {
+                handleGroupSmsTemplateChange('custom', { syncEmailTemplate: false });
+            }
+            return;
+        }
 
         const dbTemplate = emailTemplates.find(t => t.id.toString() === templateValue.toString());
         const previewBooking = groupMessagePreviewBooking || (groupSelectedBookings.length > 0 ? groupSelectedBookings[0] : selectedBookingForEmail);
@@ -443,10 +463,6 @@ const Manifest = () => {
             case 'to_be_updated':
                 subject = 'Flight update';
                 message = getDefaultTemplateMessageHtml('To Be Updated', previewBooking) || '';
-                break;
-            case 'custom':
-                subject = '🎈 From Fly Away';
-                message = '';
                 break;
             default:
                 subject = groupMessageForm.subject || '';
