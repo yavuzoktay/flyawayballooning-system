@@ -29,6 +29,7 @@ const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
 const FNV_32_OFFSET_BASIS = 0x811c9dc5;
 const FNV_32_SECONDARY_SEED = 0x9e3779b1;
 const FNV_32_PRIME = 0x01000193;
+const CUSTOMER_PORTAL_PRE_FORMATTED_CREATED_AT_REGEX = /^\d{2}\/\d{2}\/\d{4}(?: \d{2}:\d{2})?$/;
 
 const base64Encode = (value = '') => {
     try {
@@ -52,6 +53,36 @@ const getUtf8Bytes = (value = '') => {
         return Uint8Array.from(Buffer.from(String(value), 'utf8'));
     }
     return Uint8Array.from(String(value)).map((character) => character.charCodeAt(0));
+};
+
+const formatCustomerPortalCreatedAt = (rawCreatedAt = '') => {
+    if (rawCreatedAt == null || rawCreatedAt === '') {
+        return '';
+    }
+
+    if (typeof rawCreatedAt === 'string') {
+        const trimmedValue = rawCreatedAt.trim();
+        if (!trimmedValue) {
+            return '';
+        }
+
+        // Keep already-formatted legacy portal timestamps stable so preview
+        // links match the server's deterministic short-code recovery.
+        if (CUSTOMER_PORTAL_PRE_FORMATTED_CREATED_AT_REGEX.test(trimmedValue)) {
+            return trimmedValue;
+        }
+    }
+
+    try {
+        const dateObj = dayjs(rawCreatedAt);
+        if (dateObj.isValid()) {
+            return dateObj.format('DD/MM/YYYY HH:mm');
+        }
+    } catch (error) {
+        console.warn('Error formatting customer portal created_at:', error);
+    }
+
+    return String(rawCreatedAt).trim();
 };
 
 const buildCustomerPortalToken = (booking = {}) => {
@@ -132,24 +163,9 @@ const buildCustomerPortalToken = (booking = {}) => {
     }
 
     // Format created_at to DD/MM/YYYY HH:mm format (same as server-side)
-    let formattedCreatedAt = '';
-    const rawCreatedAt = booking.created_at ?? booking.created ?? '';
-    if (rawCreatedAt) {
-        try {
-            // Try to parse and format the date using dayjs
-            const dateObj = dayjs(rawCreatedAt);
-            if (dateObj.isValid()) {
-                // Format as DD/MM/YYYY HH:mm (same as server-side)
-                formattedCreatedAt = dateObj.format('DD/MM/YYYY HH:mm');
-            } else {
-                // If parsing fails, use the original value
-                formattedCreatedAt = String(rawCreatedAt).trim();
-            }
-        } catch (e) {
-            // If error, use original value
-            formattedCreatedAt = String(rawCreatedAt).trim();
-        }
-    }
+    const formattedCreatedAt = formatCustomerPortalCreatedAt(
+        booking.created_at ?? booking.created ?? ''
+    );
 
     const sourceParts = [
         idToUse,

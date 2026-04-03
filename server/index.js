@@ -34715,6 +34715,39 @@ function wrapParagraphs(paragraphs = []) {
         .join('');
 }
 
+const CUSTOMER_PORTAL_PRE_FORMATTED_CREATED_AT_REGEX = /^\d{2}\/\d{2}\/\d{4}(?: \d{2}:\d{2})?$/;
+
+function formatCustomerPortalCreatedAt(rawCreatedAt = '') {
+    if (rawCreatedAt == null || rawCreatedAt === '') {
+        return '';
+    }
+
+    if (typeof rawCreatedAt === 'string') {
+        const trimmedValue = rawCreatedAt.trim();
+        if (!trimmedValue) {
+            return '';
+        }
+
+        // Some legacy short links were generated from already-formatted
+        // portal timestamps (DD/MM/YYYY HH:mm). Re-parsing these strings can
+        // shift the time and break deterministic short-code recovery.
+        if (CUSTOMER_PORTAL_PRE_FORMATTED_CREATED_AT_REGEX.test(trimmedValue)) {
+            return trimmedValue;
+        }
+    }
+
+    try {
+        const dateObj = moment(rawCreatedAt);
+        if (dateObj.isValid()) {
+            return dateObj.format('DD/MM/YYYY HH:mm');
+        }
+    } catch (error) {
+        console.warn('Error formatting customer portal created_at:', error);
+    }
+
+    return String(rawCreatedAt).trim();
+}
+
 function buildCustomerPortalToken(booking = {}) {
     const explicitToken =
         booking.customerPortalToken ||
@@ -34794,24 +34827,9 @@ function buildCustomerPortalToken(booking = {}) {
     }
 
     // Format created_at to DD/MM/YYYY HH:mm format (same as frontend)
-    let formattedCreatedAt = '';
-    const rawCreatedAt = booking.created_at ?? booking.created ?? '';
-    if (rawCreatedAt) {
-        try {
-            // Try to parse and format the date
-            const dateObj = moment(rawCreatedAt);
-            if (dateObj.isValid()) {
-                // Format as DD/MM/YYYY HH:mm (same as frontend)
-                formattedCreatedAt = dateObj.format('DD/MM/YYYY HH:mm');
-            } else {
-                // If parsing fails, use the original value
-                formattedCreatedAt = String(rawCreatedAt).trim();
-            }
-        } catch (e) {
-            // If error, use original value
-            formattedCreatedAt = String(rawCreatedAt).trim();
-        }
-    }
+    const formattedCreatedAt = formatCustomerPortalCreatedAt(
+        booking.created_at ?? booking.created ?? ''
+    );
 
     const sourceParts = [
         idToUse,
