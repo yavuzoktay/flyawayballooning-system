@@ -30246,6 +30246,22 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                 // mark processed and store id to avoid duplicates
                 storeData.processed = true;
                 storeData.bookingData.booking_id = result;
+
+                if (storeData.manualBooking) {
+                    try {
+                        const manualBookingProfile = extractManualBookingProfileFromBookingData(storeData.bookingData);
+                        if (isTheNewtManualBookingProfile(manualBookingProfile)) {
+                            const invoiceEmailResult = await sendTheNewtVatInvoiceEmail({
+                                bookingId: result,
+                                manualBookingProfile,
+                                bookingData: storeData.bookingData
+                            });
+                            storeData.bookingData.the_newt_vat_invoice_email = invoiceEmailResult;
+                        }
+                    } catch (invoiceError) {
+                        console.error('❌ [createBookingFromSession] Error while sending The Newt VAT invoice email:', invoiceError);
+                    }
+                }
             } finally {
                 storeData.processing = false;
             }
@@ -36169,6 +36185,328 @@ function resolveBodyHtml(template = {}, fallbackParagraphsHtml = '') {
         return textToParagraphHtml(raw);
     }
     return fallbackParagraphsHtml;
+}
+
+const THE_NEWT_VAT_INVOICE_TEMPLATE_TYPE = 'the_newt_vat_invoice';
+const THE_NEWT_VAT_INVOICE_CONFIG = Object.freeze({
+    accommodationName: 'The Newt',
+    lineItemDescription: 'Private Charter Balloon Flight',
+    netAmount: 825,
+    vatRatePercent: 20,
+    vatAmount: 165,
+    grossAmount: 990,
+    vatNumber: '439125200',
+    companyName: 'FLY AWAY BALLOONING LTD',
+    companyAddress: 'St John’s House, Castle St, Taunton, TA1 4AY',
+    bankName: 'Starling',
+    accountName: 'FLY AWAY BALLOONING LTD',
+    sortCode: '608371',
+    accountNumber: '38742247'
+});
+
+function parsePossibleJsonObject(value) {
+    if (!value) return null;
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    return typeof value === 'object' ? value : null;
+}
+
+function normalizeComparableText(value = '') {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+}
+
+function getManualBookingProfileField(profile = {}, keys = []) {
+    if (!profile || typeof profile !== 'object') return '';
+
+    for (const key of keys) {
+        const value = profile[key];
+        if (value === null || value === undefined) continue;
+        const normalized = String(value).trim();
+        if (normalized) return normalized;
+    }
+
+    return '';
+}
+
+function extractManualBookingProfileFromBookingData(bookingData = {}) {
+    const additionalInfo = parsePossibleJsonObject(bookingData?.additionalInfo);
+    if (!additionalInfo || typeof additionalInfo !== 'object') {
+        return null;
+    }
+
+    const manualBookingProfile = parsePossibleJsonObject(additionalInfo.manual_booking_profile);
+    return manualBookingProfile && typeof manualBookingProfile === 'object'
+        ? manualBookingProfile
+        : null;
+}
+
+function isTheNewtManualBookingProfile(profile = null) {
+    const hotelName = getManualBookingProfileField(profile, [
+        'accommodation_name',
+        'accommodationName',
+        'hotel_name',
+        'hotelName'
+    ]);
+
+    return normalizeComparableText(hotelName) === normalizeComparableText(THE_NEWT_VAT_INVOICE_CONFIG.accommodationName);
+}
+
+function formatCurrencyAmount(amount) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) return '£0';
+    return `£${numericAmount.toFixed(2).replace(/\.00$/, '')}`;
+}
+
+function buildTheNewtVatInvoiceEmailContent({ bookingId, manualBookingProfile = {}, bookingData = {} }) {
+    const hotelName = getManualBookingProfileField(manualBookingProfile, [
+        'accommodation_name',
+        'accommodationName',
+        'hotel_name',
+        'hotelName'
+    ]) || THE_NEWT_VAT_INVOICE_CONFIG.accommodationName;
+    const billingEmail = getManualBookingProfileField(manualBookingProfile, [
+        'contact_email',
+        'contactEmail',
+        'email'
+    ]);
+    const staffName = getManualBookingProfileField(manualBookingProfile, [
+        'staff_name',
+        'staffName'
+    ]);
+    const bookingReference = bookingId ? `FAB-${bookingId}` : 'FAB-INVOICE';
+    const flightDateLabel = formatDateTime(bookingData?.selectedDate) || formatDate(bookingData?.selectedDate) || 'To be confirmed';
+    const locationLabel = bookingData?.chooseLocation || 'Somerset';
+    const contactName = staffName || `${hotelName} team`;
+
+    const highlightHtml = `
+        <p style="margin:0 0 8px;"><strong>Booking reference:</strong> ${escapeHtml(bookingReference)}</p>
+        <p style="margin:0 0 8px;"><strong>Hotel:</strong> ${escapeHtml(hotelName)}</p>
+        <p style="margin:0 0 8px;"><strong>Billing email:</strong> ${escapeHtml(billingEmail || 'Not provided')}</p>
+        <p style="margin:0 0 8px;"><strong>Staff contact:</strong> ${escapeHtml(staffName || 'Not provided')}</p>
+        <p style="margin:0;"><strong>Flight:</strong> ${escapeHtml(locationLabel)}${flightDateLabel ? `, ${escapeHtml(flightDateLabel)}` : ''}</p>
+    `;
+
+    const bodyHtml = `
+        ${wrapParagraphs([
+            `Hello ${escapeHtml(contactName)},`,
+            'Thank you for choosing Fly Away Ballooning. Please find your VAT invoice below for your The Newt private charter balloon booking.',
+            `Please use <strong>${escapeHtml(bookingReference)}</strong> as the payment reference when making the bank transfer.`
+        ])}
+        <div style="border:1px solid #dbe4f0; border-radius:16px; overflow:hidden; margin:24px 0;">
+            <div style="background:#f8fafc; padding:16px 20px; border-bottom:1px solid #dbe4f0; font-size:18px; font-weight:700; color:#111827;">Invoice Summary</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                <tr>
+                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; color:#111827;">${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.lineItemDescription)}</td>
+                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; text-align:right; color:#111827;">${formatCurrencyAmount(THE_NEWT_VAT_INVOICE_CONFIG.netAmount)}</td>
+                </tr>
+                <tr>
+                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; color:#111827;">VAT (${THE_NEWT_VAT_INVOICE_CONFIG.vatRatePercent}%)</td>
+                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; text-align:right; color:#111827;">${formatCurrencyAmount(THE_NEWT_VAT_INVOICE_CONFIG.vatAmount)}</td>
+                </tr>
+                <tr>
+                    <td style="padding:18px 20px; font-size:18px; font-weight:700; color:#111827;">Total Due</td>
+                    <td style="padding:18px 20px; text-align:right; font-size:18px; font-weight:700; color:#111827;">${formatCurrencyAmount(THE_NEWT_VAT_INVOICE_CONFIG.grossAmount)}</td>
+                </tr>
+            </table>
+        </div>
+        <div style="display:block; margin:24px 0;">
+            <div style="border:1px solid #dbe4f0; border-radius:16px; padding:18px 20px; margin-bottom:16px;">
+                <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:12px;">Bank Details</div>
+                <p style="margin:0 0 8px;"><strong>Account Name:</strong> ${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.accountName)}</p>
+                <p style="margin:0 0 8px;"><strong>Account Number:</strong> ${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.accountNumber)}</p>
+                <p style="margin:0 0 8px;"><strong>Sort Code:</strong> ${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.sortCode)}</p>
+                <p style="margin:0;"><strong>Bank:</strong> ${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.bankName)}</p>
+            </div>
+            <div style="border:1px solid #dbe4f0; border-radius:16px; padding:18px 20px;">
+                <div style="font-size:18px; font-weight:700; color:#111827; margin-bottom:12px;">Company Details</div>
+                <p style="margin:0 0 8px;"><strong>Company:</strong> ${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.companyName)}</p>
+                <p style="margin:0 0 8px;"><strong>VAT Number:</strong> ${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.vatNumber)}</p>
+                <p style="margin:0;"><strong>Address:</strong> ${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.companyAddress)}</p>
+            </div>
+        </div>
+        ${wrapParagraphs([
+            'If you need any amendments to this invoice, please reply directly to this email and our team will be happy to help.',
+            'Kind regards,'
+        ])}
+    `;
+
+    const subject = `VAT Invoice - The Newt Balloon Booking (${bookingReference})`;
+    const html = buildEmailLayout({
+        subject,
+        headline: 'VAT Invoice',
+        highlightHtml,
+        bodyHtml,
+        customerName: contactName,
+        signatureLines: [
+            'Fly Away Ballooning LTD',
+            'info@flyawayballooning.com'
+        ],
+        footerLinks: [],
+        disableFormatDetection: true
+    });
+
+    return {
+        subject,
+        html,
+        text: convertHtmlToText(html)
+    };
+}
+
+async function sendTheNewtVatInvoiceEmail({
+    bookingId,
+    manualBookingProfile = {},
+    bookingData = {},
+    overrideRecipientEmail = null,
+    force = false
+} = {}) {
+    try {
+        if (!isEmailServiceAvailable()) {
+            console.warn('⚠️ [sendTheNewtVatInvoiceEmail] Email service not configured, skipping VAT invoice email.');
+            return { sent: false, skipped: true, reason: 'email_service_unavailable' };
+        }
+
+        const recipientEmail = (overrideRecipientEmail || getManualBookingProfileField(manualBookingProfile, [
+            'contact_email',
+            'contactEmail',
+            'email'
+        ])).trim();
+
+        if (!recipientEmail) {
+            console.warn('⚠️ [sendTheNewtVatInvoiceEmail] No recipient email available, skipping VAT invoice email.', {
+                bookingId
+            });
+            return { sent: false, skipped: true, reason: 'missing_recipient_email' };
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(recipientEmail)) {
+            console.warn('⚠️ [sendTheNewtVatInvoiceEmail] Recipient email is invalid, skipping VAT invoice email.', {
+                bookingId,
+                recipientEmail
+            });
+            return { sent: false, skipped: true, reason: 'invalid_recipient_email' };
+        }
+
+        await new Promise((resolve) => ensureEmailLogsSchema(() => resolve()));
+
+        if (!force) {
+            const existingLog = await new Promise((resolve) => {
+                const duplicateSql = `
+                    SELECT id, sent_at
+                    FROM email_logs
+                    WHERE context_type = 'booking'
+                      AND context_id = ?
+                      AND template_type = ?
+                    ORDER BY sent_at DESC
+                    LIMIT 1
+                `;
+                con.query(duplicateSql, [String(bookingId), THE_NEWT_VAT_INVOICE_TEMPLATE_TYPE], (err, rows) => {
+                    if (err) {
+                        console.warn('⚠️ [sendTheNewtVatInvoiceEmail] Could not check existing email log, continuing anyway:', err?.message || err);
+                        return resolve(null);
+                    }
+                    resolve(rows && rows.length > 0 ? rows[0] : null);
+                });
+            });
+
+            if (existingLog) {
+                console.log('⏭️ [sendTheNewtVatInvoiceEmail] VAT invoice email already logged, skipping duplicate send.', {
+                    bookingId,
+                    recipientEmail,
+                    emailLogId: existingLog.id
+                });
+                return { sent: false, skipped: true, reason: 'already_sent' };
+            }
+        }
+
+        const { subject, html, text } = buildTheNewtVatInvoiceEmailContent({
+            bookingId,
+            manualBookingProfile,
+            bookingData
+        });
+
+        const emailPayload = {
+            to: recipientEmail,
+            from: {
+                email: 'info@flyawayballooning.com',
+                name: 'Fly Away Ballooning'
+            },
+            subject,
+            html,
+            text,
+            custom_args: {
+                booking_id: bookingId ? String(bookingId) : 'manual-booking',
+                template_type: THE_NEWT_VAT_INVOICE_TEMPLATE_TYPE,
+                context_type: 'booking',
+                context_id: bookingId ? String(bookingId) : recipientEmail
+            }
+        };
+
+        const { provider, messageId } = await sendEmailWithFallback(emailPayload, {
+            context: 'the_newt_vat_invoice'
+        });
+
+        const bookingIdValue = bookingId && Number.isFinite(Number(bookingId)) ? Number(bookingId) : null;
+        await new Promise((resolve) => {
+            const logSql = `
+                INSERT INTO email_logs (
+                    booking_id,
+                    recipient_email,
+                    subject,
+                    template_type,
+                    message_html,
+                    message_text,
+                    sent_at,
+                    status,
+                    message_id,
+                    opens,
+                    clicks,
+                    last_event,
+                    last_event_at,
+                    context_type,
+                    context_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), 'booking', ?)
+            `;
+            con.query(logSql, [
+                bookingIdValue,
+                recipientEmail,
+                subject,
+                THE_NEWT_VAT_INVOICE_TEMPLATE_TYPE,
+                html,
+                text,
+                messageId,
+                bookingId ? String(bookingId) : recipientEmail
+            ], (err) => {
+                if (err) {
+                    console.error('❌ [sendTheNewtVatInvoiceEmail] Failed to log VAT invoice email:', err);
+                }
+                resolve();
+            });
+        });
+
+        console.log(`✅ [sendTheNewtVatInvoiceEmail] VAT invoice email sent via ${provider}`, {
+            bookingId,
+            recipientEmail,
+            messageId
+        });
+
+        return { sent: true, provider, messageId, recipientEmail };
+    } catch (error) {
+        console.error('❌ [sendTheNewtVatInvoiceEmail] Failed to send VAT invoice email:', error);
+        return { sent: false, skipped: false, reason: 'send_failed', error: error?.message || String(error) };
+    }
 }
 
 // Helper function to generate booking confirmation email HTML using database template
