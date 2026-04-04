@@ -10,6 +10,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
     const [isLaunchingManualBooking, setIsLaunchingManualBooking] = useState(false);
+    const [isLaunchingTheNewtBooking, setIsLaunchingTheNewtBooking] = useState(false);
     const [isLaunchingHotelManualBooking, setIsLaunchingHotelManualBooking] = useState(false);
     const API_BASE_URL = config.API_BASE_URL;
 
@@ -309,9 +310,19 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         return token;
     };
 
-    const navigateToManualBooking = (path, token) => {
+    const navigateToManualBooking = (path, token, options = {}) => {
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-        const bookingUrl = `${getBookingBaseUrl()}${normalizedPath}?manualBooking=1&source=admin&manualBookingToken=${encodeURIComponent(token)}`;
+        const { tokenParam = 'manualBookingToken', includeLegacyParams = true } = options;
+        const queryParams = new URLSearchParams();
+
+        if (includeLegacyParams) {
+            queryParams.set('manualBooking', '1');
+            queryParams.set('source', 'admin');
+        }
+
+        queryParams.set(tokenParam, token);
+
+        const bookingUrl = `${getBookingBaseUrl()}${normalizedPath}?${queryParams.toString()}`;
 
         if (typeof window !== 'undefined') {
             window.location.assign(bookingUrl);
@@ -345,6 +356,24 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             alert(error?.response?.data?.message || error.message || 'Could not start hotel manual booking.');
         } finally {
             setIsLaunchingHotelManualBooking(false);
+        }
+    };
+
+    const handleTheNewtManualBookingClick = async () => {
+        if (isLaunchingTheNewtBooking) return;
+
+        try {
+            setIsLaunchingTheNewtBooking(true);
+            const token = await requestManualBookingToken();
+            navigateToManualBooking('/thenewt', token, {
+                tokenParam: 't',
+                includeLegacyParams: false
+            });
+        } catch (error) {
+            console.error('Error starting The Newt manual booking:', error);
+            alert(error?.response?.data?.message || error.message || 'Could not start The Newt balloon booking.');
+        } finally {
+            setIsLaunchingTheNewtBooking(false);
         }
     };
 
@@ -508,6 +537,32 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                             )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, minWidth: 210, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
+                            <button
+                                type="button"
+                                onClick={handleTheNewtManualBookingClick}
+                                disabled={isLaunchingTheNewtBooking}
+                                style={{
+                                    display: 'inline-block',
+                                    background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 10,
+                                    padding: '10px 20px',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    letterSpacing: '0.04em',
+                                    textTransform: 'uppercase',
+                                    textAlign: 'center',
+                                    textDecoration: 'none',
+                                    cursor: isLaunchingTheNewtBooking ? 'wait' : 'pointer',
+                                    boxShadow: '0 8px 20px rgba(15, 118, 110, 0.18)',
+                                    width: '100%',
+                                    maxWidth: 210,
+                                    opacity: isLaunchingTheNewtBooking ? 0.75 : 1
+                                }}
+                            >
+                                {isLaunchingTheNewtBooking ? 'Opening...' : 'The Newt Balloon Booking'}
+                            </button>
                             <button
                                 type="button"
                                 onClick={handleHotelManualBookingClick}
