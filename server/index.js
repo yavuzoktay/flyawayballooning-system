@@ -3941,7 +3941,10 @@ function getTieredPriceForPassengers(pricingMapRaw, voucherTitleRaw, passengers 
     }
 
     if (typeof entry === 'object' && !Array.isArray(entry)) {
-        const tierKey = String([2, 3, 4, 8].includes(Number(passengers)) ? Number(passengers) : 2);
+        const passengerCount = Number(passengers);
+        const tierKey = [2, 3, 4].includes(passengerCount)
+            ? String(passengerCount)
+            : (passengerCount >= 5 ? '8' : '2');
         const tierValue = entry[tierKey] ?? entry['2'];
         return parseNumericPrice(tierValue);
     }
@@ -4621,7 +4624,9 @@ app.get('/api/private-charter-voucher-types', (req, res) => {
                     console.error('Error fetching activity for pricing:', aErr);
                 } else if (aRes && aRes.length > 0) {
                     const normalize = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
-                    const selectedPassengers = passengers && [2, 3, 4, 8].includes(passengers) ? String(passengers) : '2';
+                    const selectedPassengers = [2, 3, 4].includes(passengers)
+                        ? String(passengers)
+                        : (passengers >= 5 ? '8' : '2');
                     // Map titles to prices (tolerant)
                     finalResult = finalResult.map(v => {
                         const pricingPayload = buildPrivateCharterPricingPayload({
@@ -30257,6 +30262,7 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                                 bookingData: storeData.bookingData
                             });
                             storeData.bookingData.the_newt_vat_invoice_email = invoiceEmailResult;
+                            storeData.bookingData.the_newt_purchase_order = invoiceEmailResult?.purchaseOrderNumber || null;
                         }
                     } catch (invoiceError) {
                         console.error('❌ [createBookingFromSession] Error while sending The Newt VAT invoice email:', invoiceError);
@@ -34703,6 +34709,32 @@ function ensureEmailLogsSchema(callback) {
     });
 }
 
+let theNewtPurchaseOrderSchemaEnsured = false;
+function ensureTheNewtPurchaseOrderSchema(callback) {
+    if (theNewtPurchaseOrderSchemaEnsured) return callback && callback();
+
+    const createTableSql = `
+        CREATE TABLE IF NOT EXISTS the_newt_purchase_orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            booking_id INT NOT NULL UNIQUE,
+            recipient_email VARCHAR(255) DEFAULT NULL,
+            purchase_order_number VARCHAR(50) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_the_newt_purchase_order_number (purchase_order_number),
+            INDEX idx_the_newt_purchase_order_recipient (recipient_email)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `;
+
+    con.query(createTableSql, (err) => {
+        if (err) {
+            console.error('Error creating the_newt_purchase_orders table:', err);
+        }
+        theNewtPurchaseOrderSchemaEnsured = true;
+        return callback && callback();
+    });
+}
+
 const CUSTOMER_PORTAL_HOST = BACKEND_PUBLIC_URL || 'https://flyawayballooning-system.com';
 const CUSTOMER_PORTAL_BASE_URL = `${CUSTOMER_PORTAL_HOST}/customerPortal`;
 const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
@@ -36190,11 +36222,14 @@ function resolveBodyHtml(template = {}, fallbackParagraphsHtml = '') {
 const THE_NEWT_VAT_INVOICE_TEMPLATE_TYPE = 'the_newt_vat_invoice';
 const THE_NEWT_VAT_INVOICE_CONFIG = Object.freeze({
     accommodationName: 'The Newt',
-    lineItemDescription: 'Private Charter Balloon Flight',
-    netAmount: 825,
+    lineItemBaseDescription: 'Private Charter Balloon Flight',
+    rateCard: Object.freeze([
+        Object.freeze({ minPassengers: 1, maxPassengers: 2, netAmount: 825 }),
+        Object.freeze({ minPassengers: 3, maxPassengers: 3, netAmount: 962.5 }),
+        Object.freeze({ minPassengers: 4, maxPassengers: 4, netAmount: 1100 }),
+        Object.freeze({ minPassengers: 5, maxPassengers: 8, netAmount: 1650 })
+    ]),
     vatRatePercent: 20,
-    vatAmount: 165,
-    grossAmount: 990,
     vatNumber: '439125200',
     companyName: 'FLY AWAY BALLOONING LTD',
     companyAddress: 'St John’s House, Castle St, Taunton, TA1 4AY',
@@ -36268,7 +36303,113 @@ function formatCurrencyAmount(amount) {
     return `£${numericAmount.toFixed(2).replace(/\.00$/, '')}`;
 }
 
-function buildTheNewtVatInvoiceEmailContent({ bookingId, manualBookingProfile = {}, bookingData = {} }) {
+async function getOrCreateTheNewtPurchaseOrder({ bookingId, recipientEmail = '' } = {}) {
+    const normalizedBookingId = parsePositiveInt(bookingId);
+    if (!normalizedBookingId) {
+        return { purchaseOrderNumber: null, sequenceNumber: null };
+    }
+
+    await new Promise((resolve) => ensureTheNewtPurchaseOrderSchema(() => resolve()));
+
+    const applyPurchaseOrderRowUpdates = async (row) => {
+        const purchaseOrderNumber = row.purchase_order_number || `FAB${row.id}`;
+        const shouldUpdateNumber = row.purchase_order_number !== purchaseOrderNumber;
+        const shouldUpdateRecipient = !!recipientEmail && row.recipient_email !== recipientEmail;
+
+        if (shouldUpdateNumber || shouldUpdateRecipient) {
+            await runPoolQuery(
+                `
+                    UPDATE the_newt_purchase_orders
+                    SET purchase_order_number = ?, recipient_email = ?
+                    WHERE id = ?
+                `,
+                [purchaseOrderNumber, recipientEmail || row.recipient_email || null, row.id]
+            );
+        }
+
+        return {
+            purchaseOrderNumber,
+            sequenceNumber: row.id,
+            bookingId: normalizedBookingId
+        };
+    };
+
+    const existingRows = await runPoolQuery(
+        `
+            SELECT id, booking_id, recipient_email, purchase_order_number
+            FROM the_newt_purchase_orders
+            WHERE booking_id = ?
+            LIMIT 1
+        `,
+        [normalizedBookingId]
+    );
+
+    if (Array.isArray(existingRows) && existingRows.length > 0) {
+        return applyPurchaseOrderRowUpdates(existingRows[0]);
+    }
+
+    try {
+        const insertResult = await runPoolQuery(
+            `
+                INSERT INTO the_newt_purchase_orders (booking_id, recipient_email)
+                VALUES (?, ?)
+            `,
+            [normalizedBookingId, recipientEmail || null]
+        );
+
+        return applyPurchaseOrderRowUpdates({
+            id: insertResult.insertId,
+            booking_id: normalizedBookingId,
+            recipient_email: recipientEmail || null,
+            purchase_order_number: null
+        });
+    } catch (error) {
+        if (error?.code === 'ER_DUP_ENTRY') {
+            const duplicateRows = await runPoolQuery(
+                `
+                    SELECT id, booking_id, recipient_email, purchase_order_number
+                    FROM the_newt_purchase_orders
+                    WHERE booking_id = ?
+                    LIMIT 1
+                `,
+                [normalizedBookingId]
+            );
+
+            if (Array.isArray(duplicateRows) && duplicateRows.length > 0) {
+                return applyPurchaseOrderRowUpdates(duplicateRows[0]);
+            }
+        }
+
+        throw error;
+    }
+}
+
+function resolveTheNewtVatInvoicePricing(bookingData = {}) {
+    const derivedPassengerCount = Math.max(parsePositiveInt(derivePassengerCount(bookingData, { preferStoredCount: false })) || 2, 2);
+    const matchingRate =
+        THE_NEWT_VAT_INVOICE_CONFIG.rateCard.find((entry) =>
+            derivedPassengerCount >= entry.minPassengers && derivedPassengerCount <= entry.maxPassengers
+        ) || THE_NEWT_VAT_INVOICE_CONFIG.rateCard[THE_NEWT_VAT_INVOICE_CONFIG.rateCard.length - 1];
+    const netAmount = roundCurrency(matchingRate?.netAmount || 0);
+    const vatAmount = roundCurrency(netAmount * (THE_NEWT_VAT_INVOICE_CONFIG.vatRatePercent / 100));
+    const grossAmount = roundCurrency(netAmount + vatAmount);
+
+    return {
+        passengerCount: derivedPassengerCount,
+        netAmount,
+        vatAmount,
+        grossAmount,
+        lineItemDescription: `${THE_NEWT_VAT_INVOICE_CONFIG.lineItemBaseDescription} (${derivedPassengerCount} passenger${derivedPassengerCount === 1 ? '' : 's'})`
+    };
+}
+
+function buildTheNewtVatInvoiceEmailContent({
+    bookingId,
+    manualBookingProfile = {},
+    bookingData = {},
+    purchaseOrderNumber = null,
+    pricing = null
+}) {
     const hotelName = getManualBookingProfileField(manualBookingProfile, [
         'accommodation_name',
         'accommodationName',
@@ -36285,15 +36426,19 @@ function buildTheNewtVatInvoiceEmailContent({ bookingId, manualBookingProfile = 
         'staffName'
     ]);
     const bookingReference = bookingId ? `FAB-${bookingId}` : 'FAB-INVOICE';
+    const resolvedPricing = pricing || resolveTheNewtVatInvoicePricing(bookingData);
+    const paymentReference = purchaseOrderNumber || bookingReference;
     const flightDateLabel = formatDateTime(bookingData?.selectedDate) || formatDate(bookingData?.selectedDate) || 'To be confirmed';
     const locationLabel = bookingData?.chooseLocation || 'Somerset';
     const contactName = staffName || `${hotelName} team`;
 
     const highlightHtml = `
+        <p style="margin:0 0 8px;"><strong>Purchase order:</strong> ${escapeHtml(purchaseOrderNumber || 'Pending')}</p>
         <p style="margin:0 0 8px;"><strong>Booking reference:</strong> ${escapeHtml(bookingReference)}</p>
         <p style="margin:0 0 8px;"><strong>Hotel:</strong> ${escapeHtml(hotelName)}</p>
         <p style="margin:0 0 8px;"><strong>Billing email:</strong> ${escapeHtml(billingEmail || 'Not provided')}</p>
         <p style="margin:0 0 8px;"><strong>Staff contact:</strong> ${escapeHtml(staffName || 'Not provided')}</p>
+        <p style="margin:0 0 8px;"><strong>Passengers:</strong> ${escapeHtml(String(resolvedPricing.passengerCount))}</p>
         <p style="margin:0;"><strong>Flight:</strong> ${escapeHtml(locationLabel)}${flightDateLabel ? `, ${escapeHtml(flightDateLabel)}` : ''}</p>
     `;
 
@@ -36301,22 +36446,22 @@ function buildTheNewtVatInvoiceEmailContent({ bookingId, manualBookingProfile = 
         ${wrapParagraphs([
             `Hello ${escapeHtml(contactName)},`,
             'Thank you for choosing Fly Away Ballooning. Please find your VAT invoice below for your The Newt private charter balloon booking.',
-            `Please use <strong>${escapeHtml(bookingReference)}</strong> as the payment reference when making the bank transfer.`
+            `Please use <strong>${escapeHtml(paymentReference)}</strong> as the payment reference when making the bank transfer.`
         ])}
         <div style="border:1px solid #dbe4f0; border-radius:16px; overflow:hidden; margin:24px 0;">
             <div style="background:#f8fafc; padding:16px 20px; border-bottom:1px solid #dbe4f0; font-size:18px; font-weight:700; color:#111827;">Invoice Summary</div>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                 <tr>
-                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; color:#111827;">${escapeHtml(THE_NEWT_VAT_INVOICE_CONFIG.lineItemDescription)}</td>
-                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; text-align:right; color:#111827;">${formatCurrencyAmount(THE_NEWT_VAT_INVOICE_CONFIG.netAmount)}</td>
+                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; color:#111827;">${escapeHtml(resolvedPricing.lineItemDescription)}</td>
+                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; text-align:right; color:#111827;">${formatCurrencyAmount(resolvedPricing.netAmount)}</td>
                 </tr>
                 <tr>
                     <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; color:#111827;">VAT (${THE_NEWT_VAT_INVOICE_CONFIG.vatRatePercent}%)</td>
-                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; text-align:right; color:#111827;">${formatCurrencyAmount(THE_NEWT_VAT_INVOICE_CONFIG.vatAmount)}</td>
+                    <td style="padding:16px 20px; border-bottom:1px solid #e5e7eb; text-align:right; color:#111827;">${formatCurrencyAmount(resolvedPricing.vatAmount)}</td>
                 </tr>
                 <tr>
                     <td style="padding:18px 20px; font-size:18px; font-weight:700; color:#111827;">Total Due</td>
-                    <td style="padding:18px 20px; text-align:right; font-size:18px; font-weight:700; color:#111827;">${formatCurrencyAmount(THE_NEWT_VAT_INVOICE_CONFIG.grossAmount)}</td>
+                    <td style="padding:18px 20px; text-align:right; font-size:18px; font-weight:700; color:#111827;">${formatCurrencyAmount(resolvedPricing.grossAmount)}</td>
                 </tr>
             </table>
         </div>
@@ -36341,7 +36486,7 @@ function buildTheNewtVatInvoiceEmailContent({ bookingId, manualBookingProfile = 
         ])}
     `;
 
-    const subject = `VAT Invoice - The Newt Balloon Booking (${bookingReference})`;
+    const subject = `VAT Invoice - The Newt Balloon Booking (${purchaseOrderNumber || bookingReference})`;
     const html = buildEmailLayout({
         subject,
         headline: 'VAT Invoice',
@@ -36399,6 +36544,11 @@ async function sendTheNewtVatInvoiceEmail({
         }
 
         await new Promise((resolve) => ensureEmailLogsSchema(() => resolve()));
+        const purchaseOrderRecord = await getOrCreateTheNewtPurchaseOrder({
+            bookingId,
+            recipientEmail
+        });
+        const pricing = resolveTheNewtVatInvoicePricing(bookingData);
 
         if (!force) {
             const existingLog = await new Promise((resolve) => {
@@ -36426,14 +36576,25 @@ async function sendTheNewtVatInvoiceEmail({
                     recipientEmail,
                     emailLogId: existingLog.id
                 });
-                return { sent: false, skipped: true, reason: 'already_sent' };
+                return {
+                    sent: false,
+                    skipped: true,
+                    reason: 'already_sent',
+                    recipientEmail,
+                    purchaseOrderNumber: purchaseOrderRecord?.purchaseOrderNumber || null,
+                    passengerCount: pricing.passengerCount,
+                    netAmount: pricing.netAmount,
+                    grossAmount: pricing.grossAmount
+                };
             }
         }
 
         const { subject, html, text } = buildTheNewtVatInvoiceEmailContent({
             bookingId,
             manualBookingProfile,
-            bookingData
+            bookingData,
+            purchaseOrderNumber: purchaseOrderRecord?.purchaseOrderNumber || null,
+            pricing
         });
 
         const emailPayload = {
@@ -36502,7 +36663,16 @@ async function sendTheNewtVatInvoiceEmail({
             messageId
         });
 
-        return { sent: true, provider, messageId, recipientEmail };
+        return {
+            sent: true,
+            provider,
+            messageId,
+            recipientEmail,
+            purchaseOrderNumber: purchaseOrderRecord?.purchaseOrderNumber || null,
+            passengerCount: pricing.passengerCount,
+            netAmount: pricing.netAmount,
+            grossAmount: pricing.grossAmount
+        };
     } catch (error) {
         console.error('❌ [sendTheNewtVatInvoiceEmail] Failed to send VAT invoice email:', error);
         return { sent: false, skipped: false, reason: 'send_failed', error: error?.message || String(error) };
