@@ -14954,11 +14954,18 @@ app.post('/api/createBooking', (req, res) => {
                 }
             }
 
-            // If this booking was created via a rebook operation, previous history entries
-            // can be passed in history_entries. Copy them to preserve the timeline.
+            // If this creates a brand-new booking we may need to copy prior history over.
+            // For in-place rebooks (UPDATE on the same booking_id), the history already belongs
+            // to that booking, so copying it again creates duplicates.
             const incomingHistoryEntriesRaw = Array.isArray(req.body.history_entries) ? req.body.history_entries : [];
-            if (incomingHistoryEntriesRaw.length > 0) {
+            const historyEntriesToCopy = !isRebook ? incomingHistoryEntriesRaw : [];
+            if (historyEntriesToCopy.length > 0) {
                 console.log('📜 Copying history entries to new booking:', {
+                    booking_id: bookingId,
+                    entries: historyEntriesToCopy.length
+                });
+            } else if (incomingHistoryEntriesRaw.length > 0 && isRebook) {
+                console.log('⏭️ Skipping history copy for in-place rebook:', {
                     booking_id: bookingId,
                     entries: incomingHistoryEntriesRaw.length
                 });
@@ -14968,7 +14975,7 @@ app.post('/api/createBooking', (req, res) => {
             // flight_date is at index 2 in bookingValues array
             const flightDate = bookingValues[2] || selectedDate || null;
             
-            incomingHistoryEntriesRaw
+            historyEntriesToCopy
                 .filter(entry => entry && typeof entry.status === 'string' && entry.status.trim() !== '')
                 .forEach((entry, idx) => {
                     const statusValue = entry.status.trim();
@@ -15024,7 +15031,7 @@ app.post('/api/createBooking', (req, res) => {
 
             // Check if initial status already exists in copied history entries to avoid duplicates
             // This is especially important for rebook operations where history_entries already contains the current status
-            const initialStatusAlreadyExists = incomingHistoryEntriesRaw.some(entry => {
+            const initialStatusAlreadyExists = !isRebook && historyEntriesToCopy.some(entry => {
                 if (!entry || !entry.status) return false;
                 const entryStatus = entry.status.trim();
                 const entryFlightDate = entry.flight_date || null;
@@ -20220,24 +20227,36 @@ app.patch('/api/updateBookingField', (req, res) => {
                                 proceedWithAvailabilityRefresh();
                             });
                         } else if (lastRows && lastRows.length > 0) {
-                            // Update the last entry (any status) to Cancelled
-                            const updateSql = 'UPDATE booking_status_history SET status = ? WHERE id = ?';
-                            con.query(updateSql, [normalizedValue, lastRows[0].id], (updateErr) => {
-                                if (updateErr) {
-                                    console.error('Error updating entry to Cancelled:', updateErr);
-                                    // Fallback to insert if update fails
-                                    const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
-                                    con.query(historySql, [booking_id, normalizedValue], (err2) => {
-                                        if (err2) console.error('History insert error:', err2);
-                                        else console.log('updateBookingField - Status history başarıyla eklendi');
+                            // Update the last entry to Cancelled and refresh changed_at so history ordering
+                            // reflects when the cancellation happened, not when the slot was first booked.
+                            con.query('SELECT flight_date FROM all_booking WHERE id = ?', [booking_id], (fetchErr, bookingRows) => {
+                                const flightDate = !fetchErr && bookingRows && bookingRows[0]
+                                    ? (bookingRows[0].flight_date || null)
+                                    : null;
+                                const updateSql = flightDate
+                                    ? 'UPDATE booking_status_history SET status = ?, changed_at = NOW(), flight_date = COALESCE(flight_date, ?) WHERE id = ?'
+                                    : 'UPDATE booking_status_history SET status = ?, changed_at = NOW() WHERE id = ?';
+                                const updateParams = flightDate
+                                    ? [normalizedValue, flightDate, lastRows[0].id]
+                                    : [normalizedValue, lastRows[0].id];
+
+                                con.query(updateSql, updateParams, (updateErr) => {
+                                    if (updateErr) {
+                                        console.error('Error updating entry to Cancelled:', updateErr);
+                                        // Fallback to insert if update fails
+                                        const historySql = 'INSERT INTO booking_status_history (booking_id, status) VALUES (?, ?)';
+                                        con.query(historySql, [booking_id, normalizedValue], (err2) => {
+                                            if (err2) console.error('History insert error:', err2);
+                                            else console.log('updateBookingField - Status history başarıyla eklendi');
+                                            maybeIncrementFlightAttempts();
+                                            proceedWithAvailabilityRefresh();
+                                        });
+                                    } else {
+                                        console.log('updateBookingField - Updated last entry (', lastRows[0].status, ') to Cancelled:', lastRows[0].id);
                                         maybeIncrementFlightAttempts();
                                         proceedWithAvailabilityRefresh();
-                                    });
-                                } else {
-                                    console.log('updateBookingField - Updated last entry (', lastRows[0].status, ') to Cancelled:', lastRows[0].id);
-                                    maybeIncrementFlightAttempts();
-                                    proceedWithAvailabilityRefresh();
-                                }
+                                    }
+                                });
                             });
                         } else {
                             // No previous entry found, insert new Cancelled entry with flight_date if available
@@ -20474,12 +20493,16 @@ app.post('/api/cleanupCancelledCalendarEvents', async (req, res) => {
 app.get('/api/getBookingHistory', (req, res) => {
     const booking_id = req.query.booking_id;
     if (!booking_id) return res.status(400).json({ success: false, message: 'booking_id is required' });
-    // Join with all_booking to get flight_date for each history entry
-    // Order by changed_at DESC to show most recent first, but we'll reverse in frontend for chronological display
+    // Return history timestamps as timezone-less strings so the client can display the exact
+    // wall-clock booking times without browser/JSON Date conversion shifting them.
     const sql = `
         SELECT 
-            h.*,
-            b.flight_date as booking_flight_date,
+            h.id,
+            h.booking_id,
+            h.status,
+            DATE_FORMAT(h.changed_at, '%Y-%m-%d %H:%i:%s') as changed_at,
+            DATE_FORMAT(h.flight_date, '%Y-%m-%d %H:%i:%s') as flight_date,
+            h.changed_by,
             b.status as booking_status
         FROM booking_status_history h
         LEFT JOIN all_booking b ON h.booking_id = b.id
@@ -20488,15 +20511,7 @@ app.get('/api/getBookingHistory', (req, res) => {
     `;
     con.query(sql, [booking_id], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'DB error' });
-        // Map results: Use flight_date from history entry if available, otherwise use changed_at
-        // DO NOT use current booking's flight_date as it may have changed
-        const mappedRows = rows.map(row => ({
-            ...row,
-            // Use flight_date from history entry itself, or changed_at as fallback
-            // Do not use booking_flight_date as it represents current state, not historical state
-            flight_date: row.flight_date || row.changed_at
-        }));
-        res.json({ success: true, history: mappedRows });
+        res.json({ success: true, history: rows || [] });
     });
 });
 
@@ -22363,12 +22378,12 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
 
         // Add history entry for reschedule
         const historySql = `
-            INSERT INTO booking_status_history (booking_id, status, changed_at, notes)
-            VALUES (?, 'Scheduled', NOW(), 'Rescheduled via Customer Portal')
+            INSERT INTO booking_status_history (booking_id, status, changed_at, flight_date, changed_by)
+            VALUES (?, 'Scheduled', NOW(), ?, ?)
         `;
 
         await new Promise((resolve, reject) => {
-            con.query(historySql, [bookingId], (err, result) => {
+            con.query(historySql, [bookingId, flight_date, 'Customer Portal'], (err, result) => {
                 if (err) {
                     console.error('Error adding history entry:', err);
                     // Don't fail the request if history insert fails
@@ -22821,20 +22836,23 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
         }
 
         // Add history entry for location change
-        const historySql = `
-            INSERT INTO booking_status_history (booking_id, status, changed_at, notes)
-            VALUES (?, ?, NOW(), ?)
-        `;
-
-        let historyNote = `Location changed to ${location} via Customer Portal`;
-        if (flight_date) {
-            const oldDate = booking.flight_date ? dayjs(booking.flight_date).format('DD/MM/YYYY HH:mm') : 'N/A';
-            const newDate = dayjs(flight_date).format('DD/MM/YYYY HH:mm');
-            historyNote = `Location changed to ${location} and flight rescheduled from ${oldDate} to ${newDate} via Customer Portal`;
-        }
+        const historyStatus = flight_date ? 'Scheduled' : (booking.status || 'Scheduled');
+        const historyFlightDate = flight_date || booking.flight_date || null;
+        const historySql = historyFlightDate
+            ? `
+                INSERT INTO booking_status_history (booking_id, status, changed_at, flight_date, changed_by)
+                VALUES (?, ?, NOW(), ?, ?)
+            `
+            : `
+                INSERT INTO booking_status_history (booking_id, status, changed_at, changed_by)
+                VALUES (?, ?, NOW(), ?)
+            `;
 
         await new Promise((resolve, reject) => {
-            con.query(historySql, [bookingId, booking.status || 'Scheduled', historyNote], (err, result) => {
+            const historyParams = historyFlightDate
+                ? [bookingId, historyStatus, historyFlightDate, 'Customer Portal']
+                : [bookingId, historyStatus, 'Customer Portal'];
+            con.query(historySql, historyParams, (err, result) => {
                 if (err) {
                     console.error('Error adding history entry:', err);
                     // Don't fail the request if history insert fails

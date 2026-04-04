@@ -420,188 +420,73 @@ const BookingPage = () => {
 
     const formatHistoryDateKey = (value) => formatHistoryDateTime(value, 'YYYY-MM-DD HH:mm');
     const formatHistoryDateDisplay = (value) => formatHistoryDateTime(value, 'DD/MM/YYYY HH:mm');
+    const normalizeHistoryDateValue = (value) => {
+        if (!value) return null;
+
+        const localDate = parseLocalNoTzDateTime(value);
+        if (localDate) return dayjs(localDate).format('YYYY-MM-DD HH:mm:ss');
+
+        const parsed = dayjs(value);
+        return parsed.isValid() ? parsed.format('YYYY-MM-DD HH:mm:ss') : null;
+    };
+    const getHistoryComparableTime = (value) => {
+        if (!value) return 0;
+
+        const localDate = parseLocalNoTzDateTime(value);
+        if (localDate) return localDate.getTime();
+
+        const parsed = dayjs(value);
+        return parsed.isValid() ? parsed.valueOf() : 0;
+    };
 
     const buildDisplayedHistoryRows = () => {
-        // Build history from booking_status_history and current booking
         const historyEntries = Array.isArray(bookingHistory) ? [...bookingHistory] : [];
-        
-        // Process all entries chronologically
-        const processedRows = [];
-        
-        // Sort history entries by changed_at (oldest first)
-        const sortedHistory = [...historyEntries]
+        const rowsByDateKey = new Map();
+
+        const upsertHistoryRow = (entry) => {
+            if (!entry || !entry.status) return;
+
+            const normalizedFlightDate = normalizeHistoryDateValue(entry.flight_date || entry.changed_at);
+            if (!normalizedFlightDate) return;
+
+            const normalizedChangedAt = normalizeHistoryDateValue(entry.changed_at) || normalizedFlightDate;
+            const dateKey = formatHistoryDateKey(normalizedFlightDate);
+            const comparableChangedAt = getHistoryComparableTime(normalizedChangedAt) || getHistoryComparableTime(normalizedFlightDate);
+            const nextRow = {
+                flight_date: normalizedFlightDate,
+                status: entry.status,
+                changed_at: normalizedChangedAt,
+                comparable_changed_at: comparableChangedAt
+            };
+            const existingRow = rowsByDateKey.get(dateKey);
+
+            if (!existingRow || comparableChangedAt >= existingRow.comparable_changed_at) {
+                rowsByDateKey.set(dateKey, nextRow);
+            }
+        };
+
+        [...historyEntries]
             .filter(entry => entry && entry.status)
             .sort((a, b) => {
-                const dateA = a.changed_at ? new Date(a.changed_at).getTime() : 0;
-                const dateB = b.changed_at ? new Date(b.changed_at).getTime() : 0;
-                return dateA - dateB;
-            });
-        
-        // Process each history entry - each entry should keep its own flight_date
-        sortedHistory.forEach(entry => {
-            // Each entry should use its own flight_date from the database
-            // Use entry.flight_date if available, otherwise use entry.changed_at as fallback
-            const entryFlightDate = entry.flight_date || entry.changed_at;
-            const status = entry.status;
-            
-            // Only process entries with valid flight dates and status
-            if (entryFlightDate && status) {
-                const isCancelled = status.toLowerCase() === 'cancelled';
-            
-            if (isCancelled) {
-                    // Cancelled: Find the last Scheduled entry with the same flight_date and update it
-                    // Use the Cancelled entry's own flight_date to find matching Scheduled entry
-                    const cancelledDateKey = formatHistoryDateKey(entryFlightDate);
-                    
-                    // Search from the end to find the most recent Scheduled entry for this date
-                    let foundScheduled = false;
-                    for (let i = processedRows.length - 1; i >= 0; i--) {
-                        const row = processedRows[i];
-                        const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
-                        if (rowDateKey === cancelledDateKey && row.status && row.status.toLowerCase() !== 'cancelled') {
-                            // Update this Scheduled entry to Cancelled, but keep the Scheduled entry's original flight_date
-                            // This way the Cancelled row shows the same date as the Scheduled row it replaced
-                            processedRows[i] = {
-                                ...row,
-                                status: 'Cancelled',
-                                // Keep the Scheduled entry's flight_date (they should be the same date anyway)
-                                flight_date: row.flight_date,
-                                changed_at: entry.changed_at || row.changed_at
-                            };
-                            foundScheduled = true;
-                            break; // Exit after updating
-                        }
-                    }
-                    
-                    // If no Scheduled entry found for this date, add Cancelled as new entry with its own flight_date
-                    if (!foundScheduled) {
-                        processedRows.push({
-                            flight_date: entryFlightDate, // Use Cancelled entry's own flight_date
-                            status: 'Cancelled',
-                            changed_at: entry.changed_at || entryFlightDate
-                        });
-                    }
-                } else {
-                    // Scheduled or other non-Cancelled status: Check for duplicates before adding
-                    const entryDateKey = formatHistoryDateKey(entryFlightDate);
-                    const entryStatus = status.toLowerCase();
-                    
-                    // Check if an entry with the same flight_date and status already exists
-                    const duplicateExists = processedRows.some(row => {
-                        const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
-                        const rowStatus = row.status ? row.status.toLowerCase() : '';
-                        return rowDateKey === entryDateKey && rowStatus === entryStatus;
-                    });
-                    
-                    // Only add if it's not a duplicate
-                    if (!duplicateExists) {
-                        processedRows.push({
-                            flight_date: entryFlightDate, // Use the flight_date from this specific entry
-                            status: status,
-                            changed_at: entry.changed_at || entryFlightDate
-                        });
-                    }
-                }
-            }
-        });
-        
-        // Add current booking if it has a flight_date
-        // But only if it doesn't already exist in processed rows to avoid duplicates
+                const changedAtDiff = getHistoryComparableTime(a.changed_at) - getHistoryComparableTime(b.changed_at);
+                if (changedAtDiff !== 0) return changedAtDiff;
+                return getHistoryComparableTime(a.flight_date) - getHistoryComparableTime(b.flight_date);
+            })
+            .forEach(upsertHistoryRow);
+
         if (bookingDetail?.booking?.flight_date) {
-            const currentFlightDate = bookingDetail.booking.flight_date;
-            const currentStatus = bookingDetail.booking.status || 'Scheduled';
-            const dateKey = formatHistoryDateKey(currentFlightDate);
-            const isCancelled = currentStatus.toLowerCase() === 'cancelled';
-            
-            // Check if current booking's status and flight_date already exists in processed rows
-            const alreadyExists = processedRows.some(row => {
-                const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
-                const rowStatus = row.status || '';
-                return rowDateKey === dateKey && rowStatus.toLowerCase() === currentStatus.toLowerCase();
+            upsertHistoryRow({
+                flight_date: bookingDetail.booking.flight_date,
+                changed_at: bookingDetail.booking.flight_date,
+                status: bookingDetail.booking.status || 'Scheduled'
             });
-            
-            // Only add current booking if it doesn't already exist
-            if (!alreadyExists) {
-                if (isCancelled) {
-                    // If Cancelled, update the last Scheduled entry for this date
-                    // Search from the end to find the most recent Scheduled entry for this date
-                    let foundScheduled = false;
-                    for (let i = processedRows.length - 1; i >= 0; i--) {
-                        const row = processedRows[i];
-                        const rowDateKey = row.flight_date ? formatHistoryDateKey(row.flight_date) : '';
-                        if (rowDateKey === dateKey && row.status && row.status.toLowerCase() !== 'cancelled') {
-                            // Update this Scheduled entry to Cancelled, but keep its original flight_date
-                            processedRows[i] = {
-                                ...row,
-                                status: 'Cancelled',
-                                // Keep the original flight_date from the Scheduled entry
-                                flight_date: row.flight_date,
-                                changed_at: currentFlightDate
-                            };
-                            foundScheduled = true;
-                            break;
-                        }
-                    }
-                    if (!foundScheduled) {
-                        // No Scheduled entry found, add Cancelled as new entry
-                        processedRows.push({
-                            flight_date: currentFlightDate,
-                            status: 'Cancelled',
-                            changed_at: currentFlightDate
-                        });
-                }
-            } else {
-                    // If Scheduled, add as new row only if it doesn't already exist
-                    processedRows.push({
-                        flight_date: currentFlightDate,
-                        status: currentStatus,
-                        changed_at: currentFlightDate
-                    });
-                }
-            }
         }
-        
-        // Remove duplicates: If same flight_date and status exist, keep only the most recent one (by changed_at)
-        const uniqueRowsMap = new Map();
-        
-        // Process all rows and keep the most recent one for each unique flight_date + status combination
-        processedRows.forEach(row => {
-            if (!row || !row.flight_date || !row.status) return;
-            
-            const dateKey = formatHistoryDateKey(row.flight_date);
-            const statusKey = row.status.toLowerCase();
-            const uniqueKey = `${dateKey}|${statusKey}`;
-            
-            // Get the changed_at timestamp for comparison
-            const rowChangedAt = row.changed_at ? new Date(row.changed_at).getTime() : (row.flight_date ? new Date(row.flight_date).getTime() : 0);
-            
-            // If we haven't seen this combination, or if this one is more recent, keep it
-            if (!uniqueRowsMap.has(uniqueKey)) {
-                uniqueRowsMap.set(uniqueKey, row);
-            } else {
-                const existingRow = uniqueRowsMap.get(uniqueKey);
-                const existingChangedAt = existingRow.changed_at ? new Date(existingRow.changed_at).getTime() : (existingRow.flight_date ? new Date(existingRow.flight_date).getTime() : 0);
-                
-                // Keep the row with the most recent changed_at
-                if (rowChangedAt > existingChangedAt) {
-                    uniqueRowsMap.set(uniqueKey, row);
-                }
-            }
-        });
-        
-        // Convert map to array
-        const uniqueRows = Array.from(uniqueRowsMap.values());
-        
-        // Sort all rows by changed_at (most recently changed/created first - at the top)
-        // This ensures the most recent action appears at the top, regardless of flight_date
-        return uniqueRows
-            .filter(entry => entry && entry.flight_date && entry.status)
+
+        return Array.from(rowsByDateKey.values())
             .sort((a, b) => {
-                // Use changed_at for sorting (when the entry was created/changed)
-                const dateA = a.changed_at ? new Date(a.changed_at).getTime() : (a.flight_date ? new Date(a.flight_date).getTime() : 0);
-                const dateB = b.changed_at ? new Date(b.changed_at).getTime() : (b.flight_date ? new Date(b.flight_date).getTime() : 0);
-                return dateB - dateA; // Newest first (most recently changed at the top)
-            });
+                return b.comparable_changed_at - a.comparable_changed_at;
+            })
+            .map(({ comparable_changed_at, ...row }) => row);
     };
     const historyRows = buildDisplayedHistoryRows();
 
