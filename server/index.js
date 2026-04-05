@@ -426,7 +426,11 @@ const MANUAL_BOOKING_ADMIN_USERNAME = process.env.ADMIN_MANUAL_BOOKING_USERNAME 
 const MANUAL_BOOKING_ADMIN_PASSWORD = process.env.ADMIN_MANUAL_BOOKING_PASSWORD || 'cevcov-5FABys-kaafds';
 const MANUAL_BOOKING_TOKEN_TTL_SECONDS = Math.max(
     300,
-    Number(process.env.MANUAL_BOOKING_TOKEN_TTL_SECONDS || 7200)
+    Number(process.env.MANUAL_BOOKING_TOKEN_TTL_SECONDS || 86400)
+);
+const MANUAL_BOOKING_ACCESS_TOKEN_TTL_SECONDS = Math.max(
+    3600,
+    Number(process.env.MANUAL_BOOKING_ACCESS_TOKEN_TTL_SECONDS || 604800)
 );
 
 function getManualBookingSigningSecret() {
@@ -450,11 +454,11 @@ function safeTimingCompare(left, right) {
     return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function issueManualBookingToken() {
+function issueScopedManualBookingToken({ scope = 'manual-booking', ttlSeconds = MANUAL_BOOKING_TOKEN_TTL_SECONDS } = {}) {
     const payload = {
-        scope: 'manual-booking',
+        scope,
         iat: Date.now(),
-        exp: Date.now() + (MANUAL_BOOKING_TOKEN_TTL_SECONDS * 1000)
+        exp: Date.now() + (Math.max(300, Number(ttlSeconds) || MANUAL_BOOKING_TOKEN_TTL_SECONDS) * 1000)
     };
     const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
     const signature = crypto
@@ -465,14 +469,35 @@ function issueManualBookingToken() {
     return `${encodedPayload}.${signature}`;
 }
 
-function verifyManualBookingToken(token) {
+function issueManualBookingToken() {
+    return issueScopedManualBookingToken({
+        scope: 'manual-booking',
+        ttlSeconds: MANUAL_BOOKING_TOKEN_TTL_SECONDS
+    });
+}
+
+function issueManualBookingAccessToken() {
+    return issueScopedManualBookingToken({
+        scope: 'manual-booking-access',
+        ttlSeconds: MANUAL_BOOKING_ACCESS_TOKEN_TTL_SECONDS
+    });
+}
+
+function verifyScopedManualBookingToken(token, {
+    expectedScope = 'manual-booking',
+    requiredMessage = 'Manual booking token is required.',
+    formatMessage = 'Manual booking token format is invalid.',
+    invalidMessage = 'Manual booking token is invalid.',
+    invalidScopeMessage = 'Manual booking token scope is invalid.',
+    expiredMessage = 'Manual booking token has expired. Please reopen the flow from admin.'
+} = {}) {
     if (!token || typeof token !== 'string') {
-        return { valid: false, message: 'Manual booking token is required.' };
+        return { valid: false, message: requiredMessage };
     }
 
     const [encodedPayload, signature] = token.split('.');
     if (!encodedPayload || !signature) {
-        return { valid: false, message: 'Manual booking token format is invalid.' };
+        return { valid: false, message: formatMessage };
     }
 
     const expectedSignature = crypto
@@ -481,23 +506,45 @@ function verifyManualBookingToken(token) {
         .digest('base64url');
 
     if (!safeTimingCompare(signature, expectedSignature)) {
-        return { valid: false, message: 'Manual booking token is invalid.' };
+        return { valid: false, message: invalidMessage };
     }
 
     try {
         const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
-        if (payload.scope !== 'manual-booking') {
-            return { valid: false, message: 'Manual booking token scope is invalid.' };
+        if (payload.scope !== expectedScope) {
+            return { valid: false, message: invalidScopeMessage };
         }
 
         if (!payload.exp || Number(payload.exp) < Date.now()) {
-            return { valid: false, message: 'Manual booking token has expired. Please reopen the flow from admin.' };
+            return { valid: false, message: expiredMessage };
         }
 
         return { valid: true, payload };
     } catch (error) {
-        return { valid: false, message: 'Manual booking token could not be decoded.' };
+        return { valid: false, message: formatMessage };
     }
+}
+
+function verifyManualBookingToken(token) {
+    return verifyScopedManualBookingToken(token, {
+        expectedScope: 'manual-booking',
+        requiredMessage: 'Manual booking token is required.',
+        formatMessage: 'Manual booking token format is invalid.',
+        invalidMessage: 'Manual booking token is invalid.',
+        invalidScopeMessage: 'Manual booking token scope is invalid.',
+        expiredMessage: 'Manual booking token has expired. Please reopen the flow from admin.'
+    });
+}
+
+function verifyManualBookingAccessToken(token) {
+    return verifyScopedManualBookingToken(token, {
+        expectedScope: 'manual-booking-access',
+        requiredMessage: 'Manual booking access token is required.',
+        formatMessage: 'Manual booking access token format is invalid.',
+        invalidMessage: 'Manual booking access token is invalid.',
+        invalidScopeMessage: 'Manual booking access token scope is invalid.',
+        expiredMessage: 'Manual booking access has expired. Please reopen the flow from admin.'
+    });
 }
 
 function getManualQuotedTotal(storeData) {
@@ -544,6 +591,25 @@ app.post('/api/admin/manual-booking-token', (req, res) => {
         success: true,
         token,
         expires_at: new Date(Date.now() + (MANUAL_BOOKING_TOKEN_TTL_SECONDS * 1000)).toISOString()
+    });
+});
+
+app.post('/api/authorize-manual-booking', (req, res) => {
+    const { manualBookingToken } = req.body || {};
+    const tokenResult = verifyManualBookingToken(manualBookingToken);
+
+    if (!tokenResult.valid) {
+        return res.status(403).json({
+            success: false,
+            message: tokenResult.message
+        });
+    }
+
+    const accessToken = issueManualBookingAccessToken();
+    return res.json({
+        success: true,
+        accessToken,
+        expires_at: new Date(Date.now() + (MANUAL_BOOKING_ACCESS_TOKEN_TTL_SECONDS * 1000)).toISOString()
     });
 });
 
@@ -29757,14 +29823,21 @@ app.post('/api/create-manual-session', async (req, res) => {
             voucherData,
             type,
             userSessionData,
-            manualBookingToken
+            manualBookingToken,
+            manualBookingAccessToken
         } = req.body || {};
 
-        const tokenResult = verifyManualBookingToken(manualBookingToken);
-        if (!tokenResult.valid) {
+        const accessTokenResult = manualBookingAccessToken
+            ? verifyManualBookingAccessToken(manualBookingAccessToken)
+            : { valid: false, message: 'Manual booking access token is required.' };
+        const linkTokenResult = manualBookingToken
+            ? verifyManualBookingToken(manualBookingToken)
+            : { valid: false, message: 'Manual booking token is required.' };
+
+        if (!accessTokenResult.valid && !linkTokenResult.valid) {
             return res.status(403).json({
                 success: false,
-                message: tokenResult.message
+                message: linkTokenResult.message || accessTokenResult.message || 'Manual booking authorisation is invalid.'
             });
         }
 
