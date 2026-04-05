@@ -15310,7 +15310,11 @@ app.post('/api/createBooking', (req, res) => {
                     // Call email function immediately and log the call
                     try {
                         const emailOptions = deriveEmailOptionsForAutoSend();
-                        sendAutomaticBookingConfirmationEmail(bookingId, emailOptions || undefined);
+                        const manualBookingProfile = extractManualBookingProfileFromBookingData({ additionalInfo });
+                        const resolvedEmailOptions = manualBookingProfile
+                            ? { ...(emailOptions || {}), manualBookingProfile }
+                            : emailOptions;
+                        sendAutomaticBookingConfirmationEmail(bookingId, resolvedEmailOptions || undefined);
                         console.log('✅ [createBooking] sendAutomaticBookingConfirmationEmail function called successfully');
                     } catch (emailError) {
                         console.error('❌ [createBooking] Error calling sendAutomaticBookingConfirmationEmail:', emailError);
@@ -28910,7 +28914,11 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                         // Send automatic booking confirmation email for webhook booking
                         const bookingEmail = (passengerData && passengerData[0]) ? passengerData[0].email : null;
                         if (bookingEmail) {
-                            sendAutomaticBookingConfirmationEmail(bookingId);
+                            const manualBookingProfile = extractManualBookingProfileFromBookingData(bookingData);
+                            sendAutomaticBookingConfirmationEmail(
+                                bookingId,
+                                manualBookingProfile ? { manualBookingProfile } : undefined
+                            );
                         }
 
                         // Send automatic booking confirmation SMS for "Book Flight Date" bookings
@@ -29063,7 +29071,11 @@ async function createBookingFromWebhook(bookingData, stripe_session_id = null) {
                     // Send automatic booking confirmation email for webhook booking (no passengers case)
                     const bookingEmailNoPassengers = bookingData?.passengerData?.[0]?.email || null;
                     if (bookingEmailNoPassengers) {
-                        sendAutomaticBookingConfirmationEmail(bookingId);
+                        const manualBookingProfile = extractManualBookingProfileFromBookingData(bookingData);
+                        sendAutomaticBookingConfirmationEmail(
+                            bookingId,
+                            manualBookingProfile ? { manualBookingProfile } : undefined
+                        );
                     }
 
                     resolve(bookingId);
@@ -34781,6 +34793,25 @@ function wrapParagraphs(paragraphs = []) {
         .join('');
 }
 
+function buildMinimalEmailDocument({ subject = '', bodyHtml = '' }) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />
+    <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0; padding:24px; background-color:#f5f7fb; font-family:'Helvetica Neue', Arial, sans-serif; color:#1f2937;">
+    <div style="max-width:640px; margin:0 auto; background:#ffffff; border-radius:18px; padding:32px 28px; box-shadow:0 10px 30px rgba(15, 23, 42, 0.08);">
+        <div style="font-size:16px; line-height:1.7; color:#1f2937;">
+            ${bodyHtml}
+        </div>
+    </div>
+</body>
+</html>`;
+}
+
 const CUSTOMER_PORTAL_PRE_FORMATTED_CREATED_AT_REGEX = /^\d{2}\/\d{2}\/\d{4}(?: \d{2}:\d{2})?$/;
 
 function formatCustomerPortalCreatedAt(rawCreatedAt = '') {
@@ -35465,6 +35496,44 @@ function getBookingConfirmationMessageHtml(booking = {}) {
         'Thank you,',
         'Fly Away Ballooning Team'
     ]);
+}
+
+function buildTheNewtBookingConfirmationEmailContent(booking = {}, subject = '🎈 Your flight is confirmed') {
+    const experienceDateTime = escapeHtml(formatDateTime(booking.flight_date) || 'To be confirmed');
+    const customerPortalLink = getCustomerPortalLink(booking);
+    const manageExperienceHtml = customerPortalLink
+        ? `<a href="${escapeHtml(customerPortalLink)}" target="_blank" rel="noopener noreferrer">Manage Your Experience</a>`
+        : 'Manage Your Experience';
+    const bodyHtml = wrapParagraphs([
+        'Dear The Newt,',
+        'A private charter balloon flight has been booked for:',
+        `<strong>${experienceDateTime}</strong>`,
+        'If you wish to make any changes, please visit:',
+        manageExperienceHtml,
+        'We look forward to flying your guests.',
+        'Fly Away Ballooning 🎈'
+    ]);
+
+    return {
+        subject,
+        html: buildMinimalEmailDocument({
+            subject,
+            bodyHtml
+        }),
+        text: [
+            'Dear The Newt,',
+            '',
+            'A private charter balloon flight has been booked for:',
+            experienceDateTime,
+            '',
+            'If you wish to make any changes, please visit:',
+            customerPortalLink || 'Manage Your Experience',
+            '',
+            'We look forward to flying your guests.',
+            '',
+            'Fly Away Ballooning 🎈'
+        ].join('\n')
+    };
 }
 
 // Helper function to generate upcoming flight reminder message HTML (matches frontend getUpcomingFlightReminderMessageHtml)
@@ -36281,6 +36350,25 @@ function extractManualBookingProfileFromBookingData(bookingData = {}) {
     }
 
     const manualBookingProfile = parsePossibleJsonObject(additionalInfo.manual_booking_profile);
+    return manualBookingProfile && typeof manualBookingProfile === 'object'
+        ? manualBookingProfile
+        : null;
+}
+
+function extractManualBookingProfileFromStoredBooking(booking = {}) {
+    const additionalInfo = parsePossibleJsonObject(
+        booking?.additional_information_json ||
+        booking?.additionalInfo ||
+        booking?.additional_information
+    );
+    if (!additionalInfo || typeof additionalInfo !== 'object') {
+        return null;
+    }
+
+    const manualBookingProfile = parsePossibleJsonObject(
+        additionalInfo.manual_booking_profile ||
+        additionalInfo.manualBookingProfile
+    );
     return manualBookingProfile && typeof manualBookingProfile === 'object'
         ? manualBookingProfile
         : null;
@@ -37296,6 +37384,9 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
                 flight_date: booking.flight_date
             });
 
+            const resolvedManualBookingProfile = options?.manualBookingProfile || extractManualBookingProfileFromStoredBooking(booking);
+            const isTheNewtBookingConfirmation = isTheNewtManualBookingProfile(resolvedManualBookingProfile);
+
             // Fetch passengers for this booking
             const passengerQuery = `SELECT * FROM passenger WHERE booking_id = ?`;
             con.query(passengerQuery, [bookingId], (passengerErr, passengerRows) => {
@@ -37308,6 +37399,17 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
                     console.log('👥 [sendAutomaticBookingConfirmationEmail] Passengers found:', booking.passengers.length);
                     if (booking.passengers.length > 0) {
                         console.log('📧 [sendAutomaticBookingConfirmationEmail] Passenger emails:', booking.passengers.map(p => p.email).filter(Boolean));
+                    }
+                }
+
+                if (isTheNewtBookingConfirmation) {
+                    const firstPassengerWithEmail = booking.passengers.find(p => p.email && p.email.trim());
+                    if (firstPassengerWithEmail) {
+                        booking.email = firstPassengerWithEmail.email.trim();
+                        console.log('✅ [sendAutomaticBookingConfirmationEmail] The Newt flow using passenger info email for confirmation:', booking.email);
+                    } else {
+                        booking.email = '';
+                        console.warn('⚠️ [sendAutomaticBookingConfirmationEmail] The Newt flow has no passenger email available for confirmation.');
                     }
                 }
 
@@ -37335,7 +37437,11 @@ async function sendAutomaticBookingConfirmationEmail(bookingId, options = {}) {
 
                 // Continue with email sending only if email is available
                 if (booking.email && booking.email.trim()) {
-                    sendEmailToCustomerAndOwner(booking, bookingId, options);
+                    sendEmailToCustomerAndOwner(booking, bookingId, {
+                        ...(options || {}),
+                        manualBookingProfile: resolvedManualBookingProfile,
+                        isTheNewtBookingConfirmation
+                    });
                 } else {
                     console.error('❌ [sendAutomaticBookingConfirmationEmail] Cannot send email - no email address available for booking:', bookingId);
                 }
@@ -37579,7 +37685,9 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
             ownerTextIntro = 'This booking confirmation was automatically sent to:',
             ownerMessageLead = 'New booking confirmation sent to customer.',
             textBodyFallback = null,
-            skipOwnerCopy = false
+            skipOwnerCopy = false,
+            manualBookingProfile = null,
+            isTheNewtBookingConfirmation = false
         } = options || {};
 
         // Templates that should send a copy to admin (owner)
@@ -37621,6 +37729,11 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
             }
 
             const template = templateRows && templateRows.length > 0 ? templateRows[0] : null;
+            const shouldUseTheNewtConfirmationTemplate = templateName === 'Booking Confirmation' && (
+                isTheNewtBookingConfirmation ||
+                isTheNewtManualBookingProfile(manualBookingProfile) ||
+                isTheNewtManualBookingProfile(extractManualBookingProfileFromStoredBooking(booking))
+            );
 
             // Debug logging
             if (template) {
@@ -37636,18 +37749,27 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
                 console.log(`⚠️ ${templateName} template not found in database, using default`);
             }
 
-            // Generate email HTML using database template (or default if template not found)
-            const htmlBody = generateBookingConfirmationEmail(booking, template);
-            const defaultTextBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${booking.location || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
-            const fallbackText = typeof textBodyFallback === 'function'
-                ? textBodyFallback(booking)
-                : textBodyFallback;
-            const normalizedFallbackText = (fallbackText !== undefined && fallbackText !== null)
-                ? String(fallbackText)
-                : '';
-            const textBody = normalizedFallbackText.trim() !== '' ? normalizedFallbackText : defaultTextBody;
-
             const subject = template?.subject || subjectFallback;
+            let htmlBody = '';
+            let textBody = '';
+
+            if (shouldUseTheNewtConfirmationTemplate) {
+                const theNewtEmail = buildTheNewtBookingConfirmationEmailContent(booking, subject);
+                htmlBody = theNewtEmail.html;
+                textBody = theNewtEmail.text;
+                console.log('📧 [sendEmailToCustomerAndOwner] Using The Newt booking confirmation template override');
+            } else {
+                // Generate email HTML using database template (or default if template not found)
+                htmlBody = generateBookingConfirmationEmail(booking, template);
+                const defaultTextBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${booking.location || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
+                const fallbackText = typeof textBodyFallback === 'function'
+                    ? textBodyFallback(booking)
+                    : textBodyFallback;
+                const normalizedFallbackText = (fallbackText !== undefined && fallbackText !== null)
+                    ? String(fallbackText)
+                    : '';
+                textBody = normalizedFallbackText.trim() !== '' ? normalizedFallbackText : defaultTextBody;
+            }
 
             // Prepare email content for customer
             const customerEmailContent = {
