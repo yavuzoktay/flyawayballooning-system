@@ -36445,7 +36445,7 @@ function buildTheNewtVatInvoiceEmailContent({
     const bodyHtml = `
         ${wrapParagraphs([
             `Hello ${escapeHtml(contactName)},`,
-            'Thank you for choosing Fly Away Ballooning. Please find your VAT invoice below for your The Newt private charter balloon booking.',
+            'Please find an invoice below for the booked Private Charter Balloon Flight.',
             `Please use <strong>${escapeHtml(paymentReference)}</strong> as the payment reference when making the bank transfer.`
         ])}
         <div style="border:1px solid #dbe4f0; border-radius:16px; overflow:hidden; margin:24px 0;">
@@ -36481,7 +36481,6 @@ function buildTheNewtVatInvoiceEmailContent({
             </div>
         </div>
         ${wrapParagraphs([
-            'If you need any amendments to this invoice, please reply directly to this email and our team will be happy to help.',
             'Kind regards,'
         ])}
     `;
