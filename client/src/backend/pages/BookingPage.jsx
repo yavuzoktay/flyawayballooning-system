@@ -3833,6 +3833,8 @@ setBookingDetail(finalVoucherDetail);
         const contextType = options.contextType || booking.contextType || 'booking';
         const contextId = options.contextId || booking.contextId || (booking.id ? String(booking.id) : '');
         const bookingWithContext = { ...booking, contextType, contextId };
+        const isBulkVoucherContext = Array.isArray(bookingWithContext.voucherIds) && bookingWithContext.voucherIds.length > 1;
+        const useCustomDefaults = options.defaultToCustom === true || contextType === 'bulk' || isBulkVoucherContext;
         
         setSelectedBookingForEmail(bookingWithContext);
         
@@ -3848,7 +3850,7 @@ setBookingDetail(finalVoucherDetail);
             );
         }
 
-        if (!selectedTemplate && emailTemplates.length > 0) {
+        if (!useCustomDefaults && !selectedTemplate && emailTemplates.length > 0) {
             selectedTemplate = emailTemplates[0];
         }
         
@@ -3856,7 +3858,12 @@ setBookingDetail(finalVoucherDetail);
         let message = '';
         let templateValue = 'custom';
         
-        if (selectedTemplate) {
+        if (useCustomDefaults) {
+            subject = '🎈 From Fly Away';
+            message = '';
+            templateValue = 'custom';
+            console.log('✅ Bulk context detected, defaulting email template to Custom Message');
+        } else if (selectedTemplate) {
             templateValue = selectedTemplate.id;
             subject = selectedTemplate.subject || '';
             message =
@@ -3883,7 +3890,13 @@ setBookingDetail(finalVoucherDetail);
         setPersonalNote('');
         
         // Initialize SMS form if SMS templates are available
-        if (smsTemplates.length > 0 && sendMessageSmsChecked) {
+        if (useCustomDefaults) {
+            setSmsForm({
+                to: cleanPhoneNumber(bookingWithContext.phone || bookingWithContext.mobile || ''),
+                message: '',
+                template: 'custom'
+            });
+        } else if (smsTemplates.length > 0 && sendMessageSmsChecked) {
             const firstSmsTemplate = smsTemplates[0];
             setSmsForm({
                 to: cleanPhoneNumber(bookingWithContext.phone || bookingWithContext.mobile || ''),
@@ -3915,7 +3928,8 @@ setBookingDetail(finalVoucherDetail);
         const voucherWithContext = buildBulkVoucherContext(primaryVoucher, selectedVoucherIds);
         openEmailModalForBooking(voucherWithContext, {
             contextType: 'voucher',
-            contextId: voucherWithContext.contextId
+            contextId: voucherWithContext.contextId,
+            defaultToCustom: true
         });
     };
 
@@ -5918,9 +5932,9 @@ setBookingDetail(finalVoucherDetail);
                                                     // Çoklu alıcılar için varsayılan booking'i kullan (ilk seçilen)
                                                     const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
                                                     if (primaryBooking) {
-                                                        openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(','), defaultToCustom: true });
                                                     } else if (filteredData.length > 0) {
-                                                        openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                        openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(','), defaultToCustom: true });
                                                     }
                                                 }}
                                                 sx={{
@@ -5943,9 +5957,9 @@ setBookingDetail(finalVoucherDetail);
                                                         if (selectedBookingIds.length === 0) return;
                                                         const primaryBooking = booking.find(b => b.id === selectedBookingIds[0]);
                                                         if (primaryBooking) {
-                                                            openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                            openEmailModalForBooking(primaryBooking, { contextType: 'bulk', contextId: selectedBookingIds.join(','), defaultToCustom: true });
                                                         } else if (filteredData.length > 0) {
-                                                            openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(',') });
+                                                            openEmailModalForBooking(filteredData[0], { contextType: 'bulk', contextId: selectedBookingIds.join(','), defaultToCustom: true });
                                                         }
                                                     }}
                                                     style={{
