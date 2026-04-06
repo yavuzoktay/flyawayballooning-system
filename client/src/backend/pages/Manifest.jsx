@@ -61,7 +61,8 @@ import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 import {
     buildPreservedAdditionalInfoPayload,
     getManualBookingFieldRows,
-    getManualBookingProfileFromSources
+    getManualBookingProfileFromSources,
+    isTheNewtBooking
 } from '../utils/additionalInfo';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
@@ -86,6 +87,17 @@ const resolveTemplateName = (templateValue, dbTemplate) => {
             return dbName || 'Custom Message';
     }
 };
+
+const renderBookingNameWithIndicators = (name, { isNewtBooking = false } = {}) => (
+    <>
+        {name}
+        {isNewtBooking ? (
+            <span role="img" aria-label="The Newt booking" style={{ marginLeft: 4 }}>
+                🦎
+            </span>
+        ) : null}
+    </>
+);
 
 const MemoizedEmailPreview = React.memo(
     ({ html, isMobile = false }) => {
@@ -292,6 +304,15 @@ const Manifest = () => {
 
         return getManualBookingFieldRows(manualBookingProfile);
     }, [additionalInformation, bookingDetail]);
+    const bookingDetailIsNewtBooking = useMemo(
+        () =>
+            isTheNewtBooking(
+                additionalInformation,
+                bookingDetail?.booking,
+                bookingDetail?.additional_information
+            ),
+        [additionalInformation, bookingDetail]
+    );
 
     // Add state for global menu anchor
     const [globalMenuAnchorEl, setGlobalMenuAnchorEl] = useState(null);
@@ -5504,6 +5525,7 @@ const Manifest = () => {
                                                     {groupFlights.map((flight, idx) => {
                                                         // Sadece ilk passenger'ı al
                                                         const firstPassenger = Array.isArray(flight.passengers) && flight.passengers.length > 0 ? flight.passengers[0] : null;
+                                                        const isNewtBooking = isTheNewtBooking(flight);
                                                         const hasWeatherRefund = (() => {
                                                             const bookingLevelRaw = flight.weather_refund_total_price ?? flight.weather_refund_price ?? flight.weather_refund ?? null;
                                                             if (bookingLevelRaw !== null && bookingLevelRaw !== undefined) {
@@ -5539,15 +5561,22 @@ const Manifest = () => {
                                                                     </span>
                                                                 </TableCell>
                                                                 <TableCell sx={isMobile ? { minWidth: '120px', width: '120px', padding: '8px 4px' } : {}}>
-                                                                    <span style={{ 
-                                                                        color: 'rgb(50, 116, 180)', 
-                                                                        cursor: 'pointer', 
-                                                                        textDecoration: 'none',
-                                                                        fontSize: isMobile ? '12px' : '0.875rem',
-                                                                    }}
-                                                                        onClick={() => handleNameClick(flight.id)}>
-                                                                        {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
-                                                                    </span>
+                                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', maxWidth: '100%' }}>
+                                                                        <span style={{ 
+                                                                            color: 'rgb(50, 116, 180)', 
+                                                                            cursor: 'pointer', 
+                                                                            textDecoration: 'none',
+                                                                            fontSize: isMobile ? '12px' : '0.875rem',
+                                                                        }}
+                                                                            onClick={() => handleNameClick(flight.id)}>
+                                                                            {firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || '')}
+                                                                        </span>
+                                                                        {isNewtBooking ? (
+                                                                            <span role="img" aria-label="The Newt booking">
+                                                                                🦎
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </div>
                                                                     {Array.isArray(flight.passengers) && flight.passengers.length > 1 && (
                                                                         <div style={{ marginTop: 4 }}>
                                                                             {flight.passengers.slice(1).map((p, i) => (
@@ -5835,7 +5864,10 @@ const Manifest = () => {
                                                     const passenger1Name = passenger1 
                                                         ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
                                                         : '';
-                                                    return bookingDetail.booking.name || passenger1Name || '-';
+                                                    return renderBookingNameWithIndicators(
+                                                        bookingDetail.booking.name || passenger1Name || '-',
+                                                        { isNewtBooking: bookingDetailIsNewtBooking }
+                                                    );
                                                 })()}
                                                 <IconButton size="small" onClick={() => {
                                                     const passenger1 = bookingDetail.passengers && bookingDetail.passengers.length > 0 

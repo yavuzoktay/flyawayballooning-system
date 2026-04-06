@@ -24,6 +24,7 @@ import {
     buildPreservedAdditionalInfoPayload,
     getManualBookingFieldRows,
     getManualBookingProfileFromSources,
+    isTheNewtBooking,
     parseAdditionalInfoJson
 } from '../utils/additionalInfo';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
@@ -149,6 +150,17 @@ const getShortNoticeAvailabilityOptOut = (item) => {
 
     return false;
 };
+
+const renderBookingNameWithIndicators = (name, { isNewtBooking = false } = {}) => (
+    <>
+        {name}
+        {isNewtBooking ? (
+            <span role="img" aria-label="The Newt booking" style={{ marginLeft: 4 }}>
+                🦎
+            </span>
+        ) : null}
+    </>
+);
 
 const BookingPage = () => {
     // Mobile detection
@@ -566,6 +578,16 @@ const BookingPage = () => {
 
         return getManualBookingFieldRows(manualBookingProfile);
     }, [additionalInformation, bookingDetail]);
+    const bookingDetailIsNewtBooking = useMemo(
+        () =>
+            isTheNewtBooking(
+                additionalInformation,
+                bookingDetail?.booking,
+                bookingDetail?.additional_information,
+                bookingDetail?.voucher
+            ),
+        [additionalInformation, bookingDetail]
+    );
 
     // Email modal state
     const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -6269,6 +6291,7 @@ setBookingDetail(finalVoucherDetail);
                                             name: (Array.isArray(item.passengers) && item.passengers.length > 0
                                                 ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                                 : item.name || ''),
+                                            is_newt_booking: isTheNewtBooking(item),
                                             short_notice_opt_out: getShortNoticeAvailabilityOptOut(item),
                                             email: item.email || '',
                                             flight_type: item.flight_type || '',
@@ -7288,7 +7311,10 @@ setBookingDetail(finalVoucherDetail);
                                                         const passenger1Name = passenger1 
                                                             ? `${passenger1.first_name || ''} ${passenger1.last_name || ''}`.trim() 
                                                             : '';
-                                                        return bookingDetail.booking.name || passenger1Name || '-';
+                                                        return renderBookingNameWithIndicators(
+                                                            bookingDetail.booking.name || passenger1Name || '-',
+                                                            { isNewtBooking: bookingDetailIsNewtBooking }
+                                                        );
                                                     })()}
                                                     <IconButton 
                                                         size="small" 
@@ -8024,7 +8050,12 @@ setBookingDetail(finalVoucherDetail);
                                                 <Box sx={{ mb: 2 }}>
                                                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Related Booking</Typography>
                                                     <Typography><b>Booking ID:</b> {bookingDetail.booking.id || '-'}</Typography>
-                                                    <Typography><b>Booking Name:</b> {bookingDetail.booking.name || '-'}</Typography>
+                                                    <Typography>
+                                                        <b>Booking Name:</b>{' '}
+                                                        {renderBookingNameWithIndicators(bookingDetail.booking.name || '-', {
+                                                            isNewtBooking: bookingDetailIsNewtBooking
+                                                        })}
+                                                    </Typography>
                                                     <Typography><b>Booking Email:</b> {bookingDetail.booking.email || '-'}</Typography>
                                                     <Typography><b>Booking Phone:</b> {bookingDetail.booking.phone || '-'}</Typography>
                                                     <Typography><b>Flight Date:</b> {bookingDetail.booking.flight_date ? dayjs(bookingDetail.booking.flight_date).format('DD/MM/YYYY HH:mm') : '-'}</Typography>

@@ -39,17 +39,23 @@ const PaginatedTable = ({
     const getColId = (col) => (typeof col === 'string' ? col : (col?.id || col?.key || ''));
 
     const OPT_OUT_EMOJI = '📵';
+    const NEWT_EMOJI = '🦎';
 
     const getDisplayNameParts = (item, key) => {
         const rawName = (item?.[key] || '').toString();
 
-        const hasEmojiInText = rawName.includes(OPT_OUT_EMOJI);
-        const shouldShowEmoji = Boolean(item?.short_notice_opt_out) || hasEmojiInText;
+        const hasOptOutEmojiInText = rawName.includes(OPT_OUT_EMOJI);
+        const hasNewtEmojiInText = rawName.includes(NEWT_EMOJI);
+        const shouldShowOptOutEmoji = Boolean(item?.short_notice_opt_out) || hasOptOutEmojiInText;
+        const shouldShowNewtEmoji = Boolean(item?.is_newt_booking) || hasNewtEmojiInText;
 
-        // Remove the emoji from the text part so underline never affects it.
-        const nameText = rawName.replaceAll(OPT_OUT_EMOJI, '').trim();
+        // Remove inline status markers from the text part so they are always rendered consistently.
+        const nameText = rawName
+            .replaceAll(OPT_OUT_EMOJI, '')
+            .replaceAll(NEWT_EMOJI, '')
+            .trim();
 
-        return { nameText, shouldShowEmoji };
+        return { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji };
     };
 
     const getColLabel = (col) => {
@@ -640,7 +646,7 @@ const PaginatedTable = ({
                                                         }}>
                                                             {id === 'name' ? (
                                                                 (() => {
-                                                                    const { nameText, shouldShowEmoji } = getDisplayNameParts(item, id);
+                                                                    const { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji } = getDisplayNameParts(item, id);
 
                                                                     // Keep the name clickable without the browser-style underline.
                                                                     const nameSpanStyles = {
@@ -657,12 +663,26 @@ const PaginatedTable = ({
                                                                         whiteSpace: 'nowrap'
                                                                     };
 
+                                                                    const nameIndicatorStyles = {
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px',
+                                                                        flex: '0 0 auto',
+                                                                        lineHeight: 1
+                                                                    };
+
+                                                                    const emojiStyles = {
+                                                                        color: onNameClick ? '#2d69c5' : 'inherit',
+                                                                        fontSize: '14px',
+                                                                        fontWeight: 'normal',
+                                                                        lineHeight: 1
+                                                                    };
+
                                                                     return onNameClick ? (
                                                                         <div
                                                                             style={{
                                                                                 display: 'flex',
                                                                                 alignItems: 'center',
-                                                                                justifyContent: 'space-between',
                                                                                 width: '100%',
                                                                                 gap: '6px'
                                                                             }}
@@ -673,18 +693,18 @@ const PaginatedTable = ({
                                                                             >
                                                                                 {nameText}
                                                                             </span>
-                                                                            {shouldShowEmoji && (
-                                                                                <span
-                                                                                    style={{
-                                                                                        flex: '0 0 auto',
-                                                                                        marginLeft: 'auto',
-                                                                                        color: '#2d69c5',
-                                                                                        fontSize: '14px',
-                                                                                        fontWeight: 'normal',
-                                                                                        lineHeight: 1
-                                                                                    }}
-                                                                                >
-                                                                                    {OPT_OUT_EMOJI}
+                                                                            {(shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
+                                                                                <span style={nameIndicatorStyles}>
+                                                                                    {shouldShowNewtEmoji && (
+                                                                                        <span style={emojiStyles}>
+                                                                                            {NEWT_EMOJI}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {shouldShowOptOutEmoji && (
+                                                                                        <span style={emojiStyles}>
+                                                                                            {OPT_OUT_EMOJI}
+                                                                                        </span>
+                                                                                    )}
                                                                                 </span>
                                                                             )}
                                                                         </div>
@@ -693,7 +713,6 @@ const PaginatedTable = ({
                                                                             style={{
                                                                                 display: 'flex',
                                                                                 alignItems: 'center',
-                                                                                justifyContent: 'space-between',
                                                                                 width: '100%',
                                                                                 gap: '6px'
                                                                             }}
@@ -712,18 +731,18 @@ const PaginatedTable = ({
                                                                             >
                                                                                 {nameText}
                                                                             </span>
-                                                                            {shouldShowEmoji && (
-                                                                                <span
-                                                                                    style={{
-                                                                                        flex: '0 0 auto',
-                                                                                        marginLeft: 'auto',
-                                                                                        color: 'inherit',
-                                                                                        fontSize: '14px',
-                                                                                        fontWeight: 'normal',
-                                                                                        lineHeight: 1
-                                                                                    }}
-                                                                                >
-                                                                                    {OPT_OUT_EMOJI}
+                                                                            {(shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
+                                                                                <span style={nameIndicatorStyles}>
+                                                                                    {shouldShowNewtEmoji && (
+                                                                                        <span style={emojiStyles}>
+                                                                                            {NEWT_EMOJI}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {shouldShowOptOutEmoji && (
+                                                                                        <span style={emojiStyles}>
+                                                                                            {OPT_OUT_EMOJI}
+                                                                                        </span>
+                                                                                    )}
                                                                                 </span>
                                                                             )}
                                                                         </div>

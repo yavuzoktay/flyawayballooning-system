@@ -31,6 +31,11 @@ const getFirstMeaningfulValue = (...candidates) => {
     return null;
 };
 
+const normalizePartnerValue = (value) => (value || '').toString().trim().toLowerCase();
+
+const THE_NEWT_ACCOMMODATION_NAME = 'the newt';
+const THE_NEWT_CONTACT_EMAIL = 'reservations@thenewtinsomerset.com';
+
 export const getManualBookingProfileFromSources = (...sources) => {
     for (const source of sources) {
         const parsedSource = parseAdditionalInfoJson(source);
@@ -76,6 +81,62 @@ export const getManualBookingFieldRows = (profile) => {
             )
         }
     ].filter((field) => hasMeaningfulValue(field.value));
+};
+
+export const isTheNewtManualBookingProfile = (profile) => {
+    if (!profile || typeof profile !== 'object') {
+        return false;
+    }
+
+    const accommodationName = normalizePartnerValue(
+        getFirstMeaningfulValue(
+            profile.accommodation_name,
+            profile.accommodationName,
+            profile.hotel_name,
+            profile.hotelName
+        )
+    );
+    const contactEmail = normalizePartnerValue(
+        getFirstMeaningfulValue(
+            profile.contact_email,
+            profile.contactEmail,
+            profile.email
+        )
+    );
+
+    return (
+        accommodationName === THE_NEWT_ACCOMMODATION_NAME ||
+        contactEmail === THE_NEWT_CONTACT_EMAIL
+    );
+};
+
+export const isTheNewtBooking = (...sources) => {
+    const profile = getManualBookingProfileFromSources(
+        ...sources.flatMap((source) => {
+            if (!source || typeof source !== 'object') {
+                return [source];
+            }
+
+            return [
+                source,
+                source.manual_booking_profile,
+                source.additional_information_json,
+                source.booking_additional_information_json,
+                source.additional_information,
+                source.additional_information?.additional_information_json,
+                source.additional_information?.manual_booking_profile,
+                source._original,
+                source._original?.manual_booking_profile,
+                source._original?.additional_information_json,
+                source._original?.booking_additional_information_json,
+                source._original?.additional_information,
+                source._original?.additional_information?.additional_information_json,
+                source._original?.additional_information?.manual_booking_profile
+            ];
+        })
+    );
+
+    return isTheNewtManualBookingProfile(profile);
 };
 
 const buildQuestionAnswerPayload = (answers = []) => {
