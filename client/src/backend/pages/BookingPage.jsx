@@ -13,6 +13,8 @@ import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import RebookAvailabilityModal from '../components/BookingPage/RebookAvailabilityModal';
 import {
+    appendCustomerPortalLinkToEmailHtml,
+    appendCustomerPortalLinkToSmsMessage,
     getDefaultEmailTemplateContent,
     getDefaultTemplateMessageHtml,
     extractMessageFromTemplateBody,
@@ -1761,13 +1763,19 @@ const BookingPage = () => {
         );
         const templateName = resolveTemplateName(emailForm.template, dbTemplate);
 
-        return buildEmailHtml({
+        let html = buildEmailHtml({
             templateName,
             messageHtml: emailForm.message,
             booking: selectedBookingForEmail,
             personalNote
         });
-    }, [emailForm.message, personalNote, emailForm.template, emailTemplates, selectedBookingForEmail]);
+
+        if (addLink) {
+            html = appendCustomerPortalLinkToEmailHtml(html, selectedBookingForEmail);
+        }
+
+        return html;
+    }, [addLink, emailForm.message, personalNote, emailForm.template, emailTemplates, selectedBookingForEmail]);
 
     // Auto-populate email form when template changes
     useEffect(() => {
@@ -11288,15 +11296,23 @@ setBookingDetail(finalVoucherDetail);
                                                             {(() => {
                                                                 const booking = selectedBookingForEmail || {};
                                                                 const isCustom = !smsForm.template || smsForm.template === 'custom';
+                                                                let previewMessage = '';
+
                                                                 if (isCustom) {
-                                                                    return (personalNote && personalNote.trim()) ? personalNote.trim() : 'Your message will appear here...';
+                                                                    previewMessage = (personalNote && personalNote.trim()) ? personalNote.trim() : '';
+                                                                } else {
+                                                                    const messageText = smsForm.message || '';
+                                                                    const messageWithPrompts = replaceSmsPrompts(messageText, booking);
+                                                                    previewMessage = personalNote
+                                                                        ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
+                                                                        : messageWithPrompts;
                                                                 }
-                                                                const messageText = smsForm.message || '';
-                                                                const messageWithPrompts = replaceSmsPrompts(messageText, booking);
-                                                                const finalMessage = personalNote
-                                                                    ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
-                                                                    : messageWithPrompts;
-                                                                return finalMessage || 'Your message will appear here...';
+
+                                                                if (addLink) {
+                                                                    previewMessage = appendCustomerPortalLinkToSmsMessage(previewMessage, booking);
+                                                                }
+
+                                                                return previewMessage || 'Your message will appear here...';
                                                             })()}
                                                         </Box>
                                                     </Box>

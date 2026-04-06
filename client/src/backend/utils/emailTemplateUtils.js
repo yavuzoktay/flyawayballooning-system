@@ -317,6 +317,33 @@ const escapeHtml = (unsafe = '') => {
         .replace(/'/g, '&#039;');
 };
 
+export const appendCustomerPortalLinkToEmailHtml = (html = '', booking = {}, linkText = 'Customer Portal') => {
+    const portalLink = getCustomerPortalLink(booking);
+    if (!portalLink) {
+        return html;
+    }
+
+    const safeLinkText = escapeHtml(linkText || 'Customer Portal');
+    const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank" rel="noopener noreferrer">${safeLinkText}</a></div>`;
+    const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+
+    if (closingPattern.test(html)) {
+        return html.replace(closingPattern, linkHtml + '$1');
+    }
+
+    return `${html}${linkHtml}`;
+};
+
+export const appendCustomerPortalLinkToSmsMessage = (message = '', booking = {}, label = 'Customer Portal') => {
+    const portalLink = getCustomerPortalLink(booking);
+    if (!portalLink) {
+        return message;
+    }
+
+    const prefix = label || 'Customer Portal';
+    return message ? `${message}\n\n${prefix}\n${portalLink}` : `${prefix}\n${portalLink}`;
+};
+
 export const isHtmlContent = (value = '') =>
     typeof value === 'string' && /<\/?[a-z][\s\S]*>/i.test(value);
 

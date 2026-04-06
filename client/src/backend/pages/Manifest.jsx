@@ -51,6 +51,8 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
 import {
+    appendCustomerPortalLinkToEmailHtml,
+    appendCustomerPortalLinkToSmsMessage,
     getDefaultEmailTemplateContent,
     getDefaultTemplateMessageHtml,
     replaceSmsPrompts,
@@ -719,13 +721,19 @@ const Manifest = () => {
         );
         const templateName = resolveTemplateName(emailForm.template, dbTemplate);
 
-        return buildEmailHtml({
+        let html = buildEmailHtml({
             templateName,
             messageHtml: emailForm.message,
             booking: selectedBookingForEmail,
             personalNote
         });
-    }, [emailForm.message, personalNote, emailForm.template, emailTemplates, selectedBookingForEmail]);
+
+        if (addLink) {
+            html = appendCustomerPortalLinkToEmailHtml(html, selectedBookingForEmail);
+        }
+
+        return html;
+    }, [addLink, emailForm.message, personalNote, emailForm.template, emailTemplates, selectedBookingForEmail]);
 
     const groupPreviewHtml = useMemo(() => {
         const previewBooking =
@@ -739,13 +747,19 @@ const Manifest = () => {
         );
         const templateName = resolveTemplateName(groupMessageForm.template, dbTemplate);
 
-        return buildEmailHtml({
+        let html = buildEmailHtml({
             templateName,
             messageHtml: groupMessageForm.message,
             booking: previewBooking,
             personalNote: groupPersonalNote
         });
-    }, [groupMessageForm.message, groupPersonalNote, groupMessageForm.template, emailTemplates, groupMessagePreviewBooking, groupSelectedBookings, selectedBookingForEmail]);
+
+        if (addLink) {
+            html = appendCustomerPortalLinkToEmailHtml(html, previewBooking);
+        }
+
+        return html;
+    }, [addLink, groupMessageForm.message, groupPersonalNote, groupMessageForm.template, emailTemplates, groupMessagePreviewBooking, groupSelectedBookings, selectedBookingForEmail]);
 
     // Auto-populate email form when template changes
     useEffect(() => {
@@ -8394,15 +8408,23 @@ const Manifest = () => {
                                                         if (!previewBooking) return 'Your message will appear here...';
                                                         
                                                         const isCustomSms = !groupSmsForm.template || groupSmsForm.template === 'custom';
+                                                        let previewMessage = '';
+
                                                         if (isCustomSms) {
-                                                            return (groupPersonalNote && groupPersonalNote.trim()) ? groupPersonalNote.trim() : 'Your message will appear here...';
+                                                            previewMessage = (groupPersonalNote && groupPersonalNote.trim()) ? groupPersonalNote.trim() : '';
+                                                        } else {
+                                                            const messageText = groupSmsForm.message || '';
+                                                            const messageWithPrompts = replaceSmsPrompts(messageText, previewBooking);
+                                                            previewMessage = groupPersonalNote 
+                                                                ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${groupPersonalNote}`
+                                                                : messageWithPrompts;
                                                         }
-                                                        const messageText = groupSmsForm.message || '';
-                                                        const messageWithPrompts = replaceSmsPrompts(messageText, previewBooking);
-                                                        const finalMessage = groupPersonalNote 
-                                                            ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${groupPersonalNote}`
-                                                            : messageWithPrompts;
-                                                        return finalMessage || 'Your message will appear here...';
+
+                                                        if (addLink) {
+                                                            previewMessage = appendCustomerPortalLinkToSmsMessage(previewMessage, previewBooking);
+                                                        }
+
+                                                        return previewMessage || 'Your message will appear here...';
                                                     })()}
                                                 </Box>
                                             </Box>
@@ -8849,15 +8871,23 @@ const Manifest = () => {
                                                     {(() => {
                                                         const booking = selectedBookingForEmail || {};
                                                         const isCustom = !smsForm.template || smsForm.template === 'custom';
+                                                        let previewMessage = '';
+
                                                         if (isCustom) {
-                                                            return (personalNote && personalNote.trim()) ? personalNote.trim() : 'Your message will appear here...';
+                                                            previewMessage = (personalNote && personalNote.trim()) ? personalNote.trim() : '';
+                                                        } else {
+                                                            const messageText = smsForm.message || '';
+                                                            const messageWithPrompts = replaceSmsPrompts(messageText, booking);
+                                                            previewMessage = personalNote 
+                                                                ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
+                                                                : messageWithPrompts;
                                                         }
-                                                        const messageText = smsForm.message || '';
-                                                        const messageWithPrompts = replaceSmsPrompts(messageText, booking);
-                                                        const finalMessage = personalNote 
-                                                            ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${personalNote}`
-                                                            : messageWithPrompts;
-                                                        return finalMessage || 'Your message will appear here...';
+
+                                                        if (addLink) {
+                                                            previewMessage = appendCustomerPortalLinkToSmsMessage(previewMessage, booking);
+                                                        }
+
+                                                        return previewMessage || 'Your message will appear here...';
                                                     })()}
                                                 </Box>
                                             </Box>
@@ -9155,15 +9185,23 @@ const Manifest = () => {
                                                 {(() => {
                                                     const booking = selectedBookingForEmail || bookingDetail?.booking || {};
                                                     const isCustom = !smsForm.template || smsForm.template === 'custom';
+                                                    let previewMessage = '';
+
                                                     if (isCustom) {
-                                                        return (smsPersonalNote && smsPersonalNote.trim()) ? smsPersonalNote.trim() : 'Your message will appear here...';
+                                                        previewMessage = (smsPersonalNote && smsPersonalNote.trim()) ? smsPersonalNote.trim() : '';
+                                                    } else {
+                                                        const messageText = smsForm.message || '';
+                                                        const messageWithPrompts = replaceSmsPrompts(messageText, booking);
+                                                        previewMessage = smsPersonalNote 
+                                                            ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${smsPersonalNote}`
+                                                            : messageWithPrompts;
                                                     }
-                                                    const messageText = smsForm.message || '';
-                                                    const messageWithPrompts = replaceSmsPrompts(messageText, booking);
-                                                    const finalMessage = smsPersonalNote 
-                                                        ? `${messageWithPrompts}${messageWithPrompts ? '\n\n' : ''}${smsPersonalNote}`
-                                                        : messageWithPrompts;
-                                                    return finalMessage || 'Your message will appear here...';
+
+                                                    if (addLink) {
+                                                        previewMessage = appendCustomerPortalLinkToSmsMessage(previewMessage, booking);
+                                                    }
+
+                                                    return previewMessage || 'Your message will appear here...';
                                                 })()}
                                             </Box>
                                         </Box>
