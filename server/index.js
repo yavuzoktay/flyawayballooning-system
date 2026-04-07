@@ -23510,6 +23510,91 @@ app.get('/api/analytics', async (req, res) => {
         if (end_date) sql += ` AND ${field} <= '${end_date}'`;
         return sql;
     };
+    const queryAsync = (sql, params = []) =>
+        con.promise().query(sql, params).then(([rows]) => rows);
+    const normalizeAnalyticsText = (value = '') =>
+        String(value || '').replace(/\s+/g, ' ').trim();
+    const isGenericFlightTypeLabel = (value = '') => {
+        const lower = normalizeAnalyticsText(value).toLowerCase();
+        return ['shared', 'shared flight', 'private', 'private flight'].includes(lower);
+    };
+    const normalizeVoucherLabel = (type) => {
+        const value = normalizeAnalyticsText(type);
+        if (!value || isGenericFlightTypeLabel(value)) return null;
+
+        const lower = value.toLowerCase();
+        if (lower.includes('proposal')) return 'Proposal';
+        if (lower.includes('private')) return 'Private Charter';
+        if (lower.includes('any')) return 'Any Day Flight';
+        if (lower.includes('flex')) return 'Flex Weekday';
+        if (lower.includes('weekday')) return 'Weekday Morning';
+        if (lower.includes('weekend')) return 'Weekend';
+        if (lower.includes('gift')) return 'Gift Voucher';
+
+        return value;
+    };
+    const normalizeAddOnName = (value = '') => {
+        const cleaned = normalizeAnalyticsText(value);
+        if (!cleaned) return '';
+
+        const lower = cleaned.toLowerCase();
+        if (lower.includes('weather') || lower.includes('wx')) return 'Weather Refundable';
+        if (lower.includes('choose location')) return 'Choose Location';
+
+        return cleaned;
+    };
+    const isWeatherAddOnName = (value = '') =>
+        normalizeAddOnName(value) === 'Weather Refundable';
+    const parseAnalyticsAddOnItems = (rawValue) => {
+        if (!rawValue) return [];
+        if (Array.isArray(rawValue)) return rawValue;
+
+        if (typeof rawValue === 'string') {
+            const trimmed = rawValue.trim();
+            if (!trimmed) return [];
+
+            if (trimmed.startsWith('[')) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    return Array.isArray(parsed) ? parsed : [];
+                } catch (error) {
+                    console.warn('Failed to parse analytics add-on JSON:', error?.message || error);
+                }
+            }
+
+            return trimmed
+                .split(',')
+                .map((item) => normalizeAnalyticsText(item))
+                .filter(Boolean)
+                .map((name) => ({ name }));
+        }
+
+        return [];
+    };
+    const getAddOnItemName = (item) =>
+        normalizeAddOnName(
+            item?.name ??
+            item?.title ??
+            item?.label ??
+            item?.item_name ??
+            ''
+        );
+    const getAddOnItemPrice = (item) => {
+        if (!item || typeof item !== 'object') return 0;
+        const priceCandidate =
+            item.price ??
+            item.amount ??
+            item.totalPrice ??
+            item.total_price ??
+            item.value;
+        return roundCurrencyAmount(priceCandidate);
+    };
+    const addAddOnValue = (map, rawName, rawValue) => {
+        const name = normalizeAddOnName(rawName);
+        const value = roundCurrencyAmount(rawValue);
+        if (!name || value <= 0) return;
+        map[name] = roundCurrencyAmount((map[name] || 0) + value);
+    };
     // 1. Booking Attempts
     // Query all bookings from all_booking table (matching the "All Booking" table view)
     // flight_attempts represents the number of cancellations/reschedules:
@@ -23732,378 +23817,478 @@ app.get('/api/analytics', async (req, res) => {
 
                             console.log('Sales by Source calculated:', salesBySource);
 
-                            // Continue with next query (Non Redemption)
-                            const nonRedemptionSql = `
-                SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Expired' THEN 1 ELSE 0 END) as expired
-                FROM all_booking
-                WHERE 1=1 ${dateFilter('expires')}
-            `;
-                            con.query(nonRedemptionSql, [], (err3, nonRows) => {
-                                if (err3) return res.status(500).json({ error: 'Failed to fetch non redemption' });
-                                const total = nonRows[0]?.total || 0;
-                                const expired = nonRows[0]?.expired || 0;
-                                nonRedemption = {
-                                    value: expired,
-                                    percent: total ? Math.round((expired / total) * 100) : 0
-                                };
-                                // 4. Add Ons (sum revenue by add on name)
-                                // Only include add-ons that were actually paid for (paid > 0)
-                                const addOnSql = `
-                    SELECT choose_add_on, paid
-                    FROM all_booking
-                    WHERE choose_add_on IS NOT NULL 
-                      AND choose_add_on != '' 
-                      AND paid IS NOT NULL 
-                      AND paid > 0
-                      ${dateFilter()}
-                `;
-                                con.query(addOnSql, [], (err4, addOnRows) => {
-                                    if (err4) return res.status(500).json({ error: 'Failed to fetch add ons' });
-                                    const addOnMap = {};
-                                    let addOnsTotal = 0;
-                                    addOnRows.forEach(row => {
-                                        try {
-                                            if (!row.choose_add_on || typeof row.choose_add_on !== 'string' || row.choose_add_on.trim() === '') return;
-                                            // Only process if booking was actually paid for
-                                            if (!row.paid || parseFloat(row.paid) <= 0) return;
-                                            
-                                            let arr = [];
-                                            try {
-                                                if (row.choose_add_on && row.choose_add_on.trim() !== "" && row.choose_add_on.startsWith("[")) {
-                                                    arr = JSON.parse(row.choose_add_on);
-                                                }
-                                            } catch (e) {
-                                                console.error('AddOn JSON parse error:', e);
-                                                arr = [];
-                                            }
-                                            if (Array.isArray(arr)) {
-                                                arr.forEach(a => {
-                                                    if (!a.name || !a.price) return;
-                                                    const price = Number(a.price) || 0;
-                                                    if (!addOnMap[a.name]) addOnMap[a.name] = 0;
-                                                    addOnMap[a.name] += price;
-                                                    addOnsTotal += price;
-                                                });
-                                            }
-                                        } catch (e) { console.error('AddOn JSON parse error:', e); }
-                                    });
-                                    addOns = Object.entries(addOnMap).map(([name, value]) => ({ name, value: Math.round(value) }));
-                                    // Store total separately for response
-                                    addOnsTotalValue = Math.round(addOnsTotal);
-                                    // 5. Sales by Location
-                                    // Get location data from multiple sources:
-                                    // 1. all_booking table (for Book Flight Date and Redeem Voucher bookings)
-                                    // 2. all_vouchers table (for Buy Flight Voucher and Buy Gift Voucher)
-                                    const locationDataMap = {};
-
-                                    // 1. Get from all_booking table
-                                    // IMPORTANT:
-                                    // A voucher purchase (all_vouchers) that later becomes a booking (all_booking)
-                                    // would otherwise be counted twice (once in bookings, once in vouchers).
-                                    // To avoid double-counting, exclude bookings that are linked to an existing voucher_ref.
-                                    const bookingLocSql = `
-                        SELECT ab.location, COUNT(*) as count
-                        FROM all_booking ab
-                        LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
-                        WHERE ab.flight_date IS NOT NULL
-                          AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
-                          AND ab.location IS NOT NULL AND ab.location != ''
-                          AND v.id IS NULL
-                          ${dateFilter('ab.flight_date')}
-                        GROUP BY ab.location
-                    `;
-
-                                    con.query(bookingLocSql, [], (errBookingLoc, bookingLocRows) => {
-                                        if (errBookingLoc) {
-                                            console.warn('Error fetching booking locations:', errBookingLoc);
-                                        } else {
-                                            bookingLocRows.forEach(row => {
-                                                const location = (row.location || '').trim();
-                                                if (location) {
-                                                    locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
-                                                }
-                                            });
-                                        }
-
-                                        // 2. Get from all_vouchers table (preferred_location)
-                                        const voucherLocSql = `
-                                    SELECT preferred_location, COUNT(*) as count
-                                    FROM all_vouchers
-                                    WHERE created_at IS NOT NULL
-                                    AND preferred_location IS NOT NULL AND preferred_location != ''
-                                    ${dateFilter('created_at')}
-                                    GROUP BY preferred_location
-                                `;
-
-                                        con.query(voucherLocSql, [], (errVoucherLoc, voucherLocRows) => {
-                                            if (errVoucherLoc) {
-                                                console.warn('Error fetching voucher locations:', errVoucherLoc);
-                                            } else {
-                                                voucherLocRows.forEach(row => {
-                                                    const location = (row.preferred_location || '').trim();
-                                                    if (location) {
-                                                        locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
-                                                    }
-                                                });
-                                            }
-
-                                            // Also check all_vouchers.location field if it exists
-                                            const voucherLocSql2 = `
-                                        SELECT location, COUNT(*) as count
-                                        FROM all_vouchers
-                                        WHERE created_at IS NOT NULL
-                                        AND location IS NOT NULL AND location != ''
-                                        AND (preferred_location IS NULL OR preferred_location = '')
-                                        ${dateFilter('created_at')}
-                                        GROUP BY location
-                                    `;
-
-                                            con.query(voucherLocSql2, [], (errVoucherLoc2, voucherLocRows2) => {
-                                                if (errVoucherLoc2) {
-                                                    console.warn('Error fetching voucher locations (location field):', errVoucherLoc2);
-                                                } else {
-                                                    voucherLocRows2.forEach(row => {
-                                                        const location = (row.location || '').trim();
-                                                        if (location) {
-                                                            locationDataMap[location] = (locationDataMap[location] || 0) + row.count;
-                                                        }
-                                                    });
-                                                }
-
-                                                // Calculate totals and percentages
-                                                const totalLoc = Object.values(locationDataMap).reduce((sum, count) => sum + count, 0);
-                                                const salesByLocation = Object.entries(locationDataMap)
-                                                    .map(([location, count]) => ({
-                                                        location: location || 'Other',
-                                                        percent: totalLoc ? Math.round((count / totalLoc) * 100) : 0,
-                                                        count: count
-                                                    }))
-                                                    .sort((a, b) => b.count - a.count); // Sort by count descending
-
-                                                console.log('Sales by Location calculated:', salesByLocation);
-
-                                                // 6. Sales by Booking Type (voucher type driven)
-                                                const normalizeVoucherLabel = (type) => {
-                                                    if (!type) return 'Other';
-                                                    const value = type.toString().trim();
-                                                    const lower = value.toLowerCase();
-                                                    if (lower.includes('proposal')) return 'Proposal';
-                                                    if (lower.includes('private')) return 'Private';
-                                                    if (lower.includes('any')) return 'Any Day Flight';
-                                                    if (lower.includes('flex')) return 'Flex Weekday';
-                                                    if (lower.includes('weekday')) return 'Weekday Morning';
-                                                    if (lower.includes('weekend')) return 'Weekend';
-                                                    if (lower.includes('gift')) return 'Gift Voucher';
-                                                    return value.replace(/\s+/g, ' ');
-                                                };
-
-                                                const addTypeCount = (map, type, count) => {
-                                                    const label = normalizeVoucherLabel(type);
-                                                    map[label] = (map[label] || 0) + (count || 0);
-                                                };
-
-                                                const bookingTypeSql = `
-                            SELECT COALESCE(v.voucher_type, ab.voucher_type, ab.flight_type) as voucher_type, COUNT(*) as count
-                            FROM all_booking ab
-                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
-                            WHERE ab.flight_date IS NOT NULL AND ab.status IN ('Flown', 'Confirmed', 'Scheduled') ${dateFilter('ab.flight_date')}
-                            GROUP BY voucher_type
-                        `;
-                                                con.query(bookingTypeSql, [], (err6, bookingTypeRows) => {
-                                                    if (err6) return res.status(500).json({ error: 'Failed to fetch sales by booking type' });
-
-                                                    const typeCounts = {};
-                                                    bookingTypeRows.forEach(row => addTypeCount(typeCounts, row.voucher_type, row.count));
-
-                                                    const voucherTypeSql = `
-                            SELECT voucher_type, COUNT(*) as count
-                            FROM all_vouchers
-                            WHERE created_at IS NOT NULL ${dateFilter('created_at')}
-                            GROUP BY voucher_type
-                        `;
-                                                    con.query(voucherTypeSql, [], (errVoucherType, voucherTypeRows) => {
-                                                        if (errVoucherType) {
-                                                            console.warn('Error fetching voucher types for analytics:', errVoucherType);
-                                                        } else {
-                                                            voucherTypeRows.forEach(row => addTypeCount(typeCounts, row.voucher_type, row.count));
-                                                        }
-
-                                                        const totalType = Object.values(typeCounts).reduce((sum, c) => sum + c, 0);
-                                                        const salesByBookingType = Object.entries(typeCounts).map(([label, count]) => ({
-                                                            type: label || 'Other',
-                                                            percent: totalType ? Math.round((count / totalType) * 100) : 0,
-                                                            count
-                                                        })).sort((a, b) => b.count - a.count);
-
-                                                        // 7. Liability by Location (excluding Flown status)
-                                                    const liabilityLocSql = `
-                                SELECT location, SUM(paid) as value
-                                FROM all_booking
-                                WHERE paid IS NOT NULL AND paid > 0 AND status != 'Flown' ${dateFilter()}
-                                GROUP BY location
-                            `;
-                                                    con.query(liabilityLocSql, [], (err7, liabLocRows) => {
-                                                        if (err7) return res.status(500).json({ error: 'Failed to fetch liability by location' });
-                                                        const liabilityByLocation = liabLocRows.map(r => {
-                                                            const finalValue = Number(r.value || 0).toFixed(2);
-                                                            return {
-                                                                location: r.location || 'Other',
-                                                                value: parseFloat(finalValue)
-                                                            };
-                                                        });
-                                                        // 8. Liability by Flight Type (voucher type driven)
-                                                        const liabilityTypeSql = `
-                                    SELECT 
-                                        COALESCE(v.voucher_type, ab.voucher_type, ab.flight_type) as voucher_type,
-                                        SUM(ab.paid) as value
-                                    FROM all_booking ab
-                                    LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
-                                    WHERE ab.paid IS NOT NULL AND ab.paid > 0 ${dateFilter('ab.flight_date')}
-                                    GROUP BY voucher_type
-                                `;
-                                                        con.query(liabilityTypeSql, [], (err8, liabTypeRows) => {
-                                                            if (err8) return res.status(500).json({ error: 'Failed to fetch liability by flight type' });
-                                                            const liabilityTypeMap = {};
-                                                            liabTypeRows.forEach(r => {
-                                                                const label = normalizeVoucherLabel(r.voucher_type);
-                                                                const value = Math.round(r.value || 0);
-                                                                liabilityTypeMap[label] = (liabilityTypeMap[label] || 0) + value;
-                                                            });
-                                                            const liabilityByFlightType = Object.entries(liabilityTypeMap).map(([label, value]) => ({
-                                                                type: label || 'Other',
-                                                                value
-                                                            })).sort((a, b) => b.value - a.value);
-                                                            // 9. Refundable Liability
-                                                            // Goal: Sum WX Refundable price for bookings where WX Refundable = Yes
-                                                            // Rules: paid > 0, not Flown/Expired, not expired. Include only when WX = Yes.
-                                                            // Price: weather_refund_total_price (booking) OR passenger-level sum OR choose_add_on
-                                                            const refundableSql = `
-                                        SELECT 
-                                            ab.id,
-                                            COALESCE(ab.weather_refund_total_price, 0) AS weather_refund_total_price,
-                                            ab.choose_add_on,
-                                            ab.paid,
-                                            ab.status,
-                                            ab.expires
-                                        FROM all_booking ab
-                                        WHERE ab.paid IS NOT NULL
-                                          AND ab.paid > 0
-                                          AND ab.status NOT IN ('Expired', 'Flown')
-                                          AND (ab.expires IS NULL OR ab.expires > CURDATE())
-                                          ${dateFilter('ab.expires')}
-                                    `;
-                                                            con.query(refundableSql, [], (err9, refRows) => {
-                                                                if (err9) return res.status(500).json({ error: 'Failed to fetch refundable liability' });
-                                                                const REFUNDABLE_WEATHER_PRICE = 47.5;
-                                                                const bookingIds = refRows.map(r => r.id).filter(Boolean);
-                                                                const runWithRefundableLiability = (refundableLiabilityVal) => {
-                                                                // 10. Flown Flights by Location (only after manifest date and not cancelled)
-                                                                const flownSql = `
+                            // Continue with the remaining analytics using the same normalized rules.
+                            (async () => {
+                                try {
+                                    const [
+                                        nonRedemptionBookingRows,
+                                        nonRedemptionVoucherRows,
+                                        bookingAddOnRows,
+                                        voucherAddOnRows,
+                                        addOnCatalogRows,
+                                        bookingLocRows,
+                                        voucherLocRows,
+                                        voucherLocRows2,
+                                        bookingTypeRows,
+                                        voucherTypeRows,
+                                        liabLocRows,
+                                        liabTypeRows,
+                                        refundableRows,
+                                        flownRows,
+                                        voucherLiabilityRows
+                                    ] = await Promise.all([
+                                        queryAsync(`
+                                            SELECT
+                                                COUNT(*) AS count,
+                                                COALESCE(SUM(COALESCE(paid, 0)), 0) AS total
+                                            FROM all_booking
+                                            WHERE COALESCE(paid, 0) > 0
+                                              AND (
+                                                    TRIM(LOWER(COALESCE(status, ''))) = 'expired'
+                                                    OR (expires IS NOT NULL AND expires < CURDATE())
+                                                  )
+                                              AND TRIM(LOWER(COALESCE(status, ''))) != 'flown'
+                                              ${dateFilter('expires')}
+                                        `),
+                                        queryAsync(`
+                                            SELECT
+                                                COUNT(*) AS count,
+                                                COALESCE(SUM(COALESCE(paid, 0)), 0) AS total
+                                            FROM all_vouchers
+                                            WHERE COALESCE(paid, 0) > 0
+                                              AND expires IS NOT NULL
+                                              AND expires < CURDATE()
+                                              AND (
+                                                    redeemed IS NULL
+                                                    OR TRIM(LOWER(redeemed)) NOT IN ('yes', 'redeemed', 'true', '1')
+                                                  )
+                                              AND (
+                                                    status IS NULL
+                                                    OR TRIM(LOWER(status)) NOT IN ('used', 'flown')
+                                                  )
+                                              ${dateFilter('expires')}
+                                        `),
+                                        queryAsync(`
+                                            SELECT
+                                                id,
+                                                choose_add_on,
+                                                COALESCE(add_to_booking_items_total_price, 0) AS add_to_booking_items_total_price,
+                                                COALESCE(weather_refund_total_price, 0) AS weather_refund_total_price,
+                                                paid
+                                            FROM all_booking
+                                            WHERE COALESCE(paid, 0) > 0
+                                              ${dateFilter()}
+                                        `),
+                                        queryAsync(`
+                                            SELECT
+                                                id,
+                                                add_to_booking_items,
+                                                voucher_passenger_details,
+                                                paid,
+                                                voucher_type,
+                                                experience_type,
+                                                book_flight,
+                                                numberOfPassengers
+                                            FROM all_vouchers
+                                            WHERE COALESCE(paid, 0) > 0
+                                              ${dateFilter('created_at')}
+                                        `),
+                                        queryAsync(`
+                                            SELECT title, price
+                                            FROM add_to_booking_items
+                                        `),
+                                        queryAsync(`
+                                            SELECT ab.location, COUNT(*) as count
+                                            FROM all_booking ab
+                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                                            WHERE ab.flight_date IS NOT NULL
+                                              AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
+                                              AND ab.location IS NOT NULL AND ab.location != ''
+                                              AND v.id IS NULL
+                                              ${dateFilter('ab.flight_date')}
+                                            GROUP BY ab.location
+                                        `),
+                                        queryAsync(`
+                                            SELECT preferred_location, COUNT(*) as count
+                                            FROM all_vouchers
+                                            WHERE created_at IS NOT NULL
+                                              AND preferred_location IS NOT NULL AND preferred_location != ''
+                                              ${dateFilter('created_at')}
+                                            GROUP BY preferred_location
+                                        `),
+                                        queryAsync(`
+                                            SELECT location, COUNT(*) as count
+                                            FROM all_vouchers
+                                            WHERE created_at IS NOT NULL
+                                              AND location IS NOT NULL AND location != ''
+                                              AND (preferred_location IS NULL OR preferred_location = '')
+                                              ${dateFilter('created_at')}
+                                            GROUP BY location
+                                        `),
+                                        queryAsync(`
+                                            SELECT
+                                                COALESCE(NULLIF(v.voucher_type, ''), NULLIF(ab.voucher_type, ''), NULLIF(ab.voucher_type_detail, '')) as voucher_type,
+                                                COUNT(*) as count
+                                            FROM all_booking ab
+                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                                            WHERE ab.flight_date IS NOT NULL
+                                              AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
+                                              ${dateFilter('ab.flight_date')}
+                                            GROUP BY voucher_type
+                                        `),
+                                        queryAsync(`
+                                            SELECT voucher_type, COUNT(*) as count
+                                            FROM all_vouchers
+                                            WHERE created_at IS NOT NULL
+                                              ${dateFilter('created_at')}
+                                            GROUP BY voucher_type
+                                        `),
+                                        queryAsync(`
+                                            SELECT location, SUM(paid) as value
+                                            FROM all_booking
+                                            WHERE paid IS NOT NULL
+                                              AND paid > 0
+                                              AND status != 'Flown'
+                                              ${dateFilter()}
+                                            GROUP BY location
+                                        `),
+                                        queryAsync(`
+                                            SELECT
+                                                COALESCE(NULLIF(v.voucher_type, ''), NULLIF(ab.voucher_type, ''), NULLIF(ab.voucher_type_detail, '')) as voucher_type,
+                                                SUM(ab.paid) as value
+                                            FROM all_booking ab
+                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                                            WHERE ab.paid IS NOT NULL
+                                              AND ab.paid > 0
+                                              ${dateFilter('ab.flight_date')}
+                                            GROUP BY voucher_type
+                                        `),
+                                        queryAsync(`
+                                            SELECT
+                                                ab.id,
+                                                ab.paid,
+                                                ab.status,
+                                                ab.expires,
+                                                ab.experience,
+                                                ab.flight_type,
+                                                ab.voucher_type,
+                                                ab.voucher_type_detail,
+                                                ab.location,
+                                                ab.pax,
+                                                COALESCE(ab.add_to_booking_items_total_price, 0) AS add_to_booking_items_total_price,
+                                                COALESCE(ab.weather_refund_total_price, 0) AS weather_refund_total_price
+                                            FROM all_booking ab
+                                            WHERE ab.paid IS NOT NULL
+                                              AND ab.paid > 0
+                                              AND TRIM(LOWER(COALESCE(ab.status, ''))) NOT IN ('expired', 'flown')
+                                              AND (ab.expires IS NULL OR ab.expires > CURDATE())
+                                              ${dateFilter('ab.expires')}
+                                        `),
+                                        queryAsync(`
                                             SELECT location, COUNT(*) as count
                                             FROM all_booking
-                                            WHERE status != 'Cancelled' 
-                                            AND flight_date IS NOT NULL 
-                                            AND flight_date < CURDATE()
-                                            ${dateFilter()}
+                                            WHERE status != 'Cancelled'
+                                              AND flight_date IS NOT NULL
+                                              AND flight_date < CURDATE()
+                                              ${dateFilter()}
                                             GROUP BY location
-                                        `;
-                                                                con.query(flownSql, [], (err10, flownRows) => {
-                                                                    if (err10) return res.status(500).json({ error: 'Failed to fetch flown flights by location' });
-                                                                    const flownFlightsByLocation = flownRows.map(r => ({
-                                                                        location: r.location || 'Other',
-                                                                        count: r.count
-                                                                    }));
-                                                                    // 11. Voucher Liability (total value of unredeemed vouchers)
-                                                                    const voucherLiabilitySql = `
-                                                                        SELECT COALESCE(SUM(COALESCE(v.paid, 0)), 0) AS total
-                                                                        FROM all_vouchers v
-                                                                        WHERE
-                                                                            (
-                                                                                v.redeemed IS NULL
-                                                                                OR TRIM(LOWER(v.redeemed)) NOT IN ('yes', 'redeemed', 'true', '1')
-                                                                            )
-                                                                    `;
-                                                                    con.query(voucherLiabilitySql, [], (err11, voucherLiabilityRows) => {
-                                                                        if (err11) return res.status(500).json({ error: 'Failed to fetch voucher liability' });
-                                                                        const voucherLiabilityRaw = Number(voucherLiabilityRows?.[0]?.total || 0);
-                                                                        const voucherLiability = Math.round(voucherLiabilityRaw * 100) / 100;
-                                                                    // Return all real analytics
-                                                                    res.json({
-                                                                        bookingAttempts,
-                                                                        salesBySource,
-                                                                        nonRedemption,
-                                                                        addOns,
-                                                                        addOnsTotal: addOnsTotalValue,
-                                                                        salesByLocation,
-                                                                        salesByBookingType,
-                                                                        liabilityByLocation,
-                                                                        liabilityByFlightType,
-                                                                        refundableLiability: Math.round(refundableLiabilityVal),
-                                                                        flownFlightsByLocation,
-                                                                        voucherLiability
-                                                                    });
-                                                                    });
-                                                                });
-                                                                };
-                                                                if (bookingIds.length === 0) {
-                                                                    runWithRefundableLiability(0);
-                                                                } else {
-                                                                    const passengerWxSql = `
-                                                                        SELECT booking_id, COUNT(*) as wx_count
-                                                                        FROM passenger
-                                                                        WHERE booking_id IN (${bookingIds.map(() => '?').join(',')})
-                                                                          AND (weather_refund = 1 OR weather_refund = '1')
-                                                                        GROUP BY booking_id
-                                                                    `;
-                                                                    con.query(passengerWxSql, bookingIds, (errPax, paxRows) => {
-                                                                        const wxByBooking = {};
-                                                                        (paxRows || []).forEach(r => {
-                                                                            wxByBooking[r.booking_id] = (Number(r.wx_count) || 0) * REFUNDABLE_WEATHER_PRICE;
-                                                                        });
-                                                                        let refundableLiability = 0;
-                                                                        refRows.forEach(row => {
-                                                                            try {
-                                                                                let rowLiability = Number(row.weather_refund_total_price) || 0;
-                                                                                if (rowLiability === 0 && row.choose_add_on && typeof row.choose_add_on === 'string' && row.choose_add_on.trim() !== '') {
-                                                                                    let wxTotal = 0;
-                                                                                    const trimmed = row.choose_add_on.trim();
-                                                                                    if (trimmed.startsWith('[')) {
-                                                                                        try {
-                                                                                            const parsed = JSON.parse(trimmed);
-                                                                                            if (Array.isArray(parsed)) {
-                                                                                                parsed.forEach(a => {
-                                                                                                    if (a && a.name && a.name.toLowerCase().includes('wx')) {
-                                                                                                        wxTotal += Number(a.price) || REFUNDABLE_WEATHER_PRICE;
-                                                                                                    }
-                                                                                                });
-                                                                                            }
-                                                                                        } catch (e) {}
-                                                                                    } else if (trimmed.toLowerCase().includes('wx')) {
-                                                                                        wxTotal += REFUNDABLE_WEATHER_PRICE;
-                                                                                    }
-                                                                                    rowLiability += wxTotal;
-                                                                                }
-                                                                                if (rowLiability === 0 && wxByBooking[row.id]) {
-                                                                                    rowLiability = wxByBooking[row.id];
-                                                                                }
-                                                                                refundableLiability += rowLiability;
-                                                                            } catch (e) {
-                                                                                console.error('Refundable liability calculation error:', e);
-                                                                            }
-                                                                        });
-                                                                        runWithRefundableLiability(refundableLiability);
-                                                                    });
-                                                                }
-                                                            });
-                                                        });
-                                                    });
-                                                });
-                                                });
-                                            });
-                                        });
+                                        `),
+                                        queryAsync(`
+                                            SELECT COALESCE(SUM(COALESCE(v.paid, 0)), 0) AS total
+                                            FROM all_vouchers v
+                                            WHERE (
+                                                    v.redeemed IS NULL
+                                                    OR TRIM(LOWER(v.redeemed)) NOT IN ('yes', 'redeemed', 'true', '1')
+                                                  )
+                                        `)
+                                    ]);
+
+                                    const expiredBookingPaid = Number(nonRedemptionBookingRows?.[0]?.total || 0);
+                                    const expiredVoucherPaid = Number(nonRedemptionVoucherRows?.[0]?.total || 0);
+                                    const expiredBookingCount = Number(nonRedemptionBookingRows?.[0]?.count || 0);
+                                    const expiredVoucherCount = Number(nonRedemptionVoucherRows?.[0]?.count || 0);
+
+                                    nonRedemption = {
+                                        value: roundCurrencyAmount(expiredBookingPaid + expiredVoucherPaid),
+                                        percent: 0,
+                                        count: expiredBookingCount + expiredVoucherCount
+                                    };
+
+                                    const addOnCatalogMap = {};
+                                    (addOnCatalogRows || []).forEach((row) => {
+                                        const name = normalizeAddOnName(row.title);
+                                        const price = roundCurrencyAmount(row.price);
+                                        if (!name || price <= 0 || addOnCatalogMap[name] > 0) return;
+                                        addOnCatalogMap[name] = price;
                                     });
-                                });
-                            });
+
+                                    const addOnMap = {};
+
+                                    (bookingAddOnRows || []).forEach((row) => {
+                                        const parsedItems = parseAnalyticsAddOnItems(row.choose_add_on);
+                                        let allocatedNonWeather = 0;
+                                        let hasExplicitWeatherAddOn = false;
+
+                                        parsedItems.forEach((item) => {
+                                            const itemName = getAddOnItemName(item);
+                                            if (!itemName) return;
+
+                                            let itemPrice = getAddOnItemPrice(item);
+                                            if (!(itemPrice > 0)) {
+                                                itemPrice = roundCurrencyAmount(addOnCatalogMap[itemName]);
+                                            }
+                                            if (!(itemPrice > 0)) return;
+
+                                            if (isWeatherAddOnName(itemName)) {
+                                                hasExplicitWeatherAddOn = true;
+                                            } else {
+                                                allocatedNonWeather += itemPrice;
+                                            }
+
+                                            addAddOnValue(addOnMap, itemName, itemPrice);
+                                        });
+
+                                        const storedAddOnTotal = roundCurrencyAmount(row.add_to_booking_items_total_price);
+                                        const remainingStoredAddOnTotal = roundCurrencyAmount(storedAddOnTotal - allocatedNonWeather);
+                                        if (remainingStoredAddOnTotal > 0) {
+                                            const fallbackNames = parsedItems
+                                                .map((item) => getAddOnItemName(item))
+                                                .filter((name) => name && !isWeatherAddOnName(name));
+
+                                            if (fallbackNames.length === 1) {
+                                                addAddOnValue(addOnMap, fallbackNames[0], remainingStoredAddOnTotal);
+                                            } else {
+                                                addAddOnValue(addOnMap, 'Other Add-Ons', remainingStoredAddOnTotal);
+                                            }
+                                        }
+
+                                        const weatherRefundTotal = roundCurrencyAmount(row.weather_refund_total_price);
+                                        if (!hasExplicitWeatherAddOn && weatherRefundTotal > 0) {
+                                            addAddOnValue(addOnMap, 'Weather Refundable', weatherRefundTotal);
+                                        }
+                                    });
+
+                                    (voucherAddOnRows || []).forEach((row) => {
+                                        const parsedItems = parseAnalyticsAddOnItems(row.add_to_booking_items);
+                                        let allocatedNonWeather = 0;
+                                        let hasExplicitWeatherAddOn = false;
+
+                                        parsedItems.forEach((item) => {
+                                            const itemName = getAddOnItemName(item);
+                                            if (!itemName) return;
+
+                                            let itemPrice = getAddOnItemPrice(item);
+                                            if (!(itemPrice > 0)) {
+                                                itemPrice = roundCurrencyAmount(addOnCatalogMap[itemName]);
+                                            }
+                                            if (!(itemPrice > 0)) return;
+
+                                            if (isWeatherAddOnName(itemName)) {
+                                                hasExplicitWeatherAddOn = true;
+                                            } else {
+                                                allocatedNonWeather += itemPrice;
+                                            }
+
+                                            addAddOnValue(addOnMap, itemName, itemPrice);
+                                        });
+
+                                        if (!hasExplicitWeatherAddOn) {
+                                            const voucherPassengers = parsePassengerList(row.voucher_passenger_details);
+                                            const weatherPassengerCount = voucherPassengers.filter((passenger) =>
+                                                isWeatherRefundSelectedValue(passenger?.weather_refund) ||
+                                                isWeatherRefundSelectedValue(passenger?.weatherRefund)
+                                            ).length;
+
+                                            if (weatherPassengerCount > 0) {
+                                                const isPrivateVoucher = [
+                                                    row.voucher_type,
+                                                    row.experience_type,
+                                                    row.book_flight
+                                                ].some(isPrivateCharterTypeValue);
+
+                                                let weatherRefundTotal = 0;
+                                                if (isPrivateVoucher) {
+                                                    const passengerBaseTotal = roundCurrencyAmount(
+                                                        derivePaidAmount({
+                                                            paidValue: 0,
+                                                            voucherPassengerDetails: voucherPassengers,
+                                                            passengerCount: parseInt(row.numberOfPassengers, 10) || voucherPassengers.length || 0,
+                                                            includePriceFallback: false
+                                                        })
+                                                    );
+                                                    const paidTotal = roundCurrencyAmount(row.paid);
+
+                                                    if (paidTotal > 0 && passengerBaseTotal > 0) {
+                                                        weatherRefundTotal = roundCurrencyAmount(
+                                                            Math.max(0, paidTotal - allocatedNonWeather - passengerBaseTotal)
+                                                        );
+                                                    }
+
+                                                    if (!(weatherRefundTotal > 0) && paidTotal > allocatedNonWeather) {
+                                                        weatherRefundTotal = roundCurrencyAmount(
+                                                            (paidTotal - allocatedNonWeather) / 11
+                                                        );
+                                                    }
+                                                } else {
+                                                    weatherRefundTotal = roundCurrencyAmount(weatherPassengerCount * WEATHER_REFUND_PRICE_GBP);
+                                                }
+
+                                                if (weatherRefundTotal > 0) {
+                                                    addAddOnValue(addOnMap, 'Weather Refundable', weatherRefundTotal);
+                                                }
+                                            }
+                                        }
+                                    });
+
+                                    addOns = Object.entries(addOnMap)
+                                        .map(([name, value]) => ({
+                                            name,
+                                            value: roundCurrencyAmount(value)
+                                        }))
+                                        .sort((a, b) => b.value - a.value);
+                                    addOnsTotalValue = roundCurrencyAmount(
+                                        Object.values(addOnMap).reduce((sum, value) => sum + (Number(value) || 0), 0)
+                                    );
+
+                                    const locationDataMap = {};
+                                    [...(bookingLocRows || []), ...(voucherLocRows || [])].forEach((row) => {
+                                        const location = normalizeAnalyticsText(row.location || row.preferred_location);
+                                        if (!location) return;
+                                        locationDataMap[location] = (locationDataMap[location] || 0) + (Number(row.count) || 0);
+                                    });
+                                    (voucherLocRows2 || []).forEach((row) => {
+                                        const location = normalizeAnalyticsText(row.location);
+                                        if (!location) return;
+                                        locationDataMap[location] = (locationDataMap[location] || 0) + (Number(row.count) || 0);
+                                    });
+
+                                    const totalLoc = Object.values(locationDataMap).reduce((sum, count) => sum + count, 0);
+                                    const salesByLocation = Object.entries(locationDataMap)
+                                        .map(([location, count]) => ({
+                                            location: location || 'Other',
+                                            percent: totalLoc ? Math.round((count / totalLoc) * 100) : 0,
+                                            count
+                                        }))
+                                        .sort((a, b) => b.count - a.count);
+
+                                    const addTypeCount = (map, type, count) => {
+                                        const label = normalizeVoucherLabel(type);
+                                        if (!label) return;
+                                        map[label] = (map[label] || 0) + (Number(count) || 0);
+                                    };
+
+                                    const typeCounts = {};
+                                    (bookingTypeRows || []).forEach((row) => addTypeCount(typeCounts, row.voucher_type, row.count));
+                                    (voucherTypeRows || []).forEach((row) => addTypeCount(typeCounts, row.voucher_type, row.count));
+
+                                    const totalType = Object.values(typeCounts).reduce((sum, count) => sum + count, 0);
+                                    const salesByBookingType = Object.entries(typeCounts)
+                                        .map(([label, count]) => ({
+                                            type: label,
+                                            percent: totalType ? Math.round((count / totalType) * 100) : 0,
+                                            count
+                                        }))
+                                        .sort((a, b) => b.count - a.count);
+
+                                    const liabilityByLocation = (liabLocRows || []).map((row) => ({
+                                        location: normalizeAnalyticsText(row.location) || 'Other',
+                                        value: roundCurrencyAmount(row.value)
+                                    }));
+
+                                    const liabilityTypeMap = {};
+                                    (liabTypeRows || []).forEach((row) => {
+                                        const label = normalizeVoucherLabel(row.voucher_type);
+                                        if (!label) return;
+                                        liabilityTypeMap[label] = roundCurrencyAmount(
+                                            (liabilityTypeMap[label] || 0) + (Number(row.value) || 0)
+                                        );
+                                    });
+
+                                    const liabilityByFlightType = Object.entries(liabilityTypeMap)
+                                        .map(([label, value]) => ({
+                                            type: label,
+                                            value: roundCurrencyAmount(value)
+                                        }))
+                                        .sort((a, b) => b.value - a.value);
+
+                                    const refundableBookingIds = (refundableRows || []).map((row) => row.id).filter(Boolean);
+                                    const refundablePassengerRows = refundableBookingIds.length > 0
+                                        ? await queryAsync(
+                                            `
+                                                SELECT booking_id, COUNT(*) as wx_count
+                                                FROM passenger
+                                                WHERE booking_id IN (${refundableBookingIds.map(() => '?').join(',')})
+                                                  AND (weather_refund = 1 OR weather_refund = '1')
+                                                GROUP BY booking_id
+                                            `,
+                                            refundableBookingIds
+                                        )
+                                        : [];
+
+                                    const passengerWeatherCountByBooking = {};
+                                    (refundablePassengerRows || []).forEach((row) => {
+                                        passengerWeatherCountByBooking[row.booking_id] = Number(row.wx_count) || 0;
+                                    });
+
+                                    let refundableLiabilityTotal = 0;
+                                    for (const bookingRow of refundableRows || []) {
+                                        let weatherRefundTotal = roundCurrencyAmount(bookingRow.weather_refund_total_price);
+                                        const passengerWeatherCount = Number(passengerWeatherCountByBooking[bookingRow.id]) || 0;
+                                        const isPrivateBooking = [
+                                            bookingRow.experience,
+                                            bookingRow.flight_type,
+                                            bookingRow.voucher_type,
+                                            bookingRow.voucher_type_detail
+                                        ].some(isPrivateCharterTypeValue);
+
+                                        if (!(weatherRefundTotal > 0) && passengerWeatherCount > 0) {
+                                            if (isPrivateBooking) {
+                                                weatherRefundTotal = await derivePrivateCharterWeatherRefundTotal(bookingRow);
+                                            } else {
+                                                weatherRefundTotal = roundCurrencyAmount(passengerWeatherCount * WEATHER_REFUND_PRICE_GBP);
+                                            }
+                                        }
+
+                                        const hasWeatherRefund = weatherRefundTotal > 0 || passengerWeatherCount > 0;
+                                        if (!hasWeatherRefund) continue;
+
+                                        const baseFlightValue = roundCurrencyAmount(
+                                            Math.max(
+                                                0,
+                                                (Number(bookingRow.paid) || 0) -
+                                                (Number(bookingRow.add_to_booking_items_total_price) || 0) -
+                                                weatherRefundTotal
+                                            )
+                                        );
+                                        refundableLiabilityTotal += baseFlightValue;
+                                    }
+
+                                    const flownFlightsByLocation = (flownRows || []).map((row) => ({
+                                        location: normalizeAnalyticsText(row.location) || 'Other',
+                                        count: Number(row.count) || 0
+                                    }));
+
+                                    const voucherLiability = roundCurrencyAmount(voucherLiabilityRows?.[0]?.total || 0);
+
+                                    res.json({
+                                        bookingAttempts,
+                                        salesBySource,
+                                        nonRedemption,
+                                        addOns,
+                                        addOnsTotal: addOnsTotalValue,
+                                        salesByLocation,
+                                        salesByBookingType,
+                                        liabilityByLocation,
+                                        liabilityByFlightType,
+                                        refundableLiability: roundCurrencyAmount(refundableLiabilityTotal),
+                                        flownFlightsByLocation,
+                                        voucherLiability
+                                    });
+                                } catch (analyticsError) {
+                                    console.error('Analytics endpoint calculation error:', analyticsError);
+                                    res.status(500).json({ error: 'Failed to fetch analytics' });
+                                }
+                            })();
                         });
                     });
                 }

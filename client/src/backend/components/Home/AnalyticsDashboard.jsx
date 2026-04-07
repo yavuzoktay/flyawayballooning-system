@@ -41,11 +41,19 @@ const AnalyticsDashboard = ({ dateRange }) => {
 
     if (loading || !analytics) return <Typography>Loading analytics...</Typography>;
 
+    const renderList = (items, renderItem) => {
+        if (!Array.isArray(items) || items.length === 0) {
+            return <Typography sx={bodyTextSx}>No data available</Typography>;
+        }
+
+        return items.map(renderItem);
+    };
+
     return (
         <Box sx={{ mt: 3 }}>
             <Grid container spacing={2}>
                 {/* Booking Attempts */}
-                <Grid item xs={12} md={2.4}>
+                <Grid item xs={12} md={3}>
                     <Card sx={cardSx}>
                         <CardContent>
                             <Typography sx={cardTitleSx}>Booking Attempts</Typography>
@@ -58,73 +66,90 @@ const AnalyticsDashboard = ({ dateRange }) => {
                         </CardContent>
                     </Card>
                 </Grid>
-                {/* Sales by Source */}
-                <Grid item xs={12} md={2.4}>
+                {/* Sales */}
+                <Grid item xs={12} md={3}>
                     <Card sx={cardSx}>
                         <CardContent>
-                            <Typography sx={cardTitleSx}>Sales by Source</Typography>
-                            {analytics?.salesBySource?.map((s, i) => (
-                                <Typography key={i} sx={bodyTextSx}>{s.source}: <span style={{color:'#2980b9'}}>{s.percent}%</span></Typography>
-                            )) || <Typography sx={bodyTextSx}>No data available</Typography>}
+                            <Typography sx={cardTitleSx}>Sales</Typography>
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mb: 0.5 }}>
+                                Sales by Location
+                            </Typography>
+                            {renderList(analytics?.salesByLocation, (locationRow, index) => (
+                                <Typography key={`sales-location-${index}`} sx={bodyTextSx}>
+                                    {locationRow.location}: <span style={{color:'#8e44ad'}}>{locationRow.percent}%</span>
+                                </Typography>
+                            ))}
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
+                                Sales by Booking Type
+                            </Typography>
+                            {renderList(analytics?.salesByBookingType, (typeRow, index) => (
+                                <Typography key={`sales-type-${index}`} sx={bodyTextSx}>
+                                    {typeRow.type}: <span style={{color:'#27ae60'}}>{typeRow.percent}%</span>
+                                </Typography>
+                            ))}
                         </CardContent>
                     </Card>
                 </Grid>
-                {/* Non Redemption & Add Ons */}
-                <Grid item xs={12} md={2.4}>
+                {/* Liability */}
+                <Grid item xs={12} md={3}>
                     <Card sx={cardSx}>
                         <CardContent>
-                            <Typography sx={cardTitleSx}>Non Redemption</Typography>
-                            <Typography sx={bodyTextSx}>{analytics?.nonRedemption?.value || 0} ({analytics?.nonRedemption?.percent || 0}%)</Typography>
-                            <Typography sx={{ ...cardTitleSx, mt: 2 }}>Add On's</Typography>
-                            {analytics?.addOns?.length > 0 ? (
-                                <>
-                                    {analytics.addOns.map((a, i) => (
-                                        <Typography key={i} sx={bodyTextSx}>{a.name}: <span style={{color:'#16a085'}}>£{formatGbp(a.value)}</span></Typography>
-                                    ))}
-                                    <Typography sx={{ ...bodyTextSx, mt: 1, fontWeight: 700 }}>
-                                        Total: <span style={{color:'#16a085'}}>£{formatGbp(analytics?.addOnsTotal)}</span>
-                                    </Typography>
-                                </>
-                            ) : (
-                                <Typography sx={bodyTextSx}>No data available</Typography>
-                            )}
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* Sales by Location & Booking Type */}
-                <Grid item xs={12} md={2.4}>
-                    <Card sx={cardSx}>
-                        <CardContent>
-                            <Typography sx={cardTitleSx}>Sales by Location</Typography>
-                            {analytics?.salesByLocation?.map((l, i) => (
-                                <Typography key={i} sx={bodyTextSx}>{l.location}: <span style={{color:'#8e44ad'}}>{l.percent}%</span></Typography>
-                            )) || <Typography sx={bodyTextSx}>No data available</Typography>}
-                            <Typography sx={{ ...cardTitleSx, mt: 2 }}>Sales by Booking Type</Typography>
-                            {analytics?.salesByBookingType?.map((b, i) => (
-                                <Typography key={i} sx={bodyTextSx}>{b.type}: <span style={{color:'#27ae60'}}>{b.percent}%</span></Typography>
-                            )) || <Typography sx={bodyTextSx}>No data available</Typography>}
-                        </CardContent>
-                    </Card>
-                </Grid>
-                {/* Liability & Flown Flights */}
-                <Grid item xs={12} md={2.4}>
-                    <Card sx={cardSx}>
-                        <CardContent>
-                            <Typography sx={cardTitleSx}>Liability by Location</Typography>
-                            {analytics?.liabilityByLocation?.map((l, i) => (
-                                <Typography key={i} sx={bodyTextSx}>{l.location}: <span style={{color:'#e67e22'}}>£{formatGbp(l.value)}</span></Typography>
-                            )) || <Typography sx={bodyTextSx}>No data available</Typography>}
-                            <Typography sx={{ ...cardTitleSx, mt: 2 }}>Liability by Flight Type</Typography>
-                            {analytics?.liabilityByFlightType?.map((l, i) => (
-                                <Typography key={i} sx={bodyTextSx}>{l.type}: <span style={{color:'#e67e22'}}>£{formatGbp(l.value)}</span></Typography>
-                            )) || <Typography sx={bodyTextSx}>No data available</Typography>}
-                            <Typography sx={{ ...cardTitleSx, mt: 2 }}>Refundable Liability</Typography>
-                            <Typography sx={bodyTextSx}><span style={{color:'#16a085'}}>£{formatGbp(analytics?.refundableLiability)}</span></Typography>
-                            <Typography sx={{ ...cardTitleSx, mt: 2 }}>Voucher Liability</Typography>
+                            <Typography sx={cardTitleSx}>Liability</Typography>
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mb: 0.5 }}>
+                                Liability by Location
+                            </Typography>
+                            {renderList(analytics?.liabilityByLocation, (locationRow, index) => (
+                                <Typography key={`liability-location-${index}`} sx={bodyTextSx}>
+                                    {locationRow.location}: <span style={{color:'#e67e22'}}>£{formatGbp(locationRow.value)}</span>
+                                </Typography>
+                            ))}
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
+                                Liability by Flight Type
+                            </Typography>
+                            {renderList(analytics?.liabilityByFlightType, (typeRow, index) => (
+                                <Typography key={`liability-type-${index}`} sx={bodyTextSx}>
+                                    {typeRow.type}: <span style={{color:'#e67e22'}}>£{formatGbp(typeRow.value)}</span>
+                                </Typography>
+                            ))}
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
+                                Refundable Liability
+                            </Typography>
                             <Typography sx={bodyTextSx}>
-                                <span style={{color:'#2980b9'}}>
-                                    £{formatGbp(analytics?.voucherLiability)}
-                                </span>
+                                <span style={{color:'#16a085'}}>£{formatGbp(analytics?.refundableLiability || 0)}</span>
+                            </Typography>
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
+                                Voucher Liability
+                            </Typography>
+                            <Typography sx={bodyTextSx}>
+                                <span style={{color:'#2980b9'}}>£{formatGbp(analytics?.voucherLiability)}</span>
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                {/* Extras */}
+                <Grid item xs={12} md={3}>
+                    <Card sx={cardSx}>
+                        <CardContent>
+                            <Typography sx={cardTitleSx}>Extras</Typography>
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mb: 0.5 }}>
+                                Non-Redemption
+                            </Typography>
+                            <Typography sx={bodyTextSx}>
+                                Expired unused total: <span style={{color:'#16a085'}}>£{formatGbp(analytics?.nonRedemption?.value || 0)}</span>
+                            </Typography>
+                            <Typography sx={bodyTextSx}>
+                                Records: <span style={{color:'#465a79'}}>{analytics?.nonRedemption?.count || 0}</span>
+                            </Typography>
+                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
+                                Add On's
+                            </Typography>
+                            {renderList(analytics?.addOns, (addOnRow, index) => (
+                                <Typography key={`add-on-${index}`} sx={bodyTextSx}>
+                                    {addOnRow.name}: <span style={{color:'#16a085'}}>£{formatGbp(addOnRow.value)}</span>
+                                </Typography>
+                            ))}
+                            <Typography sx={{ ...bodyTextSx, mt: 1, fontWeight: 700 }}>
+                                Total: <span style={{color:'#16a085'}}>£{formatGbp(analytics?.addOnsTotal)}</span>
                             </Typography>
                         </CardContent>
                     </Card>
