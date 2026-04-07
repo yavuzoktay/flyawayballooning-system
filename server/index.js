@@ -24266,6 +24266,22 @@ app.get('/api/analytics', async (req, res) => {
                                             }
                                         }
 
+                                        // Private Charter bookings store the weather-refund toggle at the booking
+                                        // level, not as a per-passenger flag, so passengerWeatherCount can be 0
+                                        // even when the customer paid the refundable surcharge. Always probe the
+                                        // private charter pricing as a fallback so those bookings are still
+                                        // counted toward Refundable Liability (e.g. booking 1609).
+                                        if (isPrivateBooking && !(weatherRefundTotal > 0)) {
+                                            try {
+                                                const derived = await derivePrivateCharterWeatherRefundTotal(bookingRow);
+                                                if (derived > 0) {
+                                                    weatherRefundTotal = derived;
+                                                }
+                                            } catch (privateRefundError) {
+                                                console.warn('Analytics: failed to derive private charter weather refund for booking', bookingRow?.id, privateRefundError?.message || privateRefundError);
+                                            }
+                                        }
+
                                         const hasWeatherRefund = weatherRefundTotal > 0 || passengerWeatherCount > 0;
                                         if (!hasWeatherRefund) continue;
 
