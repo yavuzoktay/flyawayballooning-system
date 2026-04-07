@@ -36464,6 +36464,18 @@ function formatCurrencyAmount(amount) {
     return `£${numericAmount.toFixed(2).replace(/\.00$/, '')}`;
 }
 
+function sanitizePdfText(value = '') {
+    return String(value || '')
+        .replace(/[^\x20-\x7E\n]/g, (char) => {
+            if (char === '£') return '£';
+            if (char === '’' || char === '‘') return "'";
+            if (char === '“' || char === '”') return '"';
+            return ' ';
+        })
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+}
+
 async function getOrCreateTheNewtPurchaseOrder({ bookingId, recipientEmail = '' } = {}) {
     const normalizedBookingId = parsePositiveInt(bookingId);
     if (!normalizedBookingId) {
@@ -36596,14 +36608,16 @@ function buildTheNewtVatInvoiceEmailContent({
     const highlightHtml = `
         <p style="margin:0 0 8px;"><strong>Purchase order:</strong> ${escapeHtml(purchaseOrderNumber || 'Pending')}</p>
         <p style="margin:0 0 8px;"><strong>Booking reference:</strong> ${escapeHtml(bookingReference)}</p>
-        <p style="margin:0 0 8px;"><strong>Hotel:</strong> ${escapeHtml(hotelName)}</p>
-        <p style="margin:0 0 8px;"><strong>Billing email:</strong> ${escapeHtml(billingEmail || 'Not provided')}</p>
-        <p style="margin:0 0 8px;"><strong>Staff contact:</strong> ${escapeHtml(staffName || 'Not provided')}</p>
         <p style="margin:0 0 8px;"><strong>Passengers:</strong> ${escapeHtml(String(resolvedPricing.passengerCount))}</p>
-        <p style="margin:0;"><strong>Flight:</strong> ${escapeHtml(locationLabel)}${flightDateLabel ? `, ${escapeHtml(flightDateLabel)}` : ''}</p>
+        <p style="margin:0;"><strong>Total due:</strong> ${escapeHtml(formatCurrencyAmount(resolvedPricing.grossAmount))}</p>
     `;
 
-    const bodyHtml = `
+    const bodyHtml = wrapParagraphs([
+        `Hello ${escapeHtml(contactName)},`,
+        'Please find your VAT invoice attached as a PDF.',
+        `Please use <strong>${escapeHtml(paymentReference)}</strong> as the payment reference when making the bank transfer.`
+    ]);
+    const fallbackBodyHtml = `
         ${wrapParagraphs([
             `Hello ${escapeHtml(contactName)},`,
             'Please find an invoice below for the booked Private Charter Balloon Flight.',
@@ -36664,8 +36678,171 @@ function buildTheNewtVatInvoiceEmailContent({
     return {
         subject,
         html,
-        text: convertHtmlToText(html)
+        text: convertHtmlToText(html),
+        fallbackHtml: buildEmailLayout({
+            subject,
+            headline: 'VAT Invoice',
+            highlightHtml,
+            bodyHtml: fallbackBodyHtml,
+            customerName: contactName,
+            signatureLines: [
+                'Fly Away Ballooning LTD',
+                'info@flyawayballooning.com'
+            ],
+            footerLinks: [],
+            disableFormatDetection: true
+        })
     };
+}
+
+async function generateTheNewtVatInvoicePdf({
+    bookingId,
+    manualBookingProfile = {},
+    bookingData = {},
+    purchaseOrderNumber = null,
+    pricing = null
+} = {}) {
+    return new Promise((resolve, reject) => {
+        try {
+            const resolvedPricing = pricing || resolveTheNewtVatInvoicePricing(bookingData);
+            const bookingReference = bookingId ? `FAB-${bookingId}` : 'FAB-INVOICE';
+            const hotelName = getManualBookingProfileField(manualBookingProfile, [
+                'accommodation_name',
+                'accommodationName',
+                'hotel_name',
+                'hotelName'
+            ]) || THE_NEWT_VAT_INVOICE_CONFIG.accommodationName;
+            const billingEmail = getManualBookingProfileField(manualBookingProfile, [
+                'contact_email',
+                'contactEmail',
+                'email'
+            ]) || 'Not provided';
+            const staffName = getManualBookingProfileField(manualBookingProfile, [
+                'staff_name',
+                'staffName'
+            ]) || 'Not provided';
+            const paymentReference = purchaseOrderNumber || bookingReference;
+            const locationLabel = bookingData?.chooseLocation || 'Somerset';
+            const rawFlightDateLabel = formatDateTime(bookingData?.selectedDate) || formatDate(bookingData?.selectedDate) || 'To be confirmed';
+            const invoiceDateLabel = dayjs().format('DD/MM/YYYY');
+            const doc = new PDFDocument({
+                size: 'A4',
+                margin: 50,
+                info: {
+                    Title: `VAT Invoice ${paymentReference}`,
+                    Author: 'Fly Away Ballooning LTD',
+                    Subject: 'The Newt VAT Invoice',
+                    Keywords: 'invoice, VAT, The Newt, Fly Away Ballooning'
+                }
+            });
+            const chunks = [];
+
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            const pageWidth = doc.page.width;
+            const leftX = doc.page.margins.left;
+            const rightX = pageWidth - doc.page.margins.right;
+            const contentWidth = rightX - leftX;
+            const drawDivider = (y) => {
+                doc.save();
+                doc.moveTo(leftX, y).lineTo(rightX, y).lineWidth(1).strokeColor('#dbe4f0').stroke();
+                doc.restore();
+            };
+            const drawLabelValue = (label, value, y, options = {}) => {
+                const labelWidth = options.labelWidth || 155;
+                const valueWidth = options.valueWidth || (contentWidth - labelWidth);
+                const valueX = leftX + labelWidth;
+                doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b').text(sanitizePdfText(label), leftX, y, {
+                    width: labelWidth - 10
+                });
+                doc.font('Helvetica').fontSize(11).fillColor('#111827').text(sanitizePdfText(value), valueX, y, {
+                    width: valueWidth,
+                    align: options.align || 'left'
+                });
+                return Math.max(doc.y, y + 16);
+            };
+            const drawAmountRow = (label, value, y, { bold = false, shaded = false } = {}) => {
+                const rowHeight = 28;
+                if (shaded) {
+                    doc.save();
+                    doc.roundedRect(leftX, y - 6, contentWidth, rowHeight + 12, 10).fillColor('#f8fafc').fill();
+                    doc.restore();
+                }
+                doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 13 : 11).fillColor('#111827').text(sanitizePdfText(label), leftX + 12, y, {
+                    width: contentWidth * 0.7 - 12
+                });
+                doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(bold ? 13 : 11).fillColor('#111827').text(sanitizePdfText(value), leftX + contentWidth * 0.7, y, {
+                    width: contentWidth * 0.3 - 12,
+                    align: 'right'
+                });
+                return y + rowHeight;
+            };
+
+            doc.rect(0, 0, pageWidth, doc.page.height).fillColor('#ffffff').fill();
+            doc.fillColor('#173b67').font('Helvetica-Bold').fontSize(24).text('VAT INVOICE', leftX, 46);
+            doc.font('Helvetica').fontSize(11).fillColor('#475569').text(sanitizePdfText(THE_NEWT_VAT_INVOICE_CONFIG.companyName), leftX, 78);
+            doc.text(sanitizePdfText(THE_NEWT_VAT_INVOICE_CONFIG.companyAddress), leftX, 94, { width: contentWidth * 0.5 });
+            doc.text('info@flyawayballooning.com', leftX, 126);
+
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b').text('INVOICE TO', leftX, 170);
+            doc.font('Helvetica-Bold').fontSize(14).fillColor('#111827').text(sanitizePdfText(hotelName), leftX, 186);
+            doc.font('Helvetica').fontSize(11).fillColor('#334155').text(sanitizePdfText(billingEmail), leftX, 208, { width: contentWidth * 0.45 });
+            doc.text(`Staff contact: ${sanitizePdfText(staffName)}`, leftX, 226, { width: contentWidth * 0.45 });
+
+            const summaryBoxX = rightX - 215;
+            doc.save();
+            doc.roundedRect(summaryBoxX, 170, 215, 110, 14).fillColor('#f8fafc').fill();
+            doc.restore();
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b').text('INVOICE DETAILS', summaryBoxX + 16, 186);
+            doc.font('Helvetica').fontSize(11).fillColor('#111827').text(`Invoice Date: ${invoiceDateLabel}`, summaryBoxX + 16, 206);
+            doc.text(`Booking Ref: ${sanitizePdfText(bookingReference)}`, summaryBoxX + 16, 224, { width: 183 });
+            doc.text(`Purchase Order: ${sanitizePdfText(paymentReference)}`, summaryBoxX + 16, 242, { width: 183 });
+
+            drawDivider(304);
+            let y = 324;
+            y = drawLabelValue('Flight', `${locationLabel}${rawFlightDateLabel ? `, ${rawFlightDateLabel}` : ''}`, y);
+            y = drawLabelValue('Passengers', String(resolvedPricing.passengerCount), y + 6);
+            y = drawLabelValue('VAT Number', THE_NEWT_VAT_INVOICE_CONFIG.vatNumber, y + 6);
+
+            y += 22;
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b').text('INVOICE SUMMARY', leftX, y);
+            y += 24;
+            y = drawAmountRow(resolvedPricing.lineItemDescription, formatCurrencyAmount(resolvedPricing.netAmount), y);
+            y = drawAmountRow(`VAT (${THE_NEWT_VAT_INVOICE_CONFIG.vatRatePercent}%)`, formatCurrencyAmount(resolvedPricing.vatAmount), y + 2);
+            y = drawAmountRow('Total Due', formatCurrencyAmount(resolvedPricing.grossAmount), y + 8, { bold: true, shaded: true });
+
+            y += 34;
+            doc.font('Helvetica-Bold').fontSize(10).fillColor('#64748b').text('BANK DETAILS', leftX, y);
+            y += 22;
+            y = drawLabelValue('Account Name', THE_NEWT_VAT_INVOICE_CONFIG.accountName, y);
+            y = drawLabelValue('Account Number', THE_NEWT_VAT_INVOICE_CONFIG.accountNumber, y + 4);
+            y = drawLabelValue('Sort Code', THE_NEWT_VAT_INVOICE_CONFIG.sortCode, y + 4);
+            y = drawLabelValue('Bank', THE_NEWT_VAT_INVOICE_CONFIG.bankName, y + 4);
+            y = drawLabelValue('Payment Ref', paymentReference, y + 4);
+
+            y += 28;
+            drawDivider(y);
+            y += 18;
+            doc.font('Helvetica').fontSize(10).fillColor('#475569').text(
+                sanitizePdfText('Please use the purchase order as the payment reference when making the bank transfer.'),
+                leftX,
+                y,
+                { width: contentWidth }
+            );
+            doc.font('Helvetica').fontSize(10).fillColor('#475569').text(
+                sanitizePdfText(`${THE_NEWT_VAT_INVOICE_CONFIG.companyName} - VAT ${THE_NEWT_VAT_INVOICE_CONFIG.vatNumber}`),
+                leftX,
+                y + 18,
+                { width: contentWidth }
+            );
+
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
+    });
 }
 
 async function sendTheNewtVatInvoiceEmail({
@@ -36749,13 +36926,25 @@ async function sendTheNewtVatInvoiceEmail({
             }
         }
 
-        const { subject, html, text } = buildTheNewtVatInvoiceEmailContent({
+        const { subject, html, text, fallbackHtml } = buildTheNewtVatInvoiceEmailContent({
             bookingId,
             manualBookingProfile,
             bookingData,
             purchaseOrderNumber: purchaseOrderRecord?.purchaseOrderNumber || null,
             pricing
         });
+        let pdfBuffer = null;
+        try {
+            pdfBuffer = await generateTheNewtVatInvoicePdf({
+                bookingId,
+                manualBookingProfile,
+                bookingData,
+                purchaseOrderNumber: purchaseOrderRecord?.purchaseOrderNumber || null,
+                pricing
+            });
+        } catch (pdfError) {
+            console.error('❌ [sendTheNewtVatInvoiceEmail] Failed to generate PDF attachment, falling back to HTML invoice body:', pdfError);
+        }
 
         const emailPayload = {
             to: recipientEmail,
@@ -36764,7 +36953,7 @@ async function sendTheNewtVatInvoiceEmail({
                 name: 'Fly Away Ballooning'
             },
             subject,
-            html,
+            html: pdfBuffer ? html : fallbackHtml,
             text,
             custom_args: {
                 booking_id: bookingId ? String(bookingId) : 'manual-booking',
@@ -36773,6 +36962,18 @@ async function sendTheNewtVatInvoiceEmail({
                 context_id: bookingId ? String(bookingId) : recipientEmail
             }
         };
+
+        if (pdfBuffer) {
+            const invoiceFileStem = purchaseOrderRecord?.purchaseOrderNumber
+                ? `VAT_Invoice_${purchaseOrderRecord.purchaseOrderNumber}`
+                : (bookingId ? `VAT_Invoice_FAB-${bookingId}` : 'VAT_Invoice');
+            emailPayload.attachments = [{
+                content: pdfBuffer.toString('base64'),
+                filename: `${sanitizePdfText(invoiceFileStem)}.pdf`,
+                type: 'application/pdf',
+                disposition: 'attachment'
+            }];
+        }
 
         const { provider, messageId } = await sendEmailWithFallback(emailPayload, {
             context: 'the_newt_vat_invoice'
