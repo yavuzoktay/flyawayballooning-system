@@ -23512,6 +23512,22 @@ app.get('/api/analytics', async (req, res) => {
     };
     const queryAsync = (sql, params = []) =>
         con.promise().query(sql, params).then(([rows]) => rows);
+    const tableHasColumn = async (tableName, columnName) => {
+        try {
+            const rows = await queryAsync(`
+                SELECT 1
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND COLUMN_NAME = ?
+                LIMIT 1
+            `, [tableName, columnName]);
+            return rows.length > 0;
+        } catch (error) {
+            console.warn(`Unable to inspect schema for ${tableName}.${columnName}:`, error?.message || error);
+            return false;
+        }
+    };
     const normalizeAnalyticsText = (value = '') =>
         String(value || '').replace(/\s+/g, ' ').trim();
     const isGenericFlightTypeLabel = (value = '') => {
@@ -23820,6 +23836,7 @@ app.get('/api/analytics', async (req, res) => {
                             // Continue with the remaining analytics using the same normalized rules.
                             (async () => {
                                 try {
+                                    const hasVoucherLocationColumn = await tableHasColumn('all_vouchers', 'location');
                                     const [
                                         nonRedemptionBookingRows,
                                         nonRedemptionVoucherRows,
@@ -23916,7 +23933,7 @@ app.get('/api/analytics', async (req, res) => {
                                               ${dateFilter('created_at')}
                                             GROUP BY preferred_location
                                         `),
-                                        queryAsync(`
+                                        hasVoucherLocationColumn ? queryAsync(`
                                             SELECT location, COUNT(*) as count
                                             FROM all_vouchers
                                             WHERE created_at IS NOT NULL
@@ -23924,7 +23941,7 @@ app.get('/api/analytics', async (req, res) => {
                                               AND (preferred_location IS NULL OR preferred_location = '')
                                               ${dateFilter('created_at')}
                                             GROUP BY location
-                                        `),
+                                        `) : Promise.resolve([]),
                                         queryAsync(`
                                             SELECT
                                                 COALESCE(NULLIF(v.voucher_type, ''), NULLIF(ab.voucher_type, ''), NULLIF(ab.voucher_type_detail, '')) as voucher_type,
