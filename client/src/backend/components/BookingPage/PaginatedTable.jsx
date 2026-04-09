@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 import { useTheme, useMediaQuery } from "@mui/material";
+import { formatAdminDate, isAdminDateExpired } from "../../utils/adminDateUtils";
 
 const PaginatedTable = ({
     data,
@@ -973,13 +974,7 @@ const PaginatedTable = ({
                                             ) : id === 'expires' ? (
                                                 (() => {
                                                     if (!item[id]) return '';
-                                                    let isoString = item[id].includes('T') ? item[id] : item[id].replace(' ', 'T');
-                                                    const date = new Date(isoString);
-                                                    if (isNaN(date.getTime())) return String(item[id]);
-                                                    const day = String(date.getDate()).padStart(2, '0');
-                                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                    const year = date.getFullYear();
-                                                    return `${day}/${month}/${year}`;
+                                                    return formatAdminDate(item[id], 'DD/MM/YYYY');
                                                 })()
                                             ) : id === 'voucher_type' ? (
                                                 // For vouchers context, show book_flight if available, otherwise fallback to voucher_type
@@ -1027,56 +1022,17 @@ const PaginatedTable = ({
                                                     // Check if booking is expired (only for bookings context)
                                                     if (context === 'bookings' && item.expires) {
                                                         try {
-                                                            // Parse expires date - handle different formats
-                                                            let expiresDate = item.expires;
-                                                            let parsedDate = null;
-                                                            
-                                                            if (typeof expiresDate === 'string' && expiresDate.trim() !== '') {
-                                                                // Try to parse as ISO string first (YYYY-MM-DD or YYYY-MM-DD HH:mm:ss)
-                                                                parsedDate = dayjs(expiresDate);
-                                                                
-                                                                // If not valid, try DD/MM/YYYY format
-                                                                if (!parsedDate.isValid()) {
-                                                                    const parts = expiresDate.split('/');
-                                                                    if (parts.length === 3) {
-                                                                        // Handle 2-digit year (YY) or 4-digit year (YYYY)
-                                                                        let year = parts[2];
-                                                                        if (year.length === 2) {
-                                                                            // Convert 2-digit year to 4-digit (assuming 20XX for years 00-99)
-                                                                            year = '20' + year;
-                                                                        }
-                                                                        parsedDate = dayjs(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
-                                                                    }
-                                                                }
-                                                                
-                                                                // If still not valid, try other common formats
-                                                                if (!parsedDate.isValid()) {
-                                                                    // Try parsing as Date object
-                                                                    const dateObj = new Date(expiresDate);
-                                                                    if (!isNaN(dateObj.getTime())) {
-                                                                        parsedDate = dayjs(dateObj);
-                                                                    }
-                                                                }
-                                                                
-                                                                // Check if expires date is before today (start of day)
-                                                                if (parsedDate && parsedDate.isValid()) {
-                                                                    const today = dayjs().startOf('day');
-                                                                    const expiresStartOfDay = parsedDate.startOf('day');
-                                                                    
-                                                                    // If expires date is before today, mark as expired
-                                                                    if (expiresStartOfDay.isBefore(today)) {
-                                                                        displayStatus = 'Expired';
-                                                                        statusColor = '#c64d54';
-                                                                        statusBg = '#fdecef';
-                                                                        fontWeight = 600;
-                                                                        return (
-                                                                            <span style={{ color: statusColor, background: statusBg, fontWeight, fontSize: '13px', fontFamily: "'Gilroy', sans-serif", padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
-                                                                                {displayStatus}
-                                                                            </span>
-                                                                        );
-                                                                    }
-                                                                }
+                                                            if (isAdminDateExpired(item.expires)) {
+                                                                displayStatus = 'Expired';
+                                                                statusColor = '#c64d54';
+                                                                statusBg = '#fdecef';
+                                                                fontWeight = 600;
+                                                                return (
+                                                                    <span style={{ color: statusColor, background: statusBg, fontWeight, fontSize: '13px', fontFamily: "'Gilroy', sans-serif", padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
+                                                                        {displayStatus}
+                                                                    </span>
+                                                                );
                                                             }
                                                         } catch (expiresError) {
                                                             console.error('Error checking expires date:', expiresError, 'expires value:', item.expires);

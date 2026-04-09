@@ -3,6 +3,7 @@ import axios from "axios";
 import config from "../../../config";
 import { ADMIN_MANUAL_BOOKING_AUTH } from "../../auth/adminCredentials";
 import { formatGbp } from "../../utils/formatGbp";
+import { isAdminDateExpired, parseAdminDate } from "../../utils/adminDateUtils";
 
 const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [startDate, setStartDate] = useState("");
@@ -36,36 +37,8 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     };
 
     const parseLooseDate = (raw) => {
-        if (!raw) return null;
-        if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? null : raw;
-        const dateStr = String(raw).trim();
-        if (!dateStr) return null;
-
-        // ISO-like (YYYY-MM-DD...) works with Date constructor
-        if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-            const d = new Date(dateStr);
-            return Number.isNaN(d.getTime()) ? null : d;
-        }
-
-        // DD/MM/YYYY (common in API display fields)
-        const dmySlash = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if (dmySlash) {
-            const [, dd, mm, yyyy] = dmySlash;
-            const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
-            return Number.isNaN(d.getTime()) ? null : d;
-        }
-
-        // DD-MM-YYYY
-        const dmyDash = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-        if (dmyDash) {
-            const [, dd, mm, yyyy] = dmyDash;
-            const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
-            return Number.isNaN(d.getTime()) ? null : d;
-        }
-
-        // Fallback
-        const d = new Date(dateStr);
-        return Number.isNaN(d.getTime()) ? null : d;
+        const parsedDate = parseAdminDate(raw);
+        return parsedDate ? parsedDate.toDate() : null;
     };
 
     const isRedeemedLikeYes = (raw) => {
@@ -73,31 +46,23 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         return v === 'yes' || v === 'redeemed' || v === 'true' || v === '1';
     };
 
-    const isExpired = (rawDate) => {
-        const d = parseLooseDate(rawDate);
-        if (!d) return false; // if we can't parse expiry, don't treat as expired
-        const endOfDay = new Date(d);
-        endOfDay.setHours(23, 59, 59, 999);
-        return endOfDay < new Date();
-    };
+    const isExpired = (rawDate) => isAdminDateExpired(rawDate);
 
-    const computeTotalLiabilityAllTime = () => {
-        // Total Liability is all-time:
-        // sum paid for unflown bookings + unredeemed/unexpired vouchers
-        const bookingsLiability = (bookingData || []).reduce((sum, b) => {
+    const computeTotalLiability = (bookings = [], vouchers = []) => {
+        const bookingsLiability = (bookings || []).reduce((sum, b) => {
             if (!b || typeof b !== 'object') return sum;
             const status = String(b.status || '').trim().toLowerCase();
             if (status === 'flown') return sum;
-            if (status === 'cancelled' || status === 'canceled') return sum;
             if (status === 'expired') return sum;
-            // If booking has an expires date and it's in the past, treat as expired
             if (b.expires && isExpired(b.expires)) return sum;
             return sum + parseMoney(b.paid);
         }, 0);
 
-        const vouchersLiability = (voucherData || []).reduce((sum, v) => {
+        const vouchersLiability = (vouchers || []).reduce((sum, v) => {
             if (!v || typeof v !== 'object') return sum;
             if (isRedeemedLikeYes(v.redeemed)) return sum;
+            const status = String(v.status || '').trim().toLowerCase();
+            if (status === 'used' || status === 'flown' || status === 'expired') return sum;
             if (v.expires && isExpired(v.expires)) return sum;
             return sum + parseMoney(v.paid);
         }, 0);
@@ -116,20 +81,41 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     }, []);
 
     useEffect(() => {
-        // Calculate summary for all data on page load
-        calculateSummary(bookingData, voucherData);
-    }, [bookingData, voucherData]);
+        if (startDate && endDate) {
+            const startDateObj = parseLooseDate(startDate);
+            const endDateObj = parseLooseDate(endDate);
+
+            if (startDateObj && endDateObj) {
+                endDateObj.setHours(23, 59, 59, 999);
+
+                const filteredBookings = (bookingData || []).filter((item) => {
+                    const createdDate = parseLooseDate(item?.created || item?.created_at || null);
+                    return createdDate ? createdDate >= startDateObj && createdDate <= endDateObj : false;
+                });
+
+                const filteredVouchers = (voucherData || []).filter((item) => {
+                    const createdDate = parseLooseDate(item?.created || item?.created_at || null);
+                    return createdDate ? createdDate >= startDateObj && createdDate <= endDateObj : false;
+                });
+
+                calculateSummary(filteredBookings, filteredVouchers, { start: startDate, end: endDate });
+                return;
+            }
+        }
+
+        calculateSummary(bookingData, voucherData, { start: null, end: null });
+    }, [bookingData, voucherData, startDate, endDate]);
 
     const filterData = (start, end) => {
-        setStartDate(start);
-        setEndDate(end);
         if (onDateRangeChange) {
             onDateRangeChange({ start, end });
         }
+        setStartDate(start);
+        setEndDate(end);
         const startDateObj = parseLooseDate(start);
         const endDateObj = parseLooseDate(end);
         if (!startDateObj || !endDateObj) {
-            calculateSummary(bookingData, voucherData);
+            calculateSummary(bookingData, voucherData, { start: null, end: null });
             return;
         }
 
@@ -151,7 +137,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             return createdDate >= startDateObj && createdDate <= endDateObj;
         });
 
-        calculateSummary(filtered, filteredVouchers);
+        calculateSummary(filtered, filteredVouchers, { start, end });
     };
 
     // Updated Quick Links
@@ -162,7 +148,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             if (onDateRangeChange) {
                 onDateRangeChange({ start: null, end: null });
             }
-            calculateSummary(bookingData, voucherData);
+            calculateSummary(bookingData, voucherData, { start: null, end: null });
         },
         last12Months: () => {
             const today = new Date();
@@ -170,47 +156,37 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             lastYear.setFullYear(today.getFullYear() - 1);
             const start = lastYear.toISOString().split("T")[0];
             const end = new Date().toISOString().split("T")[0];
-            setStartDate(start);
-            setEndDate(end);
             filterData(start, end);
         },
         quarter1: () => {
             const year = new Date().getFullYear();
             const start = `${year}-01-01`;
             const end = `${year}-03-31`;
-            setStartDate(start);
-            setEndDate(end);
             filterData(start, end);
         },
         quarter2: () => {
             const year = new Date().getFullYear();
             const start = `${year}-04-01`;
             const end = `${year}-06-30`;
-            setStartDate(start);
-            setEndDate(end);
             filterData(start, end);
         },
         quarter3: () => {
             const year = new Date().getFullYear();
             const start = `${year}-07-01`;
             const end = `${year}-09-30`;
-            setStartDate(start);
-            setEndDate(end);
             filterData(start, end);
         },
         quarter4: () => {
             const year = new Date().getFullYear();
             const start = `${year}-10-01`;
             const end = `${year}-12-31`;
-            setStartDate(start);
-            setEndDate(end);
             filterData(start, end);
         },
     };
 
-    const getFlightDateRange = () => {
-        const start = parseLooseDate(startDate);
-        const end = parseLooseDate(endDate);
+    const getFlightDateRange = (rangeStart = startDate, rangeEnd = endDate) => {
+        const start = parseLooseDate(rangeStart);
+        const end = parseLooseDate(rangeEnd);
         if (!start || !end) return null;
         const endInclusive = new Date(end);
         endInclusive.setHours(23, 59, 59, 999);
@@ -218,10 +194,10 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     };
 
     // Add All Values Result
-    const calculateSummary = (data, vouchers = []) => {
+    const calculateSummary = (data, vouchers = [], range = { start: startDate, end: endDate }) => {
         const safeValue = (value) => isNaN(value) ? 0 : value;
         if(data){
-            const flightRange = getFlightDateRange();
+            const flightRange = getFlightDateRange(range?.start, range?.end);
 
             const bookingsForFlights = (bookingData && bookingData.length > 0)
                 ? bookingData
@@ -272,7 +248,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                 return sum + parseMoney(item?.paid);
             }, 0);
             const totalSales = bookingSales + voucherSales;
-            const totalLiability = computeTotalLiabilityAllTime();
+            const totalLiability = computeTotalLiability(data || [], vouchers || []);
 
             // VAT Portion: extract VAT from completed flights gross (paid includes VAT)
             const VAT_RATE = 0.2;

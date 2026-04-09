@@ -66,6 +66,7 @@ import {
     getManualBookingProfileFromSources,
     isTheNewtBooking
 } from '../utils/additionalInfo';
+import { formatAdminDate } from '../utils/adminDateUtils';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
 dayjs.extend(utc);
@@ -5996,23 +5997,7 @@ const Manifest = () => {
         // Format the persisted expires date for display.
         // Any 6-month extension must already be written by the backend.
         const formatExpiresDate = (expiresDate) => {
-          if (!expiresDate) return expiresDate;
-          const formatOut = 'DD/MM/YY';
-          
-          const parseDate = (val) => {
-            if (typeof val === 'string' && val.includes('/')) {
-              const parts = val.split('/');
-              if (parts.length === 3) {
-                return dayjs(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
-              }
-            }
-            return dayjs(val);
-          };
-
-          let parsedDate = parseDate(expiresDate);
-          if (!parsedDate.isValid()) return expiresDate;
-
-          return parsedDate.isValid() ? parsedDate.format(formatOut) : expiresDate;
+          return formatAdminDate(expiresDate, 'DD/MM/YY');
         };
 
         return formatExpiresDate(bookingDetail.booking.expires);

@@ -13340,24 +13340,24 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     // Recipient information fields (for Gift Vouchers)
                     recipient_phone: recipientPhoneWithCode ?? (row.recipient_phone ?? ''),
                     expires: expiresVal ? (() => {
-                        // Parse expires date correctly - handle both Date objects and string formats
-                        if (typeof expiresVal === 'string' && expiresVal.includes('/')) {
-                            const parts = expiresVal.split('/');
-                            if (parts.length === 3) {
-                                const firstPart = parseInt(parts[0], 10);
-                                const secondPart = parseInt(parts[1], 10);
-                                // If first part is > 12, it's likely DD/MM/YYYY, use moment
-                                // If first part is <= 12, it could be MM/DD/YYYY, convert manually
-                                if (firstPart <= 12 && secondPart <= 31) {
-                                    // Likely MM/DD/YYYY format, convert to DD/MM/YYYY
-                                    const month = parts[0];
-                                    const day = parts[1];
-                                    const year = parts[2];
-                                    return `${day}/${month}/${year}`;
-                                }
+                        if (typeof expiresVal === 'string') {
+                            const strictSlashDate = moment(
+                                expiresVal,
+                                [
+                                    'DD/MM/YYYY HH:mm:ss',
+                                    'DD/MM/YYYY HH:mm',
+                                    'DD/MM/YYYY',
+                                    'DD/MM/YY HH:mm:ss',
+                                    'DD/MM/YY HH:mm',
+                                    'DD/MM/YY'
+                                ],
+                                true
+                            );
+                            if (strictSlashDate.isValid()) {
+                                return strictSlashDate.format('DD/MM/YYYY');
                             }
                         }
-                        // Try moment parsing for Date objects or other formats
+
                         const expiresMoment = moment(expiresVal);
                         return expiresMoment.isValid() ? expiresMoment.format('DD/MM/YYYY') : '';
                     })() : '',
@@ -23528,6 +23528,54 @@ app.get('/api/analytics', async (req, res) => {
             return false;
         }
     };
+    const parseAnalyticsDate = (value) => {
+        if (!value) return null;
+
+        const strictFormats = [
+            'YYYY-MM-DD HH:mm:ss',
+            'YYYY-MM-DD HH:mm',
+            'YYYY-MM-DD',
+            'YYYY-MM-DDTHH:mm:ss.SSSZ',
+            'YYYY-MM-DDTHH:mm:ssZ',
+            'YYYY-MM-DDTHH:mm:ss.SSS[Z]',
+            'YYYY-MM-DDTHH:mm:ss[Z]',
+            'YYYY-MM-DDTHH:mm:ss',
+            'DD/MM/YYYY HH:mm:ss',
+            'DD/MM/YYYY HH:mm',
+            'DD/MM/YYYY',
+            'DD/MM/YY HH:mm:ss',
+            'DD/MM/YY HH:mm',
+            'DD/MM/YY'
+        ];
+
+        const strictParsed = moment(value, strictFormats, true);
+        if (strictParsed.isValid()) return strictParsed;
+
+        const looseParsed = moment(value);
+        return looseParsed.isValid() ? looseParsed : null;
+    };
+    const isAnalyticsDateExpired = (value) => {
+        const parsed = parseAnalyticsDate(value);
+        if (!parsed) return false;
+        return parsed.endOf('day').isBefore(moment());
+    };
+    const normalizeAnalyticsStatus = (value = '') =>
+        normalizeAnalyticsText(value).toLowerCase();
+    const isRedeemedAnalyticsValue = (value = '') =>
+        ['yes', 'redeemed', 'true', '1'].includes(normalizeAnalyticsStatus(value));
+    const isActiveBookingLiabilityRow = (row = {}) => {
+        const status = normalizeAnalyticsStatus(row.status);
+        if (status === 'flown' || status === 'expired') return false;
+        if (isAnalyticsDateExpired(row.expires)) return false;
+        return roundCurrencyAmount(row.paid) > 0;
+    };
+    const isActiveVoucherLiabilityRow = (row = {}) => {
+        const status = normalizeAnalyticsStatus(row.status);
+        if (isRedeemedAnalyticsValue(row.redeemed)) return false;
+        if (status === 'used' || status === 'flown' || status === 'expired') return false;
+        if (isAnalyticsDateExpired(row.expires)) return false;
+        return roundCurrencyAmount(row.paid) > 0;
+    };
     const normalizeAnalyticsText = (value = '') =>
         String(value || '').replace(/\s+/g, ' ').trim();
     const isGenericFlightTypeLabel = (value = '') => {
@@ -23848,11 +23896,9 @@ app.get('/api/analytics', async (req, res) => {
                                         voucherLocRows2,
                                         bookingTypeRows,
                                         voucherTypeRows,
-                                        liabLocRows,
-                                        liabTypeRows,
-                                        refundableRows,
+                                        bookingLiabilityRows,
+                                        voucherLiabilityDetailRows,
                                         flownRows,
-                                        voucherLiabilityRows
                                     ] = await Promise.all([
                                         queryAsync(`
                                             SELECT
@@ -23961,26 +24007,6 @@ app.get('/api/analytics', async (req, res) => {
                                             GROUP BY voucher_type
                                         `),
                                         queryAsync(`
-                                            SELECT location, SUM(paid) as value
-                                            FROM all_booking
-                                            WHERE paid IS NOT NULL
-                                              AND paid > 0
-                                              AND status != 'Flown'
-                                              ${dateFilter()}
-                                            GROUP BY location
-                                        `),
-                                        queryAsync(`
-                                            SELECT
-                                                COALESCE(NULLIF(v.voucher_type, ''), NULLIF(ab.voucher_type, ''), NULLIF(ab.voucher_type_detail, '')) as voucher_type,
-                                                SUM(ab.paid) as value
-                                            FROM all_booking ab
-                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
-                                            WHERE ab.paid IS NOT NULL
-                                              AND ab.paid > 0
-                                              ${dateFilter('ab.flight_date')}
-                                            GROUP BY voucher_type
-                                        `),
-                                        queryAsync(`
                                             SELECT
                                                 ab.id,
                                                 ab.paid,
@@ -23990,16 +24016,34 @@ app.get('/api/analytics', async (req, res) => {
                                                 ab.flight_type,
                                                 ab.voucher_type,
                                                 ab.voucher_type_detail,
+                                                v.voucher_type AS linked_voucher_type,
                                                 ab.location,
                                                 ab.pax,
                                                 COALESCE(ab.add_to_booking_items_total_price, 0) AS add_to_booking_items_total_price,
                                                 COALESCE(ab.weather_refund_total_price, 0) AS weather_refund_total_price
                                             FROM all_booking ab
+                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
                                             WHERE ab.paid IS NOT NULL
                                               AND ab.paid > 0
-                                              AND TRIM(LOWER(COALESCE(ab.status, ''))) NOT IN ('expired', 'flown')
-                                              AND (ab.expires IS NULL OR ab.expires > CURDATE())
-                                              ${dateFilter('ab.expires')}
+                                              ${dateFilter('ab.created_at')}
+                                        `),
+                                        queryAsync(`
+                                            SELECT
+                                                v.id,
+                                                v.paid,
+                                                v.status,
+                                                v.redeemed,
+                                                v.expires,
+                                                v.voucher_type,
+                                                v.voucher_type_detail,
+                                                v.experience_type,
+                                                v.book_flight,
+                                                v.preferred_location
+                                                ${hasVoucherLocationColumn ? ', v.location' : ', NULL AS location'}
+                                            FROM all_vouchers v
+                                            WHERE v.paid IS NOT NULL
+                                              AND v.paid > 0
+                                              ${dateFilter('v.created_at')}
                                         `),
                                         queryAsync(`
                                             SELECT location, COUNT(*) as count
@@ -24007,16 +24051,8 @@ app.get('/api/analytics', async (req, res) => {
                                             WHERE status != 'Cancelled'
                                               AND flight_date IS NOT NULL
                                               AND flight_date < CURDATE()
-                                              ${dateFilter()}
+                                              ${dateFilter('flight_date')}
                                             GROUP BY location
-                                        `),
-                                        queryAsync(`
-                                            SELECT COALESCE(SUM(COALESCE(v.paid, 0)), 0) AS total
-                                            FROM all_vouchers v
-                                            WHERE (
-                                                    v.redeemed IS NULL
-                                                    OR TRIM(LOWER(v.redeemed)) NOT IN ('yes', 'redeemed', 'true', '1')
-                                                  )
                                         `)
                                     ]);
 
@@ -24207,17 +24243,36 @@ app.get('/api/analytics', async (req, res) => {
                                         }))
                                         .sort((a, b) => b.count - a.count);
 
-                                    const liabilityByLocation = (liabLocRows || []).map((row) => ({
-                                        location: normalizeAnalyticsText(row.location) || 'Other',
-                                        value: roundCurrencyAmount(row.value)
-                                    }));
+                                    const activeBookingLiabilityRows = (bookingLiabilityRows || []).filter(isActiveBookingLiabilityRow);
+                                    const activeVoucherLiabilityRows = (voucherLiabilityDetailRows || []).filter(isActiveVoucherLiabilityRow);
+
+                                    const liabilityLocationMap = {};
+                                    activeBookingLiabilityRows.forEach((row) => {
+                                        const location = normalizeAnalyticsText(row.location) || 'Other';
+                                        liabilityLocationMap[location] = roundCurrencyAmount(
+                                            (liabilityLocationMap[location] || 0) + (Number(row.paid) || 0)
+                                        );
+                                    });
+
+                                    const liabilityByLocation = Object.entries(liabilityLocationMap)
+                                        .map(([location, value]) => ({
+                                            location,
+                                            value: roundCurrencyAmount(value)
+                                        }))
+                                        .sort((a, b) => b.value - a.value);
 
                                     const liabilityTypeMap = {};
-                                    (liabTypeRows || []).forEach((row) => {
-                                        const label = normalizeVoucherLabel(row.voucher_type);
+                                    activeBookingLiabilityRows.forEach((row) => {
+                                        const label = normalizeVoucherLabel(
+                                            row.linked_voucher_type ||
+                                            row.voucher_type ||
+                                            row.voucher_type_detail ||
+                                            row.experience ||
+                                            row.flight_type
+                                        );
                                         if (!label) return;
                                         liabilityTypeMap[label] = roundCurrencyAmount(
-                                            (liabilityTypeMap[label] || 0) + (Number(row.value) || 0)
+                                            (liabilityTypeMap[label] || 0) + (Number(row.paid) || 0)
                                         );
                                     });
 
@@ -24228,7 +24283,7 @@ app.get('/api/analytics', async (req, res) => {
                                         }))
                                         .sort((a, b) => b.value - a.value);
 
-                                    const refundableBookingIds = (refundableRows || []).map((row) => row.id).filter(Boolean);
+                                    const refundableBookingIds = activeBookingLiabilityRows.map((row) => row.id).filter(Boolean);
                                     const refundablePassengerRows = refundableBookingIds.length > 0
                                         ? await queryAsync(
                                             `
@@ -24248,7 +24303,7 @@ app.get('/api/analytics', async (req, res) => {
                                     });
 
                                     let refundableLiabilityTotal = 0;
-                                    for (const bookingRow of refundableRows || []) {
+                                    for (const bookingRow of activeBookingLiabilityRows) {
                                         let weatherRefundTotal = roundCurrencyAmount(bookingRow.weather_refund_total_price);
                                         const passengerWeatherCount = Number(passengerWeatherCountByBooking[bookingRow.id]) || 0;
                                         const isPrivateBooking = [
@@ -24301,7 +24356,13 @@ app.get('/api/analytics', async (req, res) => {
                                         count: Number(row.count) || 0
                                     }));
 
-                                    const voucherLiability = roundCurrencyAmount(voucherLiabilityRows?.[0]?.total || 0);
+                                    const voucherLiability = roundCurrencyAmount(
+                                        activeVoucherLiabilityRows.reduce((sum, row) => sum + (Number(row.paid) || 0), 0)
+                                    );
+                                    const totalBookingLiability = roundCurrencyAmount(
+                                        activeBookingLiabilityRows.reduce((sum, row) => sum + (Number(row.paid) || 0), 0)
+                                    );
+                                    const totalLiability = roundCurrencyAmount(totalBookingLiability + voucherLiability);
 
                                     res.json({
                                         bookingAttempts,
@@ -24315,7 +24376,8 @@ app.get('/api/analytics', async (req, res) => {
                                         liabilityByFlightType,
                                         refundableLiability: roundCurrencyAmount(refundableLiabilityTotal),
                                         flownFlightsByLocation,
-                                        voucherLiability
+                                        voucherLiability,
+                                        totalLiability
                                     });
                                 } catch (analyticsError) {
                                     console.error('Analytics endpoint calculation error:', analyticsError);

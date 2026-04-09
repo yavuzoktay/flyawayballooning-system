@@ -29,6 +29,7 @@ import {
     isTheNewtBooking,
     parseAdditionalInfoJson
 } from '../utils/additionalInfo';
+import { formatAdminDate, isAdminDateExpired } from '../utils/adminDateUtils';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
 const SHORT_NOTICE_QUESTION_TEXT = 'Would you like to receive short notice flight availability?';
@@ -226,46 +227,8 @@ const BookingPage = () => {
         let displayStatus = rawStatus || '';
 
         // First, mirror the "Expired" logic from PaginatedTable for bookings context
-        if (item.expires) {
-            try {
-                let expiresDate = item.expires;
-                let parsedDate = null;
-
-                if (typeof expiresDate === 'string' && expiresDate.trim() !== '') {
-                    // Try ISO / "YYYY-MM-DD HH:mm:ss"
-                    parsedDate = dayjs(expiresDate);
-
-                    // Fallback: DD/MM/YYYY
-                    if (!parsedDate.isValid()) {
-                        const parts = expiresDate.split('/');
-                        if (parts.length === 3) {
-                            let year = parts[2];
-                            if (year.length === 2) {
-                                year = '20' + year;
-                            }
-                            parsedDate = dayjs(`${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
-                        }
-                    }
-
-                    // Fallback: native Date
-                    if (!parsedDate.isValid()) {
-                        const dateObj = new Date(expiresDate);
-                        if (!isNaN(dateObj.getTime())) {
-                            parsedDate = dayjs(dateObj);
-                        }
-                    }
-
-                    if (parsedDate && parsedDate.isValid()) {
-                        const today = dayjs().startOf('day');
-                        const expiresStartOfDay = parsedDate.startOf('day');
-                        if (expiresStartOfDay.isBefore(today)) {
-                            return 'Expired';
-                        }
-                    }
-                }
-            } catch {
-                // Ignore parsing issues for filter purposes
-            }
+        if (item.expires && isAdminDateExpired(item.expires)) {
+            return 'Expired';
         }
 
         // Normalize other statuses to match display values
@@ -377,24 +340,7 @@ const BookingPage = () => {
     // Format the persisted expires date for display.
     // Any 6-month extension must already be written by the backend.
     const formatExpiresDate = (expiresDate) => {
-        if (!expiresDate) return expiresDate;
-
-        const formatOut = 'DD/MM/YY';
-
-        const parseDate = (val) => {
-            if (typeof val === 'string' && val.includes('/')) {
-                const parts = val.split('/');
-                if (parts.length === 3) {
-                    return dayjs(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`);
-                }
-            }
-            return dayjs(val);
-        };
-
-        let parsedDate = parseDate(expiresDate);
-        if (!parsedDate.isValid()) return expiresDate;
-
-        return parsedDate.isValid() ? parsedDate.format(formatOut) : expiresDate;
+        return formatAdminDate(expiresDate, 'DD/MM/YY');
     };
 
     // History/timezone fix:
