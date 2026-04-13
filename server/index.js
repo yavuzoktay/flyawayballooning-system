@@ -400,7 +400,7 @@ console.log('Environment:', isProduction ? 'PRODUCTION' : 'DEVELOPMENT');
 console.log('Stripe secret key loaded:', stripeSecretKey ? 'YES' : 'NO');
 console.log('Stripe key type:', stripeSecretKey?.startsWith('sk_live_') ? 'LIVE' : 'TEST');
 console.log('Stripe secret key (first 10 chars):', stripeSecretKey ? stripeSecretKey.substring(0, 10) + '...' : 'NOT SET');
-
+ 
 if (!stripeSecretKey) {
     console.error('STRIPE_SECRET_KEY environment variable is not set');
 }
