@@ -248,7 +248,8 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                 return sum + parseMoney(item?.paid);
             }, 0);
             const totalSales = bookingSales + voucherSales;
-            const totalLiability = computeTotalLiability(data || [], vouchers || []);
+            // Liability must always reflect the current live balance, not the selected sales date range.
+            const totalLiability = computeTotalLiability(bookingData || [], voucherData || []);
 
             // VAT Portion: extract VAT from completed flights gross (paid includes VAT)
             const VAT_RATE = 0.2;

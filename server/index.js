@@ -24006,6 +24006,7 @@ app.get('/api/analytics', async (req, res) => {
                                               ${dateFilter('created_at')}
                                             GROUP BY voucher_type
                                         `),
+                                        // Liability is always a live balance and must ignore the selected date range.
                                         queryAsync(`
                                             SELECT
                                                 ab.id,
@@ -24025,7 +24026,6 @@ app.get('/api/analytics', async (req, res) => {
                                             LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
                                             WHERE ab.paid IS NOT NULL
                                               AND ab.paid > 0
-                                              ${dateFilter('ab.created_at')}
                                         `),
                                         queryAsync(`
                                             SELECT
@@ -24043,7 +24043,6 @@ app.get('/api/analytics', async (req, res) => {
                                             FROM all_vouchers v
                                             WHERE v.paid IS NOT NULL
                                               AND v.paid > 0
-                                              ${dateFilter('v.created_at')}
                                         `),
                                         queryAsync(`
                                             SELECT location, COUNT(*) as count
