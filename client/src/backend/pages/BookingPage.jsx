@@ -2352,7 +2352,12 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.flight_type = voucherItem.flight_type || finalVoucherDetail.voucher.flight_type;
     finalVoucherDetail.voucher.voucher_type = voucherItem.voucher_type || finalVoucherDetail.voucher.voucher_type;
     finalVoucherDetail.voucher.email = voucherItem.email || finalVoucherDetail.voucher.email;
+    finalVoucherDetail.voucher.phone = voucherItem.phone || finalVoucherDetail.voucher.phone;
     finalVoucherDetail.voucher.mobile = voucherItem.mobile || finalVoucherDetail.voucher.mobile;
+    finalVoucherDetail.voucher.purchaser_name = voucherItem.purchaser_name || finalVoucherDetail.voucher.purchaser_name;
+    finalVoucherDetail.voucher.purchaser_email = voucherItem.purchaser_email || finalVoucherDetail.voucher.purchaser_email;
+    finalVoucherDetail.voucher.purchaser_phone = voucherItem.purchaser_phone || finalVoucherDetail.voucher.purchaser_phone;
+    finalVoucherDetail.voucher.purchaser_mobile = voucherItem.purchaser_mobile || finalVoucherDetail.voucher.purchaser_mobile;
     finalVoucherDetail.voucher.weight = voucherItem.weight || finalVoucherDetail.voucher.weight;
     finalVoucherDetail.voucher.expires = voucherItem.expires || finalVoucherDetail.voucher.expires;
     // Ensure voucher code fields and counts are populated from getAllVoucherData result
@@ -4047,7 +4052,7 @@ setBookingDetail(finalVoucherDetail);
     const handleEmailFlightVoucher = () => {
         const voucher = bookingDetail?.voucher;
         if (!voucher) return;
-        const email = voucher.email || bookingDetail?.booking?.email;
+        const email = voucher.email || voucher.purchaser_email || bookingDetail?.booking?.email;
         if (!email) {
             alert('Voucher email is not available.');
             return;
@@ -4074,7 +4079,7 @@ setBookingDetail(finalVoucherDetail);
             linked_booking_id: linkedBookingId || undefined,
             name: voucher.name || bookingDetail?.booking?.name || 'Guest',
             email,
-            phone: voucher.phone || bookingDetail?.booking?.phone || '',
+            phone: voucher.phone || voucher.mobile || voucher.purchaser_phone || voucher.purchaser_mobile || bookingDetail?.booking?.phone || '',
             flight_type: voucher.flight_type || voucher.voucher_type || '',
             location: '-',
             voucher_type: voucher.voucher_type || '',
@@ -6999,7 +7004,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 </IconButton>
                                                             </>
                                                         )}</Typography>
-                                                        {/* Phone field - show purchaser_phone for Gift Vouchers, booking_phone for Flight Vouchers */}
+                                                        {/* Phone field - prefer voucher contact data, then fall back to related booking if older FAB records are blank */}
                                                         <Typography sx={{ 
                                                             mb: isMobile ? 0 : 1,
                                                             fontSize: isMobile ? '14px' : 'inherit'
@@ -7017,22 +7022,19 @@ setBookingDetail(finalVoucherDetail);
                                                         ) : (
                                                             <>
                                                                 {(() => {
-                                                                    // For Flight Voucher, prioritize booking_phone (from linked booking)
-                                                                    // For Gift Voucher, use purchaser_phone
                                                                     const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
                                                                     let phoneValue = '';
                                                                     if (isGiftVoucher) {
                                                                         phoneValue = v.purchaser_phone || v.phone || '-';
                                                                     } else {
-                                                                        // Flight Voucher: Use booking_phone if available and not empty
-                                                                        // booking_phone comes from the linked booking and has country code
-                                                                        const bookingPhone = v.booking_phone && String(v.booking_phone).trim() !== '' ? String(v.booking_phone).trim() : null;
-                                                                        if (bookingPhone) {
-                                                                            phoneValue = bookingPhone;
-                                                                        } else {
-                                                                        // Fallback to phone or mobile if booking_phone is not available
-                                                                            phoneValue = v.phone || v.mobile || '-';
-                                                                        }
+                                                                        phoneValue =
+                                                                            v.phone ||
+                                                                            v.mobile ||
+                                                                            v.purchaser_phone ||
+                                                                            v.purchaser_mobile ||
+                                                                            v.booking_phone ||
+                                                                            bookingDetail?.booking?.phone ||
+                                                                            '-';
                                                                     }
                                                                     
                                                                     // If phone value exists and is not '-', make it a clickable link
@@ -7060,9 +7062,19 @@ setBookingDetail(finalVoucherDetail);
                                                                     const isGiftVoucher = v.book_flight === "Gift Voucher" 
                                                                         || (v.book_flight || '').toLowerCase().includes('gift');
                                                                     const phoneValue = isGiftVoucher
-                                                                        ? (v.purchaser_phone || v.phone) 
-                                                                        : (v.booking_phone && v.booking_phone.trim() !== '' ? v.booking_phone : (v.phone || v.mobile));
-                                                                    const fieldName = isGiftVoucher ? 'purchaser_phone' : 'phone';
+                                                                        ? (v.purchaser_phone || v.phone || '')
+                                                                        : (
+                                                                            v.phone ||
+                                                                            v.mobile ||
+                                                                            v.purchaser_phone ||
+                                                                            v.purchaser_mobile ||
+                                                                            v.booking_phone ||
+                                                                            bookingDetail?.booking?.phone ||
+                                                                            ''
+                                                                        );
+                                                                    const fieldName = isGiftVoucher
+                                                                        ? 'purchaser_phone'
+                                                                        : ((v.purchaser_phone || v.purchaser_mobile) && !(v.phone || v.mobile) ? 'purchaser_phone' : 'phone');
                                                                     handleEditClick(fieldName, phoneValue);
                                                                     }}
                                                                     sx={{ 
@@ -7083,7 +7095,7 @@ setBookingDetail(finalVoucherDetail);
                                                         <Typography sx={{ 
                                                             mb: isMobile ? 0 : 1,
                                                             fontSize: isMobile ? '14px' : 'inherit'
-                                                        }}><b>Email:</b> {editField === 'email' ? (
+                                                        }}><b>Email:</b> {(editField === 'email' || editField === 'purchaser_email') ? (
                                                             <>
                                                                 <input 
                                                                     type="email"
@@ -7102,8 +7114,8 @@ setBookingDetail(finalVoucherDetail);
                                                                     // Ensures Passenger 1 email in Redeem modal = Email in Booking Details.
                                                                     const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
                                                                     const emailValue = isGiftVoucher
-                                                                        ? (v.booking_email || v.email || v.purchaser_email || '-')
-                                                                        : (v.email || '-');
+                                                                        ? (v.booking_email || v.email || v.purchaser_email || bookingDetail?.booking?.email || '-')
+                                                                        : (v.email || v.purchaser_email || v.booking_email || bookingDetail?.booking?.email || '-');
                                                                     // If email exists and is not '-', make it a clickable mailto link
                                                                     if (emailValue && emailValue !== '-') {
                                                                         return (
@@ -7125,8 +7137,13 @@ setBookingDetail(finalVoucherDetail);
                                                                     size="small" 
                                                                     onClick={() => {
                                                                     const isGiftVoucher = v.book_flight === "Gift Voucher" || (v.book_flight || '').toLowerCase().includes('gift');
-                                                                    const emailForEdit = isGiftVoucher ? (v.booking_email || v.email || v.purchaser_email || '') : (v.email || '');
-                                                                    handleEditClick('email', emailForEdit);
+                                                                    const emailForEdit = isGiftVoucher
+                                                                        ? (v.booking_email || v.email || v.purchaser_email || bookingDetail?.booking?.email || '')
+                                                                        : (v.email || v.purchaser_email || v.booking_email || bookingDetail?.booking?.email || '');
+                                                                    const fieldName = isGiftVoucher
+                                                                        ? 'email'
+                                                                        : (v.purchaser_email && !v.email ? 'purchaser_email' : 'email');
+                                                                    handleEditClick(fieldName, emailForEdit);
                                                                     }}
                                                                     sx={{ 
                                                                         padding: isMobile ? '2px' : '8px',
@@ -7891,7 +7908,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 }}
                                                                 onClick={emailHandler}
                                                                 disabled={
-                                                                    (isFlightVoucher && !v?.email && !bookingDetail?.booking?.email) ||
+                                                                    (isFlightVoucher && !v?.email && !v?.purchaser_email && !bookingDetail?.booking?.email) ||
                                                                     (isGiftVoucher && !hasGiftEmail)
                                                                 }
                                                             >

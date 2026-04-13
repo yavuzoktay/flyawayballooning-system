@@ -29591,6 +29591,14 @@ async function createVoucherFromWebhook(voucherData) {
         console.log('recipient_email:', recipient_email);
         console.log('Normalized book_flight:', normalizedBookFlight);
 
+        const resolvedEmail = String(email || purchaser_email || '').trim();
+        const resolvedPhone = String(phone || purchaser_phone || '').trim();
+        const resolvedMobile = String(mobile || purchaser_mobile || '').trim();
+        const resolvedPurchaserName = String(purchaser_name || name || '').trim();
+        const resolvedPurchaserEmail = String(purchaser_email || email || '').trim();
+        const resolvedPurchaserPhone = String(purchaser_phone || phone || '').trim();
+        const resolvedPurchaserMobile = String(purchaser_mobile || mobile || '').trim();
+
         // If paid wasn't provided on webhook payload, try pulling from stored session (Stripe total)
         try {
             if ((!paid || Number(paid) === 0) && voucherData && voucherData.session_id && stripeSessionStore[voucherData.session_id]) {
@@ -29671,7 +29679,7 @@ async function createVoucherFromWebhook(voucherData) {
             LIMIT 1
         `;
 
-        con.query(duplicateCheckSql, [name, email, paid, voucher_type, actualVoucherType], (err, duplicateResult) => {
+        con.query(duplicateCheckSql, [name, resolvedEmail, paid, normalizedBookFlight, actualVoucherType], (err, duplicateResult) => {
             if (err) {
                 console.error('Error checking for webhook duplicates:', err);
                 return reject(err);
@@ -29680,7 +29688,7 @@ async function createVoucherFromWebhook(voucherData) {
             if (duplicateResult && duplicateResult.length > 0) {
                 console.log('=== WEBHOOK DUPLICATE VOUCHER DETECTED ===');
                 console.log('Duplicate voucher ID:', duplicateResult[0].id);
-                console.log('Name:', name, 'Email:', email, 'Paid:', paid);
+                console.log('Name:', name, 'Email:', resolvedEmail, 'Paid:', paid);
                 // Return the existing voucher ID instead of creating a new one
                 resolve(duplicateResult[0].id);
                 return;
@@ -29719,17 +29727,17 @@ async function createVoucherFromWebhook(voucherData) {
             const resolvedOriginalAmount = original_amount != null ? Number(original_amount) : resolvedPaid;
             
             const insertSql = `INSERT INTO all_vouchers 
-                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details, season_saver)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+                    (name, weight, experience_type, book_flight, voucher_type, email, phone, mobile, expires, redeemed, paid, offer_code, voucher_ref, created_at, recipient_name, recipient_email, recipient_phone, recipient_gift_date, preferred_location, preferred_time, preferred_day, flight_attempts, purchaser_name, purchaser_email, purchaser_phone, purchaser_mobile, numberOfPassengers, additional_information_json, add_to_booking_items, voucher_passenger_details, season_saver)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             const values = [
                 emptyToNull(name),
                 emptyToNull(weight),
                 emptyToNull(flight_type), // This will go to experience_type column
                 emptyToNull(normalizedBookFlight), // Use normalized book_flight value
                 emptyToNull(actualVoucherType), // This will go to voucher_type column (actual voucher type)
-                emptyToNull(email),
-                emptyToNull(phone),
-                emptyToNull(mobile),
+                emptyToNull(resolvedEmail),
+                emptyToNull(resolvedPhone),
+                emptyToNull(resolvedMobile),
                 emptyToNull(expiresFinal),
                 emptyToNull(redeemed),
                 resolvedPaid,
@@ -29744,6 +29752,10 @@ async function createVoucherFromWebhook(voucherData) {
                 emptyToNull(preferred_time),
                 emptyToNull(preferred_day),
                 0, // flight_attempts starts at 0 for each created voucher
+                emptyToNull(resolvedPurchaserName),
+                emptyToNull(resolvedPurchaserEmail),
+                emptyToNull(resolvedPurchaserPhone),
+                emptyToNull(resolvedPurchaserMobile),
                 resolvedPassengerCount,
                 // Persist additional information answers regardless of which key frontend used
                 finalAdditionalInfoJson ? JSON.stringify(finalAdditionalInfoJson) : null,
