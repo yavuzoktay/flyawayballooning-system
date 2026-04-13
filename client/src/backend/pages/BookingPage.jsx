@@ -262,10 +262,11 @@ const BookingPage = () => {
         });
 
         // Remove statuses we explicitly do NOT want to expose in the filter
-        ['Confirmed', 'Flown', 'No show', 'Open', 'Waiting'].forEach(s => set.delete(s));
+        ['Confirmed', 'No show', 'Open', 'Waiting'].forEach(s => set.delete(s));
 
-        // Always expose "Expired" as a selectable status in the filter UI,
-        // even if it doesn't currently appear in the raw data
+        // Always expose "Flown" and "Expired" so users can opt-in to see
+        // records hidden from the default view
+        set.add('Flown');
         set.add('Expired');
 
         return Array.from(set).sort();
@@ -6185,6 +6186,12 @@ setBookingDetail(finalVoucherDetail);
                                     <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f0f8ff', borderRadius: 8, border: '1px solid #e3f2fd' }}>
                                         <Typography variant="body2" color="primary">
                                             🔍 Search results for "{filters.search}": {filteredData.filter(item => {
+                                                const _noStatusDrop = !filters.status || filters.status === 'Select';
+                                                const _noStatusMulti = !filters.statusMulti || filters.statusMulti.length === 0;
+                                                if (_noStatusDrop && _noStatusMulti) {
+                                                    const es = getEffectiveBookingStatus(item);
+                                                    if (es === 'Flown' || es === 'Expired') return false;
+                                                }
                                                 const search = filters.search.trim().toLowerCase();
                                                 const name = (item.name || "").toLowerCase();
                                                 const email = (item.email || "").toLowerCase();
@@ -6209,6 +6216,14 @@ setBookingDetail(finalVoucherDetail);
                                     <PaginatedTable
                                         itemsPerPage={10}
                                         data={filteredData.filter(item => {
+                                            // Default view: hide Flown and Expired bookings unless a
+                                            // status filter explicitly includes them
+                                            const noStatusDropdown = !filters.status || filters.status === 'Select';
+                                            const noStatusMulti = !filters.statusMulti || filters.statusMulti.length === 0;
+                                            if (noStatusDropdown && noStatusMulti) {
+                                                const effectiveStatus = getEffectiveBookingStatus(item);
+                                                if (effectiveStatus === 'Flown' || effectiveStatus === 'Expired') return false;
+                                            }
                                             // Experience filter
                                             if (filters.experience && filters.experience !== 'Select') {
                                                 const bookingFlightType = item.flight_type || item.experience || '';
@@ -6554,17 +6569,18 @@ setBookingDetail(finalVoucherDetail);
                                                 </div>
                                                 <div className="booking-filter-field" style={{ flex: '1 1 calc(50% - 2px)', minWidth: 0, margin: '0' }}>
                                                     <FormControl sx={{ m: 0.5, minWidth: 0, width: '100%' }} size="small">
-                                                        <InputLabel id="book-redeemed-status-label-vm" sx={{ fontSize: '11px' }}>Redeemed</InputLabel>
+                                                        <InputLabel id="book-redeemed-status-label-vm" sx={{ fontSize: '11px' }}>Status</InputLabel>
                                                         <Select
                                                             labelId="book-redeemed-status-label-vm"
                                                             value={filters.redeemedStatus}
                                                             onChange={(e) => handleFilterChange("redeemedStatus", e.target.value)}
-                                                            label="Redeemed"
+                                                            label="Status"
                                                             sx={{ fontSize: '11px', height: '32px', '& .MuiSelect-select': { padding: '6px 8px', fontSize: '11px' } }}
                                                         >
-                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
-                                                            <MenuItem value="Yes" sx={{ fontSize: '11px' }}>Yes</MenuItem>
-                                                            <MenuItem value="No" sx={{ fontSize: '11px' }}>No</MenuItem>
+                                                            <MenuItem value="" sx={{ fontSize: '11px' }}><em>Active</em></MenuItem>
+                                                            <MenuItem value="Yes" sx={{ fontSize: '11px' }}>Redeemed</MenuItem>
+                                                            <MenuItem value="Expired" sx={{ fontSize: '11px' }}>Expired</MenuItem>
+                                                            <MenuItem value="All" sx={{ fontSize: '11px' }}>All</MenuItem>
                                                         </Select>
                                                     </FormControl>
                                                 </div>
@@ -6627,16 +6643,17 @@ setBookingDetail(finalVoucherDetail);
                                         </div>
                                         <div className="booking-filter-field">
                                             <FormControl sx={{ m: 1, minWidth: 160 }} size="small">
-                                                <InputLabel id="book-redeemed-status-label">Redeemed</InputLabel>
+                                                <InputLabel id="book-redeemed-status-label">Status</InputLabel>
                                                 <Select
                                                     labelId="book-redeemed-status-label"
                                                     value={filters.redeemedStatus}
                                                     onChange={(e) => handleFilterChange("redeemedStatus", e.target.value)}
-                                                    label="Redeemed"
+                                                    label="Status"
                                                 >
-                                                    <MenuItem value=""><em>Select</em></MenuItem>
-                                                    <MenuItem value="Yes">Yes</MenuItem>
-                                                    <MenuItem value="No">No</MenuItem>
+                                                    <MenuItem value=""><em>Active</em></MenuItem>
+                                                    <MenuItem value="Yes">Redeemed</MenuItem>
+                                                    <MenuItem value="Expired">Expired</MenuItem>
+                                                    <MenuItem value="All">All</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -6648,17 +6665,21 @@ setBookingDetail(finalVoucherDetail);
                                     <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f0f8ff', borderRadius: 8, border: '1px solid #e3f2fd' }}>
                                         <Typography variant="body2" color="primary">
                                             🔍 Search results for "{filters.search}": {filteredData.filter(item => {
+                                                if (!filters.redeemedStatus) {
+                                                    if (item.redeemed === 'Yes') return false;
+                                                    if (item.expires && isAdminDateExpired(item.expires)) return false;
+                                                }
                                                 const search = filters.search.trim().toLowerCase();
                                                 const name = (item.name || "").toLowerCase();
                                                 const email = (item.email || "").toLowerCase();
                                                 const phone = (item.phone || "").toLowerCase();
                                                 const voucherRef = (item.voucher_ref || "").toLowerCase();
                                                 const offerCode = (item.offer_code || "").toLowerCase();
-                                                                                            const flightType = (item.flight_type || "").toLowerCase();
-                                            const voucherType = (item.voucher_type || "").toLowerCase();
-                                            const actualVoucherType = (item.actual_voucher_type || "").toLowerCase();
-                                            const bookFlight = ((item.book_flight || item._original?.book_flight) || "").toLowerCase();
-                                            return name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search) || actualVoucherType.includes(search) || bookFlight.includes(search);
+                                                const flightType = (item.flight_type || "").toLowerCase();
+                                                const voucherType = (item.voucher_type || "").toLowerCase();
+                                                const actualVoucherType = (item.actual_voucher_type || "").toLowerCase();
+                                                const bookFlight = ((item.book_flight || item._original?.book_flight) || "").toLowerCase();
+                                                return name.includes(search) || email.includes(search) || phone.includes(search) || voucherRef.includes(search) || offerCode.includes(search) || flightType.includes(search) || voucherType.includes(search) || actualVoucherType.includes(search) || bookFlight.includes(search);
                                             }).length} vouchers found
                                         </Typography>
                                     </div>
@@ -6667,6 +6688,12 @@ setBookingDetail(finalVoucherDetail);
                                 <PaginatedTable
                                     itemsPerPage={10}
                                     data={filteredData.filter(item => {
+                                        // Default view: hide Redeemed and Expired vouchers unless
+                                        // the redeemedStatus filter explicitly requests them
+                                        if (!filters.redeemedStatus) {
+                                            if (item.redeemed === 'Yes') return false;
+                                            if (item.expires && isAdminDateExpired(item.expires)) return false;
+                                        }
                                         // Book Flight filter (use book_flight from getAllVoucherData)
                                         if (filters.voucherType) {
                                             const itemBookFlight = item.book_flight || item._original?.book_flight || item.voucher_type || '';
@@ -6679,8 +6706,12 @@ setBookingDetail(finalVoucherDetail);
                                             const bookingFlightType = item.flight_type || item.experience || '';
                                             if (!experienceMatchesFilter(bookingFlightType, filters.experience)) return false;
                                         }
-                                        // Redeemed Status filter
-                                        if (filters.redeemedStatus && item.redeemed !== filters.redeemedStatus) return false;
+                                        // Redeemed / Expired status filter
+                                        if (filters.redeemedStatus === 'Expired') {
+                                            if (!item.expires || !isAdminDateExpired(item.expires)) return false;
+                                        } else if (filters.redeemedStatus && filters.redeemedStatus !== 'All') {
+                                            if (item.redeemed !== filters.redeemedStatus) return false;
+                                        }
                                         // Search filter (case-insensitive, partial match)
                                         if (filters.search && filters.search.trim() !== "") {
                                             const search = filters.search.trim().toLowerCase();
