@@ -39488,10 +39488,23 @@ app.post('/api/sendVoucherEmail', async (req, res) => {
     }
 });
 
+// Inject a Customer Portal link into the email HTML for a given booking record
+function injectPortalLinkIntoHtml(html, bookingRecord) {
+    if (!bookingRecord) return html;
+    const portalLink = getCustomerPortalLink(bookingRecord);
+    if (!portalLink) return html;
+    const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+    const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+    if (closingPattern.test(html)) {
+        return html.replace(closingPattern, linkHtml + '$1');
+    }
+    return html + linkHtml;
+}
+
 // Send bulk booking email via SendGrid
 app.post('/api/sendBulkBookingEmail', async (req, res) => {
     console.log('POST /api/sendBulkBookingEmail called');
-    const { bookingIds, to, subject, message, template } = req.body;
+    const { bookingIds, to, bookingRecipients, subject, message, template, addLink } = req.body;
 
     try {
         if (!Array.isArray(to) || to.length === 0) {
@@ -39532,6 +39545,85 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
             });
         }
 
+        // When addLink is true and we have per-booking mapping, send individual
+        // emails so each recipient gets their own Customer Portal link.
+        if (addLink && Array.isArray(bookingRecipients) && bookingRecipients.length > 0) {
+            console.log('Sending per-booking portal-link emails to', bookingRecipients.length, 'recipients');
+
+            const logSql = `
+                INSERT INTO email_logs (
+                    booking_id, recipient_email, subject, template_type,
+                    message_html, message_text, sent_at, status, message_id,
+                    opens, clicks, last_event, last_event_at, context_type, context_id
+                ) VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
+            `;
+
+            const results = await Promise.allSettled(
+                bookingRecipients.map(async (recipient) => {
+                    const recipientEmail = String(recipient.to || '').trim();
+                    if (!recipientEmail) throw new Error('Empty recipient email');
+
+                    let perRecipientHtml = htmlBody;
+                    try {
+                        const rows = await new Promise((resolve, reject) => {
+                            con.query('SELECT * FROM all_booking WHERE id = ? LIMIT 1',
+                                [recipient.bookingId], (err, r) => err ? reject(err) : resolve(r));
+                        });
+                        if (rows && rows.length > 0) {
+                            perRecipientHtml = injectPortalLinkIntoHtml(htmlBody, rows[0]);
+                        }
+                    } catch (lookupErr) {
+                        console.warn('Portal link lookup failed for booking', recipient.bookingId, lookupErr.message);
+                    }
+
+                    const emailContent = {
+                        to: recipientEmail,
+                        from: { email: 'info@flyawayballooning.com', name: 'Fly Away Ballooning' },
+                        subject,
+                        text: textBody,
+                        html: perRecipientHtml,
+                        custom_args: {
+                            booking_ids: String(recipient.bookingId || ''),
+                            template_type: template || 'custom',
+                            context_type: 'bulk'
+                        }
+                    };
+
+                    const { provider, messageId } = await sendEmailWithFallback(emailContent, {
+                        context: 'send_bulk_booking_email_per_recipient'
+                    });
+
+                    if (typeof ensureEmailLogsSchema === 'function') {
+                        ensureEmailLogsSchema(() => {
+                            con.query(logSql, [
+                                recipient.bookingId, recipientEmail, subject,
+                                template || 'custom', perRecipientHtml, textBody,
+                                messageId, 'bulk', recipientEmail
+                            ], () => {});
+                        });
+                    }
+
+                    return { bookingId: recipient.bookingId, to: recipientEmail, provider, messageId };
+                })
+            );
+
+            const successes = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+            const failures = results.filter(r => r.status === 'rejected').map((r, i) => ({
+                bookingId: bookingRecipients[i]?.bookingId,
+                to: bookingRecipients[i]?.to,
+                error: r.reason?.message
+            }));
+
+            return res.json({
+                success: successes.length > 0,
+                message: `Bulk email sent to ${successes.length} recipients` +
+                    (failures.length > 0 ? ` (${failures.length} failed)` : ''),
+                sentCount: successes.length,
+                failedCount: failures.length
+            });
+        }
+
+        // Fallback: no per-recipient portal links, send single bulk email
         const emailContent = {
             to: uniqueRecipients,
             from: {
@@ -39614,7 +39706,7 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
 
 app.post('/api/sendBulkVoucherEmail', async (req, res) => {
     console.log('POST /api/sendBulkVoucherEmail called');
-    const { voucherIds, voucherRecipients, to, subject, message, template } = req.body;
+    const { voucherIds, voucherRecipients, to, subject, message, template, addLink } = req.body;
 
     try {
         if (!subject || !message) {
@@ -39699,6 +39791,22 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                     throw new Error(`Invalid email format for ${recipient.to}`);
                 }
 
+                let perRecipientHtml = htmlBody;
+                if (addLink) {
+                    try {
+                        const vRows = await new Promise((resolve, reject) => {
+                            con.query('SELECT * FROM all_vouchers WHERE id = ? LIMIT 1',
+                                [recipient.voucherId], (err, r) => err ? reject(err) : resolve(r));
+                        });
+                        if (vRows && vRows.length > 0) {
+                            const voucherData = { ...vRows[0], voucher_id: vRows[0].id, _original: vRows[0] };
+                            perRecipientHtml = injectPortalLinkIntoHtml(htmlBody, voucherData);
+                        }
+                    } catch (lookupErr) {
+                        console.warn('Portal link lookup failed for voucher', recipient.voucherId, lookupErr.message);
+                    }
+                }
+
                 const emailContent = {
                     to: recipient.to,
                     from: {
@@ -39707,7 +39815,7 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                     },
                     subject,
                     text: textBody,
-                    html: htmlBody,
+                    html: perRecipientHtml,
                     custom_args: {
                         voucher_id: recipient.voucherId,
                         template_type: template || 'custom',

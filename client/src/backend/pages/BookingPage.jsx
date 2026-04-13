@@ -1278,7 +1278,8 @@ const BookingPage = () => {
                 });
 
                 // Append Customer Portal link if Add Link checkbox is checked
-                if (addLink && selectedBookingForEmail) {
+                // For bulk sends, let the server inject per-recipient portal links
+                if (addLink && selectedBookingForEmail && !isBulk) {
                     try {
                         const portalRes = await axios.post('/api/customerPortalShortLink', {
                             bookingId: isVoucher ? primaryVoucherContextId : selectedBookingForEmail.id,
@@ -1348,15 +1349,21 @@ const BookingPage = () => {
                                     message: finalHtml,
                                     messageText: finalText,
                                     template: emailForm.template,
+                                    addLink: !!addLink,
                                 })
                             );
                         }
                     } else {
                         // Bulk email to selected bookings
-                        const recipients = booking
+                        const bookingRecipients = booking
                             .filter(b => selectedBookingIds.includes(b.id))
-                            .map(b => (b.email || '').trim())
-                            .filter(e => !!e);
+                            .map(b => {
+                                const email = (b.email || '').trim();
+                                if (!email) return null;
+                                return { bookingId: b.id, to: email };
+                            })
+                            .filter(Boolean);
+                        const recipients = bookingRecipients.map(r => r.to);
 
                         if (recipients.length === 0) {
                             if (!sendMessageSmsChecked) {
@@ -1369,10 +1376,12 @@ const BookingPage = () => {
                                 axios.post('/api/sendBulkBookingEmail', {
                                     bookingIds: selectedBookingIds,
                                     to: recipients,
+                                    bookingRecipients,
                                     subject: emailForm.subject,
                                     message: finalHtml,
                                     messageText: finalText,
                                     template: emailForm.template,
+                                    addLink: !!addLink,
                                 })
                             );
                         }
