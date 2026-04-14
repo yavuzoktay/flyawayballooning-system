@@ -9486,11 +9486,11 @@ app.get('/api/getAllBookingData', (req, res) => {
 
     }
 
-    // Search by name or email
+    // Search by booking ID, name or email
     if (req.query.search && req.query.search.trim() !== '') {
-        whereClause += ' AND (ab.name LIKE ? OR ab.email LIKE ?)';
+        whereClause += ' AND (CAST(ab.id AS CHAR) LIKE ? OR ab.name LIKE ? OR ab.email LIKE ?)';
         const searchTerm = `%${req.query.search.trim()}%`;
-        params.push(searchTerm, searchTerm);
+        params.push(searchTerm, searchTerm, searchTerm);
     }
 
     // Remove leading ' AND ' if whereClause exists
