@@ -5946,7 +5946,7 @@ setBookingDetail(finalVoucherDetail);
                                         {/* Search Input - Input-like on mobile, full input on desktop */}
                                         {isMobile ? (
                                             <OutlinedInput
-                                                placeholder="Search..."
+                                                placeholder="Search name, email, booking ID..."
                                                 value={filters.search}
                                                 onChange={(e) => handleFilterChange("search", e.target.value)}
                                                 sx={{ 
@@ -5970,7 +5970,7 @@ setBookingDetail(finalVoucherDetail);
                                             />
                                         ) : (
                                         <OutlinedInput
-                                                placeholder="Search"
+                                                placeholder="Search name, email, booking ID"
                                             value={filters.search}
                                             onChange={(e) => handleFilterChange("search", e.target.value)}
                                                 sx={{ 
@@ -6209,7 +6209,8 @@ setBookingDetail(finalVoucherDetail);
                                                 const flightType = (item.flight_type || "").toLowerCase();
                                                 const status = (item.status || "").toLowerCase();
                                                 const voucherType = (item.voucher_type || "").toLowerCase();
-                                                return name.includes(search) || email.includes(search) || phone.includes(search) || location.includes(search) || flightType.includes(search) || status.includes(search) || voucherType.includes(search);
+                                                const bookingId = String(item.id || item.booking_id || item.bookingId || item.voucher_booking_id || "").toLowerCase();
+                                                return name.includes(search) || email.includes(search) || phone.includes(search) || location.includes(search) || flightType.includes(search) || status.includes(search) || voucherType.includes(search) || bookingId.includes(search);
                                             }).length} bookings found
                                         </Typography>
                                     </div>
@@ -6276,7 +6277,8 @@ setBookingDetail(finalVoucherDetail);
                                                 const flightType = (item.flight_type || "").toLowerCase();
                                                 const status = (item.status || "").toLowerCase();
                                                 const voucherType = (item.voucher_type || "").toLowerCase();
-                                                if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search)) {
+                                                const bookingId = String(item.id || item.booking_id || item.bookingId || item.voucher_booking_id || "").toLowerCase();
+                                                if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search) && !bookingId.includes(search)) {
                                                     return false;
                                                 }
                                             }
