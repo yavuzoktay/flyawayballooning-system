@@ -280,6 +280,14 @@ const Settings = () => {
     const [newFieldName, setNewFieldName] = useState('');
     const [editingFieldId, setEditingFieldId] = useState(null);
     const [newValueInputs, setNewValueInputs] = useState({});
+    const [faqItems, setFaqItems] = useState([]);
+    const [faqExpanded, setFaqExpanded] = useState(false);
+    const [newFaqItem, setNewFaqItem] = useState({
+        question: '',
+        answer: '',
+        sort_order: 0,
+        is_active: true
+    });
 
     const RichTextEditor = ({ value, onChange, placeholder }) => {
         const editorRef = useRef(null);
@@ -1239,6 +1247,7 @@ const Settings = () => {
         fetchCustomerPortalContents();
         fetchFlightAttemptNotifications();
         fetchOperationalSelections();
+        fetchFaqItems();
     }, []);
 
     const fetchVoucherCodes = async () => {
@@ -1504,6 +1513,20 @@ const Settings = () => {
             console.error('Error fetching operational selections:', error);
             setOperationalSelections([]);
             setOperationalFields([]);
+        }
+    };
+
+    const fetchFaqItems = async () => {
+        try {
+            const response = await axios.get('/api/booking-faq-items?includeInactive=true');
+            if (response.data?.success) {
+                setFaqItems(response.data.data || []);
+            } else {
+                setFaqItems([]);
+            }
+        } catch (error) {
+            console.error('Error fetching FAQ items:', error);
+            setFaqItems([]);
         }
     };
 
@@ -13492,6 +13515,184 @@ const Settings = () => {
                                                 >
                                                     Add
                                                 </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Booking FAQ Management Section */}
+            <div className="settings-card" style={{ marginBottom: '24px' }}>
+                <div
+                    className="card-header"
+                    onClick={() => setFaqExpanded(!faqExpanded)}
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '20px',
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0, color: '#1f2937' }}>Booking FAQ</h2>
+                        <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                            Manage questions and answers displayed in balloning-book Frequent Questions section.
+                        </p>
+                    </div>
+                    {faqExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                </div>
+
+                {faqExpanded && (
+                    <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '0 0 12px 12px' }}>
+                        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                            <h3 style={{ marginTop: 0, marginBottom: '12px', fontSize: '16px' }}>Add New FAQ</h3>
+                            <div style={{ display: 'grid', gap: '10px' }}>
+                                <input
+                                    type="text"
+                                    placeholder="Question"
+                                    value={newFaqItem.question}
+                                    onChange={(e) => setNewFaqItem((prev) => ({ ...prev, question: e.target.value }))}
+                                    style={{ padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                />
+                                <textarea
+                                    placeholder="Answer"
+                                    value={newFaqItem.answer}
+                                    onChange={(e) => setNewFaqItem((prev) => ({ ...prev, answer: e.target.value }))}
+                                    rows={4}
+                                    style={{ padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', resize: 'vertical' }}
+                                />
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <input
+                                        type="number"
+                                        placeholder="Sort order"
+                                        value={newFaqItem.sort_order}
+                                        onChange={(e) => setNewFaqItem((prev) => ({ ...prev, sort_order: Number(e.target.value || 0) }))}
+                                        style={{ width: '120px', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                    />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#374151' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={!!newFaqItem.is_active}
+                                            onChange={(e) => setNewFaqItem((prev) => ({ ...prev, is_active: e.target.checked }))}
+                                        />
+                                        Active
+                                    </label>
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={async () => {
+                                            if (!newFaqItem.question.trim() || !newFaqItem.answer.trim()) {
+                                                alert('Please enter both question and answer');
+                                                return;
+                                            }
+                                            try {
+                                                await axios.post('/api/booking-faq-items', {
+                                                    question: newFaqItem.question.trim(),
+                                                    answer: newFaqItem.answer.trim(),
+                                                    sort_order: Number(newFaqItem.sort_order || 0),
+                                                    is_active: !!newFaqItem.is_active
+                                                });
+                                                setNewFaqItem({ question: '', answer: '', sort_order: 0, is_active: true });
+                                                fetchFaqItems();
+                                            } catch (error) {
+                                                alert('Error creating FAQ item: ' + (error.response?.data?.message || error.message));
+                                            }
+                                        }}
+                                    >
+                                        <Plus size={16} />
+                                        Add FAQ
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {faqItems.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '24px', background: '#fff', border: '1px dashed #d1d5db', borderRadius: '8px', color: '#6b7280' }}>
+                                No FAQ items yet. Add your first question above.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gap: '12px' }}>
+                                {faqItems.map((item) => (
+                                    <div key={item.id} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '14px' }}>
+                                        <div style={{ display: 'grid', gap: '10px' }}>
+                                            <input
+                                                type="text"
+                                                value={item.question || ''}
+                                                onChange={(e) => setFaqItems((prev) => prev.map((f) => f.id === item.id ? { ...f, question: e.target.value } : f))}
+                                                style={{ padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                            />
+                                            <textarea
+                                                value={item.answer || ''}
+                                                onChange={(e) => setFaqItems((prev) => prev.map((f) => f.id === item.id ? { ...f, answer: e.target.value } : f))}
+                                                rows={4}
+                                                style={{ padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '6px', resize: 'vertical' }}
+                                            />
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                    <input
+                                                        type="number"
+                                                        value={Number(item.sort_order || 0)}
+                                                        onChange={(e) => setFaqItems((prev) => prev.map((f) => f.id === item.id ? { ...f, sort_order: Number(e.target.value || 0) } : f))}
+                                                        style={{ width: '110px', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                                    />
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#374151' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!item.is_active}
+                                                            onChange={(e) => setFaqItems((prev) => prev.map((f) => f.id === item.id ? { ...f, is_active: e.target.checked ? 1 : 0 } : f))}
+                                                        />
+                                                        Active
+                                                    </label>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button
+                                                        className="btn btn-primary"
+                                                        style={{ padding: '8px 12px' }}
+                                                        onClick={async () => {
+                                                            if (!String(item.question || '').trim() || !String(item.answer || '').trim()) {
+                                                                alert('Question and answer cannot be empty');
+                                                                return;
+                                                            }
+                                                            try {
+                                                                await axios.put(`/api/booking-faq-items/${item.id}`, {
+                                                                    question: String(item.question || '').trim(),
+                                                                    answer: String(item.answer || '').trim(),
+                                                                    sort_order: Number(item.sort_order || 0),
+                                                                    is_active: !!item.is_active
+                                                                });
+                                                                fetchFaqItems();
+                                                            } catch (error) {
+                                                                alert('Error updating FAQ item: ' + (error.response?.data?.message || error.message));
+                                                            }
+                                                        }}
+                                                    >
+                                                        Save
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-danger"
+                                                        style={{ padding: '8px 12px' }}
+                                                        onClick={async () => {
+                                                            if (!window.confirm('Delete this FAQ item?')) return;
+                                                            try {
+                                                                await axios.delete(`/api/booking-faq-items/${item.id}`);
+                                                                fetchFaqItems();
+                                                            } catch (error) {
+                                                                alert('Error deleting FAQ item: ' + (error.response?.data?.message || error.message));
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

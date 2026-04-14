@@ -27316,6 +27316,124 @@ app.delete('/api/customer-portal-contents/:id', (req, res) => {
     });
 });
 
+// Booking FAQ settings endpoints
+con.query(`
+    CREATE TABLE IF NOT EXISTS booking_faq_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        question VARCHAR(500) NOT NULL,
+        answer TEXT NOT NULL,
+        sort_order INT DEFAULT 0,
+        is_active TINYINT(1) DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_sort_order (sort_order),
+        INDEX idx_is_active (is_active)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+`, (err) => {
+    if (err) {
+        console.error('Error creating booking_faq_items table:', err);
+    } else {
+        console.log('booking_faq_items table ready');
+    }
+});
+
+// Get booking FAQ items (public + admin usage)
+app.get('/api/booking-faq-items', (req, res) => {
+    const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true';
+    const sql = includeInactive
+        ? 'SELECT * FROM booking_faq_items ORDER BY sort_order ASC, id ASC'
+        : 'SELECT * FROM booking_faq_items WHERE is_active = 1 ORDER BY sort_order ASC, id ASC';
+
+    con.query(sql, (err, results) => {
+        if (err) {
+            console.error('Error fetching booking FAQ items:', err);
+            return res.status(500).json({ success: false, message: 'Error fetching booking FAQ items' });
+        }
+        res.json({ success: true, data: results || [] });
+    });
+});
+
+// Create booking FAQ item
+app.post('/api/booking-faq-items', (req, res) => {
+    const { question, answer, sort_order, is_active } = req.body || {};
+    const trimmedQuestion = String(question || '').trim();
+    const trimmedAnswer = String(answer || '').trim();
+
+    if (!trimmedQuestion) {
+        return res.status(400).json({ success: false, message: 'Question is required' });
+    }
+    if (!trimmedAnswer) {
+        return res.status(400).json({ success: false, message: 'Answer is required' });
+    }
+
+    const sql = `
+        INSERT INTO booking_faq_items (question, answer, sort_order, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, NOW(), NOW())
+    `;
+    const values = [
+        trimmedQuestion,
+        trimmedAnswer,
+        Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0,
+        is_active === false || is_active === 0 || is_active === '0' ? 0 : 1,
+    ];
+
+    con.query(sql, values, (err, result) => {
+        if (err) {
+            console.error('Error creating booking FAQ item:', err);
+            return res.status(500).json({ success: false, message: 'Error creating booking FAQ item' });
+        }
+        res.json({ success: true, id: result.insertId });
+    });
+});
+
+// Update booking FAQ item
+app.put('/api/booking-faq-items/:id', (req, res) => {
+    const { id } = req.params;
+    const { question, answer, sort_order, is_active } = req.body || {};
+    const trimmedQuestion = String(question || '').trim();
+    const trimmedAnswer = String(answer || '').trim();
+
+    if (!trimmedQuestion) {
+        return res.status(400).json({ success: false, message: 'Question is required' });
+    }
+    if (!trimmedAnswer) {
+        return res.status(400).json({ success: false, message: 'Answer is required' });
+    }
+
+    const sql = `
+        UPDATE booking_faq_items
+        SET question = ?, answer = ?, sort_order = ?, is_active = ?, updated_at = NOW()
+        WHERE id = ?
+    `;
+    const values = [
+        trimmedQuestion,
+        trimmedAnswer,
+        Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0,
+        is_active === false || is_active === 0 || is_active === '0' ? 0 : 1,
+        id,
+    ];
+
+    con.query(sql, values, (err) => {
+        if (err) {
+            console.error('Error updating booking FAQ item:', err);
+            return res.status(500).json({ success: false, message: 'Error updating booking FAQ item' });
+        }
+        res.json({ success: true });
+    });
+});
+
+// Delete booking FAQ item
+app.delete('/api/booking-faq-items/:id', (req, res) => {
+    const { id } = req.params;
+    con.query('DELETE FROM booking_faq_items WHERE id = ?', [id], (err) => {
+        if (err) {
+            console.error('Error deleting booking FAQ item:', err);
+            return res.status(500).json({ success: false, message: 'Error deleting booking FAQ item' });
+        }
+        res.json({ success: true });
+    });
+});
+
 // Operational Selections endpoints
 // Create operational_selections table if it doesn't exist
 con.query(`
