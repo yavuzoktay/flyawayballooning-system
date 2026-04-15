@@ -214,12 +214,21 @@ const CustomerPortal = () => {
     const isFlightVoucherSection = Boolean(
         bookingData && isFlightVoucherBase && (!bookingVoucherRedeemed || forceVoucherView)
     );
+    const isCancelledLikeStatus = (status) => {
+        const normalizedStatus = String(status || '').trim().toLowerCase();
+        return (
+            normalizedStatus === 'cancelled' ||
+            normalizedStatus === 'canceled' ||
+            normalizedStatus === 'not scheduled' ||
+            normalizedStatus.includes('cancel')
+        );
+    };
     const getActiveFlightWindowState = (booking) => {
         const now = dayjs();
         const rawFlightDate = booking?.flight_date;
         const hasFlightDate = Boolean(rawFlightDate);
         const flightDate = hasFlightDate ? dayjs(rawFlightDate) : null;
-        const isCancelled = String(booking?.status || '').toLowerCase() === 'cancelled';
+        const isCancelled = isCancelledLikeStatus(booking?.status);
         const hasActiveBookedFlightDate = Boolean(flightDate && flightDate.isValid() && !isCancelled);
         const isFlightDatePassed = hasActiveBookedFlightDate ? flightDate.isBefore(now, 'day') : false;
         const hoursUntilFlight = hasActiveBookedFlightDate ? flightDate.diff(now, 'hour') : null;
@@ -982,7 +991,7 @@ const CustomerPortal = () => {
 
     const hasScheduledFlightDate = Boolean(
         bookingData?.status &&
-        String(bookingData.status).toLowerCase() !== 'cancelled' &&
+        !isCancelledLikeStatus(bookingData.status) &&
         bookingData?.flight_date
     );
     const inviteFriendsEnabled = Boolean(bookingData?.invite_friends?.enabled && hasScheduledFlightDate);
@@ -1301,7 +1310,7 @@ const CustomerPortal = () => {
                             <Typography variant="body2" color="text.secondary">Flight Date</Typography>
                             <Typography variant="body1" sx={{ fontWeight: 500, mb: 2 }}>
                                 {(() => {
-                                    if (bookingData.status && bookingData.status.toLowerCase() === 'cancelled') {
+                                    if (isCancelledLikeStatus(bookingData.status)) {
                                         return 'Not Scheduled';
                                     }
                                     if (bookingData.flight_date) {

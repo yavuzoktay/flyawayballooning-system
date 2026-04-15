@@ -22338,20 +22338,26 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
 
         const booking = bookingRows[0];
 
-        // Check if flight date is more than 120 hours away
-        // Skip this check if booking is cancelled or has no flight_date (Not Scheduled)
-        const isCancelled = booking.status && booking.status.toLowerCase() === 'cancelled';
-        const hasNoFlightDate = !booking.flight_date || booking.flight_date === null;
+        // The 120-hour rule only applies when the customer is changing an
+        // already-booked live flight. Cancelled / unscheduled bookings can
+        // book any future slot, including within the next 5 days.
+        const normalizedStatus = String(booking.status || '').trim().toLowerCase();
+        const isCancelledLike =
+            normalizedStatus === 'cancelled' ||
+            normalizedStatus === 'canceled' ||
+            normalizedStatus === 'not scheduled' ||
+            normalizedStatus.includes('cancel');
+        const hasActiveBookedFlightDate = Boolean(booking.flight_date && !isCancelledLike);
         
-        if (!isCancelled && !hasNoFlightDate) {
-            const newFlightDate = dayjs(flight_date);
+        if (hasActiveBookedFlightDate) {
+            const currentFlightDate = dayjs(booking.flight_date);
             const now = dayjs();
-            const hoursUntilFlight = newFlightDate.diff(now, 'hour');
+            const hoursUntilFlight = currentFlightDate.diff(now, 'hour');
 
             if (hoursUntilFlight <= 120) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Flight must be rescheduled at least 120 hours (5 days) in advance'
+                    message: 'Flights cannot be rescheduled within 120 hours (5 days) of the current booked flight date.'
                 });
             }
         }
@@ -22896,8 +22902,15 @@ app.patch('/api/customer-portal-change-location/:bookingId', async (req, res) =>
                 });
             }
 
-            // Check if current flight date is more than 120 hours away (5 days)
-            const oldFlightDate = booking.flight_date ? dayjs(booking.flight_date) : null;
+            // Only enforce the 120-hour rule when the booking still has an
+            // active scheduled flight attached to it.
+            const normalizedStatus = String(booking.status || '').trim().toLowerCase();
+            const isCancelledLike =
+                normalizedStatus === 'cancelled' ||
+                normalizedStatus === 'canceled' ||
+                normalizedStatus === 'not scheduled' ||
+                normalizedStatus.includes('cancel');
+            const oldFlightDate = booking.flight_date && !isCancelledLike ? dayjs(booking.flight_date) : null;
             if (oldFlightDate) {
                 const hoursUntilCurrentFlight = oldFlightDate.diff(now, 'hour');
                 if (hoursUntilCurrentFlight <= 120) {
