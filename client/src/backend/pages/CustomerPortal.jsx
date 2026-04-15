@@ -214,6 +214,28 @@ const CustomerPortal = () => {
     const isFlightVoucherSection = Boolean(
         bookingData && isFlightVoucherBase && (!bookingVoucherRedeemed || forceVoucherView)
     );
+    const getActiveFlightWindowState = (booking) => {
+        const now = dayjs();
+        const rawFlightDate = booking?.flight_date;
+        const hasFlightDate = Boolean(rawFlightDate);
+        const flightDate = hasFlightDate ? dayjs(rawFlightDate) : null;
+        const isCancelled = String(booking?.status || '').toLowerCase() === 'cancelled';
+        const hasActiveBookedFlightDate = Boolean(flightDate && flightDate.isValid() && !isCancelled);
+        const isFlightDatePassed = hasActiveBookedFlightDate ? flightDate.isBefore(now, 'day') : false;
+        const hoursUntilFlight = hasActiveBookedFlightDate ? flightDate.diff(now, 'hour') : null;
+        const isWithinFiveDayWindow = hasActiveBookedFlightDate ? hoursUntilFlight <= 120 : false;
+
+        return {
+            now,
+            hasFlightDate,
+            flightDate,
+            isCancelled,
+            hasActiveBookedFlightDate,
+            isFlightDatePassed,
+            hoursUntilFlight,
+            isWithinFiveDayWindow
+        };
+    };
     const inviteSectionPalette = {
         background: '#f4f5fb',
         border: '#e4e7f0',
@@ -1311,14 +1333,12 @@ const CustomerPortal = () => {
                                         : (bookingData.is_flight_voucher ? 'Not Scheduled' : 'TBD')}
                                 </Typography>
                                 {(() => {
-                                    const hasFlightDate = Boolean(bookingData.flight_date);
-                                    const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
-                                    const now = dayjs();
-                                    const isCancelled = bookingData.status && String(bookingData.status).toLowerCase() === 'cancelled';
-                                    const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
-                                    
-                                    // When cancelled, allow location changes because there is no active flight slot anymore.
-                                    const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
+                                    const {
+                                        now,
+                                        hasActiveBookedFlightDate,
+                                        isFlightDatePassed,
+                                        hoursUntilFlight
+                                    } = getActiveFlightWindowState(bookingData);
                                     
                                     // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
                                     const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
@@ -1330,8 +1350,8 @@ const CustomerPortal = () => {
                                     const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
                                     const shouldApplyRedeemedCheck = isFlightVoucherSection;
-                                    const flightRestrictions = isFlightDatePassed || hoursUntilFlight <= 120;
-                                    const isDisabled = changingLocation || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired || (!isCancelled && flightRestrictions);
+                                    const flightRestrictions = hasActiveBookedFlightDate && (isFlightDatePassed || hoursUntilFlight <= 120);
+                                    const isDisabled = changingLocation || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired || flightRestrictions;
                                     
                                     return (
                                         <Tooltip
@@ -1342,9 +1362,9 @@ const CustomerPortal = () => {
                                                         ? "Voucher has been redeemed. Location cannot be changed."
                                                         : isFullyRefunded
                                                             ? "Full refund has been processed. Location cannot be changed."
-                                                            : !isCancelled && isFlightDatePassed
+                                                            : hasActiveBookedFlightDate && isFlightDatePassed
                                                                 ? "Flight date has passed. Location cannot be changed."
-                                                                : !isCancelled && hoursUntilFlight <= 120
+                                                                : hasActiveBookedFlightDate && hoursUntilFlight <= 120
                                                                     ? "Less than 120 hours remaining until your flight"
                                                                     : ""
                                             }
@@ -1493,14 +1513,12 @@ const CustomerPortal = () => {
                                     })()}
                                 </Typography>
                                 {(() => {
-                                    const hasFlightDate = Boolean(bookingData.flight_date);
-                                    const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
-                                    const now = dayjs();
-                                    const isCancelled = bookingData.status && String(bookingData.status).toLowerCase() === 'cancelled';
-                                    const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
-                                    
-                                    // Calculate hours until flight for 120-hour rule (skip for cancelled - no active flight)
-                                    const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
+                                    const {
+                                        now,
+                                        hasActiveBookedFlightDate,
+                                        isFlightDatePassed,
+                                        hoursUntilFlight
+                                    } = getActiveFlightWindowState(bookingData);
                                     
                                     // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
                                     const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
@@ -1512,9 +1530,8 @@ const CustomerPortal = () => {
                                     const isFlightVoucherBase = bookingData.is_flight_voucher || bookFlight === 'flight voucher';
                                     const isFlightVoucherSection = isFlightVoucherBase && (!isVoucherRedeemed || forceVoucherView);
                                     const shouldApplyRedeemedCheck = isFlightVoucherSection;
-                                    // When cancelled, allow Extend (bypass flight-date/120h rules - no active flight)
-                                    const flightRestrictions = isFlightDatePassed || hoursUntilFlight <= 120;
-                                    const isDisabled = extendingVoucher || (!isCancelled && flightRestrictions);
+                                    const flightRestrictions = hasActiveBookedFlightDate && (isFlightDatePassed || hoursUntilFlight <= 120);
+                                    const isDisabled = extendingVoucher || flightRestrictions;
                                     
                                     const isExtendDisabled = isDisabled || isFullyRefunded || (isVoucherRedeemed && shouldApplyRedeemedCheck) || isExpired;
                                     
@@ -1527,9 +1544,9 @@ const CustomerPortal = () => {
                                                         ? "Voucher has been redeemed. Voucher cannot be extended."
                                                         : isFullyRefunded
                                                             ? "Full refund has been processed. Voucher cannot be extended."
-                                                            : !isCancelled && isFlightDatePassed
+                                                            : hasActiveBookedFlightDate && isFlightDatePassed
                                                                 ? "Flight date has passed. Voucher cannot be extended."
-                                                                : !isCancelled && hoursUntilFlight <= 120
+                                                                : hasActiveBookedFlightDate && hoursUntilFlight <= 120
                                                                     ? "Less than 120 hours remaining until your flight"
                                                                     : ""
                                             }
@@ -1573,17 +1590,13 @@ const CustomerPortal = () => {
 
                     {/* Action Buttons - Reschedule, Change Location, Cancel */}
                     {(() => {
-                        const hasFlightDate = Boolean(bookingData.flight_date);
-                        const flightDate = hasFlightDate ? dayjs(bookingData.flight_date) : null;
-                        const now = dayjs();
-                        const isCancelled = bookingData.status && bookingData.status.toLowerCase() === 'cancelled';
-
-                        // Check if flight date has passed (compare by day to avoid time-of-day edge cases)
-                        const isFlightDatePassed = flightDate ? flightDate.isBefore(now, 'day') : false;
-
-                        // If cancelled (admin side), allow customer to pick a new date/location immediately
-                        // by treating hoursUntilFlight as "far in future" when no upcoming flight is set.
-                        const hoursUntilFlight = flightDate ? flightDate.diff(now, 'hour') : 999999;
+                        const {
+                            now,
+                            isCancelled,
+                            hasActiveBookedFlightDate,
+                            isFlightDatePassed,
+                            isWithinFiveDayWindow
+                        } = getActiveFlightWindowState(bookingData);
 
                         // Check if expiry date has passed (compare by day to avoid time-of-day edge cases)
                         const expiryDate = bookingData.expires ? dayjs(bookingData.expires) : null;
@@ -1607,55 +1620,28 @@ const CustomerPortal = () => {
                         // If voucher is redeemed (Flight Voucher ONLY), disable Reschedule and Cancel buttons
                         // If fully refunded, disable Change, Extend, and Reschedule buttons
                         let canReschedule;
-                        let canChangeLocation;
                         let canCancel;
-                        let canResendConfirmation;
-                        let canExtendVoucher;
 
                         if (isExpired) {
                             canReschedule = false;
-                            canChangeLocation = false;
                             canCancel = false;
-                            canResendConfirmation = false;
-                            canExtendVoucher = false;
                         } else if (isFullyRefunded) {
                             // If fully refunded, disable Change, Extend, Reschedule, and Cancel buttons
                             canReschedule = false;
-                            canChangeLocation = false;
-                            canExtendVoucher = false;
                             canCancel = false;
-                            // Resend Confirmation can still be available
-                            canResendConfirmation = !resendingConfirmation;
                         } else if (isVoucherRedeemed && shouldApplyRedeemedCheck) {
                             // If voucher is redeemed AND this is a Flight Voucher section, disable Reschedule, Cancel, Change Location, and Extend buttons
                             // For regular bookings, redeemed status should NOT disable buttons
                             canReschedule = false;
                             canCancel = false;
-                            canChangeLocation = false;
-                            canExtendVoucher = false;
-                            // Resend Confirmation can still be available
-                            canResendConfirmation = !resendingConfirmation;
-                        } else if (isFlightDatePassed) {
-                            // If flight date has passed, disable Change Location and Extend Voucher
-                            canReschedule = isCancelled || hoursUntilFlight > 120;
-                            canChangeLocation = false; // Disabled if flight date passed
+                        } else if (hasActiveBookedFlightDate && isFlightDatePassed) {
+                            // Past scheduled flights cannot be managed from the portal.
+                            canReschedule = false;
                             canCancel = false; // Can't cancel past flights
-                            canResendConfirmation = !resendingConfirmation;
-                            canExtendVoucher = false; // Disabled if flight date passed
                         } else {
-                            // Normal (non-expired and flight date not passed) behaviour:
-                            // Reschedule disabled within 120 hours; cancelled overrides the window check
-                            canReschedule = isCancelled || hoursUntilFlight > 120;
-
-                            // Change Location disabled only if less than 120 hours; cancelled overrides the window check
-                            canChangeLocation = isCancelled || hoursUntilFlight > 120;
-
-                            // Cancel disabled if already cancelled or less than 120 hours
-                            canCancel = !isCancelled && hoursUntilFlight > 120;
-
-                            // Resend / Extend actions available while not in a loading state
-                            canResendConfirmation = !resendingConfirmation;
-                            canExtendVoucher = !extendingVoucher;
+                            // The 120-hour rule only applies while an active booked flight exists.
+                            canReschedule = !hasActiveBookedFlightDate || !isWithinFiveDayWindow;
+                            canCancel = hasActiveBookedFlightDate && !isWithinFiveDayWindow;
                         }
 
                         return (
@@ -1679,10 +1665,10 @@ const CustomerPortal = () => {
                                                     ? "Full refund has been processed. This booking cannot be rescheduled."
                                                 : (isVoucherRedeemed && shouldApplyRedeemedCheck)
                                                     ? "Voucher has been redeemed and cannot be rescheduled"
-                                                    : (!canReschedule 
-                                                        ? (isCancelled 
-                                                            ? "Flight cancelled - pick a new date"
-                                                            : "Less than 120 hours remaining until your flight")
+                                                    : (!canReschedule
+                                                        ? (hasActiveBookedFlightDate
+                                                            ? "Less than 120 hours remaining until your flight"
+                                                            : "")
                                                         : "")
                                         }
                                         arrow
@@ -1715,7 +1701,11 @@ const CustomerPortal = () => {
                                                     ? "Voucher has been redeemed and cannot be cancelled"
                                                 : (isCancelled
                                                     ? "Flight is cancelled"
-                                                    : (!canCancel ? "Less than 120 hours remaining until your flight" : ""))
+                                                    : (!canCancel
+                                                        ? (hasActiveBookedFlightDate
+                                                            ? "Less than 120 hours remaining until your flight"
+                                                            : "No flight is currently scheduled")
+                                                        : ""))
                                         }
                                         arrow
                                     >
