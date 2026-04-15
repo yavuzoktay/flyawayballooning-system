@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     Box,
     Grid,
@@ -102,6 +102,9 @@ const renderBookingNameWithIndicators = (name, { isNewtBooking = false } = {}) =
     </>
 );
 
+const MANIFEST_DATE_NOTE_AUTO_SAVE_DELAY_MS = 700;
+const normalizeManifestDateNoteValue = (value = '') => String(value || '').trim();
+
 const MemoizedEmailPreview = React.memo(
     ({ html, isMobile = false }) => {
         return (
@@ -202,6 +205,8 @@ const Manifest = () => {
     const [manifestDateNoteDraft, setManifestDateNoteDraft] = useState('');
     const [manifestDateNoteLoading, setManifestDateNoteLoading] = useState(false);
     const [manifestDateNoteSaving, setManifestDateNoteSaving] = useState(false);
+    const selectedDateRef = useRef(selectedDate);
+    const manifestDateNoteSaveSequenceRef = useRef(0);
     const [flights, setFlights] = useState([]);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedFlightId, setSelectedFlightId] = useState(null);
@@ -338,8 +343,14 @@ const Manifest = () => {
       setGlobalMenuAnchorEl(null);
       setGlobalMenuGroup(null);
     };
+    useEffect(() => {
+        selectedDateRef.current = selectedDate;
+    }, [selectedDate]);
+
     const fetchManifestDateNote = useCallback(async (dateToLoad) => {
-        if (!dateToLoad) {
+        const normalizedDateToLoad = String(dateToLoad || '').trim();
+
+        if (!normalizedDateToLoad) {
             setManifestDateNote('');
             setManifestDateNoteDraft('');
             return;
@@ -348,59 +359,94 @@ const Manifest = () => {
         setManifestDateNoteLoading(true);
         try {
             const response = await axios.get('/api/manifest/date-note', {
-                params: { date: dateToLoad }
+                params: { date: normalizedDateToLoad }
             });
+            if (selectedDateRef.current !== normalizedDateToLoad) {
+                return;
+            }
+
             const nextNote = response?.data?.success && response?.data?.data?.note
-                ? response.data.data.note
+                ? normalizeManifestDateNoteValue(response.data.data.note)
                 : '';
             setManifestDateNote(nextNote);
             setManifestDateNoteDraft(nextNote);
         } catch (error) {
             console.error('Error fetching manifest date note:', error);
+            if (selectedDateRef.current !== normalizedDateToLoad) {
+                return;
+            }
             setManifestDateNote('');
             setManifestDateNoteDraft('');
         } finally {
-            setManifestDateNoteLoading(false);
+            if (selectedDateRef.current === normalizedDateToLoad) {
+                setManifestDateNoteLoading(false);
+            }
         }
     }, []);
 
-    const handleSaveManifestDateNote = useCallback(async () => {
-        const trimmedNote = manifestDateNoteDraft.trim();
-        if (!selectedDate || !trimmedNote) return;
+    const persistManifestDateNote = useCallback(async (draftValue) => {
+        const targetDate = String(selectedDateRef.current || '').trim();
+        const normalizedDraft = normalizeManifestDateNoteValue(draftValue);
+        const normalizedSaved = normalizeManifestDateNoteValue(manifestDateNote);
+
+        if (!targetDate || normalizedDraft === normalizedSaved) {
+            return;
+        }
+
+        const requestSequence = manifestDateNoteSaveSequenceRef.current + 1;
+        manifestDateNoteSaveSequenceRef.current = requestSequence;
 
         setManifestDateNoteSaving(true);
         try {
+            if (!normalizedDraft) {
+                await axios.delete('/api/manifest/date-note', {
+                    params: { date: targetDate }
+                });
+
+                if (
+                    selectedDateRef.current === targetDate &&
+                    manifestDateNoteSaveSequenceRef.current === requestSequence
+                ) {
+                    setManifestDateNote('');
+                    setManifestDateNoteDraft((currentDraft) =>
+                        normalizeManifestDateNoteValue(currentDraft) ? currentDraft : ''
+                    );
+                }
+                return;
+            }
+
             await axios.put('/api/manifest/date-note', {
-                date: selectedDate,
-                note: trimmedNote
+                date: targetDate,
+                note: normalizedDraft
             });
-            setManifestDateNote(trimmedNote);
-            setManifestDateNoteDraft(trimmedNote);
+
+            if (
+                selectedDateRef.current === targetDate &&
+                manifestDateNoteSaveSequenceRef.current === requestSequence
+            ) {
+                setManifestDateNote(normalizedDraft);
+                setManifestDateNoteDraft((currentDraft) => {
+                    const normalizedCurrentDraft = normalizeManifestDateNoteValue(currentDraft);
+                    return normalizedCurrentDraft === normalizedDraft ? normalizedDraft : currentDraft;
+                });
+            }
         } catch (error) {
             console.error('Error saving manifest date note:', error);
             alert('Failed to save the date note. Please try again.');
         } finally {
-            setManifestDateNoteSaving(false);
+            if (
+                selectedDateRef.current === targetDate &&
+                manifestDateNoteSaveSequenceRef.current === requestSequence
+            ) {
+                setManifestDateNoteSaving(false);
+            }
         }
-    }, [manifestDateNoteDraft, selectedDate]);
+    }, [manifestDateNote]);
 
-    const handleDeleteManifestDateNote = useCallback(async () => {
-        if (!selectedDate) return;
-
-        setManifestDateNoteSaving(true);
-        try {
-            await axios.delete('/api/manifest/date-note', {
-                params: { date: selectedDate }
-            });
-            setManifestDateNote('');
-            setManifestDateNoteDraft('');
-        } catch (error) {
-            console.error('Error deleting manifest date note:', error);
-            alert('Failed to delete the date note. Please try again.');
-        } finally {
-            setManifestDateNoteSaving(false);
-        }
-    }, [selectedDate]);
+    const handleManifestDateNoteBlur = useCallback(() => {
+        if (manifestDateNoteLoading) return;
+        void persistManifestDateNote(manifestDateNoteDraft);
+    }, [manifestDateNoteDraft, manifestDateNoteLoading, persistManifestDateNote]);
 
     const openGroupMessageModalForAction = (mode = 'message') => {
         handleGlobalMenuClose();
@@ -2115,6 +2161,31 @@ const Manifest = () => {
     useEffect(() => {
         fetchManifestDateNote(selectedDate);
     }, [fetchManifestDateNote, selectedDate]);
+
+    useEffect(() => {
+        if (!selectedDate || manifestDateNoteLoading) {
+            return undefined;
+        }
+
+        const normalizedDraft = normalizeManifestDateNoteValue(manifestDateNoteDraft);
+        const normalizedSaved = normalizeManifestDateNoteValue(manifestDateNote);
+
+        if (normalizedDraft === normalizedSaved) {
+            return undefined;
+        }
+
+        const autoSaveTimer = window.setTimeout(() => {
+            void persistManifestDateNote(manifestDateNoteDraft);
+        }, MANIFEST_DATE_NOTE_AUTO_SAVE_DELAY_MS);
+
+        return () => window.clearTimeout(autoSaveTimer);
+    }, [
+        manifestDateNote,
+        manifestDateNoteDraft,
+        manifestDateNoteLoading,
+        persistManifestDateNote,
+        selectedDate
+    ]);
 
     // Hatalı veri durumunu kontrol et
     useEffect(() => {
@@ -4825,41 +4896,12 @@ const Manifest = () => {
                                         placeholder="Add a short reminder for this manifest date..."
                                         value={manifestDateNoteDraft}
                                         onChange={(event) => setManifestDateNoteDraft(event.target.value)}
-                                        disabled={manifestDateNoteLoading || manifestDateNoteSaving}
+                                        disabled={manifestDateNoteLoading}
+                                        onBlur={handleManifestDateNoteBlur}
+                                        inputProps={{
+                                            'aria-busy': manifestDateNoteSaving
+                                        }}
                                     />
-                                    <Box sx={{
-                                        display: 'flex',
-                                        flexWrap: 'wrap',
-                                        justifyContent: 'flex-end',
-                                        alignItems: 'center',
-                                        gap: 1.5,
-                                        mt: 1.5
-                                    }}>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                            {manifestDateNote ? (
-                                                <Button
-                                                    variant="outlined"
-                                                    color="error"
-                                                    onClick={handleDeleteManifestDateNote}
-                                                    disabled={manifestDateNoteSaving || manifestDateNoteLoading}
-                                                >
-                                                    Delete Note
-                                                </Button>
-                                            ) : null}
-                                            <Button
-                                                variant="contained"
-                                                onClick={handleSaveManifestDateNote}
-                                                disabled={
-                                                    manifestDateNoteLoading ||
-                                                    manifestDateNoteSaving ||
-                                                    !manifestDateNoteDraft.trim() ||
-                                                    manifestDateNoteDraft.trim() === manifestDateNote.trim()
-                                                }
-                                            >
-                                                {manifestDateNoteSaving ? 'Saving...' : (manifestDateNote ? 'Save Changes' : 'Save Note')}
-                                            </Button>
-                                        </Box>
-                                    </Box>
                                 </CardContent>
                             </Card>
                         </Box>
