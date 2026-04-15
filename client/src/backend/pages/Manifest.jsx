@@ -4817,28 +4817,6 @@ const Manifest = () => {
                         <Box sx={{ width: '100%', maxWidth: 760, mx: 'auto', mt: isMobile ? 1.5 : 2.5 }}>
                             <Card variant="outlined" sx={{ borderColor: '#dbe4f0', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)' }}>
                                 <CardContent sx={{ p: isMobile ? 2 : 2.5, '&:last-child': { pb: isMobile ? 2 : 2.5 } }}>
-                                    <Box sx={{
-                                        display: 'flex',
-                                        flexDirection: isMobile ? 'column' : 'row',
-                                        alignItems: isMobile ? 'flex-start' : 'center',
-                                        justifyContent: 'space-between',
-                                        gap: 1,
-                                        mb: 1.5
-                                    }}>
-                                        <Box>
-                                            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: isMobile ? '1rem' : '1.05rem' }}>
-                                                Date Manifest Note
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                This note stays on {dayjs(selectedDate).format('DD MMMM YYYY')} until you edit or delete it.
-                                            </Typography>
-                                        </Box>
-                                        {manifestDateNoteLoading && (
-                                            <Typography variant="caption" color="text.secondary">
-                                                Loading note...
-                                            </Typography>
-                                        )}
-                                    </Box>
                                     <TextField
                                         fullWidth
                                         multiline
@@ -4852,14 +4830,11 @@ const Manifest = () => {
                                     <Box sx={{
                                         display: 'flex',
                                         flexWrap: 'wrap',
-                                        justifyContent: 'space-between',
+                                        justifyContent: 'flex-end',
                                         alignItems: 'center',
                                         gap: 1.5,
                                         mt: 1.5
                                     }}>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Visible only on this date&apos;s manifest.
-                                        </Typography>
                                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                             {manifestDateNote ? (
                                                 <Button
