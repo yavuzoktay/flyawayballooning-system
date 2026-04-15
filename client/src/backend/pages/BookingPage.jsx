@@ -11199,7 +11199,6 @@ setBookingDetail(finalVoucherDetail);
                                                     sx={{
                                                         transform: isMobile ? 'scale(0.5)' : 'scale(0.75)',
                                                         transformOrigin: 'top center',
-                                                        width: isMobile ? '200%' : '133.33%',
                                                         width: isMobile ? '200%' : '100%',
                                                         overflow: 'visible',
                                                         marginBottom: isMobile ? '-50%' : '-25%',

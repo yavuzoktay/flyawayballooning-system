@@ -989,7 +989,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     }}
                     style={{
                         aspectRatio: '1 / 1',
-                        borderRadius: isMobile ? 6 : 10,
+                        borderRadius: isMobile ? 5 : 10,
                         background: isSelected
                             ? '#56C1FF'
                             : isPast
@@ -1025,8 +1025,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         zIndex: 1,
                         position: 'relative',
                         transition: 'all 0.2s ease',
-                        minHeight: '40px',
-                        padding: isMobile ? '2px' : '4px'
+                        minHeight: isMobile ? '36px' : '40px',
+                        minWidth: 0,
+                        width: '100%',
+                        padding: isMobile ? '1px' : '4px'
                     }}
                 >
                     <div style={{ fontSize: isMobile ? 11 : 13, lineHeight: 1.2, fontWeight: 700 }}>{d.date()}</div>
@@ -1461,9 +1463,9 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     borderRadius: 3,
                     maxHeight: isMobile ? '84vh' : '90vh',
                     ...(isMobile ? {
-                        margin: '8px',
-                        width: 'calc(100% - 16px)',
-                        maxWidth: 'calc(100% - 16px)'
+                        margin: '6px',
+                        width: 'calc(100% - 12px)',
+                        maxWidth: 'calc(100% - 12px)'
                     } : {})
                 }
             }}
@@ -1472,11 +1474,11 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                 fontWeight: 700, 
                 fontSize: isMobile ? 16 : 20, 
                 pb: 1.5,
-                padding: isMobile ? '12px 16px' : '20px 24px'
+                padding: isMobile ? '10px 12px' : '20px 24px'
             }}>
                 Reschedule Your Flight
             </DialogTitle>
-            <DialogContent sx={{ padding: isMobile ? '12px 16px 6px' : '24px' }}>
+            <DialogContent sx={{ padding: isMobile ? '10px 10px 6px' : '24px' }}>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                         {error}
@@ -1520,12 +1522,12 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         )}
 
                         {/* Calendar */}
-                        <Box sx={{ mb: 3, maxWidth: isMobile ? '100%' : '500px', mx: 'auto', px: isMobile ? 1 : 0 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
+                        <Box sx={{ mb: 3, width: '100%', maxWidth: isMobile ? '100%' : '500px', mx: 'auto', px: 0, overflowX: 'hidden' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5, px: isMobile ? 0.25 : 0 }}>
                                 <IconButton 
                                     onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} 
                                     size="small"
-                                    sx={{ padding: isMobile ? '4px' : '8px' }}
+                                    sx={{ padding: isMobile ? '2px' : '8px' }}
                                 >
                                     <ChevronLeftIcon fontSize={isMobile ? 'small' : 'medium'} />
                                 </IconButton>
@@ -1535,14 +1537,14 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 <IconButton 
                                     onClick={() => setCurrentMonth(prev => prev.add(1, 'month'))} 
                                     size="small"
-                                    sx={{ padding: isMobile ? '4px' : '8px' }}
+                                    sx={{ padding: isMobile ? '2px' : '8px' }}
                                 >
                                     <ChevronRightIcon fontSize={isMobile ? 'small' : 'medium'} />
                                 </IconButton>
                             </Box>
                             
                             {/* Calendar Grid */}
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '2px', mb: isMobile ? 0.5 : 1 }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '1px' : '2px', mb: isMobile ? 0.5 : 1, width: '100%' }}>
                                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                                     <div 
                                         key={day} 
@@ -1550,7 +1552,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                             textAlign: 'center', 
                                             fontWeight: 700, 
                                             color: '#64748b', 
-                                            fontSize: isMobile ? 9 : 11 
+                                            fontSize: isMobile ? 8 : 11,
+                                            minWidth: 0
                                         }}
                                     >
                                         {day}
@@ -1558,7 +1561,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ))}
                             </Box>
                             
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '2px' : '2px' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '1px' : '2px', width: '100%' }}>
                                 {buildDayCells()}
                             </Box>
                         </Box>
