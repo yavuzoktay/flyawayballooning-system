@@ -7706,8 +7706,8 @@ setBookingDetail(finalVoucherDetail);
                                     <Grid item xs={12} md={8}>
                                         <Box sx={{ background: '#fff', borderRadius: 2, p: 2, boxShadow: 1 }}>
                                             {/* Current Booking */}
-                                            <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                                                <Box>
+                                            <Box sx={{ mb: 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? 1 : 0 }}>
+                                                <Box sx={{ width: '100%', minWidth: 0 }}>
                                                     <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Current Booking</Typography>
                                                     {activeTab === 'vouchers' ? (
                                                         (() => {
@@ -7829,8 +7829,11 @@ setBookingDetail(finalVoucherDetail);
                                                     flexDirection: 'column',
                                                     flexWrap: 'nowrap',
                                                     gap: isMobile ? '10px' : 1, 
-                                                    minWidth: isMobile ? 'auto' : 140,
+                                                    minWidth: isMobile ? 0 : 140,
                                                     width: isMobile ? '100%' : 'auto',
+                                                    maxWidth: '100%',
+                                                    alignItems: 'stretch',
+                                                    flex: '0 0 auto',
                                                     background: isMobile ? 'transparent' : '#eef2ff',
                                                     borderRadius: isMobile ? 0 : 3,
                                                     padding: isMobile ? 0 : '10px',
@@ -7851,8 +7854,11 @@ setBookingDetail(finalVoucherDetail);
                                                                     borderRadius: 2.5, 
                                                                     fontWeight: 700, 
                                                                     textTransform: 'none',
-                                                                    flex: isMobile ? '1 1 100%' : 'none',
-                                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                                    flex: isMobile ? '0 0 auto' : 'none',
+                                                                    width: isMobile ? '100%' : 'auto',
+                                                                    minWidth: 0,
+                                                                    alignSelf: 'stretch',
+                                                                    justifyContent: 'center',
                                                                     fontSize: isMobile ? '12px' : '14px',
                                                                     padding: isMobile ? '6px 8px' : '8px 16px',
                                                                     background: '#2ECC71',
@@ -7874,8 +7880,11 @@ setBookingDetail(finalVoucherDetail);
                                                             borderRadius: 2.5, 
                                                             fontWeight: 700, 
                                                             textTransform: 'none',
-                                                            flex: isMobile ? '1 1 100%' : 'none',
-                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            flex: isMobile ? '0 0 auto' : 'none',
+                                                            width: isMobile ? '100%' : 'auto',
+                                                            minWidth: 0,
+                                                            alignSelf: 'stretch',
+                                                            justifyContent: 'center',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
                                                             background: '#1ABC9C',
@@ -7896,8 +7905,11 @@ setBookingDetail(finalVoucherDetail);
                                                             fontWeight: 700, 
                                                             textTransform: 'none', 
                                                             background: '#E74C3C',
-                                                            flex: isMobile ? '1 1 100%' : 'none',
-                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            flex: isMobile ? '0 0 auto' : 'none',
+                                                            width: isMobile ? '100%' : 'auto',
+                                                            minWidth: 0,
+                                                            alignSelf: 'stretch',
+                                                            justifyContent: 'center',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
                                                             '&:hover': {
@@ -7940,8 +7952,11 @@ setBookingDetail(finalVoucherDetail);
                                                                     textTransform: 'none', 
                                                                     background: '#3498DB',
                                                                     mb: isMobile ? 0 : 1,
-                                                                    flex: isMobile ? '1 1 100%' : 'none',
-                                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                                    flex: isMobile ? '0 0 auto' : 'none',
+                                                                    width: isMobile ? '100%' : 'auto',
+                                                                    minWidth: 0,
+                                                                    alignSelf: 'stretch',
+                                                                    justifyContent: 'center',
                                                                     fontSize: isMobile ? '12px' : '14px',
                                                                     padding: isMobile ? '6px 8px' : '8px 16px',
                                                                     '&:hover': {
@@ -7985,8 +8000,11 @@ setBookingDetail(finalVoucherDetail);
                                                             textTransform: 'none', 
                                                             background: '#5B6CFF',
                                                             mb: isMobile ? 0 : 1,
-                                                            flex: isMobile ? '1 1 100%' : 'none',
-                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            flex: isMobile ? '0 0 auto' : 'none',
+                                                            width: isMobile ? '100%' : 'auto',
+                                                            minWidth: 0,
+                                                            alignSelf: 'stretch',
+                                                            justifyContent: 'center',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
                                                             '&:hover': {
@@ -8008,8 +8026,11 @@ setBookingDetail(finalVoucherDetail);
                                                             background: '#8E44AD', 
                                                             mt: isMobile ? 0 : 1,
                                                             mb: isMobile ? 0 : 1,
-                                                            flex: isMobile ? '1 1 100%' : 'none',
-                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            flex: isMobile ? '0 0 auto' : 'none',
+                                                            width: isMobile ? '100%' : 'auto',
+                                                            minWidth: 0,
+                                                            alignSelf: 'stretch',
+                                                            justifyContent: 'center',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
                                                             '&:hover': {
@@ -8046,8 +8067,11 @@ setBookingDetail(finalVoucherDetail);
                                                             textTransform: 'none', 
                                                             background: '#7F8C8D', 
                                                             mt: isMobile ? 0 : 1,
-                                                            flex: isMobile ? '1 1 100%' : 'none',
-                                                            minWidth: isMobile ? 'auto' : 'auto',
+                                                            flex: isMobile ? '0 0 auto' : 'none',
+                                                            width: isMobile ? '100%' : 'auto',
+                                                            minWidth: 0,
+                                                            alignSelf: 'stretch',
+                                                            justifyContent: 'center',
                                                             fontSize: isMobile ? '12px' : '14px',
                                                             padding: isMobile ? '6px 8px' : '8px 16px',
                                                             '&:hover': {

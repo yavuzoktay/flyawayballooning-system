@@ -5687,8 +5687,8 @@ const Manifest = () => {
                                             <Table className="manifest-table">
                                                 <TableHead sx={{ marginTop: 2, background: "#d3d3d3", color: "#000" }}>
                                                     <TableRow>
-                                                        <TableCell sx={isMobile ? { width: '45px', minWidth: '45px', maxWidth: '45px', padding: '8px 2px', fontSize: '12px' } : {}}>Booking ID</TableCell>
-                                                        <TableCell sx={isMobile ? { minWidth: '120px', width: '120px', padding: '8px 4px', fontSize: '12px' } : {}}>Name</TableCell>
+                                                        <TableCell sx={isMobile ? { width: '74px', minWidth: '74px', maxWidth: '74px', padding: '8px 8px', fontSize: '12px', whiteSpace: 'nowrap' } : {}}>Booking ID</TableCell>
+                                                        <TableCell sx={isMobile ? { minWidth: '128px', width: '128px', padding: '8px 8px', fontSize: '12px', whiteSpace: 'nowrap' } : {}}>Name</TableCell>
                                                         <TableCell>Weight</TableCell>
                                                         <TableCell>Mobile</TableCell>
                                                         <TableCell>Email</TableCell>
@@ -5727,7 +5727,7 @@ const Manifest = () => {
                                                         })();
                                                         return (
                                                             <TableRow key={flight.id}>
-                                                                <TableCell sx={isMobile ? { width: '45px', minWidth: '45px', maxWidth: '45px', padding: '8px 2px' } : {}}>
+                                                                <TableCell sx={isMobile ? { width: '74px', minWidth: '74px', maxWidth: '74px', padding: '8px 8px', whiteSpace: 'nowrap' } : {}}>
                                                                     <span style={{ 
                                                                         color: '#3274b4', 
                                                                         cursor: 'pointer', 
@@ -5738,7 +5738,7 @@ const Manifest = () => {
                                                                         {flight.id || ''}
                                                                     </span>
                                                                 </TableCell>
-                                                                <TableCell sx={isMobile ? { minWidth: '120px', width: '120px', padding: '8px 4px' } : {}}>
+                                                                <TableCell sx={isMobile ? { minWidth: '128px', width: '128px', padding: '8px 8px' } : {}}>
                                                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', maxWidth: '100%' }}>
                                                                         <span style={{ 
                                                                             color: 'rgb(50, 116, 180)', 
@@ -6371,7 +6371,7 @@ const Manifest = () => {
                                     <Box sx={{ background: '#f8faff', borderRadius: 3, p: isMobile ? 1.5 : 2, border: '1px solid #dce2f7', boxShadow: 'none' }}>
                                         {/* Current Booking */}
                                         <Box sx={{ mb: isMobile ? 1 : 2, display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? 1 : 0 }}>
-                                            <Box sx={{ flex: 1 }}>
+                                            <Box sx={{ flex: 1, width: '100%', minWidth: 0 }}>
                                                 <Typography variant="h6" sx={{ fontWeight: 700, mb: isMobile ? 0.5 : 1, fontSize: isMobile ? '16px' : 'inherit' }}>Current Booking</Typography>
                                                 <Typography><b>Activity:</b> {bookingDetail.booking.experience || bookingDetail.booking.flight_type || '-'} - {bookingDetail.booking.location}</Typography>
                                                 {bookingDetail.booking.status !== 'Cancelled' && (
@@ -6448,8 +6448,11 @@ const Manifest = () => {
                                                 flexDirection: 'column',
                                                 flexWrap: 'nowrap',
                                                 gap: isMobile ? '10px' : 1, 
-                                                minWidth: isMobile ? 'auto' : 140,
+                                                minWidth: isMobile ? 0 : 140,
                                                 width: isMobile ? '100%' : 'auto',
+                                                maxWidth: '100%',
+                                                alignItems: 'stretch',
+                                                flex: '0 0 auto',
                                                 mt: isMobile ? 1 : 0,
                                                 background: isMobile ? 'transparent' : '#eef2ff',
                                                 borderRadius: isMobile ? 0 : 3,
@@ -6461,8 +6464,11 @@ const Manifest = () => {
                                                     borderRadius: 2.5, 
                                                     fontWeight: 700, 
                                                     textTransform: 'none',
-                                                    flex: isMobile ? '1 1 100%' : 'none',
-                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    flex: isMobile ? '0 0 auto' : 'none',
+                                                    width: isMobile ? '100%' : 'auto',
+                                                    minWidth: 0,
+                                                    alignSelf: 'stretch',
+                                                    justifyContent: 'center',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
                                                     background: '#2ECC71',
@@ -6475,8 +6481,11 @@ const Manifest = () => {
                                                     borderRadius: 2.5, 
                                                     fontWeight: 700, 
                                                     textTransform: 'none',
-                                                    flex: isMobile ? '1 1 100%' : 'none',
-                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    flex: isMobile ? '0 0 auto' : 'none',
+                                                    width: isMobile ? '100%' : 'auto',
+                                                    minWidth: 0,
+                                                    alignSelf: 'stretch',
+                                                    justifyContent: 'center',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
                                                     background: '#1ABC9C',
@@ -6490,8 +6499,11 @@ const Manifest = () => {
                                                     fontWeight: 700, 
                                                     textTransform: 'none', 
                                                     background: '#E74C3C',
-                                                    flex: isMobile ? '1 1 100%' : 'none',
-                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    flex: isMobile ? '0 0 auto' : 'none',
+                                                    width: isMobile ? '100%' : 'auto',
+                                                    minWidth: 0,
+                                                    alignSelf: 'stretch',
+                                                    justifyContent: 'center',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
                                                     '&:hover': {
@@ -6504,8 +6516,11 @@ const Manifest = () => {
                                                     textTransform: 'none', 
                                                     background: '#3498DB',
                                                     mb: isMobile ? 0 : 1,
-                                                    flex: isMobile ? '1 1 100%' : 'none',
-                                                    minWidth: isMobile ? 'auto' : 'auto',
+                                                    flex: isMobile ? '0 0 auto' : 'none',
+                                                    width: isMobile ? '100%' : 'auto',
+                                                    minWidth: 0,
+                                                    alignSelf: 'stretch',
+                                                    justifyContent: 'center',
                                                     fontSize: isMobile ? '12px' : '14px',
                                                     padding: isMobile ? '6px 8px' : '8px 16px',
                                                     '&:hover': {
@@ -6521,8 +6536,11 @@ const Manifest = () => {
                                                         textTransform: 'none', 
                                                         background: '#5B6CFF',
                                                         mb: isMobile ? 0 : 1,
-                                                        flex: isMobile ? '1 1 100%' : 'none',
-                                                        minWidth: isMobile ? 'auto' : 'auto',
+                                                        flex: isMobile ? '0 0 auto' : 'none',
+                                                        width: isMobile ? '100%' : 'auto',
+                                                        minWidth: 0,
+                                                        alignSelf: 'stretch',
+                                                        justifyContent: 'center',
                                                         fontSize: isMobile ? '12px' : '14px',
                                                         padding: isMobile ? '6px 8px' : '8px 16px',
                                                         '&:hover': {
@@ -6544,8 +6562,11 @@ const Manifest = () => {
                                                         background: '#8E44AD',
                                                         mt: isMobile ? 0 : 1,
                                                         mb: isMobile ? 0 : 1,
-                                                        flex: isMobile ? '1 1 100%' : 'none',
-                                                        minWidth: isMobile ? 'auto' : 'auto',
+                                                        flex: isMobile ? '0 0 auto' : 'none',
+                                                        width: isMobile ? '100%' : 'auto',
+                                                        minWidth: 0,
+                                                        alignSelf: 'stretch',
+                                                        justifyContent: 'center',
                                                         fontSize: isMobile ? '12px' : '14px',
                                                         padding: isMobile ? '6px 8px' : '8px 16px',
                                                         '&:hover': {
@@ -6573,8 +6594,11 @@ const Manifest = () => {
                                                         textTransform: 'none', 
                                                         background: '#7F8C8D',
                                                         mt: isMobile ? 0 : 1,
-                                                        flex: isMobile ? '1 1 100%' : 'none',
-                                                        minWidth: isMobile ? 'auto' : 'auto',
+                                                        flex: isMobile ? '0 0 auto' : 'none',
+                                                        width: isMobile ? '100%' : 'auto',
+                                                        minWidth: 0,
+                                                        alignSelf: 'stretch',
+                                                        justifyContent: 'center',
                                                         fontSize: isMobile ? '12px' : '14px',
                                                         padding: isMobile ? '6px 8px' : '8px 16px',
                                                         '&:hover': {
