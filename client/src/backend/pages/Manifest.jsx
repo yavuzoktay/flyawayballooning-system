@@ -198,6 +198,10 @@ const Manifest = () => {
             setSelectedDate(dateParam);
         }
     }, []);
+    const [manifestDateNote, setManifestDateNote] = useState('');
+    const [manifestDateNoteDraft, setManifestDateNoteDraft] = useState('');
+    const [manifestDateNoteLoading, setManifestDateNoteLoading] = useState(false);
+    const [manifestDateNoteSaving, setManifestDateNoteSaving] = useState(false);
     const [flights, setFlights] = useState([]);
     const [menuAnchorEl, setMenuAnchorEl] = useState(null);
     const [selectedFlightId, setSelectedFlightId] = useState(null);
@@ -334,6 +338,70 @@ const Manifest = () => {
       setGlobalMenuAnchorEl(null);
       setGlobalMenuGroup(null);
     };
+    const fetchManifestDateNote = useCallback(async (dateToLoad) => {
+        if (!dateToLoad) {
+            setManifestDateNote('');
+            setManifestDateNoteDraft('');
+            return;
+        }
+
+        setManifestDateNoteLoading(true);
+        try {
+            const response = await axios.get('/api/manifest/date-note', {
+                params: { date: dateToLoad }
+            });
+            const nextNote = response?.data?.success && response?.data?.data?.note
+                ? response.data.data.note
+                : '';
+            setManifestDateNote(nextNote);
+            setManifestDateNoteDraft(nextNote);
+        } catch (error) {
+            console.error('Error fetching manifest date note:', error);
+            setManifestDateNote('');
+            setManifestDateNoteDraft('');
+        } finally {
+            setManifestDateNoteLoading(false);
+        }
+    }, []);
+
+    const handleSaveManifestDateNote = useCallback(async () => {
+        const trimmedNote = manifestDateNoteDraft.trim();
+        if (!selectedDate || !trimmedNote) return;
+
+        setManifestDateNoteSaving(true);
+        try {
+            await axios.put('/api/manifest/date-note', {
+                date: selectedDate,
+                note: trimmedNote
+            });
+            setManifestDateNote(trimmedNote);
+            setManifestDateNoteDraft(trimmedNote);
+        } catch (error) {
+            console.error('Error saving manifest date note:', error);
+            alert('Failed to save the date note. Please try again.');
+        } finally {
+            setManifestDateNoteSaving(false);
+        }
+    }, [manifestDateNoteDraft, selectedDate]);
+
+    const handleDeleteManifestDateNote = useCallback(async () => {
+        if (!selectedDate) return;
+
+        setManifestDateNoteSaving(true);
+        try {
+            await axios.delete('/api/manifest/date-note', {
+                params: { date: selectedDate }
+            });
+            setManifestDateNote('');
+            setManifestDateNoteDraft('');
+        } catch (error) {
+            console.error('Error deleting manifest date note:', error);
+            alert('Failed to delete the date note. Please try again.');
+        } finally {
+            setManifestDateNoteSaving(false);
+        }
+    }, [selectedDate]);
+
     const openGroupMessageModalForAction = (mode = 'message') => {
         handleGlobalMenuClose();
         if (!globalMenuGroupFlights || globalMenuGroupFlights.length === 0) {
@@ -2043,6 +2111,10 @@ const Manifest = () => {
             fetchAvailabilitiesForDate(selectedDate);
         }
     }, [selectedDate]); // Only when selectedDate changes
+
+    useEffect(() => {
+        fetchManifestDateNote(selectedDate);
+    }, [fetchManifestDateNote, selectedDate]);
 
     // Hatalı veri durumunu kontrol et
     useEffect(() => {
@@ -4741,6 +4813,80 @@ const Manifest = () => {
                                     </IconButton>
                                 </>
                             )}
+                        </Box>
+                        <Box sx={{ width: '100%', maxWidth: 760, mx: 'auto', mt: isMobile ? 1.5 : 2.5 }}>
+                            <Card variant="outlined" sx={{ borderColor: '#dbe4f0', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)' }}>
+                                <CardContent sx={{ p: isMobile ? 2 : 2.5, '&:last-child': { pb: isMobile ? 2 : 2.5 } }}>
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexDirection: isMobile ? 'column' : 'row',
+                                        alignItems: isMobile ? 'flex-start' : 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 1,
+                                        mb: 1.5
+                                    }}>
+                                        <Box>
+                                            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: isMobile ? '1rem' : '1.05rem' }}>
+                                                Date Manifest Note
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                This note stays on {dayjs(selectedDate).format('DD MMMM YYYY')} until you edit or delete it.
+                                            </Typography>
+                                        </Box>
+                                        {manifestDateNoteLoading && (
+                                            <Typography variant="caption" color="text.secondary">
+                                                Loading note...
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                    <TextField
+                                        fullWidth
+                                        multiline
+                                        minRows={2}
+                                        maxRows={5}
+                                        placeholder="Add a short reminder for this manifest date..."
+                                        value={manifestDateNoteDraft}
+                                        onChange={(event) => setManifestDateNoteDraft(event.target.value)}
+                                        disabled={manifestDateNoteLoading || manifestDateNoteSaving}
+                                    />
+                                    <Box sx={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: 1.5,
+                                        mt: 1.5
+                                    }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Visible only on this date&apos;s manifest.
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                            {manifestDateNote ? (
+                                                <Button
+                                                    variant="outlined"
+                                                    color="error"
+                                                    onClick={handleDeleteManifestDateNote}
+                                                    disabled={manifestDateNoteSaving || manifestDateNoteLoading}
+                                                >
+                                                    Delete Note
+                                                </Button>
+                                            ) : null}
+                                            <Button
+                                                variant="contained"
+                                                onClick={handleSaveManifestDateNote}
+                                                disabled={
+                                                    manifestDateNoteLoading ||
+                                                    manifestDateNoteSaving ||
+                                                    !manifestDateNoteDraft.trim() ||
+                                                    manifestDateNoteDraft.trim() === manifestDateNote.trim()
+                                                }
+                                            >
+                                                {manifestDateNoteSaving ? 'Saving...' : (manifestDateNote ? 'Save Changes' : 'Save Note')}
+                                            </Button>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
                         </Box>
                     </Box>
 

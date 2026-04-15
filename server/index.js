@@ -16,7 +16,6 @@ const { BALLOON_210_CAPACITY, BALLOON_105_CAPACITY, getAssignedResourceInfo } = 
 const { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, findAndDeleteCalendarEventByDetails, setSaveErrorLog } = require('./utils/googleCalendar');
 const { sendConversion: sendGoogleAdsConversion, setSaveErrorLog: setGoogleAdsSaveErrorLog } = require('./utils/googleAdsConversion');
 const multer = require('multer');
-const dotenv = require('dotenv');
 const axios = require('axios');
 const sgMail = require('@sendgrid/mail');
 const nodemailer = require('nodemailer');
@@ -24,7 +23,6 @@ const { EventWebhook, EventWebhookHeader } = require('@sendgrid/eventwebhook');
 const Twilio = require('twilio');
 const { parsePassengerList, derivePaidAmount } = require('./lib/voucherMetrics');
 const PDFDocument = require('pdfkit');
-dotenv.config();
 
 // Optional: silence verbose console.log output (keeps warn/error)
 if (process.env.SILENCE_VERBOSE_LOGS === 'true') {
@@ -7379,9 +7377,7 @@ const con = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0,
     multipleStatements: true,
-    connectTimeout: 60000, // 60 seconds connection timeout
-    acquireTimeout: 60000, // 60 seconds to acquire connection from pool
-    timeout: 60000 // 60 seconds query timeout
+    connectTimeout: 60000 // 60 seconds connection timeout
 });
 
 // Handle connection errors and reconnection
@@ -13613,6 +13609,101 @@ app.get("/api/getAdminNotes", (req, res) => {
             return res.status(500).send({ error: "Failed to fetch notes" });
         }
         res.status(200).send({ notes: results });
+    });
+});
+
+// Manifest date notes are attached to the date only (not a specific booking or slot).
+app.get('/api/manifest/date-note', (req, res) => {
+    const manifestDate = String(req.query?.date || '').trim();
+
+    if (!manifestDate) {
+        return res.status(400).json({ success: false, message: 'Date is required' });
+    }
+
+    const sql = `
+        SELECT manifest_date, note, updated_at
+        FROM manifest_date_notes
+        WHERE manifest_date = ?
+        LIMIT 1
+    `;
+
+    con.query(sql, [manifestDate], (err, rows) => {
+        if (err) {
+            console.error('Error fetching manifest date note:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+
+        const noteRow = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+
+        res.json({
+            success: true,
+            data: noteRow
+                ? {
+                    date: noteRow.manifest_date,
+                    note: noteRow.note,
+                    updated_at: noteRow.updated_at
+                }
+                : null
+        });
+    });
+});
+
+app.put('/api/manifest/date-note', (req, res) => {
+    const manifestDate = String(req.body?.date || '').trim();
+    const note = String(req.body?.note || '').trim();
+
+    if (!manifestDate) {
+        return res.status(400).json({ success: false, message: 'Date is required' });
+    }
+
+    if (!note) {
+        return res.status(400).json({ success: false, message: 'Note is required' });
+    }
+
+    const sql = `
+        INSERT INTO manifest_date_notes (manifest_date, note)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE
+            note = VALUES(note),
+            updated_at = CURRENT_TIMESTAMP
+    `;
+
+    con.query(sql, [manifestDate, note], (err) => {
+        if (err) {
+            console.error('Error saving manifest date note:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+
+        res.json({
+            success: true,
+            message: 'Manifest date note saved successfully',
+            data: {
+                date: manifestDate,
+                note
+            }
+        });
+    });
+});
+
+app.delete('/api/manifest/date-note', (req, res) => {
+    const manifestDate = String(req.query?.date || '').trim();
+
+    if (!manifestDate) {
+        return res.status(400).json({ success: false, message: 'Date is required' });
+    }
+
+    const sql = 'DELETE FROM manifest_date_notes WHERE manifest_date = ?';
+
+    con.query(sql, [manifestDate], (err) => {
+        if (err) {
+            console.error('Error deleting manifest date note:', err);
+            return res.status(500).json({ success: false, message: 'Database error', error: err });
+        }
+
+        res.json({
+            success: true,
+            message: 'Manifest date note deleted successfully'
+        });
     });
 });
 
@@ -24805,6 +24896,188 @@ app.get('/api/locationPricing/:location', (req, res) => {
     });
 });
 
+const normalizeAvailabilityTypeValue = (value) =>
+    String(value === null || value === undefined ? '' : value).trim().toLowerCase();
+
+const isAvailabilityAllToken = (value) =>
+    normalizeAvailabilityTypeValue(value) === 'all';
+
+const parseAvailabilityTypeList = (value, options = {}) => {
+    const { preserveAll = false } = options;
+
+    const normalizeArray = (items) =>
+        items
+            .map((item) => String(item === null || item === undefined ? '' : item).trim())
+            .filter(Boolean)
+            .filter((item) => preserveAll || !isAvailabilityAllToken(item));
+
+    if (Array.isArray(value)) {
+        return normalizeArray(value);
+    }
+
+    if (value === null || value === undefined) {
+        return [];
+    }
+
+    const str = String(value).trim();
+    if (!str) return [];
+    if (isAvailabilityAllToken(str)) {
+        return preserveAll ? ['All'] : [];
+    }
+
+    return normalizeArray(str.split(','));
+};
+
+const serializeAvailabilityTypeList = (values) => {
+    const seen = new Set();
+    const unique = [];
+
+    parseAvailabilityTypeList(values).forEach((value) => {
+        const normalized = normalizeAvailabilityTypeValue(value);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        unique.push(value);
+    });
+
+    return unique.length ? unique.join(',') : null;
+};
+
+const availabilityTypeListContains = (values, candidate) => {
+    const normalizedCandidate = normalizeAvailabilityTypeValue(candidate);
+    if (!normalizedCandidate) return false;
+
+    return parseAvailabilityTypeList(values, { preserveAll: true }).some((value) => {
+        const normalizedValue = normalizeAvailabilityTypeValue(value);
+        if (!normalizedValue) return false;
+        return (
+            normalizedValue === normalizedCandidate ||
+            normalizedValue.includes(normalizedCandidate) ||
+            normalizedCandidate.includes(normalizedValue)
+        );
+    });
+};
+
+const addAvailabilityTypeToList = (values, candidate) => {
+    if (!candidate) return [...values];
+    if (availabilityTypeListContains(values, candidate)) {
+        return [...values];
+    }
+
+    return [...values, candidate];
+};
+
+const removeAvailabilityTypeFromList = (values, candidate) => {
+    const normalizedCandidate = normalizeAvailabilityTypeValue(candidate);
+    if (!normalizedCandidate) return [...values];
+
+    return values.filter((value) => {
+        const normalizedValue = normalizeAvailabilityTypeValue(value);
+        return !(
+            normalizedValue === normalizedCandidate ||
+            normalizedValue.includes(normalizedCandidate) ||
+            normalizedCandidate.includes(normalizedValue)
+        );
+    });
+};
+
+const AVAILABILITY_EXPERIENCE_VISIBILITY_CONFIG = [
+    {
+        aliases: ['private charter'],
+        target: 'voucher',
+        value: 'Private Charter',
+        label: 'Private Charter'
+    },
+    {
+        aliases: ['proposal flight', 'proposal'],
+        target: 'voucher',
+        value: 'Proposal Flight',
+        label: 'Proposal'
+    },
+    {
+        aliases: ['shared flight', 'shared'],
+        target: 'flight',
+        value: 'Shared',
+        label: 'Shared'
+    },
+    {
+        aliases: ['private flight', 'private'],
+        target: 'flight',
+        value: 'Private',
+        label: 'Private'
+    }
+];
+
+const resolveAvailabilityExperienceVisibilityConfig = (experienceType) => {
+    const normalizedExperienceType = normalizeAvailabilityTypeValue(experienceType);
+    if (!normalizedExperienceType) return null;
+
+    return (
+        AVAILABILITY_EXPERIENCE_VISIBILITY_CONFIG.find((entry) =>
+            entry.aliases.some((alias) => normalizedExperienceType === alias)
+        ) || null
+    );
+};
+
+const applyExperienceTypesToAvailabilityHiddenLists = ({
+    currentHiddenFlightTypes,
+    currentHiddenVoucherTypes,
+    experienceTypes,
+    action
+}) => {
+    let nextHiddenFlightTypes = parseAvailabilityTypeList(currentHiddenFlightTypes);
+    let nextHiddenVoucherTypes = parseAvailabilityTypeList(currentHiddenVoucherTypes);
+
+    (Array.isArray(experienceTypes) ? experienceTypes : []).forEach((experienceType) => {
+        const config = resolveAvailabilityExperienceVisibilityConfig(experienceType);
+        if (!config) return;
+
+        if (config.target === 'flight') {
+            nextHiddenFlightTypes =
+                action === 'show'
+                    ? removeAvailabilityTypeFromList(nextHiddenFlightTypes, config.value)
+                    : addAvailabilityTypeToList(nextHiddenFlightTypes, config.value);
+        } else if (config.target === 'voucher') {
+            nextHiddenVoucherTypes =
+                action === 'show'
+                    ? removeAvailabilityTypeFromList(nextHiddenVoucherTypes, config.value)
+                    : addAvailabilityTypeToList(nextHiddenVoucherTypes, config.value);
+        }
+    });
+
+    return {
+        hiddenFlightTypes: serializeAvailabilityTypeList(nextHiddenFlightTypes),
+        hiddenVoucherTypes: serializeAvailabilityTypeList(nextHiddenVoucherTypes)
+    };
+};
+
+const pruneHiddenAvailabilityTypes = ({
+    flightTypes,
+    voucherTypes,
+    hiddenFlightTypes,
+    hiddenVoucherTypes
+}) => {
+    const nextHiddenFlightTypes = parseAvailabilityTypeList(hiddenFlightTypes).filter((type) => {
+        if (isAvailabilityAllToken(flightTypes)) return true;
+        return availabilityTypeListContains(flightTypes, type);
+    });
+
+    const nextHiddenVoucherTypes = parseAvailabilityTypeList(hiddenVoucherTypes).filter((type) => {
+        if (isAvailabilityAllToken(voucherTypes)) return true;
+        return availabilityTypeListContains(voucherTypes, type);
+    });
+
+    return {
+        hiddenFlightTypes: serializeAvailabilityTypeList(nextHiddenFlightTypes),
+        hiddenVoucherTypes: serializeAvailabilityTypeList(nextHiddenVoucherTypes)
+    };
+};
+
+const subtractHiddenAvailabilityTypes = (visibleValues, hiddenValues) =>
+    parseAvailabilityTypeList(visibleValues, { preserveAll: true }).filter((value) => {
+        if (isAvailabilityAllToken(value)) return true;
+        return !availabilityTypeListContains(hiddenValues, value);
+    });
+
 // Create Availabilities for an activity
 app.post('/api/activity/:id/availabilities', (req, res) => {
     const { id } = req.params;
@@ -25115,6 +25388,8 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 : Math.min(Number(row.capacity) || BALLOON_210_CAPACITY, BALLOON_210_CAPACITY);
             const sharedBooked = Number(row.shared_consumed_pax || 0);
             const privateSmallBookings = Number(row.private_charter_small_bookings || 0);
+            const hiddenFlightTypesArray = parseAvailabilityTypeList(row.hidden_flight_types);
+            const hiddenVoucherTypesArray = parseAvailabilityTypeList(row.hidden_voucher_types);
             const locationName = normalizeLocationValue(row.location);
             const assignedBalloon210Location = normalizeLocationValue(row.assigned_balloon210_location);
             const assignedBalloon105Location = normalizeLocationValue(row.assigned_balloon105_location);
@@ -25161,7 +25436,9 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
                 balloon210_locked: balloon210Locked,
                 private_charter_small_bookings: privateSmallBookings,
                 private_charter_small_remaining: privateSmallRemaining,
-                private_charter_small_passengers: Number(row.private_charter_small_passengers || 0)
+                private_charter_small_passengers: Number(row.private_charter_small_passengers || 0),
+                hidden_flight_types_array: hiddenFlightTypesArray,
+                hidden_voucher_types_array: hiddenVoucherTypesArray
             };
         });
 
@@ -25339,6 +25616,13 @@ app.get('/api/availabilities/filter', (req, res) => {
         }
     }
 
+    const requestedFlightTypes = normalizedFlightType && normalizedFlightType !== 'All'
+        ? parseAvailabilityTypeList(normalizedFlightType)
+        : [];
+    const requestedVoucherTypes = voucherTypes && voucherTypes !== 'All'
+        ? parseAvailabilityTypeList(voucherTypes)
+        : [];
+
     if (normalizedFlightType && normalizedFlightType !== 'All') {
         sql += ` AND (aa.flight_types = 'All' OR aa.flight_types = ? OR FIND_IN_SET(?, aa.flight_types) > 0)`;
         params.push(normalizedFlightType, normalizedFlightType);
@@ -25444,8 +25728,41 @@ app.get('/api/availabilities/filter', (req, res) => {
                 }
             }
 
-            const voucherTypesArray = parseList(row.voucher_types);
-            const flightTypesArray = parseList(row.flight_types);
+            const rawVoucherTypesArray = parseAvailabilityTypeList(row.voucher_types, { preserveAll: true });
+            const rawFlightTypesArray = parseAvailabilityTypeList(row.flight_types, { preserveAll: true });
+            const hiddenVoucherTypesArray = parseAvailabilityTypeList(row.hidden_voucher_types);
+            const hiddenFlightTypesArray = parseAvailabilityTypeList(row.hidden_flight_types);
+            const voucherTypesAreAll = rawVoucherTypesArray.length === 1 && isAvailabilityAllToken(rawVoucherTypesArray[0]);
+            const flightTypesAreAll = rawFlightTypesArray.length === 1 && isAvailabilityAllToken(rawFlightTypesArray[0]);
+            const visibleVoucherTypesArray = voucherTypesAreAll
+                ? rawVoucherTypesArray
+                : subtractHiddenAvailabilityTypes(rawVoucherTypesArray, hiddenVoucherTypesArray);
+            const visibleFlightTypesArray = flightTypesAreAll
+                ? rawFlightTypesArray
+                : subtractHiddenAvailabilityTypes(rawFlightTypesArray, hiddenFlightTypesArray);
+            const requestedFlightTypeIsHidden =
+                requestedFlightTypes.length > 0 &&
+                requestedFlightTypes.some((requestedType) =>
+                    availabilityTypeListContains(hiddenFlightTypesArray, requestedType)
+                );
+            const requestedVoucherTypeIsHidden =
+                requestedVoucherTypes.length > 0 &&
+                requestedVoucherTypes.some((requestedType) =>
+                    availabilityTypeListContains(hiddenVoucherTypesArray, requestedType)
+                );
+            const hasNoVisibleConfiguredFlightTypes =
+                !flightTypesAreAll &&
+                rawFlightTypesArray.length > 0 &&
+                visibleFlightTypesArray.length === 0;
+            const hasNoVisibleConfiguredVoucherTypes =
+                !voucherTypesAreAll &&
+                rawVoucherTypesArray.length > 0 &&
+                visibleVoucherTypesArray.length === 0;
+            const excludeFromBooking =
+                requestedFlightTypeIsHidden ||
+                requestedVoucherTypeIsHidden ||
+                (hasNoVisibleConfiguredFlightTypes &&
+                    (rawVoucherTypesArray.length === 0 || hasNoVisibleConfiguredVoucherTypes));
 
             const sharedCapacity = row.shared_capacity
                 ? Number(row.shared_capacity)
@@ -25498,10 +25815,23 @@ app.get('/api/availabilities/filter', (req, res) => {
                 private_charter_small_bookings: privateSmallBookings,
                 private_charter_small_remaining: privateSmallRemaining,
                 private_charter_small_passengers: Number(row.private_charter_small_passengers || 0),
-                voucher_types_array: voucherTypesArray,
-                flight_types_array: flightTypesArray
+                voucher_types: voucherTypesAreAll
+                    ? row.voucher_types
+                    : (serializeAvailabilityTypeList(visibleVoucherTypesArray) || ''),
+                flight_types: flightTypesAreAll
+                    ? row.flight_types
+                    : (serializeAvailabilityTypeList(visibleFlightTypesArray) || ''),
+                voucher_types_array: visibleVoucherTypesArray,
+                flight_types_array: visibleFlightTypesArray,
+                hidden_voucher_types_array: hiddenVoucherTypesArray,
+                hidden_flight_types_array: hiddenFlightTypesArray,
+                _excludeFromBooking: excludeFromBooking
             };
         });
+
+        const bookingVisibleResult = normalizedResult
+            .filter((row) => !row._excludeFromBooking)
+            .map(({ _excludeFromBooking, ...row }) => row);
 
         const processingEndTime = Date.now();
         const processingDuration = processingEndTime - processingStartTime;
@@ -25514,7 +25844,7 @@ app.get('/api/availabilities/filter', (req, res) => {
                 activityId,
                 flightType,
                 voucherTypes,
-                count: normalizedResult.length,
+                count: bookingVisibleResult.length,
                 queryDuration,
                 processingDuration,
                 totalDuration
@@ -25523,7 +25853,7 @@ app.get('/api/availabilities/filter', (req, res) => {
 
         // Set cache headers for better performance
         res.setHeader('Cache-Control', 'private, max-age=60'); // Cache for 60 seconds
-        return res.json({ success: true, data: normalizedResult || [] });
+        return res.json({ success: true, data: bookingVisibleResult || [] });
     });
 });
 
@@ -25691,25 +26021,135 @@ app.patch('/api/availability/:id/flight-types', (req, res) => {
         return res.status(400).json({ success: false, message: 'No fields to update' });
     }
 
-    values.push(id);
+    const selectSql = `
+        SELECT id, hidden_flight_types, hidden_voucher_types, flight_types, voucher_types
+        FROM activity_availability
+        WHERE id = ?
+        LIMIT 1
+    `;
 
-    const sql = `UPDATE activity_availability SET ${updates.join(', ')} WHERE id = ?`;
-    
-    con.query(sql, values, (err, result) => {
-        if (err) {
-            console.error('Error updating availability flight types:', err);
-            return res.status(500).json({ success: false, message: 'Database error', error: err });
+    con.query(selectSql, [id], (selectErr, rows) => {
+        if (selectErr) {
+            console.error('Error loading availability before flight type update:', selectErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: selectErr });
         }
 
-        if (result.affectedRows === 0) {
+        if (!rows || rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Availability not found' });
         }
 
-        res.json({
-            success: true,
-            message: 'Availability flight types updated successfully',
-            data: { id, flight_types, voucher_types }
+        const currentAvailability = rows[0];
+        const nextFlightTypes = flight_types !== undefined ? flight_types : currentAvailability.flight_types;
+        const nextVoucherTypes = voucher_types !== undefined ? voucher_types : currentAvailability.voucher_types;
+        const prunedHiddenTypes = pruneHiddenAvailabilityTypes({
+            flightTypes: nextFlightTypes,
+            voucherTypes: nextVoucherTypes,
+            hiddenFlightTypes: currentAvailability.hidden_flight_types,
+            hiddenVoucherTypes: currentAvailability.hidden_voucher_types
         });
+
+        updates.push('hidden_flight_types = ?');
+        values.push(prunedHiddenTypes.hiddenFlightTypes);
+        updates.push('hidden_voucher_types = ?');
+        values.push(prunedHiddenTypes.hiddenVoucherTypes);
+        values.push(id);
+
+        const sql = `UPDATE activity_availability SET ${updates.join(', ')} WHERE id = ?`;
+
+        con.query(sql, values, (err, result) => {
+            if (err) {
+                console.error('Error updating availability flight types:', err);
+                return res.status(500).json({ success: false, message: 'Database error', error: err });
+            }
+
+            res.json({
+                success: true,
+                message: 'Availability flight types updated successfully',
+                data: {
+                    id,
+                    flight_types: nextFlightTypes,
+                    voucher_types: nextVoucherTypes,
+                    hidden_flight_types: prunedHiddenTypes.hiddenFlightTypes,
+                    hidden_voucher_types: prunedHiddenTypes.hiddenVoucherTypes
+                }
+            });
+        });
+    });
+});
+
+// Hide or restore specific experience types for an availability without deleting the slot.
+app.patch('/api/availability/:id/hidden-types', (req, res) => {
+    const { id } = req.params;
+    const action = String(req.body?.action || '').trim().toLowerCase();
+    const experienceTypes = Array.isArray(req.body?.experience_types)
+        ? req.body.experience_types
+        : (Array.isArray(req.body?.experienceTypes) ? req.body.experienceTypes : []);
+
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Missing availability id' });
+    }
+
+    if (action !== 'hide' && action !== 'show') {
+        return res.status(400).json({ success: false, message: 'Action must be "hide" or "show"' });
+    }
+
+    if (!experienceTypes.length) {
+        return res.status(400).json({ success: false, message: 'At least one experience type is required' });
+    }
+
+    const selectSql = `
+        SELECT id, hidden_flight_types, hidden_voucher_types
+        FROM activity_availability
+        WHERE id = ?
+        LIMIT 1
+    `;
+
+    con.query(selectSql, [id], (selectErr, rows) => {
+        if (selectErr) {
+            console.error('Error loading availability visibility:', selectErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: selectErr });
+        }
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Availability not found' });
+        }
+
+        const currentAvailability = rows[0];
+        const nextHiddenTypes = applyExperienceTypesToAvailabilityHiddenLists({
+            currentHiddenFlightTypes: currentAvailability.hidden_flight_types,
+            currentHiddenVoucherTypes: currentAvailability.hidden_voucher_types,
+            experienceTypes,
+            action
+        });
+
+        const updateSql = `
+            UPDATE activity_availability
+            SET hidden_flight_types = ?, hidden_voucher_types = ?
+            WHERE id = ?
+        `;
+
+        con.query(
+            updateSql,
+            [nextHiddenTypes.hiddenFlightTypes, nextHiddenTypes.hiddenVoucherTypes, id],
+            (updateErr) => {
+                if (updateErr) {
+                    console.error('Error updating availability visibility:', updateErr);
+                    return res.status(500).json({ success: false, message: 'Database error', error: updateErr });
+                }
+
+                res.json({
+                    success: true,
+                    message: action === 'hide'
+                        ? 'Availability experience types hidden successfully'
+                        : 'Availability experience types restored successfully',
+                    data: {
+                        id,
+                        hidden_flight_types: nextHiddenTypes.hiddenFlightTypes,
+                        hidden_voucher_types: nextHiddenTypes.hiddenVoucherTypes
+                    }
+                });
+            }
+        );
     });
 });
 
@@ -28530,8 +28970,10 @@ const cleanupCancelledCalendarEventsOnStartup = async () => {
     }
 };
 
-const PORT = process.env.PORT || 3002;
-app.listen(PORT, '0.0.0.0', () => {
+const PORT = Number(process.env.PORT) || 3002;
+const HOST = process.env.HOST || '0.0.0.0';
+
+const server = app.listen(PORT, HOST, () => {
     console.log(`Server is running on port ${PORT}`);
 
     // Run database migrations on server start
@@ -28563,6 +29005,16 @@ app.listen(PORT, '0.0.0.0', () => {
 
     // Set up periodic updates every 5 minutes (maintenance only)
     setInterval(updateAvailabilityStatus, 5 * 60 * 1000);
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`Server could not start: port ${PORT} is already in use on ${HOST}. Stop the existing process or set a different PORT in your .env file.`);
+    } else {
+        console.error('Server failed to start:', err);
+    }
+
+    process.exit(1);
 });
 
 // Delete a booking by ID (with cascade delete for passengers)
@@ -33676,6 +34128,55 @@ function runFlightAssignmentSlotSegmentMigration() {
     migrateTable('flight_pilot_assignments');
 }
 runFlightAssignmentSlotSegmentMigration();
+
+function runAvailabilityVisibilityMigrations() {
+    const ensureAvailabilityColumn = (columnName, sqlDefinition, positionClause = '') => {
+        con.query(`SHOW COLUMNS FROM activity_availability LIKE '${columnName}'`, (err, rows) => {
+            if (err) {
+                console.error(`availability visibility migration: cannot inspect ${columnName}:`, err.message);
+                return;
+            }
+
+            if (rows && rows.length > 0) {
+                return;
+            }
+
+            con.query(
+                `ALTER TABLE activity_availability ADD COLUMN ${columnName} ${sqlDefinition} ${positionClause}`.trim(),
+                (alterErr) => {
+                    if (alterErr) {
+                        console.error(`availability visibility migration: add ${columnName}:`, alterErr.message);
+                    } else {
+                        console.log(`✅ activity_availability.${columnName} ready`);
+                    }
+                }
+            );
+        });
+    };
+
+    ensureAvailabilityColumn('hidden_flight_types', 'VARCHAR(255) NULL', 'AFTER flight_types');
+    ensureAvailabilityColumn('hidden_voucher_types', 'VARCHAR(255) NULL', 'AFTER voucher_types');
+
+    const createManifestDateNotesTable = `
+        CREATE TABLE IF NOT EXISTS manifest_date_notes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            manifest_date DATE NOT NULL,
+            note TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_manifest_date (manifest_date)
+        ) COMMENT 'Admin note attached to a manifest date';
+    `;
+
+    con.query(createManifestDateNotesTable, (createErr) => {
+        if (createErr) {
+            console.error('Error creating manifest_date_notes table:', createErr);
+        } else {
+            console.log('✅ manifest_date_notes table ready');
+        }
+    });
+}
+runAvailabilityVisibilityMigrations();
 
 // Update existing date_request table with missing columns
 const updateDateRequestTable = () => {

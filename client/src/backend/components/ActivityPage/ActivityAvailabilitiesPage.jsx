@@ -19,6 +19,7 @@ const columns = [
     { key: 'available', label: 'Available' },
     { key: 'total_booked', label: 'Booked' },
     { key: 'flight_types', label: 'Flight Type' },
+    { key: 'hidden_types', label: 'Hidden' },
     { key: 'status', label: 'Status' },
     { key: 'channels', label: 'Channels' },
 ];
@@ -51,6 +52,19 @@ const DAY_OPTIONS = [
 const MERIDIEM_OPTIONS = ['AM', 'PM'];
 
 const EXPERIENCE_TYPE_ORDER = ['Shared', 'Private', 'Private Charter', 'Proposal'];
+
+const sortExperienceTypes = (values = []) =>
+    Array.from(new Set(values)).sort((first, second) => {
+        const firstIndex = EXPERIENCE_TYPE_ORDER.indexOf(first);
+        const secondIndex = EXPERIENCE_TYPE_ORDER.indexOf(second);
+
+        if (firstIndex === -1 && secondIndex === -1) {
+            return first.localeCompare(second);
+        }
+        if (firstIndex === -1) return 1;
+        if (secondIndex === -1) return -1;
+        return firstIndex - secondIndex;
+    });
 
 const parseAvailabilityDate = (dateValue) => {
     if (!dateValue) return null;
@@ -105,17 +119,52 @@ const getAvailabilityExperienceTypes = (availability) => {
         });
     }
 
-    return Array.from(experienceTypes).sort((first, second) => {
-        const firstIndex = EXPERIENCE_TYPE_ORDER.indexOf(first);
-        const secondIndex = EXPERIENCE_TYPE_ORDER.indexOf(second);
+    return sortExperienceTypes(Array.from(experienceTypes));
+};
 
-        if (firstIndex === -1 && secondIndex === -1) {
-            return first.localeCompare(second);
+const getHiddenExperienceTypes = (availability) => {
+    const hiddenExperienceTypes = new Set();
+
+    const hiddenFlightTypes = typeof availability?.hidden_flight_types === 'string'
+        ? availability.hidden_flight_types.split(',').map((type) => type.trim()).filter(Boolean)
+        : Array.isArray(availability?.hidden_flight_types_array)
+            ? availability.hidden_flight_types_array
+            : [];
+
+    hiddenFlightTypes.forEach((type) => {
+        const lowerType = String(type).toLowerCase();
+        if (lowerType.includes('shared')) {
+            hiddenExperienceTypes.add('Shared');
         }
-        if (firstIndex === -1) return 1;
-        if (secondIndex === -1) return -1;
-        return firstIndex - secondIndex;
+        if (lowerType.includes('private')) {
+            hiddenExperienceTypes.add('Private');
+        }
     });
+
+    const hiddenVoucherTypes = typeof availability?.hidden_voucher_types === 'string'
+        ? availability.hidden_voucher_types.split(',').map((type) => type.trim()).filter(Boolean)
+        : Array.isArray(availability?.hidden_voucher_types_array)
+            ? availability.hidden_voucher_types_array
+            : [];
+
+    hiddenVoucherTypes.forEach((voucherType) => {
+        const lowerVoucherType = String(voucherType).toLowerCase();
+        if (lowerVoucherType.includes('private charter')) {
+            hiddenExperienceTypes.add('Private Charter');
+        }
+        if (lowerVoucherType.includes('proposal')) {
+            hiddenExperienceTypes.add('Proposal');
+        }
+    });
+
+    return sortExperienceTypes(Array.from(hiddenExperienceTypes));
+};
+
+const getVisibleExperienceTypes = (availability) => {
+    const allExperienceTypes = getAvailabilityExperienceTypes(availability);
+    const hiddenExperienceTypes = new Set(getHiddenExperienceTypes(availability));
+
+    return allExperienceTypes.filter((experienceType) => !hiddenExperienceTypes.has(experienceType));
 };
 
 const ActivityAvailabilitiesPage = () => {
@@ -127,7 +176,10 @@ const ActivityAvailabilitiesPage = () => {
     const [selectedRows, setSelectedRows] = useState([]);
     const [filterDialogOpen, setFilterDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [visibilityDialogMode, setVisibilityDialogMode] = useState(null);
+    const [visibilityDialogOpen, setVisibilityDialogOpen] = useState(false);
     const [selectedFlightTypesForDelete, setSelectedFlightTypesForDelete] = useState([]);
+    const [selectedExperienceTypesForVisibility, setSelectedExperienceTypesForVisibility] = useState([]);
     const [loading, setLoading] = useState(false);
     const [filters, setFilters] = useState({
         monthMulti: [],
@@ -367,8 +419,38 @@ const ActivityAvailabilitiesPage = () => {
             }
         });
         
-        return Array.from(flightTypesSet).sort();
+        return sortExperienceTypes(Array.from(flightTypesSet));
     }, [selectedRows, availabilities]);
+
+    const getVisibleExperienceTypesFromSelected = useMemo(() => {
+        const experienceTypesSet = new Set();
+        availabilities
+            .filter((availability) => selectedRows.includes(availability.id))
+            .forEach((availability) => {
+                getVisibleExperienceTypes(availability).forEach((experienceType) => {
+                    experienceTypesSet.add(experienceType);
+                });
+            });
+
+        return sortExperienceTypes(Array.from(experienceTypesSet));
+    }, [selectedRows, availabilities]);
+
+    const getHiddenExperienceTypesFromSelected = useMemo(() => {
+        const experienceTypesSet = new Set();
+        availabilities
+            .filter((availability) => selectedRows.includes(availability.id))
+            .forEach((availability) => {
+                getHiddenExperienceTypes(availability).forEach((experienceType) => {
+                    experienceTypesSet.add(experienceType);
+                });
+            });
+
+        return sortExperienceTypes(Array.from(experienceTypesSet));
+    }, [selectedRows, availabilities]);
+
+    const visibilityExperienceOptions = visibilityDialogMode === 'show'
+        ? getHiddenExperienceTypesFromSelected
+        : getVisibleExperienceTypesFromSelected;
 
     const handleDeleteClick = () => {
         if (selectedRows.length === 0) return;
@@ -394,6 +476,29 @@ const ActivityAvailabilitiesPage = () => {
             setSelectedFlightTypesForDelete([...getFlightTypesFromSelected]);
         } else {
             setSelectedFlightTypesForDelete([]);
+        }
+    };
+
+    const handleVisibilityActionClick = (mode) => {
+        if (selectedRows.length === 0) return;
+        setVisibilityDialogMode(mode);
+        setSelectedExperienceTypesForVisibility([]);
+        setVisibilityDialogOpen(true);
+    };
+
+    const handleVisibilityTypeToggle = (experienceType) => {
+        setSelectedExperienceTypesForVisibility((prev) => (
+            prev.includes(experienceType)
+                ? prev.filter((item) => item !== experienceType)
+                : [...prev, experienceType]
+        ));
+    };
+
+    const handleSelectAllVisibilityTypes = (checked) => {
+        if (checked) {
+            setSelectedExperienceTypesForVisibility([...visibilityExperienceOptions]);
+        } else {
+            setSelectedExperienceTypesForVisibility([]);
         }
     };
 
@@ -483,6 +588,56 @@ const ActivityAvailabilitiesPage = () => {
         }
     };
 
+    const handleConfirmVisibilityChange = async () => {
+        if (!visibilityDialogMode) return;
+
+        if (selectedExperienceTypesForVisibility.length === 0) {
+            alert(`Please select at least one experience type to ${visibilityDialogMode}.`);
+            return;
+        }
+
+        const selectedAvailabilities = availabilities.filter((availability) => selectedRows.includes(availability.id));
+        if (selectedAvailabilities.length === 0) {
+            alert('No availabilities selected.');
+            setVisibilityDialogOpen(false);
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            await Promise.all(
+                selectedAvailabilities.map((availability) =>
+                    axios.patch(`/api/availability/${availability.id}/hidden-types`, {
+                        action: visibilityDialogMode,
+                        experience_types: selectedExperienceTypesForVisibility
+                    })
+                )
+            );
+
+            setSelectedRows([]);
+            setSelectedExperienceTypesForVisibility([]);
+            setVisibilityDialogOpen(false);
+            setVisibilityDialogMode(null);
+
+            const res = await axios.get(`/api/activity/${id}/availabilities`, { timeout: 60000 });
+            if (res.data.success) {
+                setAvailabilities(res.data.data);
+            }
+
+            alert(
+                visibilityDialogMode === 'hide'
+                    ? 'Selected experience types are now hidden from the booking frontend.'
+                    : 'Selected experience types are now visible again on the booking frontend.'
+            );
+        } catch (error) {
+            console.error('Error updating availability visibility:', error);
+            alert('Failed to update availability visibility. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
 
     return (
         <Container maxWidth="lg" style={{ marginTop: 40 }} className="availabilities-page-container">
@@ -499,6 +654,22 @@ const ActivityAvailabilitiesPage = () => {
                     <h2 style={{ margin: 0 }} className="availabilities-title">Availabilities{activityName ? ` - ${activityName}` : ''}</h2>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="availabilities-actions">
+                    <Button
+                        variant="contained"
+                        color="warning"
+                        disabled={selectedRows.length === 0 || getVisibleExperienceTypesFromSelected.length === 0}
+                        onClick={() => handleVisibilityActionClick('hide')}
+                    >
+                        Hide
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        color="success"
+                        disabled={selectedRows.length === 0 || getHiddenExperienceTypesFromSelected.length === 0}
+                        onClick={() => handleVisibilityActionClick('show')}
+                    >
+                        Show Hidden
+                    </Button>
                     <Button
                         variant="contained"
                         color="error"
@@ -657,6 +828,36 @@ const ActivityAvailabilitiesPage = () => {
                                 })()}
                             </TableCell>
                             <TableCell>
+                                {(() => {
+                                    const hiddenExperienceTypes = getHiddenExperienceTypes(row);
+
+                                    if (hiddenExperienceTypes.length === 0) {
+                                        return (
+                                            <Chip
+                                                label="None"
+                                                size="small"
+                                                color="success"
+                                                variant="outlined"
+                                            />
+                                        );
+                                    }
+
+                                    return (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {hiddenExperienceTypes.map((experienceType) => (
+                                                <Chip
+                                                    key={`${row.id}-hidden-${experienceType}`}
+                                                    label={experienceType}
+                                                    size="small"
+                                                    color="warning"
+                                                    variant="outlined"
+                                                />
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                            </TableCell>
+                            <TableCell>
                                 <Chip 
                                     label={row.status} 
                                     color={row.status === 'Open' ? 'success' : 'error'} 
@@ -782,6 +983,88 @@ const ActivityAvailabilitiesPage = () => {
                     <Button onClick={handleClearFilters}>Clear</Button>
                     <Button onClick={() => setFilterDialogOpen(false)} variant="contained" color="primary">
                         Apply
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={visibilityDialogOpen}
+                onClose={() => {
+                    setVisibilityDialogOpen(false);
+                    setVisibilityDialogMode(null);
+                    setSelectedExperienceTypesForVisibility([]);
+                }}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle sx={{ fontWeight: 700, fontSize: 22 }}>
+                    {visibilityDialogMode === 'show' ? 'Show Hidden Availability' : 'Hide Availability'}
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+                        {visibilityDialogMode === 'show'
+                            ? 'Choose which hidden experience types should become visible again on the booking frontend.'
+                            : 'Choose which experience types should be temporarily hidden from the booking frontend without deleting the slot.'}
+                    </Typography>
+                    {visibilityExperienceOptions.length > 0 ? (
+                        <>
+                            <Box sx={{ mb: 2 }}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={selectedExperienceTypesForVisibility.length === visibilityExperienceOptions.length}
+                                            indeterminate={
+                                                selectedExperienceTypesForVisibility.length > 0 &&
+                                                selectedExperienceTypesForVisibility.length < visibilityExperienceOptions.length
+                                            }
+                                            onChange={(e) => handleSelectAllVisibilityTypes(e.target.checked)}
+                                        />
+                                    }
+                                    label={<Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Select All</Typography>}
+                                />
+                            </Box>
+                            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                                Experience Types
+                            </Typography>
+                            <FormGroup>
+                                {visibilityExperienceOptions.map((experienceType) => (
+                                    <FormControlLabel
+                                        key={`${visibilityDialogMode}-${experienceType}`}
+                                        control={
+                                            <Checkbox
+                                                checked={selectedExperienceTypesForVisibility.includes(experienceType)}
+                                                onChange={() => handleVisibilityTypeToggle(experienceType)}
+                                            />
+                                        }
+                                        label={experienceType}
+                                    />
+                                ))}
+                            </FormGroup>
+                        </>
+                    ) : (
+                        <Typography variant="body2" color="text.secondary">
+                            {visibilityDialogMode === 'show'
+                                ? 'No hidden experience types were found in the selected availabilities.'
+                                : 'No visible experience types were found in the selected availabilities.'}
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => {
+                            setVisibilityDialogOpen(false);
+                            setVisibilityDialogMode(null);
+                            setSelectedExperienceTypesForVisibility([]);
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleConfirmVisibilityChange}
+                        variant="contained"
+                        color={visibilityDialogMode === 'show' ? 'success' : 'warning'}
+                        disabled={selectedExperienceTypesForVisibility.length === 0}
+                    >
+                        {visibilityDialogMode === 'show' ? 'Show Selected' : 'Hide Selected'}
                     </Button>
                 </DialogActions>
             </Dialog>
