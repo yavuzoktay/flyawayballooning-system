@@ -6080,7 +6080,27 @@ const Manifest = () => {
                                             </>
                                         ) : (
                                             <>
-                                                {bookingDetail.booking.phone || '-'}
+                                                {(() => {
+                                                    const phoneValue = bookingDetail.booking.phone || '-';
+
+                                                    if (phoneValue && phoneValue !== '-') {
+                                                        const cleanPhone = phoneValue.replace(/[\s\-()]/g, '');
+                                                        return (
+                                                            <a
+                                                                href={`tel:${cleanPhone}`}
+                                                                style={{
+                                                                    color: '#3274b4',
+                                                                    textDecoration: 'underline',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                {phoneValue}
+                                                            </a>
+                                                        );
+                                                    }
+
+                                                    return phoneValue;
+                                                })()}
                                                 <IconButton 
                                                     size="small" 
                                                     onClick={() => handleEditClick('phone', bookingDetail.booking.phone)}
@@ -6103,10 +6123,34 @@ const Manifest = () => {
                                             </>
                                         ) : (
                                             <>
-                                                {bookingDetail.booking.email || '-'}
+                                                {(() => {
+                                                    const passenger1Email = bookingDetail.passengers?.[0]?.email;
+                                                    const emailValue = bookingDetail.booking.email || passenger1Email || '-';
+
+                                                    if (emailValue && emailValue !== '-') {
+                                                        return (
+                                                            <a
+                                                                href={`mailto:${emailValue}`}
+                                                                style={{
+                                                                    color: '#3274b4',
+                                                                    textDecoration: 'underline',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                {emailValue}
+                                                            </a>
+                                                        );
+                                                    }
+
+                                                    return emailValue;
+                                                })()}
                                                 <IconButton 
                                                     size="small" 
-                                                    onClick={() => handleEditClick('email', bookingDetail.booking.email)}
+                                                    onClick={() => {
+                                                        const passenger1Email = bookingDetail.passengers?.[0]?.email;
+                                                        const emailToEdit = bookingDetail.booking.email || passenger1Email || '';
+                                                        handleEditClick('email', emailToEdit);
+                                                    }}
                                                     sx={{
                                                         padding: isMobile ? '2px' : '8px',
                                                         '& .MuiSvgIcon-root': {
