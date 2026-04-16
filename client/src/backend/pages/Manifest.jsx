@@ -5095,7 +5095,7 @@ const Manifest = () => {
                                     ? f.passengers.reduce((s, p) => s + (parseFloat(p.weight) || 0), 0)
                                     : (parseFloat(f.weight) || 0);
                                 return sum + passengerWeight;
-                            }, 0);
+                            }, 0).toFixed(2);
                             
                             // Auto-update status to Closed if Pax Booked equals capacity
                             if (status === "Closed" && paxBookedDisplay === paxTotalDisplay && paxTotalDisplay !== '-') {
