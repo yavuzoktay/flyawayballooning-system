@@ -5029,18 +5029,28 @@ const Manifest = () => {
                                 const parsed = Number(value);
                                 return Number.isFinite(parsed) ? parsed : null;
                             };
+                            const isSharedFlightType = String(first?.flight_type || first?.experience || '')
+                                .toLowerCase()
+                                .includes('shared');
                             const getInitialAvailableTotal = (slot) => {
                                 if (!slot) return null;
+                                if (isSharedFlightType) {
+                                    const sharedCapacityNum = parseNumeric(slot.shared_capacity);
+                                    if (sharedCapacityNum !== null) {
+                                        return sharedCapacityNum;
+                                    }
+                                }
                                 // Capacity is the source of truth for total pax on manifest.
                                 // Using available+booked can drift and incorrectly mark flights as full.
                                 const capacityNum = parseNumeric(slot.capacity);
                                 if (capacityNum !== null) {
-                                    return capacityNum;
+                                    return isSharedFlightType ? Math.min(capacityNum, 8) : capacityNum;
                                 }
                                 const availableNum = parseNumeric(slot.available);
                                 const bookedNum = parseNumeric(slot.booked);
                                 if (availableNum !== null && bookedNum !== null) {
-                                    return availableNum + bookedNum;
+                                    const inferredCapacity = availableNum + bookedNum;
+                                    return isSharedFlightType ? Math.min(inferredCapacity, 8) : inferredCapacity;
                                 }
                                 return null;
                             };
