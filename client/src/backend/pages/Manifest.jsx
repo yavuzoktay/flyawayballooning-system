@@ -5829,10 +5829,50 @@ const Manifest = () => {
                                                                             latestUpdatedPhone ||
                                                                             flight.phone ||
                                                                             (firstPassenger?.mobile || firstPassenger?.phone || flight.mobile || '');
-                                                                        return displayMobile;
+
+                                                                        if (!displayMobile) return '';
+
+                                                                        const cleanPhone = String(displayMobile)
+                                                                            .replace(/[\s\-()]/g, '')
+                                                                            .trim();
+
+                                                                        return cleanPhone ? (
+                                                                            <a
+                                                                                href={`tel:${cleanPhone}`}
+                                                                                style={{
+                                                                                    color: '#3274b4',
+                                                                                    textDecoration: 'underline',
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                            >
+                                                                                {displayMobile}
+                                                                            </a>
+                                                                        ) : displayMobile;
                                                                     })()}
                                                                 </TableCell>
-                                                                <TableCell>{flight.email || ''}</TableCell>
+                                                                <TableCell>
+                                                                    {(() => {
+                                                                        const displayEmail =
+                                                                            flight.email ||
+                                                                            firstPassenger?.email ||
+                                                                            '';
+
+                                                                        if (!displayEmail) return '';
+
+                                                                        return (
+                                                                            <a
+                                                                                href={`mailto:${displayEmail}`}
+                                                                                style={{
+                                                                                    color: '#3274b4',
+                                                                                    textDecoration: 'underline',
+                                                                                    cursor: 'pointer'
+                                                                                }}
+                                                                            >
+                                                                                {displayEmail}
+                                                                            </a>
+                                                                        );
+                                                                    })()}
+                                                                </TableCell>
                                                                 <TableCell>{hasWeatherRefund ? 'Yes' : 'No'}</TableCell>
                                                                 <TableCell>{(() => {
                                                                     if (Array.isArray(flight.choose_add_on)) {
