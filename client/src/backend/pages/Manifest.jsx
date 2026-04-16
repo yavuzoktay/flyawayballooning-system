@@ -5031,13 +5031,18 @@ const Manifest = () => {
                             };
                             const getInitialAvailableTotal = (slot) => {
                                 if (!slot) return null;
+                                // Capacity is the source of truth for total pax on manifest.
+                                // Using available+booked can drift and incorrectly mark flights as full.
+                                const capacityNum = parseNumeric(slot.capacity);
+                                if (capacityNum !== null) {
+                                    return capacityNum;
+                                }
                                 const availableNum = parseNumeric(slot.available);
                                 const bookedNum = parseNumeric(slot.booked);
                                 if (availableNum !== null && bookedNum !== null) {
                                     return availableNum + bookedNum;
                                 }
-                                const capacityNum = parseNumeric(slot.capacity);
-                                return capacityNum !== null ? capacityNum : null;
+                                return null;
                             };
                             // DISPLAY LOGIC UPDATE: Compare availability count vs actual passenger count and use the larger to include newly added guests immediately
                             const passengerCountDisplay = groupFlights.reduce((sum, f) => sum + (f.passengers ? f.passengers.length : 0), 0);
