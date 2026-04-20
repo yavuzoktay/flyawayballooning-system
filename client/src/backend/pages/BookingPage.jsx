@@ -165,6 +165,35 @@ const renderBookingNameWithIndicators = (name, { isNewtBooking = false } = {}) =
     </>
 );
 
+const normalizeVoucherTypeLabel = (value = '') => {
+    const raw = (value || '').toString().trim();
+    if (!raw) return '';
+
+    const normalized = raw.toLowerCase();
+    if (normalized === 'any day flight' || normalized === 'any day voucher') {
+        return 'Any Day';
+    }
+
+    return raw;
+};
+
+const normalizeVoucherTypeRows = (rows = []) =>
+    Array.isArray(rows)
+        ? rows.map((row) => {
+            if (!row) return row;
+
+            const normalizedVoucherType = normalizeVoucherTypeLabel(row.voucher_type);
+            if (normalizedVoucherType === (row.voucher_type || '')) {
+                return row;
+            }
+
+            return {
+                ...row,
+                voucher_type: normalizedVoucherType
+            };
+        })
+        : rows;
+
 const BookingPage = () => {
     // Mobile detection
     const theme = useTheme();
@@ -275,7 +304,7 @@ const BookingPage = () => {
     const bookingVoucherTypeOptions = useMemo(() => {
         const set = new Set();
         booking.forEach(b => {
-            const raw = (b.voucher_type || '').toString().trim();
+            const raw = normalizeVoucherTypeLabel(b.voucher_type);
             if (!raw) return;
             set.add(raw);
         });
@@ -1983,7 +2012,9 @@ const BookingPage = () => {
     // Helper: Enrich booking rows with voucher_type coming from vouchers (for redeemed vouchers)
     const enrichBookingsWithVoucherInfo = (bookings) => {
         if (!Array.isArray(bookings) || bookings.length === 0) return bookings;
-        if (!Array.isArray(voucher) || voucher.length === 0) return bookings;
+
+        const normalizedBookings = normalizeVoucherTypeRows(bookings);
+        if (!Array.isArray(voucher) || voucher.length === 0) return normalizedBookings;
 
         // Build maps:
         // 1) booking_id -> voucher_type
@@ -2014,7 +2045,7 @@ const BookingPage = () => {
                 v.book_flight ||
                 src?.book_flight ||
                 null;
-            const finalType = (typeFromDetail || fallbackType || '').toString().trim();
+            const finalType = normalizeVoucherTypeLabel(typeFromDetail || fallbackType || '');
 
             if (!finalType) return;
 
@@ -2027,10 +2058,10 @@ const BookingPage = () => {
         });
 
         if (voucherTypeByBookingId.size === 0 && voucherTypeByCode.size === 0) {
-            return bookings;
+            return normalizedBookings;
         }
 
-        return bookings.map((b) => {
+        return normalizedBookings.map((b) => {
             if (!b) return b;
 
             // If booking already has a voucher_type, keep it
@@ -2056,7 +2087,7 @@ const BookingPage = () => {
 
             return {
                 ...b,
-                voucher_type: typeFromVoucher
+                voucher_type: normalizeVoucherTypeLabel(typeFromVoucher)
             };
         });
     };
@@ -4334,8 +4365,9 @@ setBookingDetail(finalVoucherDetail);
                     // Refresh all data
                     // Refresh booking data
                     const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: buildGetAllBookingDataParams(filters) });
-                    setBooking(bookingResponse.data.data || []);
-                    setFilteredBookingData(bookingResponse.data.data || []);
+                    const refreshedBookingData = enrichBookingsWithVoucherInfo(bookingResponse.data.data || []);
+                    setBooking(refreshedBookingData);
+                    setFilteredBookingData(refreshedBookingData);
                 
                 // Refresh voucher data
                     const voucherResponse = await axios.get(`/api/getAllVoucherData`, { params: filters });
@@ -4344,7 +4376,7 @@ setBookingDetail(finalVoucherDetail);
                     
                     // Update filteredData based on active tab
                     if (activeTab === 'bookings') {
-                        setFilteredData(bookingResponse.data.data || []);
+                        setFilteredData(refreshedBookingData);
                     } else if (activeTab === 'vouchers') {
                         setFilteredData(voucherResponse.data.data || []);
                     }
@@ -4615,7 +4647,7 @@ setBookingDetail(finalVoucherDetail);
                     // This ensures the new booking appears in the table
                     // Refresh booking data
                     const bookingResponse = await axios.get(`/api/getAllBookingData`, { params: buildGetAllBookingDataParams(filters) });
-                    const newBookingData = bookingResponse.data.data || [];
+                    const newBookingData = enrichBookingsWithVoucherInfo(bookingResponse.data.data || []);
                     setBooking(newBookingData);
                     setFilteredBookingData(newBookingData);
                 
@@ -4862,7 +4894,7 @@ setBookingDetail(finalVoucherDetail);
             // Refresh all data - NO DELETE needed because backend UPDATEs the same booking
             if (activeTab === 'bookings') {
                 const response = await axios.get(`/api/getAllBookingData`, { params: buildGetAllBookingDataParams(filters) });
-                const updatedBookingData = response.data.data || [];
+                const updatedBookingData = enrichBookingsWithVoucherInfo(response.data.data || []);
                 setBooking(updatedBookingData);
                 setFilteredBookingData(updatedBookingData);
                 setFilteredData(updatedBookingData);
@@ -6088,7 +6120,7 @@ setBookingDetail(finalVoucherDetail);
                                                             <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
                                                             <MenuItem value="Weekday Morning" sx={{ fontSize: '11px' }}>Weekday Morning</MenuItem>
                                                             <MenuItem value="Flexible Weekday" sx={{ fontSize: '11px' }}>Flexible Weekday</MenuItem>
-                                                            <MenuItem value="Any Day Flight" sx={{ fontSize: '11px' }}>Any Day Flight</MenuItem>
+                                                            <MenuItem value="Any Day" sx={{ fontSize: '11px' }}>Any Day</MenuItem>
                                                         </Select>
                                                     </FormControl>
                                                 </div>
@@ -6166,7 +6198,7 @@ setBookingDetail(finalVoucherDetail);
                                                     <MenuItem value=""><em>Select</em></MenuItem>
                                                     <MenuItem value="Weekday Morning">Weekday Morning</MenuItem>
                                                     <MenuItem value="Flexible Weekday">Flexible Weekday</MenuItem>
-                                                    <MenuItem value="Any Day Flight">Any Day Flight</MenuItem>
+                                                    <MenuItem value="Any Day">Any Day</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -6574,7 +6606,7 @@ setBookingDetail(finalVoucherDetail);
                                                             <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
                                                             <MenuItem value="Weekday Morning" sx={{ fontSize: '11px' }}>Weekday Morning</MenuItem>
                                                             <MenuItem value="Flexible Weekday" sx={{ fontSize: '11px' }}>Flexible Weekday</MenuItem>
-                                                            <MenuItem value="Any Day Flight" sx={{ fontSize: '11px' }}>Any Day Flight</MenuItem>
+                                                            <MenuItem value="Any Day" sx={{ fontSize: '11px' }}>Any Day</MenuItem>
                                                         </Select>
                                                     </FormControl>
                                                 </div>
@@ -6648,7 +6680,7 @@ setBookingDetail(finalVoucherDetail);
                                                     <MenuItem value=""><em>Select</em></MenuItem>
                                                     <MenuItem value="Weekday Morning">Weekday Morning</MenuItem>
                                                     <MenuItem value="Flexible Weekday">Flexible Weekday</MenuItem>
-                                                    <MenuItem value="Any Day Flight">Any Day Flight</MenuItem>
+                                                    <MenuItem value="Any Day">Any Day</MenuItem>
                                                 </Select>
                                             </FormControl>
                                         </div>
@@ -6711,7 +6743,10 @@ setBookingDetail(finalVoucherDetail);
                                             if (itemBookFlight !== filters.voucherType) return false;
                                         }
                                         // Actual Voucher Type filter
-                                        if (filters.actualVoucherType && item.actual_voucher_type !== filters.actualVoucherType) return false;
+                                        if (filters.actualVoucherType) {
+                                            const itemActualVoucherType = normalizeVoucherTypeLabel(item.actual_voucher_type || '');
+                                            if (itemActualVoucherType !== filters.actualVoucherType) return false;
+                                        }
                                         // Experience filter
                                         if (filters.experience && filters.experience !== 'Select') {
                                             const bookingFlightType = item.flight_type || item.experience || '';
@@ -6748,6 +6783,7 @@ setBookingDetail(finalVoucherDetail);
                                     }).map(item => ({
                                         ...item,
                                         voucher_type: (item.voucher_type || '') + (item.season_saver ? ' ☘️' : ''),
+                                        actual_voucher_type: normalizeVoucherTypeLabel(item.actual_voucher_type || ''),
                                         short_notice_opt_out: getShortNoticeAvailabilityOptOut(item)
                                     }))}
                                     columns={isMobile
@@ -7714,7 +7750,7 @@ setBookingDetail(finalVoucherDetail);
                                                             const v = bookingDetail.voucher || {};
                                                             return <>
                                                                 <Typography><b>Experience:</b> {v.flight_type || '-'}</Typography>
-                                                                <Typography><b>Book Flight:</b> {v.voucher_type || '-'}</Typography>
+                                                                <Typography><b>Book Flight:</b> {normalizeVoucherTypeLabel(v.voucher_type) || '-'}</Typography>
                                                                 <Typography><b>Paid:</b> £{v.paid || '0.00'}</Typography>
                                                                 <Typography><b>Redeemed:</b> {v.redeemed || '-'}</Typography>
                                                                 <Typography><b>Voucher Ref:</b> {v.voucher_ref || '-'}</Typography>
