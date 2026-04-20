@@ -538,7 +538,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                                     opacity: isLaunchingTheNewtBooking ? 0.75 : 1
                                 }}
                             >
-                                {isLaunchingTheNewtBooking ? 'Opening...' : 'New Balloon Booking'}
+                                {isLaunchingTheNewtBooking ? 'Opening...' : 'Newt Booking Link'}
                             </button>
                             <button
                                 type="button"
