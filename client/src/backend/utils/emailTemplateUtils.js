@@ -25,10 +25,6 @@ const HERO_IMAGE_URL = `${getBaseUrl()}/uploads/email/emailImage.jpg`;
 const PERSONAL_NOTE_PLACEHOLDER = '<!--PERSONAL_NOTE-->';
 const CUSTOMER_PORTAL_HOST = 'https://flyawayballooning-system.com';
 const CUSTOMER_PORTAL_BASE_URL = `${CUSTOMER_PORTAL_HOST}/customerPortal`;
-const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
-const FNV_32_OFFSET_BASIS = 0x811c9dc5;
-const FNV_32_SECONDARY_SEED = 0x9e3779b1;
-const FNV_32_PRIME = 0x01000193;
 const CUSTOMER_PORTAL_PRE_FORMATTED_CREATED_AT_REGEX = /^\d{2}\/\d{2}\/\d{4}(?: \d{2}:\d{2})?$/;
 
 const base64Encode = (value = '') => {
@@ -43,16 +39,6 @@ const base64Encode = (value = '') => {
         console.warn('Error encoding portal token:', error);
     }
     return null;
-};
-
-const getUtf8Bytes = (value = '') => {
-    if (typeof TextEncoder !== 'undefined') {
-        return new TextEncoder().encode(String(value));
-    }
-    if (typeof Buffer !== 'undefined') {
-        return Uint8Array.from(Buffer.from(String(value), 'utf8'));
-    }
-    return Uint8Array.from(String(value)).map((character) => character.charCodeAt(0));
 };
 
 const formatCustomerPortalCreatedAt = (rawCreatedAt = '') => {
@@ -182,29 +168,6 @@ const buildCustomerPortalToken = (booking = {}) => {
 const sanitizeCustomerPortalToken = (token = '') =>
     String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
 
-const buildDeterministicHashSegment = (value = '', seed = FNV_32_OFFSET_BASIS) => {
-    const bytes = getUtf8Bytes(value);
-    let hash = seed >>> 0;
-
-    for (const byte of bytes) {
-        hash ^= byte;
-        hash = Math.imul(hash, FNV_32_PRIME) >>> 0;
-    }
-
-    return (hash >>> 0).toString(36).padStart(7, '0');
-};
-
-const buildDeterministicCustomerPortalShortCode = (value = '') => {
-    const normalizedValue = value == null ? '' : String(value);
-    const primary = buildDeterministicHashSegment(normalizedValue, FNV_32_OFFSET_BASIS);
-    const secondary = buildDeterministicHashSegment(
-        `${normalizedValue}|customerPortal`,
-        FNV_32_SECONDARY_SEED
-    );
-
-    return `${primary}${secondary}`.slice(0, 13);
-};
-
 const extractLegacyCustomerPortalToken = (value = '') => {
     const raw = value == null ? '' : String(value).trim();
     if (!raw) return null;
@@ -260,14 +223,6 @@ const buildCanonicalCustomerPortalTarget = (token = '', suffix = {}) => {
     return `${CUSTOMER_PORTAL_BASE_URL}/${encodeURIComponent(sanitizedToken)}/index${search}${hash}`;
 };
 
-const buildShortCustomerPortalLinkFromTarget = (targetUrl = '') => {
-    const trimmedTargetUrl = targetUrl == null ? '' : String(targetUrl).trim();
-    if (!trimmedTargetUrl) return null;
-
-    const shortCode = buildDeterministicCustomerPortalShortCode(trimmedTargetUrl);
-    return `${CUSTOMER_PORTAL_SHORT_BASE_URL}/${shortCode}`;
-};
-
 export const getCustomerPortalLink = (booking = {}) => {
     const explicitShortUrl =
         booking.customer_portal_short_url ||
@@ -289,20 +244,19 @@ export const getCustomerPortalLink = (booking = {}) => {
             return trimmedPortalUrl;
         }
 
-        const targetUrl = buildCanonicalCustomerPortalTarget(
+        const canonicalTargetUrl = buildCanonicalCustomerPortalTarget(
             extractLegacyCustomerPortalToken(trimmedPortalUrl),
             extractUrlSuffix(trimmedPortalUrl)
         );
-        if (targetUrl) {
-            return buildShortCustomerPortalLinkFromTarget(targetUrl);
+        if (canonicalTargetUrl) {
+            return canonicalTargetUrl;
         }
 
         return trimmedPortalUrl;
     }
 
     const token = buildCustomerPortalToken(booking);
-    const targetUrl = buildCanonicalCustomerPortalTarget(token);
-    return buildShortCustomerPortalLinkFromTarget(targetUrl);
+    return buildCanonicalCustomerPortalTarget(token);
 };
 
 const normalizeTemplateName = (name = '') => (name || '').trim();

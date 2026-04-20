@@ -10776,111 +10776,21 @@ app.get('/api/getBookingByVoucherCode', (req, res) => {
             return res.status(500).json({ success: false, message: 'Database error', error: err });
         }
 
-        // If no rows found, try to find redeem voucher bookings created from this voucher_ref
+        // If no rows found, try to find the redeemed booking from voucher metadata.
         if (!rows || rows.length === 0) {
-            console.log('🔍 getBookingByVoucherCode: No direct match, searching for redeem voucher bookings...');
-            
-            const redeemBookingSql = `
-                SELECT 
-                    ab.*,
-                    v.voucher_ref AS original_voucher_ref,
-                    COALESCE(ab.voucher_code, v.voucher_ref) AS resolved_voucher_code
-                FROM all_vouchers v
-                INNER JOIN all_booking ab
-                    ON ab.flight_type_source = 'Redeem Voucher'
-                    AND ab.redeemed_voucher = 'Yes'
-                    AND ab.created_at >= v.created_at
-                    AND (
-                        -- Match by name (flexible matching)
-                        (ab.name = v.name 
-                         OR ab.name = v.recipient_name 
-                         OR v.name = ab.name
-                         OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
-                         OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
-                        AND (
-                            -- Match by email if available
-                            (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
-                            OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
-                            OR (v.email IS NULL OR v.email = '')
-                            OR (v.recipient_email IS NULL OR v.recipient_email = '')
-                        )
-                    )
-                WHERE v.voucher_ref = ?
-                    AND (v.redeemed = 'Yes' OR v.status = 'Used')
-                ORDER BY ab.created_at DESC
-                LIMIT 5
-            `;
+            console.log('🔍 getBookingByVoucherCode: No direct match, trying redeemed voucher resolution...');
 
-            return con.query(redeemBookingSql, [rawCode], (redeemErr, redeemRows) => {
+            return findBestRedeemedVoucherBooking(rawCode, (redeemErr, bookingMatch) => {
                 if (redeemErr) {
                     console.error('Error in getBookingByVoucherCode (redeem search):', redeemErr);
-                    // Fall back to original fallback
-                    const fallbackSql = `
-                        SELECT ab.*
-                        FROM all_vouchers v
-                        JOIN all_booking ab
-                            ON ab.name = v.name
-                        WHERE v.voucher_ref = ?
-                        ORDER BY ab.created_at DESC
-                        LIMIT 5
-                    `;
-
-                    return con.query(fallbackSql, [rawCode], (fbErr, fbRows) => {
-                        if (fbErr) {
-                            console.error('Error in getBookingByVoucherCode fallback:', fbErr);
-                            return res.status(500).json({ success: false, message: 'Database error', error: fbErr });
-                        }
-
-                        return res.json({ success: true, data: fbRows || [] });
-                    });
+                    return res.status(500).json({ success: false, message: 'Database error', error: redeemErr });
                 }
 
-                if (redeemRows && redeemRows.length > 0) {
-                    console.log('✅ getBookingByVoucherCode: Found', redeemRows.length, 'redeem voucher booking(s)');
-                    return res.json({ success: true, data: redeemRows || [] });
+                if (bookingMatch) {
+                    return res.json({ success: true, data: [bookingMatch] });
                 }
 
-                // Last fallback: try to find by voucher_ref in all_vouchers and match with recent bookings
-                console.log('🔍 getBookingByVoucherCode: Trying fallback search by voucher details...');
-                
-                const fallbackSql = `
-                    SELECT 
-                        ab.*,
-                        v.voucher_ref AS original_voucher_ref,
-                        COALESCE(ab.voucher_code, v.voucher_ref) AS resolved_voucher_code
-                    FROM all_vouchers v
-                    INNER JOIN all_booking ab
-                        ON ab.flight_type_source = 'Redeem Voucher'
-                        AND ab.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                        AND (
-                            -- Match by name (flexible matching)
-                            (ab.name = v.name 
-                             OR ab.name = v.recipient_name 
-                             OR v.name = ab.name
-                             OR ab.name LIKE CONCAT('%', SUBSTRING_INDEX(COALESCE(v.name, v.recipient_name, ''), ' ', 1), '%')
-                             OR v.name LIKE CONCAT('%', SUBSTRING_INDEX(ab.name, ' ', 1), '%'))
-                            AND (
-                                -- Match by email if available
-                                (ab.email = v.email AND v.email IS NOT NULL AND v.email != '')
-                                OR (ab.email = v.recipient_email AND v.recipient_email IS NOT NULL AND v.recipient_email != '')
-                                OR (v.email IS NULL OR v.email = '')
-                                OR (v.recipient_email IS NULL OR v.recipient_email = '')
-                            )
-                        )
-                    WHERE v.voucher_ref = ?
-                        AND (v.redeemed = 'Yes' OR v.status = 'Used')
-                    ORDER BY ab.created_at DESC
-                    LIMIT 5
-                `;
-
-                return con.query(fallbackSql, [rawCode], (fbErr, fbRows) => {
-                    if (fbErr) {
-                        console.error('Error in getBookingByVoucherCode fallback:', fbErr);
-                        return res.status(500).json({ success: false, message: 'Database error', error: fbErr });
-                    }
-
-                    return res.json({ success: true, data: fbRows || [] });
-                });
+                return res.json({ success: true, data: [] });
             });
         }
 
@@ -10968,111 +10878,20 @@ function runFindBookingByVoucherRefAfterVoucherCheck(rawCode, res) {
             return res.json({ success: true, booking: rows[0] });
         }
 
-        // If not found, try to find the booking created by redeeming this voucher_ref.
-        // IMPORTANT: In our redeem flow, the booking gets a NEW generated voucher_code (BAT...),
-        // so we cannot rely on direct voucher_code match with the original voucher_ref (GAT...).
-        // We therefore match using voucher metadata (email/phone/name/paid) + time window.
-        console.log('🔍 findBookingByVoucherRef: No direct match, searching for redeem voucher booking (metadata match)...');
+        console.log('🔍 findBookingByVoucherRef: No direct match, trying redeemed voucher resolution...');
 
-        const redeemBookingSql = `
-            SELECT 
-                ab.*,
-                v.voucher_ref AS original_voucher_ref,
-                v.created_at AS voucher_created_at,
-                v.redeemed AS voucher_redeemed,
-                v.status AS voucher_status
-            FROM all_vouchers v
-            INNER JOIN all_booking ab
-                ON ab.created_at >= v.created_at
-                AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY)
-            WHERE v.voucher_ref = ?
-                AND (v.redeemed = 'Yes' OR v.status = 'Used')
-                AND (
-                    -- Prefer deterministic matches first
-                    (ab.email IS NOT NULL AND ab.email != '' AND (
-                        UPPER(ab.email) = UPPER(v.email)
-                        OR UPPER(ab.email) = UPPER(v.recipient_email)
-                        OR UPPER(ab.email) = UPPER(v.purchaser_email)
-                    ))
-                    OR (ab.phone IS NOT NULL AND ab.phone != '' AND (
-                        ab.phone = v.phone
-                        OR ab.phone = v.recipient_phone
-                        OR ab.phone = v.purchaser_phone
-                        OR ab.phone = v.mobile
-                        OR ab.phone = v.purchaser_mobile
-                    ))
-                    OR (COALESCE(NULLIF(TRIM(ab.name), ''), '') != '' AND (
-                        UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.name, '')))
-                        OR UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.recipient_name, '')))
-                        OR UPPER(TRIM(ab.name)) = UPPER(TRIM(COALESCE(v.purchaser_name, '')))
-                    ))
-                    -- Note: We don't match on paid amount because rebook operations may change the paid value
-                    -- Last resort: within a time window after voucher creation (includes rebooked bookings)
-                    -- Rebooked bookings keep the same created_at, so they'll match here
-                    OR (ab.created_at >= v.created_at AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY))
-                )
-            ORDER BY 
-                -- Prefer exact email matches, then phone, then recency
-                -- Note: We don't order by paid match because rebook operations may change the paid value
-                (ab.email IS NOT NULL AND ab.email != '' AND (
-                    UPPER(ab.email) = UPPER(v.email)
-                    OR UPPER(ab.email) = UPPER(v.recipient_email)
-                    OR UPPER(ab.email) = UPPER(v.purchaser_email)
-                )) DESC,
-                (ab.phone IS NOT NULL AND ab.phone != '' AND (
-                    ab.phone = v.phone
-                    OR ab.phone = v.recipient_phone
-                    OR ab.phone = v.purchaser_phone
-                    OR ab.phone = v.mobile
-                    OR ab.phone = v.purchaser_mobile
-                )) DESC,
-                ab.created_at DESC
-            LIMIT 1
-        `;
-
-        con.query(redeemBookingSql, [rawCode], (redeemErr, redeemRows) => {
+        findBestRedeemedVoucherBooking(rawCode, (redeemErr, bookingMatch) => {
             if (redeemErr) {
                 console.error('Error in findBookingByVoucherRef (redeem search):', redeemErr);
                 return res.status(500).json({ success: false, message: 'Database error', error: redeemErr });
             }
 
-                if (redeemRows && redeemRows.length > 0) {
-                    console.log('✅ findBookingByVoucherRef: Found redeem voucher booking:', redeemRows[0].id);
-                    return res.json({ success: true, booking: redeemRows[0] });
-                }
-
-            // Last fallback: if metadata match still fails, pick the most recent Redeem Voucher booking
-            // created after this voucher's created_at (within 30 days).
-            console.log('🔍 findBookingByVoucherRef: Fallback to most recent redeem booking after voucher created_at...');
-
-            const fallbackSql = `
-                SELECT 
-                    ab.*,
-                    v.voucher_ref AS original_voucher_ref
-                FROM all_vouchers v
-                INNER JOIN all_booking ab
-                    ON ab.created_at >= v.created_at
-                    AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY)
-                WHERE v.voucher_ref = ?
-                    AND (v.redeemed = 'Yes' OR v.status = 'Used')
-                ORDER BY ab.created_at DESC
-                LIMIT 1
-            `;
-
-            con.query(fallbackSql, [rawCode], (fallbackErr, fallbackRows) => {
-                if (fallbackErr) {
-                    console.error('Error in findBookingByVoucherRef (fallback):', fallbackErr);
-                    return res.status(500).json({ success: false, message: 'Database error', error: fallbackErr });
-                }
-
-                if (fallbackRows && fallbackRows.length > 0) {
-                    console.log('✅ findBookingByVoucherRef: Found booking by fallback search:', fallbackRows[0].id);
-                    return res.json({ success: true, booking: fallbackRows[0] });
-                }
+            if (bookingMatch) {
+                return res.json({ success: true, booking: bookingMatch });
+            }
 
                 console.log('❌ findBookingByVoucherRef: No booking found for voucher_ref:', rawCode);
                 return res.json({ success: false, message: 'No booking found for this voucher', booking: null });
-            });
         });
     });
 }
@@ -28593,17 +28412,32 @@ app.get(['/customerPortal/s/:shortCode', '/customerPortal/s/:shortCode/*'], (req
                 }
 
                 if (!rows || rows.length === 0 || !rows[0].target_url) {
-                    // Fail closed on unknown short codes. Rebuilding public links by
-                    // scanning other bookings can leak a different customer's portal.
-                    return res
-                        .status(410)
-                        .type('html')
-                        .send(
-                            buildCustomerPortalShortLinkUnavailablePage({
-                                message:
-                                    'This customer portal link has expired or is no longer available. Please use the latest link we sent you or contact Fly Away Ballooning for a new one.'
-                            })
-                        );
+                    return resolveCustomerPortalShortLinkByData(shortCode, (rebuildErr, rebuiltMatch) => {
+                        if (rebuildErr) {
+                            console.error('Error rebuilding customer portal short link:', rebuildErr);
+                            return res.status(500).send('Failed to resolve short link');
+                        }
+
+                        if (!rebuiltMatch || rebuiltMatch.ambiguous || !rebuiltMatch.targetUrl) {
+                            return res
+                                .status(410)
+                                .type('html')
+                                .send(
+                                    buildCustomerPortalShortLinkUnavailablePage({
+                                        message:
+                                            'This customer portal link has expired or is no longer available. Please use the latest link we sent you or contact Fly Away Ballooning for a new one.'
+                                    })
+                                );
+                        }
+
+                        persistCustomerPortalShortLink({
+                            shortCode,
+                            targetUrl: rebuiltMatch.targetUrl,
+                            portalToken: rebuiltMatch.portalToken
+                        });
+
+                        return res.redirect(302, rebuiltMatch.targetUrl);
+                    });
                 }
 
                 const targetUrl = String(rows[0].target_url).trim();
@@ -35733,6 +35567,9 @@ const CUSTOMER_PORTAL_HOST = BACKEND_PUBLIC_URL || 'https://flyawayballooning-sy
 const CUSTOMER_PORTAL_BASE_URL = `${CUSTOMER_PORTAL_HOST}/customerPortal`;
 const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
 const CUSTOMER_PORTAL_SHORT_CODE_LENGTH = 20;
+const LEGACY_CLIENT_FNV_32_OFFSET_BASIS = 0x811c9dc5;
+const LEGACY_CLIENT_FNV_32_SECONDARY_SEED = 0x9e3779b1;
+const LEGACY_CLIENT_FNV_32_PRIME = 0x01000193;
 const LEGACY_FNV_OFFSET_BASIS = 14695981039346656037n;
 const LEGACY_FNV_PRIME = 1099511628211n;
 const LEGACY_UINT64_MOD = 18446744073709551616n;
@@ -35980,6 +35817,38 @@ function sanitizeCustomerPortalToken(token = '') {
     return String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
 }
 
+function getUtf8Bytes(value = '') {
+    return Uint8Array.from(Buffer.from(String(value), 'utf8'));
+}
+
+function buildLegacyClientHashSegment(value = '', seed = LEGACY_CLIENT_FNV_32_OFFSET_BASIS) {
+    const bytes = getUtf8Bytes(value);
+    let hash = seed >>> 0;
+
+    for (const byte of bytes) {
+        hash ^= byte;
+        hash = Math.imul(hash, LEGACY_CLIENT_FNV_32_PRIME) >>> 0;
+    }
+
+    return (hash >>> 0).toString(36).padStart(7, '0');
+}
+
+function buildLegacyClientCustomerPortalShortCode(value = '') {
+    const normalizedValue = value == null ? '' : String(value);
+    if (!normalizedValue) return '';
+
+    const primary = buildLegacyClientHashSegment(
+        normalizedValue,
+        LEGACY_CLIENT_FNV_32_OFFSET_BASIS
+    );
+    const secondary = buildLegacyClientHashSegment(
+        `${normalizedValue}|customerPortal`,
+        LEGACY_CLIENT_FNV_32_SECONDARY_SEED
+    );
+
+    return `${primary}${secondary}`.slice(0, 13);
+}
+
 function buildDeterministicCustomerPortalShortCode(value = '') {
     const normalizedValue = value == null ? '' : String(value).trim();
     if (!normalizedValue) return '';
@@ -36048,6 +35917,7 @@ function getCustomerPortalShortCodeVariants(targetUrl = '') {
 
     return Array.from(new Set([
         buildDeterministicCustomerPortalShortCode(trimmedTargetUrl),
+        buildLegacyClientCustomerPortalShortCode(trimmedTargetUrl),
         buildLegacyCustomerPortalShortCode(trimmedTargetUrl)
     ].filter(Boolean))).map((code) => String(code).trim().toLowerCase());
 }
@@ -36265,25 +36135,63 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
         return callback(null, null);
     }
 
-    const findMatchInRows = (rows = [], mapRow = (row) => row) => {
+    const uniqueMatchesByTarget = new Map();
+
+    const collectMatchesInRows = (rows = [], mapRow = (row) => row, sourceType = 'unknown') => {
         for (const row of rows) {
             try {
                 const candidateRow = mapRow(row);
                 const matches = buildCustomerPortalShortLinkCandidates(candidateRow);
-                const matched = matches.find((entry) => entry.shortCode === normalizedShortCode);
 
-                if (matched) {
-                    return {
-                        ...matched,
-                        allMatches: matches
-                    };
-                }
+                matches
+                    .filter((entry) => entry.shortCode === normalizedShortCode)
+                    .forEach((matched) => {
+                        const targetKey = String(matched.targetUrl || '').trim();
+                        if (!targetKey) {
+                            return;
+                        }
+
+                        const existing = uniqueMatchesByTarget.get(targetKey);
+                        if (!existing) {
+                            uniqueMatchesByTarget.set(targetKey, {
+                                ...matched,
+                                sourceType,
+                                sourceId: row?.id ?? null
+                            });
+                        }
+                    });
             } catch (rowErr) {
                 console.error('Customer portal short link candidate row error:', rowErr);
             }
         }
+    };
 
-        return null;
+    const finalize = () => {
+        const uniqueMatches = Array.from(uniqueMatchesByTarget.values());
+
+        if (uniqueMatches.length === 1) {
+            return callback(null, {
+                ...uniqueMatches[0],
+                allMatches: uniqueMatches
+            });
+        }
+
+        if (uniqueMatches.length > 1) {
+            console.warn(
+                'Ambiguous customer portal short link recovery prevented:',
+                JSON.stringify({
+                    shortCode: normalizedShortCode,
+                    matches: uniqueMatches.map((entry) => ({
+                        targetUrl: entry.targetUrl,
+                        sourceType: entry.sourceType,
+                        sourceId: entry.sourceId
+                    }))
+                })
+            );
+            return callback(null, { ambiguous: true, allMatches: uniqueMatches });
+        }
+
+        return callback(null, null);
     };
 
     queryAllBookingsForPortalScan((bookingErr, bookingRows) => {
@@ -36291,34 +36199,309 @@ function resolveCustomerPortalShortLinkByData(shortCode, callback) {
             return callback(bookingErr);
         }
 
-        const bookingMatch = findMatchInRows(bookingRows || [], (row) => ({
-            ...row,
-            book_flight:
-                row.book_flight ||
-                row.flight_type ||
-                row.voucher_type_detail ||
-                row.voucher_type ||
-                null
-        }));
-        if (bookingMatch) {
-            return callback(null, bookingMatch);
-        }
+        collectMatchesInRows(
+            bookingRows || [],
+            (row) => ({
+                ...row,
+                book_flight:
+                    row.book_flight ||
+                    row.flight_type ||
+                    row.voucher_type_detail ||
+                    row.voucher_type ||
+                    null
+            }),
+            'booking'
+        );
 
         queryAllVouchersForPortalScan((voucherErr, voucherRows) => {
             if (voucherErr) {
                 return callback(voucherErr);
             }
 
-            const voucherMatch = findMatchInRows(voucherRows || [], (row) => ({
-                ...row,
-                voucher_id: row.id,
-                _original: row,
-                book_flight: row.book_flight || row.voucher_type || null
-            }));
+            collectMatchesInRows(
+                voucherRows || [],
+                (row) => ({
+                    ...row,
+                    voucher_id: row.id,
+                    _original: row,
+                    book_flight: row.book_flight || row.voucher_type || null
+                }),
+                'voucher'
+            );
 
-            return callback(null, voucherMatch || null);
+            return finalize();
         });
     });
+}
+
+function normalizeVoucherMatchValue(value = '') {
+    return String(value == null ? '' : value)
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function normalizeVoucherEmail(value = '') {
+    return String(value == null ? '' : value).trim().toLowerCase();
+}
+
+function getVoucherEmailLocalPart(value = '') {
+    const normalizedEmail = normalizeVoucherEmail(value);
+    if (!normalizedEmail) return '';
+    return normalizedEmail.split('@')[0] || '';
+}
+
+function normalizeVoucherPhone(value = '') {
+    let digits = String(value == null ? '' : value).replace(/\D/g, '');
+    if (!digits) return '';
+
+    if (digits.startsWith('44') && digits.length === 12) {
+        digits = `0${digits.slice(2)}`;
+    }
+
+    return digits;
+}
+
+function getVoucherNameCandidates(...values) {
+    const candidates = new Set();
+
+    const addValue = (value = '') => {
+        const normalized = normalizeVoucherMatchValue(value);
+        if (normalized) {
+            candidates.add(normalized);
+        }
+    };
+
+    const addCompositeParts = (value = '') => {
+        const raw = String(value == null ? '' : value).trim();
+        if (!raw) return;
+
+        const normalizedRaw = raw.replace(/&/g, ' and ');
+        const rawParts = normalizedRaw
+            .split(/\band\b|,|\/|\+/i)
+            .map((part) => part.trim())
+            .filter(Boolean);
+
+        if (rawParts.length <= 1) return;
+
+        const normalizedFull = normalizeVoucherMatchValue(raw);
+        const fullTokens = normalizedFull.split(' ').filter(Boolean);
+        const sharedSurname = fullTokens.length > 1 ? fullTokens[fullTokens.length - 1] : '';
+
+        rawParts.forEach((part) => {
+            const normalizedPart = normalizeVoucherMatchValue(part);
+            if (!normalizedPart) {
+                return;
+            }
+
+            candidates.add(normalizedPart);
+
+            if (sharedSurname) {
+                const partTokens = normalizedPart.split(' ').filter(Boolean);
+                const lastToken = partTokens[partTokens.length - 1] || '';
+                if (lastToken !== sharedSurname) {
+                    candidates.add(`${normalizedPart} ${sharedSurname}`.trim());
+                }
+            }
+        });
+    };
+
+    values.forEach((value) => {
+        addValue(value);
+        addCompositeParts(value);
+    });
+
+    return Array.from(candidates);
+}
+
+function getVoucherBookingMatchDetails(voucher = {}, booking = {}) {
+    const signals = [];
+    const addSignal = (key, weight, detail) => {
+        if (!signals.some((signal) => signal.key === key)) {
+            signals.push({ key, weight, detail });
+        }
+    };
+
+    const bookingEmail = normalizeVoucherEmail(booking.email);
+    const bookingEmailLocalPart = getVoucherEmailLocalPart(booking.email);
+    const voucherEmails = Array.from(
+        new Set(
+            [
+                voucher.email,
+                voucher.purchaser_email,
+                voucher.recipient_email
+            ].map(normalizeVoucherEmail).filter(Boolean)
+        )
+    );
+    const voucherEmailLocalParts = Array.from(
+        new Set(voucherEmails.map(getVoucherEmailLocalPart).filter(Boolean))
+    );
+
+    if (bookingEmail && voucherEmails.includes(bookingEmail)) {
+        addSignal('emailExact', 130, bookingEmail);
+    } else if (bookingEmailLocalPart && voucherEmailLocalParts.includes(bookingEmailLocalPart)) {
+        addSignal('emailLocalPart', 95, bookingEmailLocalPart);
+    }
+
+    const bookingPhone = normalizeVoucherPhone(booking.phone);
+    const voucherPhones = Array.from(
+        new Set(
+            [
+                voucher.phone,
+                voucher.mobile,
+                voucher.purchaser_phone,
+                voucher.purchaser_mobile,
+                voucher.recipient_phone,
+                voucher.recipient_mobile
+            ].map(normalizeVoucherPhone).filter(Boolean)
+        )
+    );
+
+    if (bookingPhone && voucherPhones.includes(bookingPhone)) {
+        addSignal('phoneExact', 120, bookingPhone);
+    }
+
+    const bookingName = normalizeVoucherMatchValue(booking.name);
+    const voucherNames = getVoucherNameCandidates(
+        voucher.name,
+        voucher.purchaser_name,
+        voucher.recipient_name
+    );
+
+    if (bookingName && voucherNames.includes(bookingName)) {
+        addSignal('nameExact', 110, bookingName);
+    }
+
+    const bookingPaid = Number.parseFloat(booking.paid);
+    const voucherPaid = Number.parseFloat(voucher.paid);
+    if (Number.isFinite(bookingPaid) && Number.isFinite(voucherPaid) && bookingPaid === voucherPaid) {
+        addSignal('paidExact', 15, bookingPaid);
+    }
+
+    const bookingPax = Number.parseInt(booking.pax, 10);
+    const voucherPax = Number.parseInt(voucher.numberOfPassengers, 10);
+    if (Number.isInteger(bookingPax) && Number.isInteger(voucherPax) && bookingPax === voucherPax) {
+        addSignal('paxExact', 10, bookingPax);
+    }
+
+    const bookingVoucherType = normalizeVoucherMatchValue(booking.voucher_type || booking.voucher_type_detail);
+    const voucherType = normalizeVoucherMatchValue(voucher.voucher_type || voucher.voucher_type_detail);
+    if (bookingVoucherType && voucherType && bookingVoucherType === voucherType) {
+        addSignal('voucherType', 10, bookingVoucherType);
+    }
+
+    return {
+        score: signals.reduce((sum, signal) => sum + signal.weight, 0),
+        signals
+    };
+}
+
+function selectBestRedeemedVoucherBooking(voucher = {}, candidates = []) {
+    const scoredCandidates = (candidates || [])
+        .map((booking) => {
+            const match = getVoucherBookingMatchDetails(voucher, booking);
+            return {
+                booking,
+                score: match.score,
+                signals: match.signals
+            };
+        })
+        .filter((entry) => entry.score >= 100)
+        .sort((a, b) => {
+            if (b.score !== a.score) {
+                return b.score - a.score;
+            }
+            return moment(b.booking?.created_at).valueOf() - moment(a.booking?.created_at).valueOf();
+        });
+
+    if (!scoredCandidates.length) {
+        return null;
+    }
+
+    const topCandidate = scoredCandidates[0];
+    const secondCandidate = scoredCandidates[1];
+
+    if (secondCandidate && secondCandidate.score === topCandidate.score) {
+        console.warn(
+            'Ambiguous voucher booking resolution prevented:',
+            JSON.stringify({
+                voucherRef: voucher.voucher_ref,
+                topBookingId: topCandidate.booking?.id,
+                competingBookingId: secondCandidate.booking?.id,
+                score: topCandidate.score
+            })
+        );
+        return null;
+    }
+
+    return topCandidate;
+}
+
+function queryRedeemedVoucherBookingCandidates(voucherRef, callback) {
+    const sql = `
+        SELECT 
+            ab.*
+        FROM all_vouchers v
+        INNER JOIN all_booking ab
+            ON ab.created_at >= v.created_at
+            AND ab.created_at <= DATE_ADD(v.created_at, INTERVAL 30 DAY)
+        WHERE v.voucher_ref = ?
+            AND (v.redeemed = 'Yes' OR v.status = 'Used')
+            AND (
+                COALESCE(NULLIF(TRIM(ab.flight_type_source), ''), '') = 'Redeem Voucher'
+                OR COALESCE(NULLIF(TRIM(ab.redeemed_voucher), ''), 'No') = 'Yes'
+            )
+        ORDER BY ab.created_at DESC
+        LIMIT 100
+    `;
+
+    con.query(sql, [voucherRef], (err, rows) => {
+        if (err) {
+            return callback(err);
+        }
+        return callback(null, rows || []);
+    });
+}
+
+function findBestRedeemedVoucherBooking(voucherRef, callback) {
+    con.query(
+        'SELECT * FROM all_vouchers WHERE voucher_ref = ? LIMIT 1',
+        [voucherRef],
+        (voucherErr, voucherRows) => {
+            if (voucherErr) {
+                return callback(voucherErr);
+            }
+
+            const voucher = voucherRows?.[0];
+            if (!voucher || !isAllVoucherRedeemedRow(voucher)) {
+                return callback(null, null);
+            }
+
+            queryRedeemedVoucherBookingCandidates(voucherRef, (candidateErr, candidates) => {
+                if (candidateErr) {
+                    return callback(candidateErr);
+                }
+
+                const bestMatch = selectBestRedeemedVoucherBooking(voucher, candidates);
+
+                if (bestMatch) {
+                    console.log(
+                        '✅ Redeemed voucher booking match:',
+                        JSON.stringify({
+                            voucherRef,
+                            bookingId: bestMatch.booking?.id,
+                            score: bestMatch.score,
+                            signals: bestMatch.signals.map((signal) => signal.key)
+                        })
+                    );
+                }
+
+                return callback(null, bestMatch?.booking || null);
+            });
+        }
+    );
 }
 
 function extractLegacyCustomerPortalToken(value = '') {
