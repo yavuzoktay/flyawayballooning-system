@@ -674,26 +674,41 @@ const Manifest = () => {
         }
     };
 
-    const cancelGroupBookings = async (bookings) => {
-        if (!bookings || bookings.length === 0) return;
-        const bookingIds = bookings.map(b => b.id);
+    const cancelSingleGroupBooking = async (booking) => {
+        if (!booking?.id) {
+            throw new Error('Booking ID is required');
+        }
 
-        await Promise.all(bookings.map(async (booking) => {
-            const newAttempts = (booking.flight_attempts || 0) + 1;
-            await axios.patch('/api/updateBookingField', {
-                booking_id: booking.id,
-                field: 'status',
-                value: 'Cancelled'
-            });
-            await axios.patch('/api/updateBookingField', {
-                booking_id: booking.id,
-                field: 'flight_attempts',
-                value: newAttempts
-            });
-        }));
+        const currentAttempts = parseInt(booking.flight_attempts || 0, 10);
+        const newAttempts = currentAttempts + 1;
 
-        setFlights(prev => prev.filter(f => !bookingIds.includes(f.id)));
-        
+        await axios.patch('/api/updateBookingField', {
+            booking_id: booking.id,
+            field: 'status',
+            value: 'Cancelled'
+        });
+
+        await axios.patch('/api/updateBookingField', {
+            booking_id: booking.id,
+            field: 'flight_attempts',
+            value: newAttempts
+        });
+
+        return {
+            ...booking,
+            status: 'Cancelled',
+            flight_attempts: newAttempts
+        };
+    };
+
+    const finalizeCancelledGroupBookings = async (cancelledBookings = []) => {
+        if (!Array.isArray(cancelledBookings) || cancelledBookings.length === 0) {
+            return;
+        }
+
+        const cancelledBookingIds = cancelledBookings.map(booking => booking.id);
+        setFlights(prev => prev.filter(f => !cancelledBookingIds.includes(f.id)));
+
         // Refetch booking data to ensure backend changes are reflected
         if (typeof bookingHook.refetch === 'function') {
             await bookingHook.refetch();
@@ -707,6 +722,31 @@ const Manifest = () => {
             refreshCrewAssignments(selectedDate);
             refreshPilotAssignments(selectedDate);
         }
+    };
+
+    const cancelGroupBookings = async (bookings) => {
+        if (!Array.isArray(bookings) || bookings.length === 0) {
+            return { cancelledBookings: [], failures: [] };
+        }
+
+        const cancelledBookings = [];
+        const failures = [];
+
+        for (const booking of bookings) {
+            try {
+                const cancelledBooking = await cancelSingleGroupBooking(booking);
+                cancelledBookings.push(cancelledBooking);
+            } catch (error) {
+                failures.push({
+                    booking,
+                    reason: error?.response?.data?.message || error.message || 'Unknown error'
+                });
+            }
+        }
+
+        await finalizeCancelledGroupBookings(cancelledBookings);
+
+        return { cancelledBookings, failures };
     };
 
     const closeGroupMessageModal = () => {
@@ -1371,238 +1411,312 @@ const Manifest = () => {
         }
 
         setGroupMessageSending(true);
-        let emailSuccessCount = 0;
-        let smsSuccessCount = 0;
-        const emailFailures = [];
-        const smsFailures = [];
+        try {
+            let emailSuccessCount = 0;
+            let smsSuccessCount = 0;
+            const emailFailures = [];
+            const smsFailures = [];
+            const bookingSendResults = [];
 
-        for (const booking of groupSelectedBookings) {
-            // Send email if email checkbox is checked
-            if (groupMessageEmailChecked) {
-                const to = booking.email || '';
-                if (!to) {
-                    emailFailures.push({ booking, reason: 'Missing email address' });
-                } else {
-                    const templateName = resolveTemplateName(groupMessageForm.template, emailTemplates.find((t) => t.id?.toString() === groupMessageForm.template?.toString()));
-                    let finalHtml = buildEmailHtml({
-                        templateName,
-                        messageHtml: groupMessageForm.message,
-                        booking,
-                        personalNote: groupPersonalNote
-                    });
+            for (const booking of groupSelectedBookings) {
+                let emailSent = false;
+                let smsSent = false;
 
-                    // Append Customer Portal link if Add Link checkbox is checked
-                    if (groupAddLink) {
-                        try {
-                            const portalRes = await axios.post('/api/customerPortalShortLink', {
-                                bookingId: booking.id,
-                                contextType: 'booking'
-                            });
-                            const portalLink = portalRes.data?.shortUrl;
-                            if (portalLink) {
-                                const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
-                                const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
-                                if (closingPattern.test(finalHtml)) {
-                                    finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
-                                } else {
-                                    finalHtml += linkHtml;
-                                }
-                            }
-                        } catch (linkErr) {
-                            console.warn('⚠️ Failed to generate customer portal link:', linkErr);
-                        }
-                    }
-
-                    const finalText = stripHtml(finalHtml);
-
-                    try {
-                        await axios.post('/api/sendBookingEmail', {
-                            bookingId: booking.id,
-                            to,
-                            subject: groupMessageForm.subject,
-                            message: finalHtml,
-                            messageText: finalText,
-                            template: groupMessageForm.template,
-                            bookingData: booking
-                        });
-                        emailSuccessCount += 1;
-                    } catch (err) {
-                        emailFailures.push({
+                // Send email if email checkbox is checked
+                if (groupMessageEmailChecked) {
+                    const to = booking.email || '';
+                    if (!to) {
+                        emailFailures.push({ booking, reason: 'Missing email address' });
+                    } else {
+                        const templateName = resolveTemplateName(groupMessageForm.template, emailTemplates.find((t) => t.id?.toString() === groupMessageForm.template?.toString()));
+                        let finalHtml = buildEmailHtml({
+                            templateName,
+                            messageHtml: groupMessageForm.message,
                             booking,
-                            reason: err?.response?.data?.message || err.message || 'Unknown error'
+                            personalNote: groupPersonalNote
                         });
-                    }
-                }
-            }
 
-            // Send SMS if SMS checkbox is checked
-            if (groupMessageSmsChecked) {
-                // Phone: use same sources as Mobile column - bookingFieldUpdates, booking.phone, then ALL passengers
-                // Same priority as Mobile column: manual updates > booking.phone > all passengers' mobile/phone
-                const getEffectivePhoneForBooking = (f) => {
-                    let latestUpdatedPhone = null;
-                    if (typeof window !== 'undefined') {
-                        const memUpdates = window.__bookingFieldUpdates || {};
-                        const memUpdate = memUpdates[String(f.id)];
-                        if (memUpdate?.field === 'phone' && memUpdate?.value) latestUpdatedPhone = memUpdate.value;
-                        if (!latestUpdatedPhone) {
+                        // Append Customer Portal link if Add Link checkbox is checked
+                        if (groupAddLink) {
                             try {
-                                const raw = window.localStorage?.getItem('bookingFieldUpdates');
-                                if (raw) {
-                                    const updates = JSON.parse(raw);
-                                    if (Array.isArray(updates)) {
-                                        for (let i = updates.length - 1; i >= 0; i--) {
-                                            const u = updates[i];
-                                            if (u && String(u.bookingId) === String(f.id) && u.field === 'phone' && u.value) {
-                                                latestUpdatedPhone = u.value;
-                                                break;
-                                            }
-                                        }
+                                const portalRes = await axios.post('/api/customerPortalShortLink', {
+                                    bookingId: booking.id,
+                                    contextType: 'booking'
+                                });
+                                const portalLink = portalRes.data?.shortUrl;
+                                if (portalLink) {
+                                    const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+                                    const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+                                    if (closingPattern.test(finalHtml)) {
+                                        finalHtml = finalHtml.replace(closingPattern, linkHtml + '$1');
+                                    } else {
+                                        finalHtml += linkHtml;
                                     }
                                 }
-                            } catch (_) {}
-                        }
-                    }
-                    if (latestUpdatedPhone) return latestUpdatedPhone;
-                    // Booking Details "Phone" field (synced with all_booking.phone)
-                    if (f.phone) return f.phone;
-                    if (f.mobile) return f.mobile;
-                    // Mobile column: check ALL passengers (correct number may be on passenger 2, e.g. 46 46)
-                    if (Array.isArray(f.passengers)) {
-                        for (const p of f.passengers) {
-                            const val = (p.mobile || p.phone || '').trim();
-                            if (val.length >= 10) return val;
-                        }
-                    }
-                    return '';
-                };
-                const phone = getEffectivePhoneForBooking(booking);
-                const normalizedPhone = normalizeUkPhone(phone);
-                // UK E.164: +44 + 10 digits = min 12 chars; reject clearly invalid/short numbers
-                const isValidUkPhone = normalizedPhone && normalizedPhone.startsWith('+') && normalizedPhone.length >= 12 && /^\+44\d{10}$/.test(normalizedPhone);
-                if (!normalizedPhone || !normalizedPhone.startsWith('+') || !isValidUkPhone) {
-                    smsFailures.push({ booking, reason: 'Missing or invalid phone number (need full UK number, e.g. 07563035823)' });
-                } else {
-                    // Use SMS template if available, otherwise convert email template to SMS format
-                    let smsMessage = '';
-                    let smsTemplateId = null;
-                    const isCustomSmsTemplate = !groupSmsForm.template || groupSmsForm.template === 'custom';
-
-                    // Custom Message: use ONLY the personalized note as the full SMS body
-                    if (isCustomSmsTemplate) {
-                        smsMessage = (groupPersonalNote && groupPersonalNote.trim()) ? groupPersonalNote.trim() : '';
-                    } else {
-                        // Template selected: use template message, optionally append personal note
-                        let effectiveSmsMessage = groupSmsForm.message;
-                        if ((!effectiveSmsMessage || effectiveSmsMessage.trim().length === 0) && smsTemplates.length > 0) {
-                            const templateObj = smsTemplates.find(t => String(t.id) === String(groupSmsForm.template));
-                            effectiveSmsMessage = templateObj ? (templateObj.message || '') : '';
-                        }
-                        if (effectiveSmsMessage && effectiveSmsMessage.trim().length > 0) {
-                            smsMessage = replaceSmsPrompts(effectiveSmsMessage, booking);
-                            smsTemplateId = groupSmsForm.template;
-                        } else if (groupMessageForm.message && groupMessageForm.message.trim().length > 0) {
-                            // Fallback: Convert email template to SMS format (only when not Custom Message)
-                            smsMessage = stripHtml(groupMessageForm.message);
-                            smsMessage = smsMessage
-                                .replace(/https?:\/\/[^\s]+/gi, '')
-                                .replace(/Customer Portal Link:.*/gi, '')
-                                .replace(/Receipt.*?All prices in GBP.*/gis, '')
-                                .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '')
-                                .replace(/\n{3,}/g, '\n\n')
-                                .trim();
-                            smsMessage = replaceSmsPrompts(smsMessage, booking);
-                        }
-
-                        // Add personal note if there's space (only for non-Custom templates)
-                        if (groupPersonalNote && groupPersonalNote.trim()) {
-                            const note = groupPersonalNote.trim();
-                            if (smsMessage) {
-                                smsMessage = `${smsMessage}\n\n${note}`;
-                            } else {
-                                smsMessage = note;
+                            } catch (linkErr) {
+                                console.warn('⚠️ Failed to generate customer portal link:', linkErr);
                             }
                         }
-                    }
 
-                    // Append Customer Portal link if Add Link checkbox is checked
-                    if (groupAddLink) {
+                        const finalText = stripHtml(finalHtml);
+
                         try {
-                            const portalRes = await axios.post('/api/customerPortalShortLink', {
+                            await axios.post('/api/sendBookingEmail', {
                                 bookingId: booking.id,
-                                contextType: 'booking'
+                                to,
+                                subject: groupMessageForm.subject,
+                                message: finalHtml,
+                                messageText: finalText,
+                                template: groupMessageForm.template,
+                                bookingData: booking
                             });
-                            const portalLink = portalRes.data?.shortUrl;
-                            if (portalLink) {
-                                smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
-                            }
-                        } catch (linkErr) {
-                            console.warn('⚠️ Failed to generate customer portal link for SMS:', linkErr);
-                        }
-                    }
-
-                    const SMS_MAX_LENGTH = 1600;
-                    let finalSmsMessage = smsMessage;
-
-                    // Final check - ensure total length doesn't exceed limit
-                    if (finalSmsMessage.length > SMS_MAX_LENGTH) {
-                        const truncated = finalSmsMessage.substring(0, SMS_MAX_LENGTH - 3).trim();
-                        finalSmsMessage = truncated.endsWith('.') || truncated.endsWith('!') || truncated.endsWith('?') 
-                            ? truncated + '..' 
-                            : truncated + '...';
-                    }
-
-                    if (finalSmsMessage && finalSmsMessage.trim().length > 0) {
-                        try {
-                            await axios.post('/api/sendBookingSms', {
-                                bookingId: booking.id,
-                                to: normalizedPhone,
-                                body: finalSmsMessage,
-                                templateId: smsTemplateId || (groupSmsForm.template && groupSmsForm.template !== 'custom' ? groupSmsForm.template : null)
-                            });
-                            smsSuccessCount += 1;
+                            emailSuccessCount += 1;
+                            emailSent = true;
                         } catch (err) {
-                            smsFailures.push({
+                            emailFailures.push({
                                 booking,
                                 reason: err?.response?.data?.message || err.message || 'Unknown error'
                             });
                         }
-                    } else {
-                        smsFailures.push({ booking, reason: 'SMS message is empty' });
                     }
                 }
-            }
-        }
 
-        setGroupMessageSending(false);
+                // Send SMS if SMS checkbox is checked
+                if (groupMessageSmsChecked) {
+                // Phone: use same sources as Mobile column - bookingFieldUpdates, booking.phone, then ALL passengers
+                // Same priority as Mobile column: manual updates > booking.phone > all passengers' mobile/phone
+                    const getEffectivePhoneForBooking = (f) => {
+                        let latestUpdatedPhone = null;
+                        if (typeof window !== 'undefined') {
+                            const memUpdates = window.__bookingFieldUpdates || {};
+                            const memUpdate = memUpdates[String(f.id)];
+                            if (memUpdate?.field === 'phone' && memUpdate?.value) latestUpdatedPhone = memUpdate.value;
+                            if (!latestUpdatedPhone) {
+                                try {
+                                    const raw = window.localStorage?.getItem('bookingFieldUpdates');
+                                    if (raw) {
+                                        const updates = JSON.parse(raw);
+                                        if (Array.isArray(updates)) {
+                                            for (let i = updates.length - 1; i >= 0; i--) {
+                                                const u = updates[i];
+                                                if (u && String(u.bookingId) === String(f.id) && u.field === 'phone' && u.value) {
+                                                    latestUpdatedPhone = u.value;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (_) {}
+                            }
+                        }
+                        if (latestUpdatedPhone) return latestUpdatedPhone;
+                        // Booking Details "Phone" field (synced with all_booking.phone)
+                        if (f.phone) return f.phone;
+                        if (f.mobile) return f.mobile;
+                        // Mobile column: check ALL passengers (correct number may be on passenger 2, e.g. 46 46)
+                        if (Array.isArray(f.passengers)) {
+                            for (const p of f.passengers) {
+                                const val = (p.mobile || p.phone || '').trim();
+                                if (val.length >= 10) return val;
+                            }
+                        }
+                        return '';
+                    };
+                    const phone = getEffectivePhoneForBooking(booking);
+                    const normalizedPhone = normalizeUkPhone(phone);
+                    // UK E.164: +44 + 10 digits = min 12 chars; reject clearly invalid/short numbers
+                    const isValidUkPhone = normalizedPhone && normalizedPhone.startsWith('+') && normalizedPhone.length >= 12 && /^\+44\d{10}$/.test(normalizedPhone);
+                    if (!normalizedPhone || !normalizedPhone.startsWith('+') || !isValidUkPhone) {
+                        smsFailures.push({ booking, reason: 'Missing or invalid phone number (need full UK number, e.g. 07563035823)' });
+                    } else {
+                        // Use SMS template if available, otherwise convert email template to SMS format
+                        let smsMessage = '';
+                        let smsTemplateId = null;
+                        const isCustomSmsTemplate = !groupSmsForm.template || groupSmsForm.template === 'custom';
 
-        let summary = '';
-        if (groupMessageEmailChecked) {
-            summary += `Emails sent: ${emailSuccessCount}`;
-            if (emailFailures.length > 0) {
-                summary += `\nEmail failures: ${emailFailures.length}`;
-            }
-        }
-        if (groupMessageSmsChecked) {
-            if (summary) summary += '\n';
-            summary += `SMS sent: ${smsSuccessCount}`;
-            if (smsFailures.length > 0) {
-                summary += `\nSMS failures: ${smsFailures.length}`;
-            }
-        }
+                        // Custom Message: use ONLY the personalized note as the full SMS body
+                        if (isCustomSmsTemplate) {
+                            smsMessage = (groupPersonalNote && groupPersonalNote.trim()) ? groupPersonalNote.trim() : '';
+                        } else {
+                            // Template selected: use template message, optionally append personal note
+                            let effectiveSmsMessage = groupSmsForm.message;
+                            if ((!effectiveSmsMessage || effectiveSmsMessage.trim().length === 0) && smsTemplates.length > 0) {
+                                const templateObj = smsTemplates.find(t => String(t.id) === String(groupSmsForm.template));
+                                effectiveSmsMessage = templateObj ? (templateObj.message || '') : '';
+                            }
+                            if (effectiveSmsMessage && effectiveSmsMessage.trim().length > 0) {
+                                smsMessage = replaceSmsPrompts(effectiveSmsMessage, booking);
+                                smsTemplateId = groupSmsForm.template;
+                            } else if (groupMessageForm.message && groupMessageForm.message.trim().length > 0) {
+                                // Fallback: Convert email template to SMS format (only when not Custom Message)
+                                smsMessage = stripHtml(groupMessageForm.message);
+                                smsMessage = smsMessage
+                                    .replace(/https?:\/\/[^\s]+/gi, '')
+                                    .replace(/Customer Portal Link:.*/gi, '')
+                                    .replace(/Receipt.*?All prices in GBP.*/gis, '')
+                                    .replace(/Fly Away Ballooning.*?All prices in GBP.*/gis, '')
+                                    .replace(/\n{3,}/g, '\n\n')
+                                    .trim();
+                                smsMessage = replaceSmsPrompts(smsMessage, booking);
+                            }
 
-        if (emailFailures.length === 0 && smsFailures.length === 0 && groupActionMode === 'cancel') {
-            try {
-                await cancelGroupBookings(groupSelectedBookings);
-                summary += `\nCancelled ${groupSelectedBookings.length} booking(s).`;
-            } catch (cancelErr) {
-                summary += `\nFailed to cancel bookings: ${cancelErr?.response?.data?.message || cancelErr.message || 'Unknown error'}`;
-            }
-        }
+                            // Add personal note if there's space (only for non-Custom templates)
+                            if (groupPersonalNote && groupPersonalNote.trim()) {
+                                const note = groupPersonalNote.trim();
+                                if (smsMessage) {
+                                    smsMessage = `${smsMessage}\n\n${note}`;
+                                } else {
+                                    smsMessage = note;
+                                }
+                            }
+                        }
 
-        alert(summary);
-        if (emailFailures.length === 0 && smsFailures.length === 0) {
-            closeGroupMessageModal();
+                        // Append Customer Portal link if Add Link checkbox is checked
+                        if (groupAddLink) {
+                            try {
+                                const portalRes = await axios.post('/api/customerPortalShortLink', {
+                                    bookingId: booking.id,
+                                    contextType: 'booking'
+                                });
+                                const portalLink = portalRes.data?.shortUrl;
+                                if (portalLink) {
+                                    smsMessage = smsMessage ? `${smsMessage}\n\nCustomer Portal\n${portalLink}` : `Customer Portal\n${portalLink}`;
+                                }
+                            } catch (linkErr) {
+                                console.warn('⚠️ Failed to generate customer portal link for SMS:', linkErr);
+                            }
+                        }
+
+                        const SMS_MAX_LENGTH = 1600;
+                        let finalSmsMessage = smsMessage;
+
+                        // Final check - ensure total length doesn't exceed limit
+                        if (finalSmsMessage.length > SMS_MAX_LENGTH) {
+                            const truncated = finalSmsMessage.substring(0, SMS_MAX_LENGTH - 3).trim();
+                            finalSmsMessage = truncated.endsWith('.') || truncated.endsWith('!') || truncated.endsWith('?') 
+                                ? truncated + '..' 
+                                : truncated + '...';
+                        }
+
+                        if (finalSmsMessage && finalSmsMessage.trim().length > 0) {
+                            try {
+                                await axios.post('/api/sendBookingSms', {
+                                    bookingId: booking.id,
+                                    to: normalizedPhone,
+                                    body: finalSmsMessage,
+                                    templateId: smsTemplateId || (groupSmsForm.template && groupSmsForm.template !== 'custom' ? groupSmsForm.template : null)
+                                });
+                                smsSuccessCount += 1;
+                                smsSent = true;
+                            } catch (err) {
+                                smsFailures.push({
+                                    booking,
+                                    reason: err?.response?.data?.message || err.message || 'Unknown error'
+                                });
+                            }
+                        } else {
+                            smsFailures.push({ booking, reason: 'SMS message is empty' });
+                        }
+                    }
+                }
+                bookingSendResults.push({
+                    booking,
+                    emailSent,
+                    smsSent,
+                    hasSuccessfulCommunication: emailSent || smsSent
+                });
+            }
+
+            let cancelledCount = 0;
+            let cancelFailures = [];
+            let remainingBookings = [];
+
+            if (groupActionMode === 'cancel') {
+                const bookingsToCancel = bookingSendResults
+                    .filter(result => result.hasSuccessfulCommunication)
+                    .map(result => result.booking);
+
+                if (bookingsToCancel.length > 0) {
+                    const cancelResult = await cancelGroupBookings(bookingsToCancel);
+                    cancelledCount = cancelResult.cancelledBookings.length;
+                    cancelFailures = cancelResult.failures;
+                }
+
+                const communicationFailureIds = new Set(
+                    bookingSendResults
+                        .filter(result => !result.hasSuccessfulCommunication)
+                        .map(result => result.booking.id)
+                );
+                const cancelFailureIds = new Set(cancelFailures.map(item => item.booking?.id).filter(Boolean));
+
+                remainingBookings = groupSelectedBookings.filter(
+                    booking => communicationFailureIds.has(booking.id) || cancelFailureIds.has(booking.id)
+                );
+            }
+
+            let summary = '';
+            if (groupMessageEmailChecked) {
+                summary += `Emails sent: ${emailSuccessCount}`;
+                if (emailFailures.length > 0) {
+                    summary += `\nEmail failures: ${emailFailures.length}`;
+                }
+            }
+            if (groupMessageSmsChecked) {
+                if (summary) summary += '\n';
+                summary += `SMS sent: ${smsSuccessCount}`;
+                if (smsFailures.length > 0) {
+                    summary += `\nSMS failures: ${smsFailures.length}`;
+                }
+            }
+
+            if (groupActionMode === 'cancel') {
+                const successfulCommunicationCount = bookingSendResults.filter(result => result.hasSuccessfulCommunication).length;
+
+                if (summary) summary += '\n';
+                summary += `Bookings cancelled: ${cancelledCount}`;
+
+                if (successfulCommunicationCount === 0) {
+                    summary += `\nNo bookings were cancelled because no message was successfully sent.`;
+                }
+
+                if (cancelFailures.length > 0) {
+                    summary += `\nCancel failures: ${cancelFailures.length}`;
+                }
+
+                if (remainingBookings.length > 0) {
+                    summary += `\nStill on manifest to retry: ${remainingBookings.length}`;
+                }
+            }
+
+            alert(summary);
+
+            if (groupActionMode === 'cancel') {
+                if (remainingBookings.length === 0) {
+                    closeGroupMessageModal();
+                } else {
+                    const remainingRecipients = Array.from(
+                        new Set(
+                            remainingBookings
+                                .map(booking => (booking.email || '').trim())
+                                .filter(Boolean)
+                        )
+                    );
+
+                    setGroupSelectedBookings(remainingBookings);
+                    setGroupMessagePreviewBooking(remainingBookings[0] || null);
+                    setGroupMessageForm(prev => ({
+                        ...prev,
+                        to: remainingRecipients
+                    }));
+                }
+                return;
+            }
+
+            if (emailFailures.length === 0 && smsFailures.length === 0) {
+                closeGroupMessageModal();
+            }
+        } finally {
+            setGroupMessageSending(false);
         }
     };
 
