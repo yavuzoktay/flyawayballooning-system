@@ -28593,34 +28593,17 @@ app.get(['/customerPortal/s/:shortCode', '/customerPortal/s/:shortCode/*'], (req
                 }
 
                 if (!rows || rows.length === 0 || !rows[0].target_url) {
-                    return resolveCustomerPortalShortLinkByData(shortCode, (fallbackErr, fallbackMatch) => {
-                        if (fallbackErr) {
-                            console.error(
-                                'Error rebuilding customer portal short link:',
-                                fallbackErr?.message || fallbackErr,
-                                fallbackErr?.sqlMessage || ''
-                            );
-                            return res.status(500).send('Failed to resolve short link');
-                        }
-
-                        if (!fallbackMatch?.targetUrl) {
-                            return res.status(404).send('Customer portal link not found');
-                        }
-
-                        const matchesToPersist = Array.isArray(fallbackMatch.allMatches) && fallbackMatch.allMatches.length
-                            ? fallbackMatch.allMatches
-                            : [fallbackMatch];
-
-                        matchesToPersist.forEach((match) => {
-                            persistCustomerPortalShortLink({
-                                shortCode: match.shortCode,
-                                targetUrl: match.targetUrl,
-                                portalToken: match.portalToken
-                            });
-                        });
-
-                        return res.redirect(302, fallbackMatch.targetUrl);
-                    });
+                    // Fail closed on unknown short codes. Rebuilding public links by
+                    // scanning other bookings can leak a different customer's portal.
+                    return res
+                        .status(410)
+                        .type('html')
+                        .send(
+                            buildCustomerPortalShortLinkUnavailablePage({
+                                message:
+                                    'This customer portal link has expired or is no longer available. Please use the latest link we sent you or contact Fly Away Ballooning for a new one.'
+                            })
+                        );
                 }
 
                 const targetUrl = String(rows[0].target_url).trim();
@@ -35749,9 +35732,7 @@ function ensureTheNewtPurchaseOrderSchema(callback) {
 const CUSTOMER_PORTAL_HOST = BACKEND_PUBLIC_URL || 'https://flyawayballooning-system.com';
 const CUSTOMER_PORTAL_BASE_URL = `${CUSTOMER_PORTAL_HOST}/customerPortal`;
 const CUSTOMER_PORTAL_SHORT_BASE_URL = `${CUSTOMER_PORTAL_BASE_URL}/s`;
-const FNV_32_OFFSET_BASIS = 0x811c9dc5;
-const FNV_32_SECONDARY_SEED = 0x9e3779b1;
-const FNV_32_PRIME = 0x01000193;
+const CUSTOMER_PORTAL_SHORT_CODE_LENGTH = 20;
 const LEGACY_FNV_OFFSET_BASIS = 14695981039346656037n;
 const LEGACY_FNV_PRIME = 1099511628211n;
 const LEGACY_UINT64_MOD = 18446744073709551616n;
@@ -35806,6 +35787,27 @@ function buildMinimalEmailDocument({ subject = '', bodyHtml = '' }) {
         <div style="font-size:16px; line-height:1.7; color:#1f2937;">
             ${bodyHtml}
         </div>
+    </div>
+</body>
+</html>`;
+}
+
+function buildCustomerPortalShortLinkUnavailablePage({
+    title = 'Customer Portal Link Expired',
+    message = 'This customer portal link is no longer valid. Please use the latest link we sent you or contact Fly Away Ballooning for a new one.'
+} = {}) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0; padding:24px; background:#f5f7fb; font-family:'Helvetica Neue', Arial, sans-serif; color:#1f2937;">
+    <div style="max-width:560px; margin:48px auto; background:#ffffff; border-radius:18px; padding:32px 28px; box-shadow:0 12px 32px rgba(15, 23, 42, 0.08);">
+        <p style="margin:0 0 12px; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#2563eb; font-weight:700;">Fly Away Ballooning</p>
+        <h1 style="margin:0 0 16px; font-size:28px; line-height:1.2; color:#111827;">${escapeHtml(title)}</h1>
+        <p style="margin:0; font-size:16px; line-height:1.7; color:#4b5563;">${escapeHtml(message)}</p>
     </div>
 </body>
 </html>`;
@@ -35978,27 +35980,17 @@ function sanitizeCustomerPortalToken(token = '') {
     return String(token).trim().replace(/[^a-zA-Z0-9+/=_-]/g, '');
 }
 
-function buildDeterministicHashSegment(value = '', seed = FNV_32_OFFSET_BASIS) {
-    const bytes = Buffer.from(String(value), 'utf8');
-    let hash = seed >>> 0;
-
-    for (const byte of bytes) {
-        hash ^= byte;
-        hash = Math.imul(hash, FNV_32_PRIME) >>> 0;
-    }
-
-    return (hash >>> 0).toString(36).padStart(7, '0');
-}
-
 function buildDeterministicCustomerPortalShortCode(value = '') {
-    const normalizedValue = value == null ? '' : String(value);
-    const primary = buildDeterministicHashSegment(normalizedValue, FNV_32_OFFSET_BASIS);
-    const secondary = buildDeterministicHashSegment(
-        `${normalizedValue}|customerPortal`,
-        FNV_32_SECONDARY_SEED
-    );
+    const normalizedValue = value == null ? '' : String(value).trim();
+    if (!normalizedValue) return '';
 
-    return `${primary}${secondary}`.slice(0, 13);
+    // Use a longer SHA-256-derived code so short links remain stable without
+    // relying on a small hash space that can accidentally cross-resolve.
+    return crypto
+        .createHash('sha256')
+        .update(normalizedValue)
+        .digest('hex')
+        .slice(0, CUSTOMER_PORTAL_SHORT_CODE_LENGTH);
 }
 
 function buildLegacyCustomerPortalShortCode(value = '') {
@@ -36417,15 +36409,41 @@ function persistCustomerPortalShortLink({ shortCode, targetUrl, portalToken }) {
             INSERT INTO customer_portal_short_links (short_code, target_url, portal_token, created_at, updated_at)
             VALUES (?, ?, ?, NOW(), NOW())
             ON DUPLICATE KEY UPDATE
-                target_url = VALUES(target_url),
-                portal_token = COALESCE(VALUES(portal_token), portal_token),
-                updated_at = CURRENT_TIMESTAMP
+                target_url = IF(target_url = VALUES(target_url), VALUES(target_url), target_url),
+                portal_token = IF(
+                    target_url = VALUES(target_url),
+                    COALESCE(VALUES(portal_token), portal_token),
+                    portal_token
+                ),
+                updated_at = IF(target_url = VALUES(target_url), CURRENT_TIMESTAMP, updated_at)
         `;
 
-        con.query(sql, [shortCode, targetUrl, portalToken || null], (err) => {
+        con.query(sql, [shortCode, targetUrl, portalToken || null], (err, result) => {
             if (err) {
                 console.error('Error upserting customer portal short link:', err);
                 customerPortalShortLinkCache.delete(cacheKey);
+                return;
+            }
+
+            if (result?.affectedRows === 2 && result?.changedRows === 0) {
+                con.query(
+                    'SELECT target_url FROM customer_portal_short_links WHERE short_code = ? LIMIT 1',
+                    [shortCode],
+                    (lookupErr, lookupRows) => {
+                        if (lookupErr) {
+                            console.error('Error checking customer portal short link collision:', lookupErr);
+                            return;
+                        }
+
+                        const existingTargetUrl = String(lookupRows?.[0]?.target_url || '').trim();
+                        if (existingTargetUrl && existingTargetUrl !== targetUrl) {
+                            console.error(
+                                'Customer portal short link collision prevented:',
+                                JSON.stringify({ shortCode, existingTargetUrl, requestedTargetUrl: targetUrl })
+                            );
+                        }
+                    }
+                );
             }
         });
     });
@@ -36446,9 +36464,7 @@ function getCustomerPortalLink(booking = {}) {
         booking.customerPortalShortUrl ||
         booking.portal_short_url ||
         booking.portalShortUrl;
-    if (explicitShortUrl) {
-        return explicitShortUrl;
-    }
+    const normalizedExplicitShortUrl = explicitShortUrl ? String(explicitShortUrl).trim() : '';
 
     const portalUrl =
         booking.customer_portal_url ||
@@ -36457,25 +36473,27 @@ function getCustomerPortalLink(booking = {}) {
         booking.portalUrl;
     if (portalUrl) {
         const trimmedPortalUrl = String(portalUrl).trim();
-        if (/\/customerPortal\/s\/[a-z0-9]+/i.test(trimmedPortalUrl)) {
+        if (!/\/customerPortal\/s\/[a-z0-9]+/i.test(trimmedPortalUrl)) {
+            const portalToken = extractLegacyCustomerPortalToken(trimmedPortalUrl);
+            const canonicalTarget = buildCanonicalCustomerPortalTarget(
+                portalToken,
+                extractUrlSuffix(trimmedPortalUrl)
+            );
+            if (canonicalTarget) {
+                return buildShortCustomerPortalLinkFromTarget(canonicalTarget, portalToken);
+            }
+
             return trimmedPortalUrl;
         }
-
-        const portalToken = extractLegacyCustomerPortalToken(trimmedPortalUrl);
-        const canonicalTarget = buildCanonicalCustomerPortalTarget(
-            portalToken,
-            extractUrlSuffix(trimmedPortalUrl)
-        );
-        if (canonicalTarget) {
-            return buildShortCustomerPortalLinkFromTarget(canonicalTarget, portalToken);
-        }
-
-        return trimmedPortalUrl;
     }
 
     const portalToken = buildCustomerPortalToken(booking);
     const canonicalTarget = buildCanonicalCustomerPortalTarget(portalToken);
-    return buildShortCustomerPortalLinkFromTarget(canonicalTarget, portalToken);
+    if (canonicalTarget) {
+        return buildShortCustomerPortalLinkFromTarget(canonicalTarget, portalToken);
+    }
+
+    return normalizedExplicitShortUrl || null;
 }
 
 // Helper function to generate booking confirmation message HTML (matches frontend getBookingConfirmationMessageHtml)
