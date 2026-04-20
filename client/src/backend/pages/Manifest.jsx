@@ -105,6 +105,21 @@ const renderBookingNameWithIndicators = (name, { isNewtBooking = false } = {}) =
 const MANIFEST_DATE_NOTE_AUTO_SAVE_DELAY_MS = 700;
 const normalizeManifestDateNoteValue = (value = '') => String(value || '').trim();
 
+const formatOperationalTimeForPayload = (value) => {
+    if (!value) return null;
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+            return trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+        }
+    }
+
+    const parsedValue = dayjs.isDayjs(value) ? value : dayjs(value);
+    return parsedValue.isValid() ? parsedValue.format('HH:mm:ss') : null;
+};
+
 const MemoizedEmailPreview = React.memo(
     ({ html, isMobile = false }) => {
         return (
@@ -3927,8 +3942,8 @@ const Manifest = () => {
               operational_selections: selectedOperationalValues,
               aircraft_defects: aircraftDefects,
               vehicle_trailer_defects: vehicleTrailerDefects,
-              flight_start_time: flightStartTime,
-              flight_end_time: flightEndTime
+              flight_start_time: formatOperationalTimeForPayload(flightStartTime),
+              flight_end_time: formatOperationalTimeForPayload(flightEndTime)
             })
           ));
         } catch (err) {

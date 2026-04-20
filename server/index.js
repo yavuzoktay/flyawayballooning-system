@@ -28025,6 +28025,86 @@ app.delete('/api/operational-selections/field/:field_name', (req, res) => {
 
 // Get flown flights (completed flights) - Similar to getAllBookingData
 // Use derived table + LEFT JOIN trip_booking to avoid MySQL "Invalid use of group function" with MIN() in correlated subqueries
+const FLIGHT_OPERATION_TIME_ZONE = 'Europe/London';
+const OPERATIONAL_TIME_ONLY_REGEX = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+const OPERATIONAL_LOCAL_DATETIME_REGEX = /^(\d{4}-\d{2}-\d{2})[ T]((?:\d{1,2}):\d{2}(?::\d{2})?)$/;
+const OPERATIONAL_DATE_TIME_FORMATS = [
+    'YYYY-MM-DD HH:mm:ss',
+    'YYYY-MM-DD HH:mm',
+    'YYYY-MM-DDTHH:mm:ss.SSS',
+    'YYYY-MM-DDTHH:mm:ss',
+    'YYYY-MM-DDTHH:mm',
+    'DD/MM/YYYY HH:mm:ss',
+    'DD/MM/YYYY HH:mm',
+    'HH:mm:ss',
+    'HH:mm',
+    moment.ISO_8601
+];
+const operationalLondonTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: FLIGHT_OPERATION_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+});
+
+const padOperationalTimePart = (value) => String(value).padStart(2, '0');
+
+const parseOperationalDateTime = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+
+    const strictParsed = moment(value, OPERATIONAL_DATE_TIME_FORMATS, true);
+    if (strictParsed.isValid()) {
+        return strictParsed;
+    }
+
+    const looseParsed = moment(value);
+    return looseParsed.isValid() ? looseParsed : null;
+};
+
+const normalizeOperationalWallClockTime = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        const timeOnlyMatch = trimmed.match(OPERATIONAL_TIME_ONLY_REGEX);
+        if (timeOnlyMatch) {
+            return [
+                padOperationalTimePart(timeOnlyMatch[1]),
+                padOperationalTimePart(timeOnlyMatch[2]),
+                padOperationalTimePart(timeOnlyMatch[3] || '00')
+            ].join(':');
+        }
+
+        const localDateTimeMatch = trimmed.match(OPERATIONAL_LOCAL_DATETIME_REGEX);
+        if (localDateTimeMatch) {
+            return normalizeOperationalWallClockTime(localDateTimeMatch[2]);
+        }
+
+        const hasExplicitTimezone =
+            /Z$/i.test(trimmed) ||
+            /[+-]\d{2}:?\d{2}$/.test(trimmed) ||
+            /\bGMT\b/i.test(trimmed) ||
+            /\bUTC\b/i.test(trimmed);
+
+        if (hasExplicitTimezone) {
+            const asDate = new Date(trimmed);
+            if (!Number.isNaN(asDate.getTime())) {
+                return operationalLondonTimeFormatter.format(asDate);
+            }
+        }
+    }
+
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : operationalLondonTimeFormatter.format(value);
+    }
+
+    const parsedMoment = parseOperationalDateTime(value);
+    return parsedMoment ? parsedMoment.format('HH:mm:ss') : null;
+};
+
 app.get('/api/flown-flights', (req, res) => {
     const sql = `
         SELECT 
@@ -28057,8 +28137,8 @@ app.get('/api/flown-flights', (req, res) => {
             tb.vehicle_used,
             tb.aircraft_defects,
             tb.vehicle_trailer_defects,
-            tb.flight_start_time,
-            tb.flight_end_time,
+            DATE_FORMAT(tb.flight_start_time, '%Y-%m-%d %H:%i:%s') as flight_start_time,
+            DATE_FORMAT(tb.flight_end_time, '%Y-%m-%d %H:%i:%s') as flight_end_time,
             tb.additional_fields,
             (SELECT CONCAT(pt.first_name, ' ', pt.last_name) 
              FROM flight_pilot_assignments fpa
@@ -28143,65 +28223,70 @@ app.get('/api/flown-flights', (req, res) => {
             
             // Format the results similar to getAllBookingData
             const formatted = results.map(row => {
+                const flightDateMoment = parseOperationalDateTime(row.flight_date);
+                const flightStartMoment = parseOperationalDateTime(row.flight_start_time);
+                const flightEndMoment = parseOperationalDateTime(row.flight_end_time);
+
                 // Format flight_date as DD/MM/YYYY AM/PM if time exists (for display only)
                 let flightDateFormatted = '';
-                if (row.flight_date) {
-                    const dateTime = moment(row.flight_date, [
-                        "YYYY-MM-DD HH:mm",
-                        "YYYY-MM-DDTHH:mm",
-                        "YYYY-MM-DD",
-                        "DD/MM/YYYY HH:mm",
-                        "DD/MM/YYYY"
-                    ]);
-                    if (dateTime.isValid()) {
-                        const hour = dateTime.hour();
-                        const ampm = hour < 12 ? 'AM' : 'PM';
-                        const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-                        const minute = dateTime.minute();
-                        flightDateFormatted =
-                            dateTime.format('DD/MM/YYYY') +
-                            ' ' +
-                            displayHour +
-                            ':' +
-                            (minute < 10 ? '0' : '') +
-                            minute +
-                            ' ' +
-                            ampm;
-                    } else {
-                        flightDateFormatted = row.flight_date;
-                    }
+                if (flightDateMoment) {
+                    const hour = flightDateMoment.hour();
+                    const minute = flightDateMoment.minute();
+                    const displayHour = hour === 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+                    const ampm = hour < 12 ? 'AM' : 'PM';
+                    flightDateFormatted =
+                        flightDateMoment.format('DD/MM/YYYY') +
+                        ' ' +
+                        displayHour +
+                        ':' +
+                        (minute < 10 ? '0' : '') +
+                        minute +
+                        ' ' +
+                        ampm;
+                } else if (row.flight_date) {
+                    flightDateFormatted = typeof row.flight_date === 'string'
+                        ? row.flight_date
+                        : moment(row.flight_date).format('DD/MM/YYYY h:mm A');
                 }
 
                 // Determine flight period (AM / PM)
                 // Priority: operational flight_start_time from trip_booking; fallback to booking flight_date
                 let flightPeriod = '';
-                if (row.flight_start_time) {
-                    const startTime = moment(row.flight_start_time, [
-                        "YYYY-MM-DD HH:mm",
-                        "YYYY-MM-DDTHH:mm",
-                        "DD/MM/YYYY HH:mm",
-                        "HH:mm",
-                        moment.ISO_8601
-                    ]);
-                    if (startTime.isValid()) {
-                        const hour = startTime.hour();
-                        flightPeriod = hour < 12 ? 'AM' : 'PM';
-                    }
+                if (flightStartMoment) {
+                    const hour = flightStartMoment.hour();
+                    flightPeriod = hour < 12 ? 'AM' : 'PM';
                 }
-                if (!flightPeriod && row.flight_date) {
-                    const dateTime = moment(row.flight_date, [
-                        "YYYY-MM-DD HH:mm",
-                        "YYYY-MM-DDTHH:mm",
-                        "YYYY-MM-DD",
-                        "DD/MM/YYYY HH:mm",
-                        "DD/MM/YYYY"
-                    ]);
-                    if (dateTime.isValid()) {
-                        const hour = dateTime.hour();
-                        flightPeriod = hour < 12 ? 'AM' : 'PM';
-                    }
+                if (!flightPeriod && flightDateMoment) {
+                    const hour = flightDateMoment.hour();
+                    flightPeriod = hour < 12 ? 'AM' : 'PM';
                 }
-                
+
+                let totalFlightTime = null;
+                if (flightStartMoment && flightEndMoment) {
+                    const duration = moment.duration(flightEndMoment.diff(flightStartMoment));
+                    const hours = Math.floor(duration.asHours());
+                    const minutes = duration.minutes();
+                    totalFlightTime = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+                }
+
+                const dutyStartTime = flightStartMoment
+                    ? flightStartMoment.clone().subtract(45, 'minutes').format('DD/MM/YYYY HH:mm')
+                    : null;
+
+                const dutyEndTime = flightEndMoment
+                    ? flightEndMoment.clone().add(45, 'minutes').format('DD/MM/YYYY HH:mm')
+                    : null;
+
+                let dutyTime = null;
+                if (flightStartMoment && flightEndMoment) {
+                    const dutyStart = flightStartMoment.clone().subtract(45, 'minutes');
+                    const dutyEnd = flightEndMoment.clone().add(45, 'minutes');
+                    const duration = moment.duration(dutyEnd.diff(dutyStart));
+                    const hours = Math.floor(duration.asHours());
+                    const minutes = duration.minutes();
+                    dutyTime = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+                }
+
                 // Format flight_type to show Private or Shared
                 let flightTypeDisplay = '';
                 if (row.flight_type) {
@@ -28214,7 +28299,7 @@ app.get('/api/flown-flights', (req, res) => {
                         flightTypeDisplay = row.flight_type; // Keep original if not matching
                     }
                 }
-                
+
                 // Parse additional_fields JSON if exists
                 let additionalFieldsParsed = {};
                 if (row.additional_fields) {
@@ -28226,7 +28311,7 @@ app.get('/api/flown-flights', (req, res) => {
                         console.warn('Failed to parse additional_fields:', e);
                     }
                 }
-                
+
                 // Build operational selections object
                 const operationalSelections = {
                     'Refuel Location': row.refuel_location || '',
@@ -28235,7 +28320,7 @@ app.get('/api/flown-flights', (req, res) => {
                     'Vehicle Used': row.vehicle_used || '',
                     ...additionalFieldsParsed
                 };
-                
+
                 // Calculate balloon resource
                 let balloonResource = 'N/A';
                 try {
@@ -28258,7 +28343,7 @@ app.get('/api/flown-flights', (req, res) => {
                 } catch (e) {
                     console.warn('Error calculating balloon resource:', e);
                 }
-                
+
                 return {
                     ...row,
                     booking_ids: row.booking_ids || row.id || '', // Comma-separated booking IDs
@@ -28275,90 +28360,12 @@ app.get('/api/flown-flights', (req, res) => {
                     aircraft_defects: row.aircraft_defects || '',
                     vehicle_trailer_defects: row.vehicle_trailer_defects || '',
                     balloon_resource: balloonResource,
-                    flight_start_time: row.flight_start_time ? moment(row.flight_start_time).format('DD/MM/YYYY HH:mm') : null,
-                    flight_end_time: row.flight_end_time ? moment(row.flight_end_time).format('DD/MM/YYYY HH:mm') : null,
-                    total_flight_time: (() => {
-                        if (row.flight_start_time && row.flight_end_time) {
-                            try {
-                                const start = moment(row.flight_start_time);
-                                const end = moment(row.flight_end_time);
-                                if (start.isValid() && end.isValid()) {
-                                    const duration = moment.duration(end.diff(start));
-                                    const hours = Math.floor(duration.asHours());
-                                    const minutes = duration.minutes();
-                                    if (hours > 0) {
-                                        return `${hours}h ${minutes}m`;
-                                    } else {
-                                        return `${minutes}m`;
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('Error calculating total flight time:', e);
-                            }
-                        }
-                        return null;
-                    })(),
-                    duty_start_time: (() => {
-                        // Calculate duty start time: 45 mins before flight start
-                        if (row.flight_start_time) {
-                            try {
-                                const flightStart = moment(row.flight_start_time);
-                                if (flightStart.isValid()) {
-                                    const dutyStart = moment(flightStart).subtract(45, 'minutes');
-                                    return dutyStart.format('DD/MM/YYYY HH:mm');
-                                }
-                            } catch (e) {
-                                console.warn('Error calculating duty start time:', e);
-                            }
-                        }
-                        return null;
-                    })(),
-                    duty_end_time: (() => {
-                        // Calculate duty end time: 45 mins after flight end
-                        if (row.flight_end_time) {
-                            try {
-                                const flightEnd = moment(row.flight_end_time);
-                                if (flightEnd.isValid()) {
-                                    const dutyEnd = moment(flightEnd).add(45, 'minutes');
-                                    return dutyEnd.format('DD/MM/YYYY HH:mm');
-                                }
-                            } catch (e) {
-                                console.warn('Error calculating duty end time:', e);
-                            }
-                        }
-                        return null;
-                    })(),
-                    duty_time: (() => {
-                        // Calculate duty time: 45 mins before flight start to 45 mins after flight end
-                        if (row.flight_start_time && row.flight_end_time) {
-                            try {
-                                const flightStart = moment(row.flight_start_time);
-                                const flightEnd = moment(row.flight_end_time);
-                                
-                                if (flightStart.isValid() && flightEnd.isValid()) {
-                                    // Calculate duty start (45 mins before flight start)
-                                    const dutyStart = moment(flightStart).subtract(45, 'minutes');
-                                    
-                                    // Calculate duty end (45 mins after flight end)
-                                    const dutyEnd = moment(flightEnd).add(45, 'minutes');
-                                    
-                                    // Calculate duration
-                                    const duration = moment.duration(dutyEnd.diff(dutyStart));
-                                    const hours = Math.floor(duration.asHours());
-                                    const minutes = duration.minutes();
-                                    
-                                    if (hours > 0) {
-                                        return `${hours}h ${minutes}m`;
-                                    } else {
-                                        return `${minutes}m`;
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('Error calculating duty time:', e);
-                            }
-                        }
-                        return null;
-                    })()
+                    flight_start_time: flightStartMoment ? flightStartMoment.format('DD/MM/YYYY HH:mm') : null,
+                    flight_end_time: flightEndMoment ? flightEndMoment.format('DD/MM/YYYY HH:mm') : null,
+                    total_flight_time: totalFlightTime,
+                    duty_start_time: dutyStartTime,
+                    duty_end_time: dutyEndTime,
+                    duty_time: dutyTime
                 };
             });
             
@@ -28464,8 +28471,9 @@ app.post('/api/save-flight-operational-selections', (req, res) => {
     const aircraftDefects = aircraft_defects || null;
     const vehicleTrailerDefects = vehicle_trailer_defects || null;
     
-    // Get flight_date from all_booking table and combine with time for flight_start_time and flight_end_time
-    con.query('SELECT flight_date FROM all_booking WHERE id = ?', [booking_id], (err, bookingResult) => {
+    // Get the flight date as a timezone-less YYYY-MM-DD string so operational times
+    // can be stored as exact wall-clock values without server/browser offset drift.
+    con.query(`SELECT DATE_FORMAT(flight_date, '%Y-%m-%d') AS flight_date_only FROM all_booking WHERE id = ?`, [booking_id], (err, bookingResult) => {
         if (err) {
             console.error('Error fetching booking flight_date:', err);
             return res.status(500).json({ success: false, message: 'Error fetching booking information' });
@@ -28475,16 +28483,13 @@ app.post('/api/save-flight-operational-selections', (req, res) => {
             return res.status(404).json({ success: false, message: 'Booking not found' });
         }
         
-        const flightDate = bookingResult[0].flight_date;
-        const flightDateStr = flightDate ? moment(flightDate).format('YYYY-MM-DD') : null;
+        const flightDateStr = bookingResult[0].flight_date_only || null;
         
         // Combine date from flight_date and time for flight_start_time and flight_end_time
         let flightStartTime = null;
         if (flightDateStr && flight_start_time) {
             try {
-                const startTime = moment(flight_start_time).isValid()
-                    ? moment(flight_start_time).format('HH:mm:ss')
-                    : null;
+                const startTime = normalizeOperationalWallClockTime(flight_start_time);
                 if (startTime) {
                     flightStartTime = `${flightDateStr} ${startTime}`;
                 }
@@ -28496,9 +28501,7 @@ app.post('/api/save-flight-operational-selections', (req, res) => {
         let flightEndTime = null;
         if (flightDateStr && flight_end_time) {
             try {
-                const endTime = moment(flight_end_time).isValid()
-                    ? moment(flight_end_time).format('HH:mm:ss')
-                    : null;
+                const endTime = normalizeOperationalWallClockTime(flight_end_time);
                 if (endTime) {
                     flightEndTime = `${flightDateStr} ${endTime}`;
                 }
