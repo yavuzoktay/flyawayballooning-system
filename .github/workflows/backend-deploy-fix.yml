@@ -130,7 +130,7 @@ jobs:
           
           # Start the server with PM2
           echo "Starting server with PM2..."
-          PORT=3002 pm2 start index.js --name flyawayballooning-server
+          PORT=3002 pm2 start index.js --name flyawayballooning-backend
           
           # Save PM2 configuration
           echo "Saving PM2 configuration..."
@@ -147,7 +147,7 @@ jobs:
           else
             echo "✗ Backend server is not responding"
             echo "Checking PM2 logs..."
-            pm2 logs flyawayballooning-server --lines 10
+            pm2 logs flyawayballooning-backend --lines 10
           fi
           
           # Update Nginx configuration

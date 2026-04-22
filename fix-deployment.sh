@@ -50,7 +50,7 @@ sudo systemctl restart nginx
 
 # Restart the Node.js application
 echo "Restarting Node.js application..."
-pm2 restart flyawayballooning-server
+pm2 restart flyawayballooning-backend
 
 echo "=== Deployment fixes completed ==="
 echo "Checking if services are running..."
@@ -63,7 +63,7 @@ else
 fi
 
 # Check if the Node.js app is running
-if pm2 list | grep -q "flyawayballooning-server.*online"; then
+if pm2 list | grep -q "flyawayballooning-backend.*online"; then
     echo "✅ Node.js application is running"
 else
     echo "❌ Node.js application is not running"
@@ -77,4 +77,4 @@ echo "Checking nginx configuration:"
 sudo nginx -t
 
 echo "Checking backend health:"
-curl -s http://localhost:3002/api/health || echo "Backend not responding" 
+curl -s http://localhost:3002/api/health || echo "Backend not responding"

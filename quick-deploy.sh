@@ -65,9 +65,9 @@ echo ""
 echo -e "${YELLOW}Step 5: Restarting backend server with PM2...${NC}"
 ssh ${SERVER_USER}@${SERVER_IP} << 'ENDSSH'
 cd /home/ec2-user/flyawayballooning-system-backend/server
-pm2 restart flyawayballooning-server
+pm2 restart flyawayballooning-backend
 sleep 3
-pm2 status flyawayballooning-server
+pm2 status flyawayballooning-backend
 ENDSSH
 echo -e "${GREEN}✅ Server restarted${NC}"
 echo ""
@@ -78,7 +78,7 @@ echo "Testing API endpoint locally..."
 curl -s http://localhost:3002/api/email-templates | head -c 100
 echo ""
 echo "Checking PM2 logs for errors..."
-pm2 logs flyawayballooning-server --lines 5 --nostream
+pm2 logs flyawayballooning-backend --lines 5 --nostream
 ENDSSH
 echo ""
 
@@ -108,6 +108,5 @@ echo "4. Verify the section loads without errors"
 echo ""
 echo "If issues persist, check logs:"
 echo "  ssh ${SERVER_USER}@${SERVER_IP}"
-echo "  pm2 logs flyawayballooning-server"
+echo "  pm2 logs flyawayballooning-backend"
 echo ""
-

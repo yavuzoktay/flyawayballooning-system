@@ -24,12 +24,14 @@ chmod 755 uploads/activities
 
 # Stop the current PM2 process if running
 echo "Stopping current PM2 process..."
+pm2 stop flyawayballooning-backend 2>/dev/null || true
+pm2 delete flyawayballooning-backend 2>/dev/null || true
 pm2 stop flyawayballooning-server 2>/dev/null || true
 pm2 delete flyawayballooning-server 2>/dev/null || true
 
 # Start the server with PM2
 echo "Starting server with PM2..."
-PORT=3002 pm2 start index.js --name flyawayballooning-server
+PORT=3002 pm2 start index.js --name flyawayballooning-backend
 
 # Save PM2 configuration
 echo "Saving PM2 configuration..."
@@ -46,7 +48,7 @@ if curl -s http://localhost:3002/api/health > /dev/null; then
 else
     echo "❌ Backend server is not responding"
     echo "Checking PM2 logs..."
-    pm2 logs flyawayballooning-server --lines 10
+    pm2 logs flyawayballooning-backend --lines 10
 fi
 
-echo "=== Backend deployment completed ===" 
+echo "=== Backend deployment completed ==="

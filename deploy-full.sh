@@ -70,10 +70,12 @@ fi
 
 echo ""
 echo "7. Restarting Backend Server (PM2)..."
+pm2 stop flyawayballooning-backend 2>/dev/null || true
+pm2 delete flyawayballooning-backend 2>/dev/null || true
 pm2 stop flyawayballooning-server 2>/dev/null || true
 pm2 delete flyawayballooning-server 2>/dev/null || true
 cd server
-PORT=3002 pm2 start index.js --name flyawayballooning-server
+PORT=3002 pm2 start index.js --name flyawayballooning-backend
 pm2 save
 cd ..
 
@@ -93,11 +95,11 @@ else
 fi
 
 # Check PM2
-if pm2 list | grep -q "flyawayballooning-server.*online"; then
+if pm2 list | grep -q "flyawayballooning-backend.*online"; then
     echo "✅ Backend server (PM2) is running"
 else
     echo "❌ Backend server (PM2) is not running"
-    pm2 logs flyawayballooning-server --lines 20
+    pm2 logs flyawayballooning-backend --lines 20
 fi
 
 # Check Backend Health
@@ -108,7 +110,7 @@ if curl -s http://localhost:3002/api/health > /dev/null; then
 else
     echo "❌ Backend health check failed"
     echo "PM2 logs:"
-    pm2 logs flyawayballooning-server --lines 20
+    pm2 logs flyawayballooning-backend --lines 20
 fi
 
 echo ""
@@ -118,7 +120,6 @@ echo "=========================================="
 echo ""
 echo "Next steps:"
 echo "1. Check the live site: https://flyawayballooning-system.com"
-echo "2. Check PM2 logs: pm2 logs flyawayballooning-server"
+echo "2. Check PM2 logs: pm2 logs flyawayballooning-backend"
 echo "3. Check Nginx logs: sudo tail -f /var/log/nginx/error.log"
 echo ""
-

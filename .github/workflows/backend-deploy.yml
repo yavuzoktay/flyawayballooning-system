@@ -162,8 +162,11 @@ jobs:
               EOF
               
               echo "Restarting application with PM2..."
+              pm2 stop flyawayballooning-backend 2>/dev/null || true
+              pm2 delete flyawayballooning-backend 2>/dev/null || true
+              pm2 stop flyawayballooning-server 2>/dev/null || true
               pm2 delete flyawayballooning-server 2>/dev/null || true
-              PORT=3002 pm2 start index.js --name flyawayballooning-server
+              PORT=3002 pm2 start index.js --name flyawayballooning-backend
               pm2 save
               
               echo "Setting up PM2 startup script..."
@@ -190,7 +193,7 @@ jobs:
                 echo "Checking PM2 status:"
                 pm2 status
                 echo "Checking PM2 logs:"
-                pm2 logs flyawayballooning-server --lines 20
+                pm2 logs flyawayballooning-backend --lines 20
                 echo "Checking if port 3002 is listening:"
                 netstat -tlnp | grep 3002 || echo "Port 3002 not listening"
                 exit 1
