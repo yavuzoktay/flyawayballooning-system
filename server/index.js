@@ -9591,14 +9591,24 @@ app.get('/api/getAllBookingData', (req, res) => {
                 ab.name
             ) as name,
             ab.name as passenger_name,
-            -- Calculate actual paid amount from payment_history (includes promo codes and refunds)
+            -- Calculate actual paid amount from payment_history (includes promo codes and refunds).
+            -- Some legacy/add-passenger bookings only have the incremental payment in payment_history,
+            -- so never let non-refund payment history understate the stored booking paid total.
             -- For Gift Voucher redemptions, prioritize voucher's paid amount over payment_history
             -- Only override if there are payment records; otherwise use the stored paid value
             CASE 
                 WHEN v.book_flight = 'Gift Voucher' AND v.paid IS NOT NULL AND v.paid > 0 THEN v.paid
-                ELSE COALESCE(
+                WHEN EXISTS (
+                    SELECT 1 FROM payment_history ph
+                    WHERE ph.booking_id = ab.id
+                    AND (ph.payment_status = 'refunded' OR ph.amount < 0 OR ph.origin = 'refund')
+                ) THEN COALESCE(
                     (SELECT SUM(ph.amount) FROM payment_history ph WHERE ph.booking_id = ab.id),
                     ab.paid
+                )
+                ELSE GREATEST(
+                    COALESCE((SELECT SUM(ph.amount) FROM payment_history ph WHERE ph.booking_id = ab.id), ab.paid, 0),
+                    COALESCE(ab.paid, 0)
                 )
             END as paid,
             -- Check if booking has any refunds (payment_status = 'refunded' or amount < 0)
