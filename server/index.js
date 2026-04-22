@@ -19851,6 +19851,13 @@ app.patch('/api/updateBookingField', (req, res) => {
                     // Preserve original value if it doesn't match known patterns
                     normalizedValue = value;
                 }
+
+                if (String(normalizedValue).trim().toLowerCase() === 'closed') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Closed is an availability status, not a booking status'
+                    });
+                }
             }
 
             sql = `UPDATE all_booking SET ${field} = ? WHERE id = ?`;
@@ -26812,11 +26819,29 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
     }
 
     try {
-        // 1. Update booking status
-        // BUT: Preserve statuses like 'Flown', 'Checked In', 'No Show', 'Cancelled' when new_status is 'Open' or 'Closed'
-        // Only update status if current status is not a preserved status
+        const normalizeManifestStatus = (status) => {
+            const trimmed = String(status || '').trim();
+            const lower = trimmed.toLowerCase();
+
+            if (lower === 'open') return 'Open';
+            if (lower === 'closed') return 'Closed';
+            if (lower === 'cancelled') return 'Cancelled';
+            if (lower === 'scheduled') return 'Scheduled';
+            if (lower === 'flown') return 'Flown';
+            if (lower === 'checked in' || lower === 'checkedin') return 'Checked In';
+            if (lower === 'no show' || lower === 'noshow') return 'No Show';
+            return trimmed;
+        };
+
+        const normalizedNewStatus = normalizeManifestStatus(new_status);
+        const normalizedOldStatus = normalizeManifestStatus(old_status);
+
+        // 1. Update booking status only for real booking lifecycle statuses.
+        // Open/Closed belong to activity availability / manifest slot state and must never be
+        // written to all_booking.status.
+        const availabilityOnlyStatuses = new Set(['Open', 'Closed']);
         const preserveStatuses = ['Flown', 'Checked In', 'No Show', 'Cancelled'];
-        let shouldUpdateStatus = true;
+        let shouldUpdateStatus = !availabilityOnlyStatuses.has(normalizedNewStatus);
         let currentStatus = null;
         
         // Get current status first
@@ -26829,10 +26854,14 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
         
         if (currentStatusRows && currentStatusRows.length > 0) {
             currentStatus = currentStatusRows[0].status;
+            const normalizedCurrentStatus = normalizeManifestStatus(currentStatus);
             // Don't override preserved statuses with 'Open' or 'Closed'
-            if (preserveStatuses.includes(currentStatus) && (new_status === 'Open' || new_status === 'Closed')) {
+            if (availabilityOnlyStatuses.has(normalizedNewStatus)) {
                 shouldUpdateStatus = false;
-                console.log(`⚠️ Preserving status '${currentStatus}' for booking ${booking_id}, not updating to '${new_status}'`);
+                console.log(`Treating '${normalizedNewStatus}' as availability-only for booking ${booking_id}; all_booking.status remains '${currentStatus}'`);
+            } else if (preserveStatuses.includes(normalizedCurrentStatus)) {
+                shouldUpdateStatus = false;
+                console.log(`Preserving status '${currentStatus}' for booking ${booking_id}, not updating to '${normalizedNewStatus}'`);
             }
         }
         
@@ -26853,7 +26882,7 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                 // 1. Status is being changed to 'Cancelled'
                 // 2. The voucher was redeemed (not just purchased)
                 // 3. This is a voucher-based booking
-                const shouldIncrement = new_status === 'Cancelled' && voucherCode;
+                const shouldIncrement = normalizedNewStatus === 'Cancelled' && voucherCode;
                 if (!shouldIncrement) return;
 
                 // Get current attempts and increment
@@ -26899,7 +26928,7 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
         // Only update status if it's not a preserved status
         if (shouldUpdateStatus) {
             await new Promise((resolve, reject) => {
-                con.query(updateBookingSql, [new_status, booking_id], (err, result) => {
+                con.query(updateBookingSql, [normalizedNewStatus, booking_id], (err, result) => {
                     if (err) reject(err);
                     else resolve(result);
                 });
@@ -26981,10 +27010,10 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
         let newAvailable = currentAvailability.available;
 
         // 6. Calculate new available count based on status change and pax
-        if (old_status === 'Open' && new_status === 'Closed') {
+        if (normalizedOldStatus === 'Open' && normalizedNewStatus === 'Closed') {
             // From Open to Closed: decrease available by pax
             newAvailable = Math.max(0, currentAvailability.available - pax);
-        } else if (old_status === 'Closed' && new_status === 'Open') {
+        } else if (normalizedOldStatus === 'Closed' && normalizedNewStatus === 'Open') {
             // From Closed to Open: increase available by pax
             newAvailable = Math.min(currentAvailability.capacity, currentAvailability.available + pax);
         }
@@ -27004,7 +27033,7 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
         });
 
         // When cancelling, clear crew and pilot assignments for this slot
-        if (new_status === 'Cancelled' && activity_id && formattedDate && formattedTime) {
+        if (normalizedNewStatus === 'Cancelled' && activity_id && formattedDate && formattedTime) {
             try {
                 let clearTime = formattedTime;
                 if (clearTime && clearTime.length === 5 && /^\d{2}:\d{2}$/.test(clearTime)) clearTime = clearTime + ':00';
@@ -27049,7 +27078,7 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                 const booking = bookingDetails[0];
                 const eventId = booking.google_calendar_event_id;
 
-                if (new_status === 'Cancelled') {
+                if (normalizedNewStatus === 'Cancelled') {
                     // Delete Google Calendar event when flight is cancelled
                     if (eventId) {
                         try {
@@ -27076,7 +27105,7 @@ app.patch("/api/updateManifestStatus", async (req, res) => {
                             saveErrorLog('error', `${errorMessage}. Details: ${errorDetails}`, stackTrace, 'updateManifestStatus.deleteCalendarEvent');
                         }
                     }
-                } else if (eventId && (old_status !== new_status || total_pax)) {
+                } else if (eventId && (normalizedOldStatus !== normalizedNewStatus || total_pax)) {
                     // Update Google Calendar event when status changes or passenger count changes
                     // Get all bookings for this flight slot to calculate total passengers
                     const getFlightBookingsSql = `
