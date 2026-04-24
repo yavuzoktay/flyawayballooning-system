@@ -6465,6 +6465,8 @@ function getAuthoritativePaidAmountFromSessionStore(storeData) {
     return 0;
 }
 
+let hasLoggedGoogleAdsApiUploadDisabled = false;
+
 /**
  * Helper function to send Google Ads conversion after successful payment
  * This is called from the webhook after payment is confirmed
@@ -6476,6 +6478,17 @@ function getAuthoritativePaidAmountFromSessionStore(storeData) {
  */
 async function sendGoogleAdsConversionIfNeeded(session, transactionId, value, currency = 'GBP') {
     try {
+        const apiUploadEnabled = String(process.env.GOOGLE_ADS_API_UPLOAD_ENABLED || '').toLowerCase() === 'true';
+        if (!apiUploadEnabled) {
+            const infoMessage = 'Skipping server-side Google Ads API upload because GOOGLE_ADS_API_UPLOAD_ENABLED is not true. Client-side Google tag purchase conversion remains active.';
+            console.log('ℹ️', infoMessage);
+            if (!hasLoggedGoogleAdsApiUploadDisabled) {
+                saveErrorLog('info', infoMessage, null, 'googleAds.sendConversionIfNeeded');
+                hasLoggedGoogleAdsApiUploadDisabled = true;
+            }
+            return { success: false, reason: 'api_upload_disabled' };
+        }
+
         // Extract funnel_type, experience_type, product_type for GA_Purchase_Completed
         const funnelType = session.metadata?.funnel_type || 'booking';
         const experienceType = session.metadata?.experience_type || 'shared';
