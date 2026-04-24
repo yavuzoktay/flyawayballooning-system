@@ -2690,6 +2690,7 @@ const Manifest = () => {
 
     // Debounce timer for auto-update status
     const autoUpdateStatusTimersRef = React.useRef({});
+    const autoUpdateStatusInFlightRef = React.useRef({});
     
     // Function to automatically update flight status based on passenger count (with debounce)
     const autoUpdateFlightStatus = async (flight) => {
@@ -2722,63 +2723,52 @@ const Manifest = () => {
             const maxCapacity = activity.find((a) => a.id == flight.activity_id)?.capacity || 0;
             
             console.log(`autoUpdateFlightStatus - Flight ${flight.id}: passengers ${totalPassengers}/${maxCapacity}, current status: ${getFlightStatus(flight)}`);
-            
-            // Eğer total passengers capacity'yi geçiyorsa, otomatik olarak flight'ı kapat
-            if (totalPassengers >= maxCapacity && maxCapacity > 0) {
-                const currentStatus = getFlightStatus(flight);
-                if (currentStatus === "Open") {
-                    console.log(`Auto-closing flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
-                    
-                    // Update the flight status to Closed
-                    await axios.patch('/api/updateManifestStatus', {
-                        booking_id: flight.id,
-                        old_status: 'Open',
-                        new_status: 'Closed',
-                        flight_date: flight.flight_date,
-                        location: flight.location,
-                        total_pax: totalPassengers
-                    });
-                    
-                    // Update local state
-                    setFlights(prevFlights => prevFlights.map(f =>
-                        f.flight_date === flight.flight_date && 
-                        f.location === flight.location && 
-                        f.flight_type === flight.flight_type &&
-                        f.time_slot === flight.time_slot
-                            ? { ...f, manual_status_override: 0 } // 0 = Closed
-                            : f
-                    ));
-                    
-                    console.log(`Flight ${flight.id} status updated to Closed`);
-                }
-            } else if (totalPassengers < maxCapacity && maxCapacity > 0) {
-                // Eğer total passengers capacity'nin altındaysa ve status "Closed" ise, "Open" yapılabilir
-                const currentStatus = getFlightStatus(flight);
-                if (currentStatus === "Closed" && flight.manual_status_override === 0) {
-                    console.log(`Auto-opening flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
-                    
-                    // Update the flight status to Open
-                    await axios.patch('/api/updateManifestStatus', {
-                        booking_id: flight.id,
-                        old_status: 'Closed',
-                        new_status: 'Open',
-                        flight_date: flight.flight_date,
-                        location: flight.location,
-                        total_pax: totalPassengers
-                    });
-                    
-                    // Update local state
-                    setFlights(prevFlights => prevFlights.map(f =>
-                        f.flight_date === flight.flight_date && 
-                        f.location === flight.location && 
-                        f.flight_type === flight.flight_type &&
-                        f.time_slot === flight.time_slot
-                            ? { ...f, manual_status_override: 1 } // 1 = Open
-                            : f
-                    ));
-                    
-                    console.log(`Flight ${flight.id} status updated to Open`);
-                }
+
+            const currentStatus = getFlightStatus(flight);
+            let nextStatus = null;
+            let nextManualOverride = null;
+
+            if (totalPassengers >= maxCapacity && maxCapacity > 0 && currentStatus === "Open") {
+                nextStatus = "Closed";
+                nextManualOverride = 0;
+            } else if (totalPassengers < maxCapacity && maxCapacity > 0 && currentStatus === "Closed" && flight.manual_status_override === 0) {
+                nextStatus = "Open";
+                nextManualOverride = 1;
+            }
+
+            if (!nextStatus) return;
+
+            const updateKey = `${flightKey}:${currentStatus}->${nextStatus}`;
+            if (autoUpdateStatusInFlightRef.current[updateKey]) {
+                console.log(`Auto-status update already in flight for ${updateKey}`);
+                return;
+            }
+
+            autoUpdateStatusInFlightRef.current[updateKey] = true;
+            try {
+                console.log(`Auto-${nextStatus === "Closed" ? "closing" : "opening"} flight: ${flight.id} - passengers: ${totalPassengers}/${maxCapacity}`);
+
+                await axios.patch('/api/updateManifestStatus', {
+                    booking_id: flight.id,
+                    old_status: currentStatus,
+                    new_status: nextStatus,
+                    flight_date: flight.flight_date,
+                    location: flight.location,
+                    total_pax: totalPassengers
+                });
+
+                setFlights(prevFlights => prevFlights.map(f =>
+                    f.flight_date === flight.flight_date &&
+                    f.location === flight.location &&
+                    f.flight_type === flight.flight_type &&
+                    f.time_slot === flight.time_slot
+                        ? { ...f, manual_status_override: nextManualOverride }
+                        : f
+                ));
+
+                console.log(`Flight ${flight.id} status updated to ${nextStatus}`);
+            } finally {
+                delete autoUpdateStatusInFlightRef.current[updateKey];
             }
         } catch (error) {
             console.error('Error auto-updating flight status:', error);
@@ -5240,38 +5230,6 @@ const Manifest = () => {
                                     : (parseFloat(f.weight) || 0);
                                 return sum + passengerWeight;
                             }, 0).toFixed(2);
-                            
-                            // Auto-update status to Closed if Pax Booked equals capacity
-                            if (status === "Closed" && paxBookedDisplay === paxTotalDisplay && paxTotalDisplay !== '-') {
-                                // Check if we need to update the database
-                                const currentFlightStatus = getFlightStatus(first);
-                                if (currentFlightStatus === "Open") {
-                                    console.log(`Auto-updating flight ${first.id} status to Closed (${paxBookedDisplay}/${paxTotalDisplay})`);
-                                    
-                                    // Update the flight status to Closed in the database
-                                    axios.patch("/api/updateManifestStatus", {
-                                        booking_id: first.id,
-                                        old_status: "Open",
-                                        new_status: "Closed",
-                                        flight_date: first.flight_date,
-                                        location: first.location,
-                                        total_pax: paxBookedDisplay
-                                    }).then(() => {
-                                        console.log(`Flight ${first.id} status updated to Closed in database`);
-                                        // Update local state
-                                        setFlights(prevFlights => prevFlights.map(f =>
-                                            f.flight_date === first.flight_date && 
-                                            f.location === first.location && 
-                                            f.flight_type === first.flight_type &&
-                                            f.time_slot === first.time_slot
-                                                ? { ...f, manual_status_override: 0 } // 0 = Closed
-                                                : f
-                                        ));
-                                    }).catch(error => {
-                                        console.error(`Error updating flight ${first.id} status:`, error);
-                                    });
-                                }
-                            }
                             
                             // Debug logging for status calculation
                             console.log('Status calculation:', {

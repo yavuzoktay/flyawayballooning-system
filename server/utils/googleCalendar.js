@@ -4,6 +4,186 @@ require('dotenv').config();
 // Function to save error logs (will be passed from index.js)
 let saveErrorLogFunction = null;
 
+const parsePositiveInt = (value, fallback) => {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const GOOGLE_CALENDAR_MIN_REQUEST_INTERVAL_MS = parsePositiveInt(
+    process.env.GOOGLE_CALENDAR_MIN_REQUEST_INTERVAL_MS,
+    300
+);
+const GOOGLE_CALENDAR_MAX_RETRY_ATTEMPTS = parsePositiveInt(
+    process.env.GOOGLE_CALENDAR_MAX_RETRY_ATTEMPTS,
+    5
+);
+const GOOGLE_CALENDAR_BASE_RETRY_DELAY_MS = parsePositiveInt(
+    process.env.GOOGLE_CALENDAR_BASE_RETRY_DELAY_MS,
+    750
+);
+const GOOGLE_CALENDAR_MAX_RETRY_DELAY_MS = parsePositiveInt(
+    process.env.GOOGLE_CALENDAR_MAX_RETRY_DELAY_MS,
+    30000
+);
+const GOOGLE_CALENDAR_ACCESS_CACHE_TTL_MS = parsePositiveInt(
+    process.env.GOOGLE_CALENDAR_ACCESS_CACHE_TTL_MS,
+    10 * 60 * 1000
+);
+
+let googleCalendarRequestQueue = Promise.resolve();
+let lastGoogleCalendarRequestAt = 0;
+let googleCalendarPauseUntil = 0;
+const calendarAccessVerifiedAt = new Map();
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const getCalendarErrorPayload = (error) => error?.response?.data?.error || error?.errors || null;
+
+const getCalendarErrorCode = (error) => {
+    const payload = getCalendarErrorPayload(error);
+    return payload?.code || error?.response?.status || error?.status || error?.code;
+};
+
+const getCalendarErrorReason = (error) => {
+    const payload = getCalendarErrorPayload(error);
+    return payload?.errors?.[0]?.reason || payload?.reason || error?.reason || null;
+};
+
+const getCalendarErrorMessage = (error) => {
+    const payload = getCalendarErrorPayload(error);
+    return String(payload?.message || error?.message || 'Unknown error');
+};
+
+const isRateLimitedCalendarError = (error) => {
+    const code = Number(getCalendarErrorCode(error));
+    const reason = getCalendarErrorReason(error);
+    return (
+        code === 429 ||
+        reason === 'rateLimitExceeded' ||
+        reason === 'userRateLimitExceeded'
+    );
+};
+
+const isRetryableCalendarError = (error) => {
+    const code = Number(getCalendarErrorCode(error));
+    return isRateLimitedCalendarError(error) || [500, 502, 503, 504].includes(code);
+};
+
+const isCalendarPermissionError = (error) => {
+    if (isRateLimitedCalendarError(error)) return false;
+
+    const code = Number(getCalendarErrorCode(error));
+    const reason = getCalendarErrorReason(error);
+    const message = getCalendarErrorMessage(error);
+
+    return (
+        code === 403 &&
+        (
+            reason === 'forbidden' ||
+            reason === 'insufficientPermissions' ||
+            message.includes('writer access') ||
+            message.includes('requiredAccessLevel')
+        )
+    );
+};
+
+const getHeaderValue = (headers, name) => {
+    if (!headers) return null;
+    if (typeof headers.get === 'function') return headers.get(name);
+    return headers[name] || headers[name.toLowerCase()] || headers[name.toUpperCase()] || null;
+};
+
+const getRetryAfterDelayMs = (error) => {
+    const headers = error?.response?.headers || error?.headers;
+    const retryAfter = getHeaderValue(headers, 'retry-after');
+    if (!retryAfter) return null;
+
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+        return seconds * 1000;
+    }
+
+    const retryDate = Date.parse(retryAfter);
+    if (Number.isFinite(retryDate)) {
+        return Math.max(0, retryDate - Date.now());
+    }
+
+    return null;
+};
+
+const calculateRetryDelayMs = (attempt, error) => {
+    const retryAfterDelay = getRetryAfterDelayMs(error);
+    if (retryAfterDelay !== null) {
+        return Math.min(retryAfterDelay, GOOGLE_CALENDAR_MAX_RETRY_DELAY_MS);
+    }
+
+    const exponentialDelay = GOOGLE_CALENDAR_BASE_RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+    const jitterMultiplier = 0.75 + Math.random() * 0.5;
+    return Math.min(
+        Math.round(exponentialDelay * jitterMultiplier),
+        GOOGLE_CALENDAR_MAX_RETRY_DELAY_MS
+    );
+};
+
+const runQueuedGoogleCalendarRequest = async (operationName, requestFunction) => {
+    const runRequest = async () => {
+        const now = Date.now();
+        const waitUntil = Math.max(
+            lastGoogleCalendarRequestAt + GOOGLE_CALENDAR_MIN_REQUEST_INTERVAL_MS,
+            googleCalendarPauseUntil
+        );
+        const waitMs = Math.max(0, waitUntil - now);
+
+        if (waitMs > 0) {
+            await sleep(waitMs);
+        }
+
+        lastGoogleCalendarRequestAt = Date.now();
+        return requestFunction();
+    };
+
+    const queuedRequest = googleCalendarRequestQueue.then(runRequest, runRequest);
+    googleCalendarRequestQueue = queuedRequest.catch(() => {});
+
+    return queuedRequest;
+};
+
+const executeGoogleCalendarRequest = async (operationName, requestFunction) => {
+    for (let attempt = 1; attempt <= GOOGLE_CALENDAR_MAX_RETRY_ATTEMPTS; attempt += 1) {
+        try {
+            return await runQueuedGoogleCalendarRequest(operationName, requestFunction);
+        } catch (error) {
+            if (!isRetryableCalendarError(error) || attempt >= GOOGLE_CALENDAR_MAX_RETRY_ATTEMPTS) {
+                throw error;
+            }
+
+            const delayMs = calculateRetryDelayMs(attempt, error);
+            googleCalendarPauseUntil = Math.max(googleCalendarPauseUntil, Date.now() + delayMs);
+
+            console.warn(
+                `⚠️ [googleCalendar] ${operationName} hit a retryable Calendar API error (${getCalendarErrorReason(error) || getCalendarErrorCode(error)}). ` +
+                `Retrying in ${delayMs}ms (attempt ${attempt + 1}/${GOOGLE_CALENDAR_MAX_RETRY_ATTEMPTS}).`
+            );
+
+            await sleep(delayMs);
+        }
+    }
+};
+
+const verifyCalendarAccess = async (calendar, calendarId) => {
+    const lastVerifiedAt = calendarAccessVerifiedAt.get(calendarId);
+    if (lastVerifiedAt && Date.now() - lastVerifiedAt < GOOGLE_CALENDAR_ACCESS_CACHE_TTL_MS) {
+        console.log('📅 [createCalendarEvent] Calendar access verified from cache');
+        return;
+    }
+
+    await executeGoogleCalendarRequest(
+        'calendars.get',
+        () => calendar.calendars.get({ calendarId: calendarId })
+    );
+    calendarAccessVerifiedAt.set(calendarId, Date.now());
+};
+
 /**
  * Set the saveErrorLog function from the main server file
  * @param {Function} saveErrorLog - Function to save error logs
@@ -76,14 +256,17 @@ const createCalendarEvent = async (flightData) => {
         // Test calendar access before creating event
         try {
             console.log('📅 [createCalendarEvent] Testing calendar access for:', calendarId);
-            await calendar.calendars.get({ calendarId: calendarId });
+            await verifyCalendarAccess(calendar, calendarId);
             console.log('✅ [createCalendarEvent] Calendar access verified');
         } catch (accessError) {
-            const accessErrorMsg = accessError.response?.data?.error?.message || accessError.message;
-            if (accessError.code === 403 || accessErrorMsg?.includes('writer access') || accessErrorMsg?.includes('requiredAccessLevel')) {
+            const accessErrorMsg = getCalendarErrorMessage(accessError);
+            if (isCalendarPermissionError(accessError)) {
                 const detailedError = `Google Calendar permission error: Service account '${process.env.GOOGLE_CLIENT_EMAIL}' does not have writer access to calendar '${calendarId}'. Please: 1) Share the calendar with the service account email, 2) Grant 'Make changes to events' permission (not just 'See only free/busy').`;
                 console.error('❌ [createCalendarEvent]', detailedError);
                 throw new Error(detailedError);
+            }
+            if (isRetryableCalendarError(accessError)) {
+                throw accessError;
             }
             // If it's a different error (like 404), log it but continue
             console.warn('⚠️ [createCalendarEvent] Calendar access check failed (non-critical):', accessErrorMsg);
@@ -135,10 +318,13 @@ const createCalendarEvent = async (flightData) => {
         console.log('📅 [createCalendarEvent] Event data:', JSON.stringify(event, null, 2));
         console.log('📅 [createCalendarEvent] Target calendar ID:', calendarId);
         
-        const response = await calendar.events.insert({
-            calendarId: calendarId,
-            resource: event,
-        });
+        const response = await executeGoogleCalendarRequest(
+            'events.insert',
+            () => calendar.events.insert({
+                calendarId: calendarId,
+                resource: event,
+            })
+        );
 
         console.log('✅ [createCalendarEvent] Google Calendar event created successfully!');
         console.log('✅ [createCalendarEvent] Event ID:', response.data.id);
@@ -153,7 +339,7 @@ const createCalendarEvent = async (flightData) => {
         
         let detailedErrorMessage = `Google Calendar: Failed to create event for booking ${flightData.bookingId || 'unknown'}`;
         
-        if (errorCode === 403 || errorMessage.includes('writer access') || errorMessage.includes('requiredAccessLevel')) {
+        if (isCalendarPermissionError(error)) {
             detailedErrorMessage += `. PERMISSION ERROR: Service account '${process.env.GOOGLE_CLIENT_EMAIL || 'NOT SET'}' needs 'Make changes to events' permission on calendar '${process.env.GOOGLE_CALENDAR_ID || 'NOT SET'}'. `;
             detailedErrorMessage += `Please: 1) Go to Google Calendar settings, 2) Share the calendar with service account email, 3) Grant 'Make changes to events' permission (NOT 'See only free/busy').`;
         } else if (errorCode === 404) {
@@ -185,14 +371,6 @@ const updateCalendarEvent = async (eventId, flightData) => {
     try {
         const calendar = getCalendarClient();
         const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
-
-        // Get existing event first
-        const existingEvent = await calendar.events.get({
-            calendarId: calendarId,
-            eventId: eventId,
-        });
-
-        console.log('📅 [updateCalendarEvent] Existing event description:', existingEvent.data.description);
         console.log('📅 [updateCalendarEvent] Received flightData:', JSON.stringify(flightData, null, 2));
 
         // Parse flight date
@@ -224,7 +402,6 @@ const updateCalendarEvent = async (eventId, flightData) => {
         console.log('📅 [updateCalendarEvent] Final description:', description);
 
         const updatedEvent = {
-            ...existingEvent.data,
             summary: title,
             description: description,
             start: {
@@ -240,11 +417,14 @@ const updateCalendarEvent = async (eventId, flightData) => {
         console.log('📅 [updateCalendarEvent] Sending update to Google Calendar API...');
         console.log('📅 [updateCalendarEvent] Updated event description:', updatedEvent.description);
         
-        const updateResponse = await calendar.events.update({
-            calendarId: calendarId,
-            eventId: eventId,
-            resource: updatedEvent,
-        });
+        const updateResponse = await executeGoogleCalendarRequest(
+            'events.patch',
+            () => calendar.events.patch({
+                calendarId: calendarId,
+                eventId: eventId,
+                resource: updatedEvent,
+            })
+        );
 
         console.log('✅ [updateCalendarEvent] Google Calendar event updated successfully:', eventId);
         console.log('✅ [updateCalendarEvent] Updated event description in response:', updateResponse.data.description);
@@ -288,10 +468,13 @@ const deleteCalendarEvent = async (eventId) => {
         const calendar = getCalendarClient();
         const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
-        await calendar.events.delete({
-            calendarId: calendarId,
-            eventId: eventId,
-        });
+        await executeGoogleCalendarRequest(
+            'events.delete',
+            () => calendar.events.delete({
+                calendarId: calendarId,
+                eventId: eventId,
+            })
+        );
 
         console.log('✅ Google Calendar event deleted:', eventId);
         return { success: true };
@@ -357,14 +540,17 @@ const findAndDeleteCalendarEventByDetails = async (flightData) => {
         const timeMax = new Date(flightDateTime);
         timeMax.setHours(23, 59, 59, 999);
 
-        const response = await calendar.events.list({
-            calendarId: calendarId,
-            timeMin: timeMin.toISOString(),
-            timeMax: timeMax.toISOString(),
-            maxResults: 100,
-            singleEvents: true,
-            orderBy: 'startTime',
-        });
+        const response = await executeGoogleCalendarRequest(
+            'events.list',
+            () => calendar.events.list({
+                calendarId: calendarId,
+                timeMin: timeMin.toISOString(),
+                timeMax: timeMax.toISOString(),
+                maxResults: 100,
+                singleEvents: true,
+                orderBy: 'startTime',
+            })
+        );
 
         if (!response.data.items || response.data.items.length === 0) {
             console.log('⚠️ [findAndDeleteCalendarEventByDetails] No events found for date:', flightData.flightDate);
@@ -439,4 +625,3 @@ module.exports = {
     findAndDeleteCalendarEventByDetails,
     setSaveErrorLog,
 };
-
