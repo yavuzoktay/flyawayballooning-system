@@ -27977,6 +27977,14 @@ const normalizeOperationalWallClockTime = (value) => {
 };
 
 app.get('/api/flown-flights', (req, res) => {
+    const flownFlightSlotTimeSql = `
+        COALESCE(
+            TIME_FORMAT(STR_TO_DATE(NULLIF(ab.time_slot, ''), '%H:%i:%s'), '%H:%i:%s'),
+            TIME_FORMAT(STR_TO_DATE(NULLIF(ab.time_slot, ''), '%H:%i'), '%H:%i:%s'),
+            TIME_FORMAT(ab.flight_date, '%H:%i:%s')
+        )
+    `;
+
     const sql = `
         SELECT 
             g.id,
@@ -28031,42 +28039,53 @@ app.get('/api/flown-flights', (req, res) => {
              LIMIT 1) as crew_name
         FROM (
             SELECT 
-                MIN(ab.id) as id,
-                MIN(ab.name) as name,
-                MIN(ab.email) as email,
-                MIN(ab.phone) as phone,
-                MIN(ab.flight_date) as flight_date,
-                MIN(ab.flight_date) as flight_date_display,
-                ab.location,
-                ab.flight_type,
-                MIN(ab.status) as status,
-                MIN(ab.created_at) as created_at,
-                MIN(ab.created_at) as created_at_display,
-                MIN(ab.voucher_type) as voucher_type,
-                MIN(ab.voucher_code) as voucher_code,
-                MIN(ab.flight_attempts) as flight_attempts,
-                MIN(ab.expires) as expires,
-                SUM(COALESCE(ab.paid, 0)) as paid,
-                SUM(COALESCE(ab.due, 0)) as due,
-                MIN(ab.activity_id) as activity_id,
+                MIN(f.id) as id,
+                MIN(f.name) as name,
+                MIN(f.email) as email,
+                MIN(f.phone) as phone,
+                MIN(f.slot_datetime) as flight_date,
+                MIN(f.slot_datetime) as flight_date_display,
+                f.location,
+                f.flight_type,
+                MIN(f.status) as status,
+                MIN(f.created_at) as created_at,
+                MIN(f.created_at) as created_at_display,
+                MIN(f.voucher_type) as voucher_type,
+                MIN(f.voucher_code) as voucher_code,
+                MIN(f.flight_attempts) as flight_attempts,
+                MIN(f.expires) as expires,
+                SUM(COALESCE(f.paid, 0)) as paid,
+                SUM(COALESCE(f.due, 0)) as due,
+                MIN(f.activity_id) as activity_id,
                 SUM(
                     CASE 
-                        WHEN ab.pax IS NOT NULL AND ab.pax > 0 THEN ab.pax
-                        ELSE (SELECT COUNT(*) FROM passenger p2 WHERE p2.booking_id = ab.id)
+                        WHEN f.pax IS NOT NULL AND f.pax > 0 THEN f.pax
+                        ELSE (SELECT COUNT(*) FROM passenger p2 WHERE p2.booking_id = f.id)
                     END
                 ) as pax,
                 SUM(
                     CASE 
-                        WHEN ab.pax IS NOT NULL AND ab.pax > 0 THEN ab.pax
-                        ELSE (SELECT COUNT(*) FROM passenger p2 WHERE p2.booking_id = ab.id)
+                        WHEN f.pax IS NOT NULL AND f.pax > 0 THEN f.pax
+                        ELSE (SELECT COUNT(*) FROM passenger p2 WHERE p2.booking_id = f.id)
                     END
                 ) as passenger_count,
-                DATE(MIN(ab.flight_date)) as flight_date_only,
-                TIME(MIN(ab.flight_date)) as flight_time_only,
-                GROUP_CONCAT(DISTINCT ab.id ORDER BY ab.id SEPARATOR ', ') as booking_ids
-            FROM all_booking ab
-            WHERE ab.status = 'Flown'
-            GROUP BY DATE(ab.flight_date), ab.location, ab.flight_type
+                f.slot_date as flight_date_only,
+                f.slot_time as flight_time_only,
+                GROUP_CONCAT(DISTINCT f.id ORDER BY f.id SEPARATOR ', ') as booking_ids
+            FROM (
+                SELECT
+                    ab.*,
+                    DATE(ab.flight_date) as slot_date,
+                    ${flownFlightSlotTimeSql} as slot_time,
+                    CASE
+                        WHEN ab.flight_date IS NULL THEN NULL
+                        WHEN ${flownFlightSlotTimeSql} IS NULL THEN ab.flight_date
+                        ELSE TIMESTAMP(DATE(ab.flight_date), ${flownFlightSlotTimeSql})
+                    END as slot_datetime
+                FROM all_booking ab
+                WHERE ab.status = 'Flown'
+            ) f
+            GROUP BY f.slot_date, f.slot_time, f.location, f.flight_type
         ) g
         LEFT JOIN trip_booking tb ON tb.booking_id = (
             SELECT tb2.booking_id
