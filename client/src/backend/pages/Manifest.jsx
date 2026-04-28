@@ -4769,6 +4769,57 @@ const Manifest = () => {
     );
     const manifestDateNotePopoverOpen = Boolean(manifestDateNoteAnchorEl);
     const bookingNotePopoverOpen = Boolean(bookingNotePopover.anchorEl);
+    const manifestDateNoteButton = (
+        <div
+            className="manifest-date-note-button-wrap"
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0
+            }}
+        >
+            <IconButton
+                onClick={(event) => setManifestDateNoteAnchorEl(event.currentTarget)}
+                disabled={manifestDateNoteLoading}
+                aria-label="Open manifest date note"
+                title="Manifest note"
+                sx={{
+                    position: 'relative',
+                    width: isMobile ? 36 : 40,
+                    height: isMobile ? 36 : 40,
+                    border: '1px solid #dbe4f0',
+                    backgroundColor: '#fff',
+                    alignSelf: 'center !important',
+                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
+                    '&:hover': {
+                        backgroundColor: '#f8fbff'
+                    }
+                }}
+            >
+                <span
+                    role="img"
+                    aria-hidden="true"
+                    style={{ fontSize: isMobile ? 18 : 21, lineHeight: 1 }}
+                >
+                    📝
+                </span>
+                {manifestDateNoteHasNote && (
+                    <span
+                        style={{
+                            position: 'absolute',
+                            top: 6,
+                            right: -3,
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            backgroundColor: '#ef4444',
+                            border: '1px solid #fff'
+                        }}
+                    />
+                )}
+            </IconButton>
+        </div>
+    );
 
     return (
         <div className="final-menifest-wrap">
@@ -4870,6 +4921,7 @@ const Manifest = () => {
                                     }} className="manifest-nav-buttons" sx={{ minWidth: 'auto', padding: '8px' }}>
                                         <ArrowForwardIosIcon />
                                     </IconButton>
+                                    {manifestDateNoteButton}
                                 </>
                             ) : (
                                 <>
@@ -4906,92 +4958,48 @@ const Manifest = () => {
                                     }} className="manifest-nav-buttons">
                                         <ArrowForwardIosIcon />
                                     </IconButton>
+                                    {manifestDateNoteButton}
                                 </>
                             )}
                         </Box>
-                        <Box sx={{
-                            width: '100%',
-                            display: 'flex',
-                            justifyContent: 'center',
-                            mt: isMobile ? 1 : 2,
-                            mb: isMobile ? 0.5 : 1
-                        }}>
-                            <IconButton
-                                onClick={(event) => setManifestDateNoteAnchorEl(event.currentTarget)}
-                                disabled={manifestDateNoteLoading}
-                                aria-label="Open manifest date note"
-                                title="Manifest note"
-                                sx={{
-                                    position: 'relative',
-                                    width: isMobile ? 34 : 40,
-                                    height: isMobile ? 34 : 40,
-                                    border: '1px solid #dbe4f0',
-                                    backgroundColor: '#fff',
-                                    alignSelf: 'center !important',
-                                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
-                                    '&:hover': {
-                                        backgroundColor: '#f8fbff'
-                                    }
-                                }}
-                            >
-                                <Box component="span" role="img" aria-hidden="true" sx={{ fontSize: isMobile ? 18 : 21, lineHeight: 1 }}>
-                                    📝
-                                </Box>
-                                {manifestDateNoteHasNote && (
-                                    <Box
-                                        component="span"
-                                        sx={{
-                                            position: 'absolute',
-                                            top: 5,
-                                            right: 5,
-                                            width: 8,
-                                            height: 8,
-                                            borderRadius: '50%',
-                                            backgroundColor: '#ef4444',
-                                            border: '1px solid #fff'
-                                        }}
-                                    />
+                        <Popover
+                            open={manifestDateNotePopoverOpen}
+                            anchorEl={manifestDateNoteAnchorEl}
+                            onClose={handleManifestDateNotePopoverClose}
+                            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                            transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                            PaperProps={{
+                                sx: {
+                                    width: isMobile ? 'calc(100vw - 32px)' : 420,
+                                    maxWidth: 'calc(100vw - 32px)',
+                                    mt: 1,
+                                    borderRadius: 2,
+                                    boxShadow: '0 18px 45px rgba(15, 23, 42, 0.18)'
+                                }
+                            }}
+                        >
+                            <Box sx={{ p: isMobile ? 1.5 : 2 }}>
+                                <TextField
+                                    fullWidth
+                                    multiline
+                                    minRows={2}
+                                    maxRows={5}
+                                    placeholder="Add a short reminder for this manifest date..."
+                                    value={manifestDateNoteDraft}
+                                    onChange={(event) => setManifestDateNoteDraft(event.target.value)}
+                                    disabled={manifestDateNoteLoading}
+                                    onBlur={handleManifestDateNoteBlur}
+                                    inputProps={{
+                                        'aria-busy': manifestDateNoteSaving
+                                    }}
+                                />
+                                {(manifestDateNoteSaving || manifestDateNoteLoading) && (
+                                    <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#64748b' }}>
+                                        {manifestDateNoteLoading ? 'Loading...' : 'Saving...'}
+                                    </Typography>
                                 )}
-                            </IconButton>
-                            <Popover
-                                open={manifestDateNotePopoverOpen}
-                                anchorEl={manifestDateNoteAnchorEl}
-                                onClose={handleManifestDateNotePopoverClose}
-                                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-                                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
-                                PaperProps={{
-                                    sx: {
-                                        width: isMobile ? 'calc(100vw - 32px)' : 420,
-                                        maxWidth: 'calc(100vw - 32px)',
-                                        mt: 1,
-                                        borderRadius: 2,
-                                        boxShadow: '0 18px 45px rgba(15, 23, 42, 0.18)'
-                                    }
-                                }}
-                            >
-                                <Box sx={{ p: isMobile ? 1.5 : 2 }}>
-                                    <TextField
-                                        fullWidth
-                                        multiline
-                                        minRows={2}
-                                        maxRows={5}
-                                        placeholder="Add a short reminder for this manifest date..."
-                                        value={manifestDateNoteDraft}
-                                        onChange={(event) => setManifestDateNoteDraft(event.target.value)}
-                                        disabled={manifestDateNoteLoading}
-                                        onBlur={handleManifestDateNoteBlur}
-                                        inputProps={{
-                                            'aria-busy': manifestDateNoteSaving
-                                        }}
-                                    />
-                                    {(manifestDateNoteSaving || manifestDateNoteLoading) && (
-                                        <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#64748b' }}>
-                                            {manifestDateNoteLoading ? 'Loading...' : 'Saving...'}
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </Popover>
-                        </Box>
+                            </Box>
+                        </Popover>
                     </Box>
 
                     {bookingLoading || passengerLoading || activityLoading ? (
