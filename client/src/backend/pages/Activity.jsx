@@ -22,16 +22,6 @@ const Activity = () => {
                     >
                         ACTIVITY
                     </Typography>
-                    <Typography
-                        sx={{
-                            color: "#64748b",
-                            fontSize: { xs: "14px", md: "16px" },
-                            maxWidth: "720px",
-                            mb: 2.5
-                        }}
-                    >
-                        Manage locations, pricing, availability setup and live activity status from one polished workspace.
-                    </Typography>
                     <Box sx={{ height: 1, bgcolor: "#dbe4f0", borderRadius: 999 }} />
                 </Box>
                 <Paper

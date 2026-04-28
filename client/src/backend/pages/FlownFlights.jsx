@@ -634,11 +634,6 @@ const FlownFlights = () => {
                     <hr />
                 </div>
                 <Box sx={{ padding: isMobile ? 1 : 2 }}>
-                    <Box sx={{ mb: 3 }}>
-                        <Typography variant="body1" color="text.secondary">
-                            View and manage completed flights
-                        </Typography>
-                    </Box>
 
             {/* Action Buttons */}
             <Box sx={{ mb: 2, display: 'flex', justifyContent: isMobile ? 'center' : 'flex-end', gap: 1 }}>

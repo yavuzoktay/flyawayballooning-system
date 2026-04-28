@@ -30,6 +30,7 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
+    Popover,
     InputAdornment,
     useTheme,
     useMediaQuery,
@@ -104,6 +105,41 @@ const renderBookingNameWithIndicators = (name, { isNewtBooking = false } = {}) =
 
 const MANIFEST_DATE_NOTE_AUTO_SAVE_DELAY_MS = 700;
 const normalizeManifestDateNoteValue = (value = '') => String(value || '').trim();
+
+const parseMaybeJsonObject = (value) => {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    if (typeof value !== 'string') return null;
+
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+        return null;
+    }
+};
+
+const getBookingNoteText = (flight = {}) => {
+    const additionalInfoJson = parseMaybeJsonObject(flight.additional_information_json);
+    const bookingAdditionalInfoJson = parseMaybeJsonObject(flight.booking_additional_information_json);
+    const nestedAdditionalInfoJson = parseMaybeJsonObject(flight.additional_information?.additional_information_json);
+
+    const noteCandidates = [
+        flight.additional_notes,
+        additionalInfoJson?.notes,
+        bookingAdditionalInfoJson?.notes,
+        nestedAdditionalInfoJson?.notes,
+        flight.additional_information?.legacy?.additional_notes,
+        flight.notes
+    ];
+
+    for (const candidate of noteCandidates) {
+        const normalized = normalizeManifestDateNoteValue(candidate);
+        if (normalized) return normalized;
+    }
+
+    return '';
+};
 
 const formatOperationalTimeForPayload = (value) => {
     if (!value) return null;
@@ -220,6 +256,12 @@ const Manifest = () => {
     const [manifestDateNoteDraft, setManifestDateNoteDraft] = useState('');
     const [manifestDateNoteLoading, setManifestDateNoteLoading] = useState(false);
     const [manifestDateNoteSaving, setManifestDateNoteSaving] = useState(false);
+    const [manifestDateNoteAnchorEl, setManifestDateNoteAnchorEl] = useState(null);
+    const [bookingNotePopover, setBookingNotePopover] = useState({
+        anchorEl: null,
+        note: '',
+        title: ''
+    });
     const selectedDateRef = useRef(selectedDate);
     const manifestDateNoteSaveSequenceRef = useRef(0);
     const [flights, setFlights] = useState([]);
@@ -462,6 +504,21 @@ const Manifest = () => {
         if (manifestDateNoteLoading) return;
         void persistManifestDateNote(manifestDateNoteDraft);
     }, [manifestDateNoteDraft, manifestDateNoteLoading, persistManifestDateNote]);
+
+    const handleManifestDateNotePopoverClose = useCallback(() => {
+        setManifestDateNoteAnchorEl(null);
+        if (!manifestDateNoteLoading) {
+            void persistManifestDateNote(manifestDateNoteDraft);
+        }
+    }, [manifestDateNoteDraft, manifestDateNoteLoading, persistManifestDateNote]);
+
+    const closeBookingNotePopover = useCallback(() => {
+        setBookingNotePopover({
+            anchorEl: null,
+            note: '',
+            title: ''
+        });
+    }, []);
 
     const openGroupMessageModalForAction = (mode = 'message') => {
         handleGlobalMenuClose();
@@ -4116,145 +4173,6 @@ const Manifest = () => {
       }
     }, [detailDialogOpen, bookingDetail]);
 
-    // Add state for booking modal
-    const [bookingModalOpen, setBookingModalOpen] = useState(false);
-    const [bookingModalLoading, setBookingModalLoading] = useState(false);
-    const [bookingAvailabilities, setBookingAvailabilities] = useState([]);
-    const [bookingModalError, setBookingModalError] = useState("");
-    const [bookingModalDate, setBookingModalDate] = useState(null);
-    const [bookingModalTimes, setBookingModalTimes] = useState([]);
-    const [bookingModalGroup, setBookingModalGroup] = useState(null);
-    // Add state for passenger count in booking modal
-    const [bookingModalPax, setBookingModalPax] = useState(1);
-
-    // Add state for selected time slot and contact information fields in booking modal
-    const [bookingModalSelectedTime, setBookingModalSelectedTime] = useState(null);
-    const [bookingModalContactInfos, setBookingModalContactInfos] = useState([
-      { firstName: '', lastName: '', phone: '', email: '', weight: '' }
-    ]);
-
-    // Booking modal: Live Availability-like filters and calendar state
-    const [bookingSelectedFlightTypes, setBookingSelectedFlightTypes] = useState(['private', 'shared']);
-    const [bookingSelectedVoucherTypes, setBookingSelectedVoucherTypes] = useState(['weekday morning', 'flexible weekday', 'any day flight']);
-    const [bookingFilteredAvailabilities, setBookingFilteredAvailabilities] = useState([]);
-    const [calendarMonth, setCalendarMonth] = useState(dayjs().startOf('month'));
-
-    // Helper to get times for selected date from filtered list
-    const getBookingTimesForDate = (dateStr) => {
-      return bookingFilteredAvailabilities.filter(a => a.date === dateStr);
-    };
-
-    // Build day cells for calendar
-    const buildBookingDayCells = () => {
-      const cells = [];
-      const startOfMonth = calendarMonth.startOf('month');
-      const firstCellDate = startOfMonth.startOf('week');
-      for (let i = 0; i < 42; i++) {
-        const d = firstCellDate.add(i, 'day');
-        const inCurrentMonth = d.isSame(calendarMonth, 'month');
-        const isPast = d.isBefore(dayjs(), 'day');
-        const isSelected = bookingModalDate && dayjs(bookingModalDate).isSame(d, 'day');
-        const dateStr = d.format('YYYY-MM-DD');
-        const slots = getBookingTimesForDate(dateStr);
-        const totalAvailable = slots.reduce((acc, s) => acc + (Number(s.available) || 0), 0);
-        const soldOut = slots.length > 0 && totalAvailable <= 0;
-        const isSelectable = inCurrentMonth && !isPast && slots.length > 0 && !soldOut;
-        cells.push(
-          <div
-            key={dateStr}
-            onClick={() => isSelectable && (setBookingModalDate(dateStr), setBookingModalTimes(getBookingTimesForDate(dateStr)), setBookingModalSelectedTime(null), setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]))}
-            style={{
-              width: 'calc((100% - 3px * 6) / 7)',
-              aspectRatio: '1 / 1',
-              borderRadius: 8,
-              background: isSelected ? '#56C1FF' : (isSelectable ? '#22c55e' : '#f0f0f0'),
-              color: isSelected ? '#fff' : (isSelectable ? '#fff' : '#999'),
-              display: inCurrentMonth ? 'flex' : 'none',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              cursor: isSelectable ? 'pointer' : 'default',
-              userSelect: 'none',
-              fontSize: 12,
-              marginBottom: 3
-            }}
-          >
-            <div>{d.date()}</div>
-            <div style={{ fontSize: 9, fontWeight: 600 }}>
-              {slots.length === 0 ? '' : (soldOut ? 'Sold Out' : `${totalAvailable} Spaces`)}
-            </div>
-          </div>
-        );
-      }
-      return cells;
-    };
-
-    // Reset contact info and selected time when modal opens or date changes
-    useEffect(() => {
-      if (!bookingModalOpen) {
-        setBookingModalSelectedTime(null);
-        setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]);
-      }
-    }, [bookingModalOpen]);
-    useEffect(() => {
-      setBookingModalSelectedTime(null);
-      setBookingModalContactInfos([{ firstName: '', lastName: '', phone: '', email: '', weight: '' }]);
-    }, [bookingModalDate]);
-
-    // Handler to update a field in a contact info object
-    const handleContactInfoChange = (idx, field, value) => {
-      setBookingModalContactInfos(prev => prev.map((info, i) => i === idx ? { ...info, [field]: value } : info));
-    };
-
-    // Handler for Book button
-    const handleOpenBookingModal = async (group) => {
-      setBookingModalGroup(group);
-      setBookingModalOpen(true);
-      setBookingModalLoading(true);
-      setBookingModalError("");
-      setBookingAvailabilities([]);
-      setBookingModalDate(null);
-      setBookingModalTimes([]);
-      setBookingModalPax(1); // Reset pax
-      try {
-        // Fetch activity id by location and flight_type
-        const res = await axios.post("/api/getActivityId", { location: group.location });
-        const activity = res.data.activity;
-        // Fetch only open availabilities for this activity
-        const availRes = await axios.get(`/api/activity/${activity.id}/rebook-availabilities`);
-        const list = (availRes.data.data || []).map(a => ({
-          ...a,
-          date: dayjs(a.date).format('YYYY-MM-DD')
-        }));
-        setBookingAvailabilities(list);
-        if (list.length > 0) {
-          setCalendarMonth(dayjs(list[0].date).startOf('month'));
-        }
-      } catch (err) {
-        setBookingModalError("Failed to fetch availabilities");
-      } finally {
-        setBookingModalLoading(false);
-      }
-    };
-
-    // When pax count changes, update the contact info array length
-    useEffect(() => {
-      setBookingModalContactInfos(prev => {
-        if (bookingModalPax > prev.length) {
-          // Add new empty contact infos
-          return [
-            ...prev,
-            ...Array.from({ length: bookingModalPax - prev.length }, () => ({ firstName: '', lastName: '', phone: '', email: '', weight: '' }))
-          ];
-        } else if (bookingModalPax < prev.length) {
-          // Remove extra contact infos
-          return prev.slice(0, bookingModalPax);
-        }
-        return prev;
-      });
-    }, [bookingModalPax]);
-
     // Auto-update flight statuses when flights data changes (only for selected date)
     useEffect(() => {
         if (flights.length > 0 && activity.length > 0 && selectedDate) {
@@ -4291,25 +4209,6 @@ const Manifest = () => {
             });
         }
     }, [flights, activity, selectedDate]); // Added selectedDate dependency
-
-    useEffect(() => {
-      const normalizeType = (t) => t.replace(' Flight', '').trim().toLowerCase();
-      const selectedTypes = bookingSelectedFlightTypes.map(normalizeType);
-      const filtered = (bookingAvailabilities || []).filter((a) => {
-        if (a.status && a.status.toLowerCase() !== 'open') return false;
-        if (a.available !== undefined && a.available <= 0) return false;
-        const slotDateTime = dayjs(`${a.date} ${a.time}`);
-        if (slotDateTime.isBefore(dayjs())) return false;
-        if (!a.flight_types || a.flight_types.toLowerCase() === 'all') return true;
-        const typesArr = a.flight_types.split(',').map(normalizeType);
-        return selectedTypes.some((t) => typesArr.includes(t));
-      });
-      setBookingFilteredAvailabilities(filtered);
-      // Reset selections when data changes
-      setBookingModalDate(null);
-      setBookingModalTimes([]);
-      setBookingModalSelectedTime(null);
-    }, [bookingAvailabilities, bookingSelectedFlightTypes, bookingSelectedVoucherTypes]);
 
     const [crewList, setCrewList] = useState([]);
     const [crewAssignmentsBySlot, setCrewAssignmentsBySlot] = useState({}); // key: `${activityId}_${date}_${time}` => crew_id
@@ -4865,6 +4764,12 @@ const Manifest = () => {
         }
     };
 
+    const manifestDateNoteHasNote = Boolean(
+        normalizeManifestDateNoteValue(manifestDateNoteDraft || manifestDateNote)
+    );
+    const manifestDateNotePopoverOpen = Boolean(manifestDateNoteAnchorEl);
+    const bookingNotePopoverOpen = Boolean(bookingNotePopover.anchorEl);
+
     return (
         <div className="final-menifest-wrap">
             <Container maxWidth={false}>
@@ -5004,9 +4909,67 @@ const Manifest = () => {
                                 </>
                             )}
                         </Box>
-                        <Box sx={{ width: '100%', maxWidth: 760, mx: 'auto', mt: isMobile ? 1.5 : 2.5 }}>
-                            <Card variant="outlined" sx={{ borderColor: '#dbe4f0', boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)' }}>
-                                <CardContent sx={{ p: isMobile ? 2 : 2.5, '&:last-child': { pb: isMobile ? 2 : 2.5 } }}>
+                        <Box sx={{
+                            width: '100%',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            mt: isMobile ? 1 : 2,
+                            mb: isMobile ? 0.5 : 1
+                        }}>
+                            <IconButton
+                                onClick={(event) => setManifestDateNoteAnchorEl(event.currentTarget)}
+                                disabled={manifestDateNoteLoading}
+                                aria-label="Open manifest date note"
+                                title="Manifest note"
+                                sx={{
+                                    position: 'relative',
+                                    width: isMobile ? 34 : 40,
+                                    height: isMobile ? 34 : 40,
+                                    border: '1px solid #dbe4f0',
+                                    backgroundColor: '#fff',
+                                    alignSelf: 'center !important',
+                                    boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
+                                    '&:hover': {
+                                        backgroundColor: '#f8fbff'
+                                    }
+                                }}
+                            >
+                                <Box component="span" role="img" aria-hidden="true" sx={{ fontSize: isMobile ? 18 : 21, lineHeight: 1 }}>
+                                    📝
+                                </Box>
+                                {manifestDateNoteHasNote && (
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            position: 'absolute',
+                                            top: 5,
+                                            right: 5,
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: '50%',
+                                            backgroundColor: '#ef4444',
+                                            border: '1px solid #fff'
+                                        }}
+                                    />
+                                )}
+                            </IconButton>
+                            <Popover
+                                open={manifestDateNotePopoverOpen}
+                                anchorEl={manifestDateNoteAnchorEl}
+                                onClose={handleManifestDateNotePopoverClose}
+                                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                                PaperProps={{
+                                    sx: {
+                                        width: isMobile ? 'calc(100vw - 32px)' : 420,
+                                        maxWidth: 'calc(100vw - 32px)',
+                                        mt: 1,
+                                        borderRadius: 2,
+                                        boxShadow: '0 18px 45px rgba(15, 23, 42, 0.18)'
+                                    }
+                                }}
+                            >
+                                <Box sx={{ p: isMobile ? 1.5 : 2 }}>
                                     <TextField
                                         fullWidth
                                         multiline
@@ -5021,8 +4984,13 @@ const Manifest = () => {
                                             'aria-busy': manifestDateNoteSaving
                                         }}
                                     />
-                                </CardContent>
-                            </Card>
+                                    {(manifestDateNoteSaving || manifestDateNoteLoading) && (
+                                        <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: '#64748b' }}>
+                                            {manifestDateNoteLoading ? 'Loading...' : 'Saving...'}
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </Popover>
                         </Box>
                     </Box>
 
@@ -5740,12 +5708,6 @@ const Manifest = () => {
                             );
                         })()}
                                                 
-                                                {/* Book Button - Hidden on mobile */}
-                                                {!isMobile && (
-                                                    <Box sx={{ display: 'flex', gap: 1 }}>
-                                                        <Button variant="contained" color="primary" sx={{ minWidth: 90, fontWeight: 600, textTransform: 'none' }} onClick={() => handleOpenBookingModal(first)}>Book</Button>
-                                                    </Box>
-                                                )}
                                                 {/* Three dots menu - Desktop only (mobile is in header) */}
                                                 {!isMobile && (
                                                 <IconButton size="large" onClick={e => handleGlobalMenuOpen(e, first, groupFlights)}>
@@ -5827,6 +5789,11 @@ const Manifest = () => {
                                                             }
                                                             return false;
                                                         })();
+                                                        const bookingNoteText = getBookingNoteText(flight);
+                                                        const bookingNoteTitle = [
+                                                            firstPassenger ? `${firstPassenger.first_name || ''} ${firstPassenger.last_name || ''}`.trim() : (flight.name || ''),
+                                                            flight.id ? `#${flight.id}` : ''
+                                                        ].filter(Boolean).join(' ');
                                                         return (
                                                             <TableRow key={flight.id}>
                                                                 <TableCell sx={isMobile ? { width: '74px', minWidth: '74px', maxWidth: '74px', padding: '8px 8px', whiteSpace: 'nowrap' } : {}}>
@@ -5993,7 +5960,57 @@ const Manifest = () => {
                                                                     }
                                                                     return '';
                                                                 })()}</TableCell>
-                                                                <TableCell>{flight.additional_notes || ''}</TableCell>
+                                                                <TableCell sx={isMobile ? {
+                                                                    width: '58px',
+                                                                    minWidth: '58px',
+                                                                    maxWidth: '58px',
+                                                                    textAlign: 'center',
+                                                                    padding: '8px 8px'
+                                                                } : {
+                                                                    width: 72,
+                                                                    textAlign: 'center'
+                                                                }}>
+                                                                    {bookingNoteText ? (
+                                                                        <IconButton
+                                                                            size="small"
+                                                                            onClick={(event) => setBookingNotePopover({
+                                                                                anchorEl: event.currentTarget,
+                                                                                note: bookingNoteText,
+                                                                                title: bookingNoteTitle || 'Booking note'
+                                                                            })}
+                                                                            aria-label={`View notes for booking ${flight.id || ''}`.trim()}
+                                                                            title="View note"
+                                                                            sx={{
+                                                                                position: 'relative',
+                                                                                width: 30,
+                                                                                height: 30,
+                                                                                border: '1px solid #dbe4f0',
+                                                                                backgroundColor: '#fff',
+                                                                                alignSelf: 'center !important',
+                                                                                '&:hover': {
+                                                                                    backgroundColor: '#f8fbff'
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <Box component="span" role="img" aria-hidden="true" sx={{ fontSize: 16, lineHeight: 1 }}>
+                                                                                📝
+                                                                            </Box>
+                                                                            <Box
+                                                                                component="span"
+                                                                                sx={{
+                                                                                    position: 'absolute',
+                                                                                    top: 3,
+                                                                                    right: 3,
+                                                                                    width: 7,
+                                                                                    height: 7,
+                                                                                    borderRadius: '50%',
+                                                                                    backgroundColor: '#ef4444',
+                                                                                    border: '1px solid #fff'
+                                                                                }}
+                                                                            />
+                                                                        </IconButton>
+                                                                    ) : null}
+                                                                </TableCell>
                                                                 <TableCell>
                                                                     <Select
                                                                         value={['Scheduled','Checked In','Flown','No Show'].includes(flight.status) ? flight.status : 'Scheduled'}
@@ -7230,146 +7247,39 @@ const Manifest = () => {
                 flightType={bookingDetail?.booking?.flight_type || ''}
                 bookingDetail={bookingDetail}
             />
-            {/* Booking Modal */}
-            <Dialog open={bookingModalOpen} onClose={() => setBookingModalOpen(false)} maxWidth="sm" fullWidth>
-              <DialogTitle style={{ fontWeight: 700, fontSize: 22 }}>
-                Create Booking<br/>{bookingModalGroup ? `${bookingModalGroup.location} - ${bookingModalGroup.flight_type}` : ''}
-              </DialogTitle>
-              <DialogContent>
-                {bookingModalLoading ? (
-                  <Typography>Loading availabilities...</Typography>
-                ) : bookingModalError ? (
-                  <Typography color="error">{bookingModalError}</Typography>
-                ) : (
-                  <Box>
-                    {/* Flight info and pax selector, calendar, and time slots */}
-                    {bookingAvailabilities.length > 0 && (
-                      <>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 2 }}>
-                          <Box sx={{ flex: 1 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                              {bookingModalGroup?.flight_type || ''} £{bookingAvailabilities[0].price || ''}
-                            </Typography>
-                            <Typography sx={{ color: '#888' }}>£{bookingAvailabilities[0].price || ''} Per Person</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Button variant="contained" color="primary" onClick={() => setBookingModalPax(p => Math.max(1, p - 1))} sx={{ minWidth: 40, fontSize: 22, fontWeight: 700 }}>-</Button>
-                            <Typography sx={{ minWidth: 32, textAlign: 'center', fontSize: 22 }}>{bookingModalPax}</Typography>
-                            <Button variant="contained" color="primary" onClick={() => setBookingModalPax(p => p + 1)} sx={{ minWidth: 40, fontSize: 22, fontWeight: 700 }}>+</Button>
-                          </Box>
-                        </Box>
-
-                        {/* Flight Type and Voucher Type filters */}
-                        <Box sx={{ mb: 2 }}>
-                          <Typography sx={{ fontWeight: 700, mb: 1 }}>Flight Type:</Typography>
-                          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                            <Button variant={bookingSelectedFlightTypes.includes('private') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedFlightTypes(prev => prev.includes('private') ? prev.filter(t => t !== 'private') : [...prev, 'private'])}>Private</Button>
-                            <Button variant={bookingSelectedFlightTypes.includes('shared') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedFlightTypes(prev => prev.includes('shared') ? prev.filter(t => t !== 'shared') : [...prev, 'shared'])}>Shared</Button>
-                          </Box>
-                          <Typography sx={{ fontWeight: 700, mb: 1 }}>Voucher Type:</Typography>
-                          <Box sx={{ display: 'flex', gap: 2 }}>
-                            <Button variant={bookingSelectedVoucherTypes.includes('weekday morning') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedVoucherTypes(prev => prev.includes('weekday morning') ? prev.filter(t => t !== 'weekday morning') : [...prev, 'weekday morning'])}>Weekday Morning</Button>
-                            <Button variant={bookingSelectedVoucherTypes.includes('flexible weekday') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedVoucherTypes(prev => prev.includes('flexible weekday') ? prev.filter(t => t !== 'flexible weekday') : [...prev, 'flexible weekday'])}>Flexible Weekday</Button>
-                            <Button variant={bookingSelectedVoucherTypes.includes('any day flight') ? 'contained' : 'outlined'} onClick={() => setBookingSelectedVoucherTypes(prev => prev.includes('any day flight') ? prev.filter(t => t !== 'any day flight') : [...prev, 'any day flight'])}>Any Day Flight</Button>
-                          </Box>
-                        </Box>
-
-                        {/* Live Availability style calendar grid */}
-                        <Box sx={{ mb: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                            <Button size="small" onClick={() => setCalendarMonth(prev => prev.subtract(1, 'month'))}>{'<'}</Button>
-                            <Typography variant="h6" sx={{ fontWeight: 700 }}>{calendarMonth.format('MMMM YYYY')}</Typography>
-                            <Button size="small" onClick={() => setCalendarMonth(prev => prev.add(1, 'month'))}>{'>'}</Button>
-                          </Box>
-                          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', mb: 1 }}>
-                            {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(w => (
-                              <div key={w} style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: 11 }}>{w}</div>
-                            ))}
-                          </Box>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                            {buildBookingDayCells()}
-                          </div>
-                        </Box>
-
-                        {/* Time slots for selected date */}
-                        {bookingModalDate && (
-                          <Box>
-                            <Typography variant="h6">Times for {dayjs(bookingModalDate).format('DD/MM/YYYY')}</Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                              {getBookingTimesForDate(bookingModalDate).map(slot => (
-                                <Button
-                                  key={slot.id}
-                                  variant={bookingModalSelectedTime && bookingModalSelectedTime.id === slot.id ? 'contained' : 'outlined'}
-                                  sx={{ minWidth: 120, mb: 1 }}
-                                  onClick={() => setBookingModalSelectedTime(slot)}
-                                >
-                                  {slot.time} ({slot.available}/{slot.capacity})
-                                </Button>
-                              ))}
-                            </Box>
-                            {/* Contact Information Form */}
-                            {bookingModalSelectedTime && (
-                              <Box sx={{ mt: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, background: '#fafbfc' }}>
-                                <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Contact Information</Typography>
-                                {bookingModalContactInfos.map((info, idx) => (
-                                  <Box key={idx} sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, background: '#fff' }}>
-                                    <Typography sx={{ fontWeight: 600, mb: 2 }}>Passenger {idx + 1}</Typography>
-                                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                                      <TextField
-                                        label="First Name"
-                                        value={info.firstName}
-                                        onChange={e => handleContactInfoChange(idx, 'firstName', e.target.value)}
-                                        fullWidth
-                                        placeholder="First"
-                                      />
-                                      <TextField
-                                        label="Last Name"
-                                        value={info.lastName}
-                                        onChange={e => handleContactInfoChange(idx, 'lastName', e.target.value)}
-                                        fullWidth
-                                        placeholder="Last"
-                                      />
-                                    </Box>
-                                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                                      <TextField
-                                        label="Phone"
-                                        value={info.phone}
-                                        onChange={e => handleContactInfoChange(idx, 'phone', e.target.value)}
-                                        fullWidth
-                                        placeholder="Phone number"
-                                      />
-                                      <TextField
-                                        label="Email"
-                                        value={info.email}
-                                        onChange={e => handleContactInfoChange(idx, 'email', e.target.value)}
-                                        fullWidth
-                                        placeholder="john@gmail.com"
-                                      />
-                                    </Box>
-                                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                                      <TextField
-                                        label="Weight (kg)"
-                                        value={info.weight}
-                                        onChange={e => handleContactInfoChange(idx, 'weight', e.target.value.replace(/[^0-9.]/g, ''))}
-                                        fullWidth
-                                        placeholder="Weight"
-                                      />
-                                    </Box>
-                                  </Box>
-                                ))}
-                              </Box>
-                            )}
-                          </Box>
-                        )}
-                      </>
-                    )}
-                  </Box>
-                )}
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={() => setBookingModalOpen(false)}>Close</Button>
-              </DialogActions>
-            </Dialog>
+            <Popover
+                open={bookingNotePopoverOpen}
+                anchorEl={bookingNotePopover.anchorEl}
+                onClose={closeBookingNotePopover}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+                PaperProps={{
+                    sx: {
+                        width: isMobile ? 'calc(100vw - 40px)' : 320,
+                        maxWidth: 'calc(100vw - 32px)',
+                        mt: 0.75,
+                        borderRadius: 2,
+                        boxShadow: '0 18px 45px rgba(15, 23, 42, 0.18)'
+                    }
+                }}
+            >
+                <Box sx={{ p: isMobile ? 1.5 : 2 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1c3458', mb: 1 }}>
+                        {bookingNotePopover.title || 'Booking note'}
+                    </Typography>
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            color: '#465a79',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            lineHeight: 1.55
+                        }}
+                    >
+                        {bookingNotePopover.note}
+                    </Typography>
+                </Box>
+            </Popover>
             {/* Messages Modal */}
             <Dialog 
                 open={messagesModalOpen}
