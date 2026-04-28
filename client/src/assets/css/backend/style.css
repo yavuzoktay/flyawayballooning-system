@@ -54,7 +54,7 @@ body {
     flex: 1;
 }
 .home-page-wrap .heading-wrap h2 {
-    font-size: 36px;
+    font-size: 32px;
     margin-bottom: 8px;
     letter-spacing: 0.01em;
 }
@@ -429,7 +429,7 @@ body {
 /* Start Booking Page */
 
 .booking-page-wrap .heading-wrap h2 {
-    font-size: 36px;
+    font-size: 32px;
     margin-bottom: 8px;
     letter-spacing: 0.01em;
 }
@@ -1129,12 +1129,27 @@ a.edit-activity svg {
 
 /* Start Manifest Page */
 .final-menifest-wrap .heading-wrap h2 {
-    font-size: 36px;
+    font-size: 32px;
     margin-bottom: 8px;
     letter-spacing: 0.01em;
 }
 
 .final-menifest-wrap .heading-wrap hr {
+    border: none;
+    height: 1px;
+    background: #e5ebf5;
+    margin-bottom: 26px;
+}
+
+.flown-flights-page-wrap .heading-wrap h2,
+.logs-page-wrap .heading-wrap h2 {
+    font-size: 32px;
+    margin-bottom: 8px;
+    letter-spacing: 0.01em;
+}
+
+.flown-flights-page-wrap .heading-wrap hr,
+.logs-page-wrap .heading-wrap hr {
     border: none;
     height: 1px;
     background: #e5ebf5;

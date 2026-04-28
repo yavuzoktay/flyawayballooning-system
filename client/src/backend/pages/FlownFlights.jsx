@@ -630,7 +630,7 @@ const FlownFlights = () => {
         <div className="flown-flights-page-wrap">
             <Container maxWidth={false}>
                 <div className="heading-wrap">
-                    <h2>FLOWN FLIGHTS PAGE</h2>
+                    <h2>FLOWN FLIGHTS</h2>
                     <hr />
                 </div>
                 <Box sx={{ padding: isMobile ? 1 : 2 }}>

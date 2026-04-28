@@ -13,9 +13,9 @@ const Activity = () => {
                     <Typography
                         variant="h3"
                         sx={{
-                            fontSize: { xs: "28px", md: "42px" },
+                            fontSize: { xs: "28px", md: "32px" },
                             fontWeight: 700,
-                            letterSpacing: "-0.04em",
+                            letterSpacing: "0.01em",
                             color: "#111827",
                             mb: 1
                         }}

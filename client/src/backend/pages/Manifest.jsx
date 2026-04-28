@@ -4774,7 +4774,7 @@ const Manifest = () => {
         <div className="final-menifest-wrap">
             <Container maxWidth={false}>
                 <div className="heading-wrap">
-                    <h2>MANIFEST PAGE</h2>
+                    <h2>MANIFEST</h2>
                     <hr />
                 </div>
                 <Box sx={{ padding: isMobile ? 1 : 3, background: '#f4f7fc', borderRadius: '22px', border: '1px solid #e1e8f3' }}>

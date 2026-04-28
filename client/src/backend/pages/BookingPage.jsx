@@ -5618,7 +5618,7 @@ setBookingDetail(finalVoucherDetail);
             <Container maxWidth={false}>
                 <div className="heading-wrap">
                     <h2>
-                        BOOKING PAGE
+                        BOOKINGS
                     </h2>
                     <hr />
                 </div>
@@ -7583,7 +7583,7 @@ setBookingDetail(finalVoucherDetail);
                                                                 const n = bookingDetail.passengers.length;
                                                                 const perPassenger = n > 0 ? parseFloat((totalAmount / n).toFixed(2)) : 0;
                                                                 
-                                                                console.log('=== UPDATING DUE AND PASSENGER PRICES (BOOKING PAGE) ===');
+                                                                console.log('=== UPDATING DUE AND PASSENGER PRICES (BOOKINGS) ===');
                                                                 console.log('Current Paid:', paid);
                                                                 console.log('New Due:', newDue);
                                                                 console.log('Total Amount:', totalAmount);
