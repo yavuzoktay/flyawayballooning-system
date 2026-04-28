@@ -307,6 +307,15 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         }
     };
 
+    const buildKaleidoscopeBookingUrl = () => {
+        const queryParams = new URLSearchParams({
+            source: 'system',
+            refresh: Date.now().toString()
+        });
+
+        return `${getBookingBaseUrl()}/kaleidoscope?${queryParams.toString()}`;
+    };
+
     const handleManualBookingClick = async () => {
         if (isLaunchingManualBooking) return;
 
@@ -360,7 +369,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
 
         try {
             setIsLaunchingKaleidoscopeBooking(true);
-            const bookingUrl = `${getBookingBaseUrl()}/kaleidoscope`;
+            const bookingUrl = buildKaleidoscopeBookingUrl();
             if (typeof window !== 'undefined') {
                 window.location.assign(bookingUrl);
             }
