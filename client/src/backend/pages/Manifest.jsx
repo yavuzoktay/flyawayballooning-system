@@ -4964,13 +4964,15 @@ const Manifest = () => {
                     <span
                         style={{
                             position: 'absolute',
-                            top: 6,
-                            right: -3,
-                            width: 8,
-                            height: 8,
+                            top: isMobile ? -3 : 6,
+                            right: isMobile ? -5 : -3,
+                            width: isMobile ? 9 : 8,
+                            height: isMobile ? 9 : 8,
                             borderRadius: '50%',
                             backgroundColor: '#ef4444',
-                            border: '1px solid #fff'
+                            border: isMobile ? '2px solid #fff' : '1px solid #fff',
+                            boxShadow: isMobile ? '0 0 0 1px rgba(219, 228, 240, 0.9)' : 'none',
+                            pointerEvents: 'none'
                         }}
                     />
                 )}
@@ -6239,6 +6241,7 @@ const Manifest = () => {
                                                                 }}>
                                                                     {bookingNoteText ? (
                                                                         <IconButton
+                                                                            className="manifest-booking-note-button"
                                                                             size="small"
                                                                             onClick={(event) => setBookingNotePopover({
                                                                                 anchorEl: event.currentTarget,
@@ -6270,7 +6273,9 @@ const Manifest = () => {
                                                                                     display: 'inline-flex',
                                                                                     alignItems: 'center',
                                                                                     justifyContent: 'center',
-                                                                                    fontSize: 16,
+                                                                                    width: isMobile ? 20 : 'auto',
+                                                                                    height: isMobile ? 20 : 'auto',
+                                                                                    fontSize: isMobile ? 18 : 16,
                                                                                     lineHeight: 1,
                                                                                     color: '#64748b'
                                                                                 }}
@@ -6285,14 +6290,15 @@ const Manifest = () => {
                                                                                 component="span"
                                                                                 sx={{
                                                                                     position: 'absolute',
-                                                                                    top: isMobile ? 5 : 3,
-                                                                                    right: isMobile ? -2 : 3,
-                                                                                    width: isMobile ? 8 : 7,
-                                                                                    height: isMobile ? 8 : 7,
+                                                                                    top: isMobile ? -4 : 3,
+                                                                                    right: isMobile ? -5 : 3,
+                                                                                    width: isMobile ? 9 : 7,
+                                                                                    height: isMobile ? 9 : 7,
                                                                                     borderRadius: '50%',
                                                                                     backgroundColor: '#ef4444',
                                                                                     border: isMobile ? '2px solid #fff' : '1px solid #fff',
-                                                                                    boxShadow: isMobile ? '0 0 0 1px rgba(219, 228, 240, 0.9)' : 'none'
+                                                                                    boxShadow: isMobile ? '0 0 0 1px rgba(219, 228, 240, 0.9)' : 'none',
+                                                                                    pointerEvents: 'none'
                                                                                 }}
                                                                             />
                                                                         </IconButton>
