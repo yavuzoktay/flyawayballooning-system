@@ -2238,11 +2238,61 @@ const Manifest = () => {
 
     // Helper: fetch capacity for a slot
     const [availabilities, setAvailabilities] = useState([]);
+    const [holdSpacesLoadingId, setHoldSpacesLoadingId] = useState(null);
     const [locationToActivityId, setLocationToActivityId] = useState({});
     const [nameToActivityId, setNameToActivityId] = useState({});
     const activitiesCacheRef = React.useRef(null);
     const availabilitiesCacheRef = React.useRef({}); // Cache by date: { '2026-03-04': [...availabilities] }
     const lastFetchDateRef = React.useRef(null);
+
+    const parseSpacesNumber = (value) => {
+        const parsed = Number.parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const parsePromptSpaces = (value) => {
+        const normalizedValue = String(value ?? '').trim();
+        if (!/^\d+$/.test(normalizedValue)) {
+            return NaN;
+        }
+
+        return Number.parseInt(normalizedValue, 10);
+    };
+
+    const getHeldSpaces = (availability) =>
+        Math.max(0, parseSpacesNumber(availability?.held_spaces ?? availability?.heldSpaces ?? availability?.adminHeldSpaces));
+
+    const getInternalAvailableSpaces = (availability) =>
+        Math.max(0, parseSpacesNumber(availability?.actualAvailable ?? availability?.available));
+
+    const getFrontendAvailableSpaces = (availability) => {
+        const explicitPublicAvailable = availability?.public_available ?? availability?.publicAvailable;
+        if (explicitPublicAvailable !== undefined && explicitPublicAvailable !== null) {
+            return Math.max(0, parseSpacesNumber(explicitPublicAvailable));
+        }
+
+        return Math.max(0, getInternalAvailableSpaces(availability) - getHeldSpaces(availability));
+    };
+
+    const mergeUpdatedAvailability = (updatedAvailability) => {
+        if (!updatedAvailability?.id) return;
+
+        const availabilityId = String(updatedAvailability.id);
+        const mergeOne = (availability) =>
+            String(availability?.id) === availabilityId
+                ? {
+                    ...availability,
+                    ...updatedAvailability,
+                    held_spaces: getHeldSpaces(updatedAvailability),
+                    public_available: getFrontendAvailableSpaces(updatedAvailability)
+                }
+                : availability;
+
+        setAvailabilities((prev) => prev.map(mergeOne));
+        Object.keys(availabilitiesCacheRef.current || {}).forEach((dateKey) => {
+            availabilitiesCacheRef.current[dateKey] = availabilitiesCacheRef.current[dateKey].map(mergeOne);
+        });
+    };
     
     // Fetch activities only once (cache them)
     const fetchActivities = async () => {
@@ -2301,7 +2351,10 @@ const Manifest = () => {
                     try {
                     // Fetch availabilities with date filter if API supports it, otherwise filter client-side
                     const availRes = await axios.get(`/api/activity/${act.id}/availabilities`, {
-                        params: { date: date } // Pass date as query parameter
+                        params: {
+                            date,
+                            includeHeldSpacesInternal: true
+                        }
                     });
                         if (availRes.data.success && Array.isArray(availRes.data.data)) {
                         // Filter by date on client side if API doesn't support date filter
@@ -2326,12 +2379,112 @@ const Manifest = () => {
                 }
             console.log(`Availabilities loaded for date ${date}:`, allAvailabilities.length, 'slots');
             availabilitiesCacheRef.current[date] = allAvailabilities; // Cache by date
-                setAvailabilities(allAvailabilities);
+            setAvailabilities(allAvailabilities);
         } catch (error) {
             console.error('Error fetching availabilities:', error);
         }
     };
-    
+
+    const handleHoldSpaces = async (availability) => {
+        if (!availability?.id) {
+            alert('No matching availability slot was found for this flight.');
+            return;
+        }
+
+        const maxHoldableSpaces = getFrontendAvailableSpaces(availability);
+        if (maxHoldableSpaces <= 0) {
+            alert('There are no available spaces left to hold for this slot.');
+            return;
+        }
+
+        const input = window.prompt(
+            `How many spaces would you like to hold?\nAvailable to hold: ${maxHoldableSpaces}`,
+            '1'
+        );
+        if (input === null) return;
+
+        const spaces = parsePromptSpaces(input);
+        if (!Number.isInteger(spaces) || spaces <= 0) {
+            alert('Please enter a positive whole number of spaces to hold.');
+            return;
+        }
+
+        if (spaces > maxHoldableSpaces) {
+            alert(`You can hold up to ${maxHoldableSpaces} space${maxHoldableSpaces === 1 ? '' : 's'} for this slot.`);
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Hold ${spaces} space${spaces === 1 ? '' : 's'} for this slot?\nThese spaces will be hidden from frontend availability.`
+        );
+        if (!confirmed) return;
+
+        setHoldSpacesLoadingId(String(availability.id));
+        try {
+            const response = await axios.patch(`/api/availability/${availability.id}/hold-spaces`, { spaces });
+            if (!response.data?.success) {
+                throw new Error(response.data?.message || 'Could not hold spaces.');
+            }
+
+            mergeUpdatedAvailability(response.data.data);
+        } catch (error) {
+            console.error('Error holding availability spaces:', error);
+            alert(error.response?.data?.message || error.message || 'Could not hold spaces.');
+        } finally {
+            setHoldSpacesLoadingId(null);
+        }
+    };
+
+    const handleReleaseHeldSpaces = async (availability) => {
+        if (!availability?.id) {
+            alert('No matching availability slot was found for this flight.');
+            return;
+        }
+
+        const heldSpaces = getHeldSpaces(availability);
+        if (heldSpaces <= 0) {
+            alert('There are no held spaces to release for this slot.');
+            return;
+        }
+
+        const input = window.prompt(
+            `How many held spaces would you like to release?\nCurrently held: ${heldSpaces}`,
+            String(heldSpaces)
+        );
+        if (input === null) return;
+
+        const spaces = parsePromptSpaces(input);
+        if (!Number.isInteger(spaces) || spaces <= 0) {
+            alert('Please enter a positive whole number of spaces to release.');
+            return;
+        }
+
+        if (spaces > heldSpaces) {
+            alert(`You can release up to ${heldSpaces} held space${heldSpaces === 1 ? '' : 's'} for this slot.`);
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Release ${spaces} held space${spaces === 1 ? '' : 's'} back to frontend availability?`
+        );
+        if (!confirmed) return;
+
+        setHoldSpacesLoadingId(String(availability.id));
+        try {
+            const response = await axios.patch(`/api/availability/${availability.id}/release-held-spaces`, { spaces });
+            if (!response.data?.success) {
+                throw new Error(response.data?.message || 'Could not release held spaces.');
+            }
+
+            mergeUpdatedAvailability(response.data.data);
+        } catch (error) {
+            console.error('Error releasing held availability spaces:', error);
+            alert(error.response?.data?.message || error.message || 'Could not release held spaces.');
+        } finally {
+            setHoldSpacesLoadingId(null);
+        }
+    };
+
     // Fetch activities only once on mount
     useEffect(() => {
         fetchActivities();
@@ -3994,7 +4147,9 @@ const Manifest = () => {
           let all = [];
           for (const act of activity) {
             try {
-              const res = await axios.get(`/api/activity/${act.id}/availabilities`);
+              const res = await axios.get(`/api/activity/${act.id}/availabilities`, {
+                params: { includeHeldSpacesInternal: true }
+              });
               if (res.data.success && Array.isArray(res.data.data)) {
                 all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
               }
@@ -4144,7 +4299,9 @@ const Manifest = () => {
           let all = [];
           for (const act of activity) {
             try {
-              const res = await axios.get(`/api/activity/${act.id}/availabilities`);
+              const res = await axios.get(`/api/activity/${act.id}/availabilities`, {
+                params: { includeHeldSpacesInternal: true }
+              });
               if (res.data.success && Array.isArray(res.data.data)) {
                 all = all.concat(res.data.data.map(a => ({ ...a, activity_id: act.id, location: act.location, flight_type: act.flight_type })));
               }
@@ -5213,6 +5370,16 @@ const Manifest = () => {
                                     status = getFlightStatus(first);
                                 }
                             }
+
+                            const heldSpacesDisplay = getHeldSpaces(found);
+                            const internalAvailableSpacesDisplay = found ? getInternalAvailableSpaces(found) : null;
+                            const frontendAvailableSpacesDisplay = found ? getFrontendAvailableSpaces(found) : null;
+                            const canHoldSpaces =
+                                !!found?.id &&
+                                frontendAvailableSpacesDisplay !== null &&
+                                frontendAvailableSpacesDisplay > 0;
+                            const canReleaseHeldSpaces = !!found?.id && heldSpacesDisplay > 0;
+                            const isHoldSpacesLoading = found?.id && holdSpacesLoadingId === String(found.id);
                             
                             // Compute total weight using passengers if present, otherwise fallback to booking weight
                             const totalWeightDisplay = groupFlights.reduce((sum, f) => {
@@ -5393,7 +5560,24 @@ const Manifest = () => {
                                                                 <Typography sx={{ fontSize: '11px', fontWeight: 500, margin: 0 }}>
                                                                     {paxBookedDisplay}/{paxTotalDisplay} Pax
                                                                 </Typography>
-                                                    </Box>
+                                                            </Box>
+                                                            {heldSpacesDisplay > 0 && (
+                                                                <Box sx={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '4px',
+                                                                    backgroundColor: '#fff7ed',
+                                                                    border: '1px solid #fed7aa',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    whiteSpace: 'nowrap'
+                                                                }}>
+                                                                    <Typography sx={{ fontSize: '11px', fontWeight: 600, margin: 0, color: '#9a3412' }}>
+                                                                        Held: {heldSpacesDisplay}
+                                                                    </Typography>
+                                                                </Box>
+                                                            )}
                                                             <Box sx={{
                                                                 display: 'inline-flex',
                                                                 alignItems: 'center',
@@ -5450,6 +5634,14 @@ const Manifest = () => {
                                                             <Box display="flex" alignItems="center">
                                                                 <Typography>Pax Booked: {paxBookedDisplay} / {paxTotalDisplay}</Typography>
                                                             </Box>
+                                                            {heldSpacesDisplay > 0 && (
+                                                                <Box display="flex" alignItems="center">
+                                                                    <Typography>
+                                                                        Held Spaces: <span style={{ color: '#c2410c', fontWeight: 700 }}>{heldSpacesDisplay}</span>
+                                                                        {frontendAvailableSpacesDisplay !== null ? ` (Frontend Available: ${frontendAvailableSpacesDisplay})` : ''}
+                                                                    </Typography>
+                                                                </Box>
+                                                            )}
                                                             <Box display="flex" alignItems="center">
                                                                 <Typography>Balloon Resource: {balloonResource}</Typography>
                                                             </Box>
@@ -5590,6 +5782,66 @@ const Manifest = () => {
                                                         border: '1px solid #b91c1c'
                                                     }}>
                                                         Sold Out
+                                                    </Box>
+                                                )}
+
+                                                {!!found?.id && (canHoldSpaces || canReleaseHeldSpaces) && (
+                                                    <Box sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 0.75,
+                                                        flexWrap: 'wrap'
+                                                    }}>
+                                                        {canHoldSpaces && (
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                disabled={!!isHoldSpacesLoading}
+                                                                onClick={() => handleHoldSpaces(found)}
+                                                                sx={{
+                                                                    minHeight: isMobile ? 28 : 32,
+                                                                    px: isMobile ? 1 : 1.5,
+                                                                    py: 0.25,
+                                                                    fontSize: isMobile ? '11px' : '12px',
+                                                                    borderColor: '#2563eb',
+                                                                    color: '#1d4ed8',
+                                                                    textTransform: 'none',
+                                                                    fontWeight: 700
+                                                                }}
+                                                            >
+                                                                {isHoldSpacesLoading ? 'Holding...' : 'Hold'}
+                                                            </Button>
+                                                        )}
+                                                        {canReleaseHeldSpaces && (
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                disabled={!!isHoldSpacesLoading}
+                                                                onClick={() => handleReleaseHeldSpaces(found)}
+                                                                sx={{
+                                                                    minHeight: isMobile ? 28 : 32,
+                                                                    px: isMobile ? 1 : 1.5,
+                                                                    py: 0.25,
+                                                                    fontSize: isMobile ? '11px' : '12px',
+                                                                    borderColor: '#ea580c',
+                                                                    color: '#c2410c',
+                                                                    textTransform: 'none',
+                                                                    fontWeight: 700
+                                                                }}
+                                                            >
+                                                                {isHoldSpacesLoading ? 'Releasing...' : 'Release Hold'}
+                                                            </Button>
+                                                        )}
+                                                        {heldSpacesDisplay > 0 && internalAvailableSpacesDisplay !== null && (
+                                                            <Typography sx={{
+                                                                fontSize: isMobile ? '11px' : '12px',
+                                                                color: '#9a3412',
+                                                                fontWeight: 600,
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                Held {heldSpacesDisplay} of {internalAvailableSpacesDisplay}
+                                                            </Typography>
+                                                        )}
                                                     </Box>
                                                 )}
                                                 

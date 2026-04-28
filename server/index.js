@@ -379,6 +379,29 @@ app.use((req, res, next) => {
 // Store holds in memory (in production, use Redis or database)
 const availabilityHolds = new Map();
 
+const getActiveCheckoutHeldSeatsForSlot = (activityId, date, time, options = {}) => {
+    const normalizedActivityId = String(activityId ?? '');
+    const normalizedDate = String(date ?? '');
+    const normalizedTime = String(time ?? '');
+
+    if (!normalizedActivityId || !normalizedDate || !normalizedTime) {
+        return 0;
+    }
+
+    const holdKeyPrefix = `${normalizedActivityId}_${normalizedDate}_${normalizedTime}_`;
+    const now = Date.now();
+    let heldSeats = 0;
+
+    for (const [key, hold] of availabilityHolds.entries()) {
+        if (options.excludeHoldKey && key === options.excludeHoldKey) continue;
+        if (key.startsWith(holdKeyPrefix) && now <= hold.expiresAt) {
+            heldSeats += Number(hold.seats || 0);
+        }
+    }
+
+    return heldSeats;
+};
+
 // Clean up expired holds every minute
 setInterval(() => {
     const now = Date.now();
@@ -25086,6 +25109,9 @@ app.post('/api/activity/:id/availabilities', (req, res) => {
 app.get('/api/activity/:id/availabilities', (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ success: false, message: 'Eksik bilgi!' });
+    const includeHeldSpacesInternal =
+        req.query.includeHeldSpacesInternal === 'true' ||
+        req.query.internal === 'true';
 
     console.log(`Fetching availabilities for activity ${id}`);
 
@@ -25258,6 +25284,11 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             const ownsBalloon210 = !assignedBalloon210Location || assignedBalloon210Location === locationName;
             const ownsBalloon105 = !assignedBalloon105Location || assignedBalloon105Location === locationName;
             const sharedAvailable = ownsBalloon210 ? Math.max(0, sharedCapacity - sharedBooked) : 0;
+            const adminHeldSpaces = Math.max(0, Number(row.held_spaces || 0));
+            const normalizedAvailabilityDate = row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date;
+            const checkoutHeldSeats = getActiveCheckoutHeldSeatsForSlot(row.activity_id, normalizedAvailabilityDate, row.time);
+            const totalHeldSeats = adminHeldSpaces + checkoutHeldSeats;
+            const publicAvailable = Math.max(0, sharedAvailable - totalHeldSeats);
             const privateSmallRemaining = ownsBalloon105
                 ? (privateSmallBookings > 0 ? 0 : BALLOON_105_CAPACITY)
                 : 0;
@@ -25273,6 +25304,8 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
             // Only close if balloon is assigned to different location or large private flight exists
             const calculatedStatus = (sharedAvailable <= 0 || (!ownsBalloon210 || privateLargeBooked > 0)) ? 'Closed' : baseStatus;
             const needsUpdate = calculatedStatus !== row.status || sharedAvailable !== row.available;
+            const responseAvailable = includeHeldSpacesInternal ? sharedAvailable : publicAvailable;
+            const responseStatus = !includeHeldSpacesInternal && publicAvailable <= 0 ? 'Closed' : calculatedStatus;
 
             if (needsUpdate) {
                 console.log(`Updating availability ${row.id}: date=${row.date}, time=${row.time}, status=${calculatedStatus}, available=${sharedAvailable}`);
@@ -25288,10 +25321,16 @@ app.get('/api/activity/:id/availabilities', (req, res) => {
 
             return {
                 ...row,
-                date: row.date ? dayjs(row.date).format('YYYY-MM-DD') : row.date,
+                date: normalizedAvailabilityDate,
                 total_booked: row.total_booked || 0,
-                available: sharedAvailable,
-                status: calculatedStatus,
+                available: responseAvailable,
+                actualAvailable: sharedAvailable,
+                held_spaces: adminHeldSpaces,
+                adminHeldSpaces,
+                checkoutHeldSeats,
+                heldSeats: totalHeldSeats,
+                public_available: publicAvailable,
+                status: responseStatus,
                 shared_capacity: sharedCapacity,
                 shared_booked: sharedBooked,
                 balloon105_locked: balloon105Locked,
@@ -25579,16 +25618,7 @@ app.get('/api/availabilities/filter', (req, res) => {
             const day = String(dateObj.getDate()).padStart(2, '0');
             const localDateString = `${year}-${month}-${day}`;
 
-            // Calculate held seats for this slot
-            const holdKey = `${row.activity_id}_${localDateString}_${row.time}`;
-            let heldSeats = 0;
-            const now = Date.now();
-
-            for (const [key, hold] of availabilityHolds.entries()) {
-                if (key.startsWith(holdKey) && now <= hold.expiresAt) {
-                    heldSeats += hold.seats;
-                }
-            }
+            const checkoutHeldSeats = getActiveCheckoutHeldSeatsForSlot(row.activity_id, localDateString, row.time);
 
             const rawVoucherTypesArray = parseAvailabilityTypeList(row.voucher_types, { preserveAll: true });
             const rawFlightTypesArray = parseAvailabilityTypeList(row.flight_types, { preserveAll: true });
@@ -25657,8 +25687,10 @@ app.get('/api/availabilities/filter', (req, res) => {
                 : 0;
             const baseStatus = (row.calculated_status || row.status || '').trim() || 'Open';
 
-            // Final available = calculated_available - heldSeats
-            const finalAvailable = Math.max(0, calculatedAvailable - heldSeats);
+            const adminHeldSpaces = Math.max(0, Number(row.held_spaces || 0));
+            const totalHeldSeats = checkoutHeldSeats + adminHeldSpaces;
+            // Final public available = calculated_available - admin holds - checkout/session holds
+            const finalAvailable = Math.max(0, calculatedAvailable - totalHeldSeats);
             const finalStatus = (finalAvailable <= 0 || !ownsBalloon210) ? 'Closed' : baseStatus;
 
             return {
@@ -25667,7 +25699,11 @@ app.get('/api/availabilities/filter', (req, res) => {
                 available: finalAvailable,
                 booked: totalBooked,
                 actualAvailable: calculatedAvailable,
-                heldSeats: heldSeats,
+                heldSeats: totalHeldSeats,
+                checkoutHeldSeats,
+                held_spaces: adminHeldSpaces,
+                adminHeldSpaces,
+                publicAvailable: finalAvailable,
                 status: finalStatus,
                 total_booked: totalBooked,
                 shared_capacity: sharedCapacity,
@@ -25852,6 +25888,213 @@ app.patch('/api/availability/:id/status', (req, res) => {
             success: true,
             message: `Availability status updated to ${status}`,
             data: { id, status }
+        });
+    });
+});
+
+const normalizeHoldSpaces = (value) => {
+    if (typeof value === 'number') {
+        return Number.isInteger(value) ? value : NaN;
+    }
+
+    const normalizedValue = String(value ?? '').trim();
+    if (!/^\d+$/.test(normalizedValue)) {
+        return NaN;
+    }
+
+    return Number.parseInt(normalizedValue, 10);
+};
+
+const buildHoldSpacesPayload = (availability) => {
+    const available = Math.max(0, Number(availability.available || 0));
+    const heldSpaces = Math.max(0, Number(availability.held_spaces || 0));
+    const checkoutHeldSeats = getActiveCheckoutHeldSeatsForSlot(
+        availability.activity_id,
+        availability.date,
+        availability.time
+    );
+    const totalHeldSeats = heldSpaces + checkoutHeldSeats;
+
+    return {
+        id: availability.id,
+        activity_id: availability.activity_id,
+        date: availability.date,
+        time: availability.time,
+        capacity: Number(availability.capacity || 0),
+        available,
+        held_spaces: heldSpaces,
+        adminHeldSpaces: heldSpaces,
+        checkoutHeldSeats,
+        heldSeats: totalHeldSeats,
+        public_available: Math.max(0, available - totalHeldSeats),
+        status: availability.status
+    };
+};
+
+// Hold spaces on an availability without deleting the underlying spaces.
+app.patch('/api/availability/:id/hold-spaces', (req, res) => {
+    const { id } = req.params;
+    const spaces = normalizeHoldSpaces(req.body?.spaces);
+
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Missing availability id' });
+    }
+
+    if (!Number.isInteger(spaces) || spaces <= 0) {
+        return res.status(400).json({ success: false, message: 'Spaces must be a positive whole number' });
+    }
+
+    const selectSql = `
+        SELECT id, activity_id, DATE_FORMAT(date, '%Y-%m-%d') as date, time, capacity, available, held_spaces, status
+        FROM activity_availability
+        WHERE id = ?
+        LIMIT 1
+    `;
+
+    con.query(selectSql, [id], (selectErr, rows) => {
+        if (selectErr) {
+            console.error('Error loading availability before holding spaces:', selectErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: selectErr });
+        }
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Availability not found' });
+        }
+
+        const availability = rows[0];
+        const available = Math.max(0, Number(availability.available || 0));
+        const currentHeldSpaces = Math.max(0, Number(availability.held_spaces || 0));
+        const activeCheckoutHeldSeats = getActiveCheckoutHeldSeatsForSlot(
+            availability.activity_id,
+            availability.date,
+            availability.time
+        );
+        const remainingSpaces = Math.max(0, available - currentHeldSpaces - activeCheckoutHeldSeats);
+
+        if (spaces > remainingSpaces) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot hold ${spaces} space${spaces === 1 ? '' : 's'}; only ${remainingSpaces} available to hold.`,
+                data: buildHoldSpacesPayload(availability)
+            });
+        }
+
+        const nextHeldSpaces = currentHeldSpaces + spaces;
+        const updateSql = `
+            UPDATE activity_availability
+            SET held_spaces = COALESCE(held_spaces, 0) + ?
+            WHERE id = ?
+              AND COALESCE(held_spaces, 0) + ? <= GREATEST(available - ?, 0)
+        `;
+
+        con.query(updateSql, [spaces, id, spaces, activeCheckoutHeldSeats], (updateErr, updateResult) => {
+            if (updateErr) {
+                console.error('Error holding availability spaces:', updateErr);
+                return res.status(500).json({ success: false, message: 'Database error', error: updateErr });
+            }
+
+            if (!updateResult || updateResult.affectedRows === 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Availability changed while holding spaces. Please refresh and try again.',
+                    data: buildHoldSpacesPayload(availability)
+                });
+            }
+
+            res.json({
+                success: true,
+                message: `${spaces} space${spaces === 1 ? '' : 's'} held`,
+                data: buildHoldSpacesPayload({
+                    ...availability,
+                    held_spaces: nextHeldSpaces
+                })
+            });
+        });
+    });
+});
+
+// Release held spaces so they return to public availability.
+app.patch('/api/availability/:id/release-held-spaces', (req, res) => {
+    const { id } = req.params;
+    const requestedSpaces = req.body?.spaces === undefined || req.body?.spaces === null || req.body?.spaces === ''
+        ? null
+        : normalizeHoldSpaces(req.body.spaces);
+
+    if (!id) {
+        return res.status(400).json({ success: false, message: 'Missing availability id' });
+    }
+
+    if (requestedSpaces !== null && (!Number.isInteger(requestedSpaces) || requestedSpaces <= 0)) {
+        return res.status(400).json({ success: false, message: 'Spaces must be a positive whole number' });
+    }
+
+    const selectSql = `
+        SELECT id, activity_id, DATE_FORMAT(date, '%Y-%m-%d') as date, time, capacity, available, held_spaces, status
+        FROM activity_availability
+        WHERE id = ?
+        LIMIT 1
+    `;
+
+    con.query(selectSql, [id], (selectErr, rows) => {
+        if (selectErr) {
+            console.error('Error loading availability before releasing held spaces:', selectErr);
+            return res.status(500).json({ success: false, message: 'Database error', error: selectErr });
+        }
+
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Availability not found' });
+        }
+
+        const availability = rows[0];
+        const currentHeldSpaces = Math.max(0, Number(availability.held_spaces || 0));
+        const spacesToRelease = requestedSpaces === null ? currentHeldSpaces : requestedSpaces;
+
+        if (currentHeldSpaces <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'This availability has no held spaces to release.',
+                data: buildHoldSpacesPayload(availability)
+            });
+        }
+
+        if (spacesToRelease > currentHeldSpaces) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot release ${spacesToRelease} space${spacesToRelease === 1 ? '' : 's'}; only ${currentHeldSpaces} held.`,
+                data: buildHoldSpacesPayload(availability)
+            });
+        }
+
+        const nextHeldSpaces = Math.max(0, currentHeldSpaces - spacesToRelease);
+        const updateSql = `
+            UPDATE activity_availability
+            SET held_spaces = GREATEST(COALESCE(held_spaces, 0) - ?, 0)
+            WHERE id = ?
+              AND COALESCE(held_spaces, 0) >= ?
+        `;
+
+        con.query(updateSql, [spacesToRelease, id, spacesToRelease], (updateErr, updateResult) => {
+            if (updateErr) {
+                console.error('Error releasing availability held spaces:', updateErr);
+                return res.status(500).json({ success: false, message: 'Database error', error: updateErr });
+            }
+
+            if (!updateResult || updateResult.affectedRows === 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Held spaces changed while releasing. Please refresh and try again.',
+                    data: buildHoldSpacesPayload(availability)
+                });
+            }
+
+            res.json({
+                success: true,
+                message: `${spacesToRelease} held space${spacesToRelease === 1 ? '' : 's'} released`,
+                data: buildHoldSpacesPayload({
+                    ...availability,
+                    held_spaces: nextHeldSpaces
+                })
+            });
         });
     });
 });
@@ -30786,28 +31029,24 @@ app.get('/api/availabilityBySlot', (req, res) => {
     if (!activity_id || !date || !time) {
         return res.status(400).json({ success: false, message: 'activity_id, date and time are required' });
     }
-    const sql = 'SELECT id, capacity, available, status FROM activity_availability WHERE activity_id = ? AND DATE(date) = ? AND TIME(time) = ? LIMIT 1';
+    const sql = 'SELECT id, capacity, available, held_spaces, status FROM activity_availability WHERE activity_id = ? AND DATE(date) = ? AND TIME(time) = ? LIMIT 1';
     con.query(sql, [activity_id, date, time], (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: 'Database error' });
         if (!rows || rows.length === 0) return res.json({ success: true, data: null });
 
-        // Calculate held seats for this slot
-        const holdKey = `${activity_id}_${date}_${time}`;
-        let heldSeats = 0;
-        const now = Date.now();
-
-        for (const [key, hold] of availabilityHolds.entries()) {
-            if (key.startsWith(holdKey) && now <= hold.expiresAt) {
-                heldSeats += hold.seats;
-            }
-        }
+        const checkoutHeldSeats = getActiveCheckoutHeldSeatsForSlot(activity_id, date, time);
+        const adminHeldSpaces = Math.max(0, Number(rows[0].held_spaces || 0));
+        const totalHeldSeats = checkoutHeldSeats + adminHeldSpaces;
 
         // Return availability minus held seats
         const availabilityData = {
             ...rows[0],
-            available: Math.max(0, rows[0].available - heldSeats),
+            available: Math.max(0, rows[0].available - totalHeldSeats),
             actualAvailable: rows[0].available,
-            heldSeats: heldSeats
+            heldSpaces: adminHeldSpaces,
+            held_spaces: adminHeldSpaces,
+            checkoutHeldSeats,
+            heldSeats: totalHeldSeats
         };
 
         return res.json({ success: true, data: availabilityData });
@@ -30822,30 +31061,66 @@ app.post('/api/holdAvailability', (req, res) => {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    // Create unique hold key
+    const seatsToHold = Number(seats);
+    if (!Number.isInteger(seatsToHold) || seatsToHold <= 0) {
+        return res.status(400).json({ success: false, message: 'Seats must be a positive whole number' });
+    }
+
     const holdKey = `${activity_id}_${date}_${time}_${sessionId}`;
-    const expiresAt = Date.now() + (5 * 60 * 1000); // 5 minutes
 
-    // Store the hold
-    availabilityHolds.set(holdKey, {
-        activity_id,
-        date,
-        time,
-        seats: parseInt(seats),
-        sessionId,
-        expiresAt,
-        createdAt: Date.now()
-    });
+    const sql = 'SELECT id, available, held_spaces FROM activity_availability WHERE activity_id = ? AND DATE(date) = ? AND TIME(time) = ? LIMIT 1';
+    con.query(sql, [activity_id, date, time], (err, rows) => {
+        if (err) {
+            console.error('Error validating availability hold:', err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
 
-    console.log(`🔒 Hold created for ${seats} seat(s) at ${date} ${time} (session: ${sessionId}, expires in 5 min)`);
-    console.log(`🔒 Hold details:`, { activity_id, date, time, seats, sessionId, holdKey });
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Availability slot not found' });
+        }
 
-    res.json({
-        success: true,
-        message: 'Availability held',
-        holdKey,
-        expiresAt,
-        expiresIn: 300 // seconds
+        const slot = rows[0];
+        const adminHeldSpaces = Math.max(0, Number(slot.held_spaces || 0));
+        const activeCheckoutHeldSeats = getActiveCheckoutHeldSeatsForSlot(activity_id, date, time, {
+            excludeHoldKey: holdKey
+        });
+
+        const availableToHold = Math.max(0, Number(slot.available || 0) - adminHeldSpaces - activeCheckoutHeldSeats);
+        if (seatsToHold > availableToHold) {
+            return res.status(409).json({
+                success: false,
+                message: `Only ${availableToHold} space${availableToHold === 1 ? '' : 's'} available for this slot.`,
+                data: {
+                    available: availableToHold,
+                    held_spaces: adminHeldSpaces,
+                    checkoutHeldSeats: activeCheckoutHeldSeats
+                }
+            });
+        }
+
+        const expiresAt = Date.now() + (5 * 60 * 1000); // 5 minutes
+
+        // Store the hold
+        availabilityHolds.set(holdKey, {
+            activity_id,
+            date,
+            time,
+            seats: seatsToHold,
+            sessionId,
+            expiresAt,
+            createdAt: Date.now()
+        });
+
+        console.log(`🔒 Hold created for ${seatsToHold} seat(s) at ${date} ${time} (session: ${sessionId}, expires in 5 min)`);
+        console.log(`🔒 Hold details:`, { activity_id, date, time, seats: seatsToHold, sessionId, holdKey });
+
+        res.json({
+            success: true,
+            message: 'Availability held',
+            holdKey,
+            expiresAt,
+            expiresIn: 300 // seconds
+        });
     });
 });
 
@@ -34058,6 +34333,7 @@ function runAvailabilityVisibilityMigrations() {
         });
     };
 
+    ensureAvailabilityColumn('held_spaces', 'INT NOT NULL DEFAULT 0', 'AFTER available');
     ensureAvailabilityColumn('hidden_flight_types', 'VARCHAR(255) NULL', 'AFTER flight_types');
     ensureAvailabilityColumn('hidden_voucher_types', 'VARCHAR(255) NULL', 'AFTER voucher_types');
 
