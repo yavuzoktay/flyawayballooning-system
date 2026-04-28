@@ -74,6 +74,20 @@ export const getManualBookingFieldRows = (profile) => {
             )
         },
         {
+            label: 'Hotel Booking ID',
+            value: getFirstMeaningfulValue(
+                profile.hotel_booking_id,
+                profile.hotelBookingId
+            )
+        },
+        {
+            label: 'Booking Name',
+            value: getFirstMeaningfulValue(
+                profile.booking_name,
+                profile.bookingName
+            )
+        },
+        {
             label: 'Staff Name',
             value: getFirstMeaningfulValue(
                 profile.staff_name,

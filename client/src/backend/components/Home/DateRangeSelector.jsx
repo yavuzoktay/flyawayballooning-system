@@ -11,7 +11,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
     const [isLaunchingManualBooking, setIsLaunchingManualBooking] = useState(false);
-    const [isLaunchingTheNewtBooking, setIsLaunchingTheNewtBooking] = useState(false);
+    const [isLaunchingKaleidoscopeBooking, setIsLaunchingKaleidoscopeBooking] = useState(false);
     const [isLaunchingHotelManualBooking, setIsLaunchingHotelManualBooking] = useState(false);
     const API_BASE_URL = config.API_BASE_URL;
 
@@ -336,21 +336,20 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         }
     };
 
-    const handleTheNewtManualBookingClick = async () => {
-        if (isLaunchingTheNewtBooking) return;
+    const handleKaleidoscopeBookingClick = () => {
+        if (isLaunchingKaleidoscopeBooking) return;
 
         try {
-            setIsLaunchingTheNewtBooking(true);
-            const token = await requestManualBookingToken();
-            navigateToManualBooking('/thenewt', token, {
-                tokenParam: 't',
-                includeLegacyParams: false
-            });
+            setIsLaunchingKaleidoscopeBooking(true);
+            const bookingUrl = `${getBookingBaseUrl()}/kaleidoscope`;
+            if (typeof window !== 'undefined') {
+                window.location.assign(bookingUrl);
+            }
         } catch (error) {
-            console.error('Error starting The Newt manual booking:', error);
-            alert(error?.response?.data?.message || error.message || 'Could not start The Newt balloon booking.');
+            console.error('Error opening Kaleidoscope balloon booking:', error);
+            alert(error?.message || 'Could not open Kaleidoscope balloon booking.');
         } finally {
-            setIsLaunchingTheNewtBooking(false);
+            setIsLaunchingKaleidoscopeBooking(false);
         }
     };
 
@@ -516,8 +515,8 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, minWidth: 210, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
                             <button
                                 type="button"
-                                onClick={handleTheNewtManualBookingClick}
-                                disabled={isLaunchingTheNewtBooking}
+                                onClick={handleKaleidoscopeBookingClick}
+                                disabled={isLaunchingKaleidoscopeBooking}
                                 style={{
                                     display: 'inline-block',
                                     background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
@@ -531,14 +530,14 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                                     textTransform: 'uppercase',
                                     textAlign: 'center',
                                     textDecoration: 'none',
-                                    cursor: isLaunchingTheNewtBooking ? 'wait' : 'pointer',
+                                    cursor: isLaunchingKaleidoscopeBooking ? 'wait' : 'pointer',
                                     boxShadow: '0 8px 20px rgba(15, 118, 110, 0.18)',
                                     width: '100%',
                                     maxWidth: 210,
-                                    opacity: isLaunchingTheNewtBooking ? 0.75 : 1
+                                    opacity: isLaunchingKaleidoscopeBooking ? 0.75 : 1
                                 }}
                             >
-                                {isLaunchingTheNewtBooking ? 'Opening...' : 'Newt Booking Link'}
+                                {isLaunchingKaleidoscopeBooking ? 'Opening...' : 'Kaleidoscope Balloon Booking'}
                             </button>
                             <button
                                 type="button"

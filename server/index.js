@@ -36754,7 +36754,7 @@ function getCustomerPortalLink(booking = {}) {
 function getBookingConfirmationMessageHtml(booking = {}) {
     const name = escapeHtml(booking.name || booking.customer_name || 'Guest');
     const flightDate = escapeHtml(formatDateTime(booking.flight_date) || 'November 14, 2025 at 3:30 PM');
-    const location = escapeHtml(booking.location || 'Bath');
+    const location = escapeHtml(getBookingDisplayLocation(booking) || 'Bath');
     const experience = escapeHtml(booking.flight_type || booking.experience || 'Private Charter');
 
     return wrapParagraphs([
@@ -36996,7 +36996,7 @@ function getBookingConfirmationReceiptHtml(booking = {}) {
         templateName === 'gift voucher';
     // For both Flight Voucher and Gift Voucher, location should show "-" instead of actual location
     // This ensures "Bath" or any other location is not displayed for vouchers
-    const location = (isFlightVoucher || isGiftVoucher) ? '—' : (booking?.location || booking?.preferred_location ? escapeHtml(booking.location || booking.preferred_location) : '');
+    const location = (isFlightVoucher || isGiftVoucher) ? '—' : (getBookingDisplayLocation(booking) ? escapeHtml(getBookingDisplayLocation(booking)) : '');
     const experience = escapeHtml(booking.flight_type || booking.experience || booking.experience_type || 'Flight Experience');
     const guestCount = receiptItems.length > 0 ? receiptItems.length : (booking.pax || booking.numberOfPassengers || 0);
 
@@ -37428,7 +37428,7 @@ function replacePrompts(html = '', booking = {}) {
         result = result.replace(/\[Flight Date\]/gi, '');
     }
 
-    result = result.replace(/\[Location\]/gi, escapeHtml(booking.location || ''));
+    result = result.replace(/\[Location\]/gi, escapeHtml(getBookingDisplayLocation(booking) || ''));
     result = result.replace(/\[Voucher Code\]/gi, escapeHtml(booking.voucher_code || booking.voucherCode || ''));
 
     const customerPortalLink = getCustomerPortalLink(booking);
@@ -37654,6 +37654,35 @@ function isTheNewtManualBookingProfile(profile = null) {
     ]);
 
     return normalizeComparableText(hotelName) === normalizeComparableText(THE_NEWT_VAT_INVOICE_CONFIG.accommodationName);
+}
+
+function shouldUseManualBookingLocationDisplay(profile = null) {
+    if (!profile || typeof profile !== 'object') return false;
+    const value = profile.use_location_display ?? profile.useLocationDisplay;
+    return value === true || value === 1 || String(value || '').toLowerCase() === 'true';
+}
+
+function getBookingDisplayLocation(booking = {}, manualBookingProfile = null) {
+    const profile = manualBookingProfile || extractManualBookingProfileFromStoredBooking(booking);
+
+    if (shouldUseManualBookingLocationDisplay(profile)) {
+        const displayLocation = getManualBookingProfileField(profile, [
+            'location_display_name',
+            'locationDisplayName',
+            'display_location',
+            'displayLocation',
+            'hotel_name',
+            'hotelName',
+            'accommodation_name',
+            'accommodationName'
+        ]);
+
+        if (displayLocation) {
+            return displayLocation;
+        }
+    }
+
+    return booking.display_location || booking.location || booking.preferred_location || '';
 }
 
 function formatCurrencyAmount(amount) {
@@ -39233,7 +39262,7 @@ async function sendEmailToCustomerAndOwner(booking, bookingId, options = {}) {
             } else {
                 // Generate email HTML using database template (or default if template not found)
                 htmlBody = generateBookingConfirmationEmail(booking, template);
-                const defaultTextBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${booking.location || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
+                const defaultTextBody = `Thank you for choosing Fly Away Ballooning! Your flight is confirmed for ${booking.flight_date ? moment(booking.flight_date).format('MMMM D, YYYY [at] h:mm A') : 'TBD'} at ${getBookingDisplayLocation(booking) || 'Bath'}. We'll be in touch closer to the flight with weather updates.`;
                 const fallbackText = typeof textBodyFallback === 'function'
                     ? textBodyFallback(booking)
                     : textBodyFallback;
@@ -41281,7 +41310,7 @@ function replaceSmsPrompts(text = '', booking = {}) {
     }
     
     // Replace [Location] (case-insensitive)
-    result = result.replace(/\[Location\]/gi, booking.location || '');
+    result = result.replace(/\[Location\]/gi, getBookingDisplayLocation(booking) || '');
     
     // Replace [Voucher Code] (case-insensitive)
     result = result.replace(/\[Voucher Code\]/gi, booking.voucher_code || booking.voucherCode || '');
