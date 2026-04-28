@@ -4825,7 +4825,23 @@ const Manifest = () => {
         <div className="final-menifest-wrap">
             <Container maxWidth={false}>
                 <div className="heading-wrap">
-                    <h2>MANIFEST</h2>
+                    {isMobile ? (
+                        <div
+                            className="manifest-mobile-heading-row"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 12,
+                                width: '100%'
+                            }}
+                        >
+                            <h2 style={{ margin: 0 }}>MANIFEST</h2>
+                            {manifestDateNoteButton}
+                        </div>
+                    ) : (
+                        <h2>MANIFEST</h2>
+                    )}
                     <hr />
                 </div>
                 <Box sx={{ padding: isMobile ? 1 : 3, background: '#f4f7fc', borderRadius: '22px', border: '1px solid #e1e8f3' }}>
@@ -4921,7 +4937,6 @@ const Manifest = () => {
                                     }} className="manifest-nav-buttons" sx={{ minWidth: 'auto', padding: '8px' }}>
                                         <ArrowForwardIosIcon />
                                     </IconButton>
-                                    {manifestDateNoteButton}
                                 </>
                             ) : (
                                 <>
@@ -5990,30 +6005,50 @@ const Manifest = () => {
                                                                             title="View note"
                                                                             sx={{
                                                                                 position: 'relative',
-                                                                                width: 30,
-                                                                                height: 30,
+                                                                                width: isMobile ? 34 : 30,
+                                                                                height: isMobile ? 34 : 30,
+                                                                                minWidth: isMobile ? 34 : 30,
+                                                                                padding: 0,
                                                                                 border: '1px solid #dbe4f0',
                                                                                 backgroundColor: '#fff',
                                                                                 alignSelf: 'center !important',
+                                                                                overflow: 'visible',
                                                                                 '&:hover': {
                                                                                     backgroundColor: '#f8fbff'
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            <Box component="span" role="img" aria-hidden="true" sx={{ fontSize: 16, lineHeight: 1 }}>
-                                                                                📝
+                                                                            <Box
+                                                                                component="span"
+                                                                                role="img"
+                                                                                aria-hidden="true"
+                                                                                sx={{
+                                                                                    display: 'inline-flex',
+                                                                                    alignItems: 'center',
+                                                                                    justifyContent: 'center',
+                                                                                    fontSize: 16,
+                                                                                    lineHeight: 1,
+                                                                                    color: '#64748b'
+                                                                                }}
+                                                                            >
+                                                                                {isMobile ? (
+                                                                                    <EditIcon sx={{ fontSize: 18, color: '#64748b' }} />
+                                                                                ) : (
+                                                                                    '📝'
+                                                                                )}
                                                                             </Box>
                                                                             <Box
                                                                                 component="span"
                                                                                 sx={{
                                                                                     position: 'absolute',
-                                                                                    top: 3,
-                                                                                    right: 3,
-                                                                                    width: 7,
-                                                                                    height: 7,
+                                                                                    top: isMobile ? 5 : 3,
+                                                                                    right: isMobile ? -2 : 3,
+                                                                                    width: isMobile ? 8 : 7,
+                                                                                    height: isMobile ? 8 : 7,
                                                                                     borderRadius: '50%',
                                                                                     backgroundColor: '#ef4444',
-                                                                                    border: '1px solid #fff'
+                                                                                    border: isMobile ? '2px solid #fff' : '1px solid #fff',
+                                                                                    boxShadow: isMobile ? '0 0 0 1px rgba(219, 228, 240, 0.9)' : 'none'
                                                                                 }}
                                                                             />
                                                                         </IconButton>
