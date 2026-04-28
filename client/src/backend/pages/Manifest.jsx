@@ -5372,7 +5372,6 @@ const Manifest = () => {
                             }
 
                             const heldSpacesDisplay = getHeldSpaces(found);
-                            const internalAvailableSpacesDisplay = found ? getInternalAvailableSpaces(found) : null;
                             const frontendAvailableSpacesDisplay = found ? getFrontendAvailableSpaces(found) : null;
                             const canHoldSpaces =
                                 !!found?.id &&
@@ -5786,14 +5785,16 @@ const Manifest = () => {
                                                 )}
 
                                                 {!!found?.id && (canHoldSpaces || canReleaseHeldSpaces) && (
-                                                    <Box sx={{
+                                                    <Box className="manifest-hold-actions" sx={{
                                                         display: 'inline-flex',
                                                         alignItems: 'center',
                                                         gap: 0.75,
-                                                        flexWrap: 'wrap'
+                                                        flexWrap: 'wrap',
+                                                        width: isMobile ? 'auto' : undefined
                                                     }}>
                                                         {canHoldSpaces && (
                                                             <Button
+                                                                className="manifest-hold-action-button"
                                                                 size="small"
                                                                 variant="outlined"
                                                                 disabled={!!isHoldSpacesLoading}
@@ -5814,6 +5815,7 @@ const Manifest = () => {
                                                         )}
                                                         {canReleaseHeldSpaces && (
                                                             <Button
+                                                                className="manifest-hold-action-button"
                                                                 size="small"
                                                                 variant="outlined"
                                                                 disabled={!!isHoldSpacesLoading}
@@ -5831,16 +5833,6 @@ const Manifest = () => {
                                                             >
                                                                 {isHoldSpacesLoading ? 'Releasing...' : 'Release Hold'}
                                                             </Button>
-                                                        )}
-                                                        {heldSpacesDisplay > 0 && internalAvailableSpacesDisplay !== null && (
-                                                            <Typography sx={{
-                                                                fontSize: isMobile ? '11px' : '12px',
-                                                                color: '#9a3412',
-                                                                fontWeight: 600,
-                                                                whiteSpace: 'nowrap'
-                                                            }}>
-                                                                Held {heldSpacesDisplay} of {internalAvailableSpacesDisplay}
-                                                            </Typography>
                                                         )}
                                                     </Box>
                                                 )}

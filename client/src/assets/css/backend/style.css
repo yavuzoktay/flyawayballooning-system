@@ -1583,6 +1583,25 @@ a.edit-activity svg {
         min-width: auto !important;
     }
 
+    .final-menifest-wrap .manifest-flight-actions .manifest-hold-actions {
+        width: auto !important;
+        padding: 0 !important;
+        gap: 6px !important;
+        flex: 0 1 auto !important;
+    }
+
+    .final-menifest-wrap .manifest-flight-actions .manifest-hold-action-button.MuiButton-root {
+        width: auto !important;
+        min-width: 72px !important;
+        height: 30px !important;
+        min-height: 30px !important;
+        padding: 3px 12px !important;
+        border-radius: 8px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        letter-spacing: 0.03em !important;
+    }
+
     .final-menifest-wrap .MuiIconButton-root {
         align-self: flex-start !important;
     }
