@@ -41,22 +41,26 @@ const PaginatedTable = ({
 
     const OPT_OUT_EMOJI = '📵';
     const NEWT_EMOJI = '🦎';
+    const KALEIDOSCOPE_EMOJI = '🌈';
 
     const getDisplayNameParts = (item, key) => {
         const rawName = (item?.[key] || '').toString();
 
         const hasOptOutEmojiInText = rawName.includes(OPT_OUT_EMOJI);
         const hasNewtEmojiInText = rawName.includes(NEWT_EMOJI);
+        const hasKaleidoscopeEmojiInText = rawName.includes(KALEIDOSCOPE_EMOJI);
         const shouldShowOptOutEmoji = Boolean(item?.short_notice_opt_out) || hasOptOutEmojiInText;
         const shouldShowNewtEmoji = Boolean(item?.is_newt_booking) || hasNewtEmojiInText;
+        const shouldShowKaleidoscopeEmoji = Boolean(item?.is_kaleidoscope_booking) || hasKaleidoscopeEmojiInText;
 
         // Remove inline status markers from the text part so they are always rendered consistently.
         const nameText = rawName
             .replaceAll(OPT_OUT_EMOJI, '')
             .replaceAll(NEWT_EMOJI, '')
+            .replaceAll(KALEIDOSCOPE_EMOJI, '')
             .trim();
 
-        return { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji };
+        return { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji, shouldShowKaleidoscopeEmoji };
     };
 
     const getColLabel = (col) => {
@@ -647,7 +651,7 @@ const PaginatedTable = ({
                                                         }}>
                                                             {id === 'name' ? (
                                                                 (() => {
-                                                                    const { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji } = getDisplayNameParts(item, id);
+                                                                    const { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji, shouldShowKaleidoscopeEmoji } = getDisplayNameParts(item, id);
 
                                                                     // Keep the name clickable without the browser-style underline.
                                                                     const nameSpanStyles = {
@@ -694,15 +698,20 @@ const PaginatedTable = ({
                                                                             >
                                                                                 {nameText}
                                                                             </span>
-                                                                            {(shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
+                                                                            {(shouldShowKaleidoscopeEmoji || shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
                                                                                 <span style={nameIndicatorStyles}>
+                                                                                    {shouldShowKaleidoscopeEmoji && (
+                                                                                        <span role="img" aria-label="Kaleidoscope booking" title="Kaleidoscope booking" style={emojiStyles}>
+                                                                                            {KALEIDOSCOPE_EMOJI}
+                                                                                        </span>
+                                                                                    )}
                                                                                     {shouldShowNewtEmoji && (
-                                                                                        <span style={emojiStyles}>
+                                                                                        <span role="img" aria-label="The Newt booking" title="The Newt booking" style={emojiStyles}>
                                                                                             {NEWT_EMOJI}
                                                                                         </span>
                                                                                     )}
                                                                                     {shouldShowOptOutEmoji && (
-                                                                                        <span style={emojiStyles}>
+                                                                                        <span role="img" aria-label="Short notice availability opt-out" title="Short notice availability opt-out" style={emojiStyles}>
                                                                                             {OPT_OUT_EMOJI}
                                                                                         </span>
                                                                                     )}
@@ -732,15 +741,20 @@ const PaginatedTable = ({
                                                                             >
                                                                                 {nameText}
                                                                             </span>
-                                                                            {(shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
+                                                                            {(shouldShowKaleidoscopeEmoji || shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
                                                                                 <span style={nameIndicatorStyles}>
+                                                                                    {shouldShowKaleidoscopeEmoji && (
+                                                                                        <span role="img" aria-label="Kaleidoscope booking" title="Kaleidoscope booking" style={emojiStyles}>
+                                                                                            {KALEIDOSCOPE_EMOJI}
+                                                                                        </span>
+                                                                                    )}
                                                                                     {shouldShowNewtEmoji && (
-                                                                                        <span style={emojiStyles}>
+                                                                                        <span role="img" aria-label="The Newt booking" title="The Newt booking" style={emojiStyles}>
                                                                                             {NEWT_EMOJI}
                                                                                         </span>
                                                                                     )}
                                                                                     {shouldShowOptOutEmoji && (
-                                                                                        <span style={emojiStyles}>
+                                                                                        <span role="img" aria-label="Short notice availability opt-out" title="Short notice availability opt-out" style={emojiStyles}>
                                                                                             {OPT_OUT_EMOJI}
                                                                                         </span>
                                                                                     )}

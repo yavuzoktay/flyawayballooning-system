@@ -35,6 +35,31 @@ const normalizePartnerValue = (value) => (value || '').toString().trim().toLower
 
 const THE_NEWT_ACCOMMODATION_NAME = 'the newt';
 const THE_NEWT_CONTACT_EMAIL = 'reservations@thenewtinsomerset.com';
+const KALEIDOSCOPE_PROFILE_PATH = '/kaleidoscope';
+const KALEIDOSCOPE_PROFILE_LABEL = 'kaleidoscope balloon booking';
+
+const getManualBookingProfileCandidateSources = (source) => {
+    if (!source || typeof source !== 'object') {
+        return [source];
+    }
+
+    return [
+        source,
+        source.manual_booking_profile,
+        source.additional_information_json,
+        source.booking_additional_information_json,
+        source.additional_information,
+        source.additional_information?.additional_information_json,
+        source.additional_information?.manual_booking_profile,
+        source._original,
+        source._original?.manual_booking_profile,
+        source._original?.additional_information_json,
+        source._original?.booking_additional_information_json,
+        source._original?.additional_information,
+        source._original?.additional_information?.additional_information_json,
+        source._original?.additional_information?.manual_booking_profile
+    ];
+};
 
 export const getManualBookingProfileFromSources = (...sources) => {
     for (const source of sources) {
@@ -126,31 +151,37 @@ export const isTheNewtManualBookingProfile = (profile) => {
 
 export const isTheNewtBooking = (...sources) => {
     const profile = getManualBookingProfileFromSources(
-        ...sources.flatMap((source) => {
-            if (!source || typeof source !== 'object') {
-                return [source];
-            }
-
-            return [
-                source,
-                source.manual_booking_profile,
-                source.additional_information_json,
-                source.booking_additional_information_json,
-                source.additional_information,
-                source.additional_information?.additional_information_json,
-                source.additional_information?.manual_booking_profile,
-                source._original,
-                source._original?.manual_booking_profile,
-                source._original?.additional_information_json,
-                source._original?.booking_additional_information_json,
-                source._original?.additional_information,
-                source._original?.additional_information?.additional_information_json,
-                source._original?.additional_information?.manual_booking_profile
-            ];
-        })
+        ...sources.flatMap(getManualBookingProfileCandidateSources)
     );
 
     return isTheNewtManualBookingProfile(profile);
+};
+
+export const isKaleidoscopeManualBookingProfile = (profile) => {
+    if (!profile || typeof profile !== 'object') {
+        return false;
+    }
+
+    const profilePath = normalizePartnerValue(
+        getFirstMeaningfulValue(profile.profile_path, profile.profilePath, profile.path)
+    );
+    const profileLabel = normalizePartnerValue(
+        getFirstMeaningfulValue(profile.profile_label, profile.profileLabel, profile.label)
+    );
+
+    return (
+        profilePath === KALEIDOSCOPE_PROFILE_PATH ||
+        profileLabel === KALEIDOSCOPE_PROFILE_LABEL ||
+        profileLabel.includes('kaleidoscope')
+    );
+};
+
+export const isKaleidoscopeBooking = (...sources) => {
+    const profile = getManualBookingProfileFromSources(
+        ...sources.flatMap(getManualBookingProfileCandidateSources)
+    );
+
+    return isKaleidoscopeManualBookingProfile(profile);
 };
 
 const buildQuestionAnswerPayload = (answers = []) => {

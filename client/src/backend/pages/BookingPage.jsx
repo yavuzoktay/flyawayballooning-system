@@ -26,6 +26,7 @@ import {
     buildPreservedAdditionalInfoPayload,
     getManualBookingFieldRows,
     getManualBookingProfileFromSources,
+    isKaleidoscopeBooking,
     isTheNewtBooking,
     parseAdditionalInfoJson
 } from '../utils/additionalInfo';
@@ -154,9 +155,14 @@ const getShortNoticeAvailabilityOptOut = (item) => {
     return false;
 };
 
-const renderBookingNameWithIndicators = (name, { isNewtBooking = false } = {}) => (
+const renderBookingNameWithIndicators = (name, { isNewtBooking = false, isKaleidoscopeBooking = false } = {}) => (
     <>
         {name}
+        {isKaleidoscopeBooking ? (
+            <span role="img" aria-label="Kaleidoscope booking" style={{ marginLeft: 4 }}>
+                🌈
+            </span>
+        ) : null}
         {isNewtBooking ? (
             <span role="img" aria-label="The Newt booking" style={{ marginLeft: 4 }}>
                 🦎
@@ -559,6 +565,16 @@ const BookingPage = () => {
     const bookingDetailIsNewtBooking = useMemo(
         () =>
             isTheNewtBooking(
+                additionalInformation,
+                bookingDetail?.booking,
+                bookingDetail?.additional_information,
+                bookingDetail?.voucher
+            ),
+        [additionalInformation, bookingDetail]
+    );
+    const bookingDetailIsKaleidoscopeBooking = useMemo(
+        () =>
+            isKaleidoscopeBooking(
                 additionalInformation,
                 bookingDetail?.booking,
                 bookingDetail?.additional_information,
@@ -6323,6 +6339,7 @@ setBookingDetail(finalVoucherDetail);
                                                 ? `${item.passengers[0]?.first_name || ''} ${item.passengers[0]?.last_name || ''}`.trim() || item.name || ''
                                                 : item.name || ''),
                                             is_newt_booking: isTheNewtBooking(item),
+                                            is_kaleidoscope_booking: isKaleidoscopeBooking(item),
                                             short_notice_opt_out: getShortNoticeAvailabilityOptOut(item),
                                             email: item.email || '',
                                             flight_type: item.flight_type || '',
@@ -7376,7 +7393,10 @@ setBookingDetail(finalVoucherDetail);
                                                             : '';
                                                         return renderBookingNameWithIndicators(
                                                             bookingDetail.booking.name || passenger1Name || '-',
-                                                            { isNewtBooking: bookingDetailIsNewtBooking }
+                                                            {
+                                                                isNewtBooking: bookingDetailIsNewtBooking,
+                                                                isKaleidoscopeBooking: bookingDetailIsKaleidoscopeBooking
+                                                            }
                                                         );
                                                     })()}
                                                     <IconButton 
@@ -8140,7 +8160,8 @@ setBookingDetail(finalVoucherDetail);
                                                     <Typography>
                                                         <b>Booking Name:</b>{' '}
                                                         {renderBookingNameWithIndicators(bookingDetail.booking.name || '-', {
-                                                            isNewtBooking: bookingDetailIsNewtBooking
+                                                            isNewtBooking: bookingDetailIsNewtBooking,
+                                                            isKaleidoscopeBooking: bookingDetailIsKaleidoscopeBooking
                                                         })}
                                                     </Typography>
                                                     <Typography><b>Booking Email:</b> {bookingDetail.booking.email || '-'}</Typography>
