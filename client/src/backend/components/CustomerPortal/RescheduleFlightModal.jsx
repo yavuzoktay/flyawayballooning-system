@@ -1025,10 +1025,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         zIndex: 1,
                         position: 'relative',
                         transition: 'all 0.2s ease',
-                        minHeight: isMobile ? '36px' : '40px',
+                        minHeight: isMobile ? '44px' : '76px',
                         minWidth: 0,
                         width: '100%',
-                        padding: isMobile ? '1px' : '4px'
+                        padding: isMobile ? '4px 2px' : '8px 4px'
                     }}
                 >
                     <div style={{ fontSize: isMobile ? 11 : 13, lineHeight: 1.2, fontWeight: 700 }}>{d.date()}</div>
@@ -1046,6 +1046,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     };
 
     const monthLabel = currentMonth.format('MMMM YYYY');
+    const calendarGap = isMobile ? 4 : 8;
+    const calendarMaxWidth = isMobile ? '100%' : 760;
 
     const handleConfirm = () => {
         if (!selectedDate || !selectedTime) return;
@@ -1456,7 +1458,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
         <Dialog
             open={open}
             onClose={onClose}
-            maxWidth={isMobile ? "sm" : "sm"}
+            maxWidth={isMobile ? "sm" : "md"}
             fullWidth
             PaperProps={{
                 sx: {
@@ -1466,7 +1468,10 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         margin: '6px',
                         width: 'calc(100% - 12px)',
                         maxWidth: 'calc(100% - 12px)'
-                    } : {})
+                    } : {
+                        width: 'min(920px, calc(100% - 48px))',
+                        maxWidth: '920px'
+                    })
                 }
             }}
         >
@@ -1478,7 +1483,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             }}>
                 Reschedule Your Flight
             </DialogTitle>
-            <DialogContent sx={{ padding: isMobile ? '10px 10px 6px' : '24px' }}>
+            <DialogContent sx={{ padding: isMobile ? '12px 12px 8px' : '24px 32px 12px' }}>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                         {error}
@@ -1522,8 +1527,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                         )}
 
                         {/* Calendar */}
-                        <Box sx={{ mb: 3, width: '100%', maxWidth: isMobile ? '100%' : '500px', mx: 'auto', px: 0, overflowX: 'hidden' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5, px: isMobile ? 0.25 : 0 }}>
+                        <Box sx={{ mb: 3, width: '100%', maxWidth: calendarMaxWidth, mx: 'auto', px: isMobile ? 0 : 1, overflowX: 'hidden' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 1 : 2, px: isMobile ? 0.25 : 0 }}>
                                 <IconButton 
                                     onClick={() => setCurrentMonth(prev => prev.subtract(1, 'month'))} 
                                     size="small"
@@ -1544,7 +1549,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             </Box>
                             
                             {/* Calendar Grid */}
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '1px' : '2px', mb: isMobile ? 0.5 : 1, width: '100%' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', columnGap: `${calendarGap}px`, rowGap: isMobile ? '4px' : '6px', mb: isMobile ? 0.75 : 1.25, width: '100%' }}>
                                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                                     <div 
                                         key={day} 
@@ -1561,7 +1566,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ))}
                             </Box>
                             
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '1px' : '2px', width: '100%' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: `${calendarGap}px`, width: '100%' }}>
                                 {buildDayCells()}
                             </Box>
                         </Box>
