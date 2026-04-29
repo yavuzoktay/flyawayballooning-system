@@ -1544,7 +1544,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                             </Box>
                             
                             {/* Calendar Grid */}
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '1px' : '2px', mb: isMobile ? 0.5 : 1, width: '100%' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '4px' : '6px', mb: isMobile ? 0.5 : 1, width: '100%' }}>
                                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
                                     <div 
                                         key={day} 
@@ -1561,7 +1561,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 ))}
                             </Box>
                             
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '1px' : '2px', width: '100%' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: isMobile ? '4px' : '6px', width: '100%' }}>
                                 {buildDayCells()}
                             </Box>
                         </Box>
