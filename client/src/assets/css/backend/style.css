@@ -1692,6 +1692,8 @@ a.edit-activity svg {
 
     .final-menifest-wrap .manifest-booking-note-button .manifest-booking-note-dot {
         display: block !important;
+        width: 2px !important;
+        height: 2px !important;
         max-width: none !important;
         overflow: visible !important;
     }
