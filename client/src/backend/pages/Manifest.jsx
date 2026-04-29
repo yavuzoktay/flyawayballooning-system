@@ -6229,12 +6229,13 @@ const Manifest = () => {
                                                                     }
                                                                     return '';
                                                                 })()}</TableCell>
-                                                                <TableCell sx={isMobile ? {
+                                                                <TableCell className="manifest-booking-note-cell" sx={isMobile ? {
                                                                     width: '58px',
                                                                     minWidth: '58px',
                                                                     maxWidth: '58px',
                                                                     textAlign: 'center',
-                                                                    padding: '8px 8px'
+                                                                    padding: '8px 8px',
+                                                                    overflow: 'visible'
                                                                 } : {
                                                                     width: 72,
                                                                     textAlign: 'center'
@@ -6252,24 +6253,25 @@ const Manifest = () => {
                                                                             title="View note"
                                                                             sx={{
                                                                                 position: 'relative',
-                                                                                width: isMobile ? 34 : 30,
-                                                                                height: isMobile ? 34 : 30,
-                                                                                minWidth: isMobile ? 34 : 30,
+                                                                                width: isMobile ? 36 : 30,
+                                                                                height: isMobile ? 36 : 30,
+                                                                                minWidth: isMobile ? 36 : 30,
                                                                                 padding: 0,
                                                                                 border: '1px solid #dbe4f0',
                                                                                 backgroundColor: '#fff',
                                                                                 alignSelf: 'center !important',
                                                                                 overflow: 'visible',
+                                                                                boxShadow: isMobile ? '0 6px 18px rgba(15, 23, 42, 0.06)' : 'none',
                                                                                 '&:hover': {
                                                                                     backgroundColor: '#f8fbff'
                                                                                 }
                                                                             }}
                                                                         >
-                                                                            <Box
-                                                                                component="span"
+                                                                            <span
+                                                                                className="manifest-booking-note-icon"
                                                                                 role="img"
                                                                                 aria-hidden="true"
-                                                                                sx={{
+                                                                                style={{
                                                                                     display: 'inline-flex',
                                                                                     alignItems: 'center',
                                                                                     justifyContent: 'center',
@@ -6280,17 +6282,14 @@ const Manifest = () => {
                                                                                     color: '#64748b'
                                                                                 }}
                                                                             >
-                                                                                {isMobile ? (
-                                                                                    <EditIcon sx={{ fontSize: 18, color: '#64748b' }} />
-                                                                                ) : (
-                                                                                    '📝'
-                                                                                )}
-                                                                            </Box>
+                                                                                📝
+                                                                            </span>
                                                                             <Box
                                                                                 component="span"
+                                                                                className="manifest-booking-note-dot"
                                                                                 sx={{
                                                                                     position: 'absolute',
-                                                                                    top: isMobile ? -4 : 3,
+                                                                                    top: isMobile ? -3 : 3,
                                                                                     right: isMobile ? -5 : 3,
                                                                                     width: isMobile ? 9 : 7,
                                                                                     height: isMobile ? 9 : 7,

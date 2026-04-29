@@ -1667,6 +1667,35 @@ a.edit-activity svg {
         max-width: 100%;
     }
 
+    .final-menifest-wrap .manifest-booking-note-cell {
+        overflow: visible !important;
+    }
+
+    .final-menifest-wrap .manifest-booking-note-button.MuiIconButton-root {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: visible !important;
+        vertical-align: middle !important;
+    }
+
+    .final-menifest-wrap .manifest-booking-note-button .manifest-booking-note-icon {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 20px !important;
+        height: 20px !important;
+        max-width: none !important;
+        font-size: 18px !important;
+        line-height: 1 !important;
+    }
+
+    .final-menifest-wrap .manifest-booking-note-button .manifest-booking-note-dot {
+        display: block !important;
+        max-width: none !important;
+        overflow: visible !important;
+    }
+
     /* Table Rows - Better spacing on mobile */
     .final-menifest-wrap .MuiTableRow-root {
         border-bottom: 1px solid #e5e7eb;

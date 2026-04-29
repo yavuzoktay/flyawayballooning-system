@@ -310,6 +310,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const buildKaleidoscopeBookingUrl = () => {
         const queryParams = new URLSearchParams({
             source: 'system',
+            hideWeatherRefundablePresentation: 'true',
             refresh: Date.now().toString()
         });
 
