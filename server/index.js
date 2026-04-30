@@ -40565,6 +40565,123 @@ function normalizeVoucherContextId(value) {
     return normalized.replace(/^voucher-/i, '');
 }
 
+const sanitizeAttachmentFilePart = (value = '') => {
+    const cleaned = String(value || '')
+        .replace(/[^\w.-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return cleaned || 'voucher';
+};
+
+const isGiftVoucherRecord = (voucher = {}) => {
+    const bookFlight = String(voucher?.book_flight || '').toLowerCase();
+    const voucherType = String(voucher?.voucher_type || '').toLowerCase();
+    return bookFlight.includes('gift') || voucherType.includes('gift voucher');
+};
+
+const resolveOutboundEmailTemplateName = async (template) => {
+    const rawTemplate = String(template || '').trim();
+    if (!rawTemplate || rawTemplate.toLowerCase() === 'custom') {
+        return rawTemplate || 'custom';
+    }
+
+    try {
+        const isNumericId = /^\d+$/.test(rawTemplate);
+        const rows = await runPoolQuery(
+            isNumericId
+                ? 'SELECT name FROM email_templates WHERE id = ? LIMIT 1'
+                : 'SELECT name FROM email_templates WHERE name = ? LIMIT 1',
+            [rawTemplate]
+        );
+        return rows && rows.length > 0 && rows[0].name
+            ? String(rows[0].name).trim()
+            : rawTemplate;
+    } catch (error) {
+        console.warn('⚠️ Could not resolve outbound email template name:', error?.message || error);
+        return rawTemplate;
+    }
+};
+
+const shouldAttachGiftVoucherPdf = ({ templateName, template, subject } = {}) => {
+    const haystack = [templateName, template, subject]
+        .map(value => String(value || '').trim().toLowerCase())
+        .filter(Boolean)
+        .join(' | ');
+
+    return haystack.includes('gift voucher confirmation');
+};
+
+const getVoucherForEmailAttachment = async (voucherId, fallbackVoucherData = {}) => {
+    const normalizedVoucherId = normalizeVoucherContextId(voucherId);
+    const fallbackData = fallbackVoucherData && typeof fallbackVoucherData === 'object'
+        ? { ...fallbackVoucherData }
+        : {};
+
+    if (!normalizedVoucherId) {
+        return fallbackData;
+    }
+
+    try {
+        const rows = await runPoolQuery('SELECT * FROM all_vouchers WHERE id = ? LIMIT 1', [normalizedVoucherId]);
+        if (rows && rows.length > 0) {
+            return { ...fallbackData, ...rows[0] };
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not fetch voucher for PDF attachment:', {
+            voucherId: normalizedVoucherId,
+            error: error?.message || error
+        });
+    }
+
+    return fallbackData;
+};
+
+const createGiftVoucherPdfAttachment = async (voucher, voucherId, templateName = '') => {
+    if (!isGiftVoucherRecord(voucher)) {
+        console.log('📄 Skipping gift voucher PDF attachment - voucher is not a Gift Voucher:', {
+            voucherId: normalizeVoucherContextId(voucherId) || voucher?.id || null,
+            book_flight: voucher?.book_flight,
+            voucher_type: voucher?.voucher_type
+        });
+        return null;
+    }
+
+    try {
+        console.log('📄 Generating gift voucher PDF attachment for manual email:', {
+            voucherId: normalizeVoucherContextId(voucherId) || voucher?.id || null,
+            templateName
+        });
+        const pdfBuffer = await generateGiftVoucherPDF(voucher);
+        const filenameRef = sanitizeAttachmentFilePart(voucher.voucher_ref || voucher.voucher_code || voucher.id || voucherId);
+        return {
+            content: pdfBuffer.toString('base64'),
+            filename: `Gift_Voucher_${filenameRef}.pdf`,
+            type: 'application/pdf',
+            disposition: 'attachment'
+        };
+    } catch (error) {
+        console.error('❌ Error generating gift voucher PDF attachment for manual email:', {
+            voucherId: normalizeVoucherContextId(voucherId) || voucher?.id || null,
+            error: error?.message || error
+        });
+        return null;
+    }
+};
+
+const buildGiftVoucherPdfAttachmentForEmail = async ({
+    voucherId,
+    voucherData,
+    templateName,
+    template,
+    subject
+} = {}) => {
+    if (!shouldAttachGiftVoucherPdf({ templateName, template, subject })) {
+        return null;
+    }
+
+    const voucher = await getVoucherForEmailAttachment(voucherId, voucherData);
+    return createGiftVoucherPdfAttachment(voucher, voucherId, templateName);
+};
+
 // Send voucher email via SendGrid (or SMTP fallback)
 app.post('/api/sendVoucherEmail', async (req, res) => {
     console.log('POST /api/sendVoucherEmail called');
@@ -40606,6 +40723,14 @@ app.post('/api/sendVoucherEmail', async (req, res) => {
         const rawHtml = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
         const htmlBody = normalizeEmailBodyStyles(rawHtml);
         const textBody = containsHtml ? convertHtmlToText(htmlBody) : message;
+        const resolvedTemplateName = await resolveOutboundEmailTemplateName(template);
+        const giftVoucherPdfAttachment = await buildGiftVoucherPdfAttachmentForEmail({
+            voucherId: normalizedVoucherId,
+            voucherData,
+            templateName: resolvedTemplateName,
+            template,
+            subject
+        });
 
         // Prepare email content
         // Always use info@flyawayballooning.com as from email address
@@ -40626,6 +40751,16 @@ app.post('/api/sendVoucherEmail', async (req, res) => {
                 context_id: normalizedVoucherId || to || 'unknown'
             }
         };
+
+        if (giftVoucherPdfAttachment) {
+            emailContent.attachments = [giftVoucherPdfAttachment];
+            emailContent.custom_args.gift_voucher_pdf_attached = 'true';
+            console.log('✅ Gift voucher PDF attached to manual voucher email:', {
+                voucherId: normalizedVoucherId || null,
+                to,
+                filename: giftVoucherPdfAttachment.filename
+            });
+        }
 
         // Send email via SendGrid (with SMTP fallback)
         console.log(`Sending voucher email to ${to}`);
@@ -40941,6 +41076,12 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
         const normalizeHtml = (html) => sanitizeComments(html || '');
         const htmlBody = containsHtml ? normalizeEmailBodyStyles(normalizeHtml(message)) : (message || '').replace(/\n/g, '<br>');
         const textBody = containsHtml ? convertHtmlToText(htmlBody) : message;
+        const resolvedTemplateName = await resolveOutboundEmailTemplateName(template);
+        const shouldAttachGiftVoucherPdfForTemplate = shouldAttachGiftVoucherPdf({
+            templateName: resolvedTemplateName,
+            template,
+            subject
+        });
 
         const fallbackRecipients = Array.isArray(to)
             ? to.map((recipient, index) => ({
@@ -41003,20 +41144,30 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                 }
 
                 let perRecipientHtml = htmlBody;
-                if (addLink) {
+                let voucherRow = null;
+
+                if (addLink || shouldAttachGiftVoucherPdfForTemplate) {
                     try {
                         const vRows = await new Promise((resolve, reject) => {
                             con.query('SELECT * FROM all_vouchers WHERE id = ? LIMIT 1',
                                 [recipient.voucherId], (err, r) => err ? reject(err) : resolve(r));
                         });
                         if (vRows && vRows.length > 0) {
-                            const voucherData = { ...vRows[0], voucher_id: vRows[0].id, _original: vRows[0] };
+                            voucherRow = { ...vRows[0], voucher_id: vRows[0].id, _original: vRows[0] };
+                        }
+
+                        if (addLink && voucherRow) {
+                            const voucherData = voucherRow;
                             perRecipientHtml = injectPortalLinkIntoHtml(htmlBody, voucherData);
                         }
                     } catch (lookupErr) {
-                        console.warn('Portal link lookup failed for voucher', recipient.voucherId, lookupErr.message);
+                        console.warn('Voucher lookup failed for voucher email', recipient.voucherId, lookupErr.message);
                     }
                 }
+
+                const giftVoucherPdfAttachment = shouldAttachGiftVoucherPdfForTemplate
+                    ? await createGiftVoucherPdfAttachment(voucherRow || { id: recipient.voucherId }, recipient.voucherId, resolvedTemplateName)
+                    : null;
 
                 const emailContent = {
                     to: recipient.to,
@@ -41034,6 +41185,16 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                         context_id: recipient.voucherId
                     }
                 };
+
+                if (giftVoucherPdfAttachment) {
+                    emailContent.attachments = [giftVoucherPdfAttachment];
+                    emailContent.custom_args.gift_voucher_pdf_attached = 'true';
+                    console.log('✅ Gift voucher PDF attached to bulk voucher email:', {
+                        voucherId: recipient.voucherId,
+                        to: recipient.to,
+                        filename: giftVoucherPdfAttachment.filename
+                    });
+                }
 
                 const { provider, messageId } = await sendEmailWithFallback(emailContent, {
                     context: 'send_bulk_voucher_email'
