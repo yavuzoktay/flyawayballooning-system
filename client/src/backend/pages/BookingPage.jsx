@@ -3269,20 +3269,51 @@ setBookingDetail(finalVoucherDetail);
                 // Booking güncelleme
                 if (!bookingDetail?.booking?.id) return;
             if (editField === 'paid') {
+                const newPaid = parseFloat(editValue) || 0;
+                const currentDue = parseFloat(bookingDetail.booking?.due) || 0;
+                const currentPassengers = Array.isArray(bookingDetail.passengers) ? bookingDetail.passengers : [];
+                const passengerCount = currentPassengers.length;
+                const perPassenger = passengerCount > 0
+                    ? parseFloat(((newPaid + currentDue) / passengerCount).toFixed(2))
+                    : 0;
+
+                if (passengerCount > 0) {
+                    await Promise.all(currentPassengers.map((p) =>
+                        axios.patch('/api/updatePassengerField', {
+                            passenger_id: p.id,
+                            field: 'price',
+                            value: perPassenger
+                        })
+                    ));
+                }
+
                 await axios.patch('/api/updateBookingField', {
                     booking_id: bookingDetail.booking.id,
                     field: 'paid',
-                    value: editValue
+                    value: newPaid
                 });
                 setBookingDetail(prev => ({
                     ...prev,
                     booking: {
                         ...prev.booking,
-                        paid: editValue
-                    }
+                        paid: newPaid
+                    },
+                    passengers: Array.isArray(prev.passengers)
+                        ? prev.passengers.map(p => ({ ...p, price: perPassenger }))
+                        : prev.passengers
                 }));
-                setBooking(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
-                setFilteredData(prev => prev.map(b => b.id === bookingDetail.booking.id ? { ...b, paid: editValue } : b));
+                const updateBookingPaidAndPassengerPrices = (b) => {
+                    if (b.id !== bookingDetail.booking.id) return b;
+                    return {
+                        ...b,
+                        paid: newPaid,
+                        passengers: Array.isArray(b.passengers)
+                            ? b.passengers.map(p => ({ ...p, price: perPassenger }))
+                            : b.passengers
+                    };
+                };
+                setBooking(prev => prev.map(updateBookingPaidAndPassengerPrices));
+                setFilteredData(prev => prev.map(updateBookingPaidAndPassengerPrices));
                 setEditField(null);
                 setEditValue('');
                 setSavingEdit(false);

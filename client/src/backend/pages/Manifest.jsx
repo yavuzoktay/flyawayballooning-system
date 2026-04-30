@@ -232,6 +232,17 @@ const MemoizedEmailPreview = React.memo(
     (prev, next) => prev.html === next.html && prev.isMobile === next.isMobile
 );
 
+const parseManifestMoney = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    const parsed = Number.parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getManifestBookingPaidTotal = (flight = {}) => parseManifestMoney(flight.paid);
+
+const getManifestGroupPaidTotal = (groupFlights = []) =>
+    groupFlights.reduce((sum, flight) => sum + getManifestBookingPaidTotal(flight), 0);
+
 const Manifest = () => {
     // Mobile detection
     const theme = useTheme();
@@ -3407,19 +3418,49 @@ const Manifest = () => {
         setSavingEdit(true);
         try {
             if (editField === 'paid') {
+                const newPaid = parseFloat(editValue) || 0;
+                const currentDue = parseFloat(bookingDetail.booking?.due) || 0;
+                const currentPassengers = Array.isArray(bookingDetail.passengers) ? bookingDetail.passengers : [];
+                const passengerCount = currentPassengers.length;
+                const perPassenger = passengerCount > 0
+                    ? parseFloat(((newPaid + currentDue) / passengerCount).toFixed(2))
+                    : 0;
+
+                if (passengerCount > 0) {
+                    await Promise.all(currentPassengers.map((p) =>
+                        axios.patch('/api/updatePassengerField', {
+                            passenger_id: p.id,
+                            field: 'price',
+                            value: perPassenger
+                        })
+                    ));
+                }
+
                 await axios.patch('/api/updateBookingField', {
                     booking_id: bookingDetail.booking.id,
                     field: 'paid',
-                    value: editValue
+                    value: newPaid
                 });
                 setBookingDetail(prev => ({
                     ...prev,
                     booking: {
                         ...prev.booking,
-                        paid: editValue
-                    }
+                        paid: newPaid
+                    },
+                    passengers: Array.isArray(prev.passengers)
+                        ? prev.passengers.map(p => ({ ...p, price: perPassenger }))
+                        : prev.passengers
                 }));
-                setFlights(prev => prev.map(f => f.id === bookingDetail.booking.id ? { ...f, paid: editValue } : f));
+                setFlights(prev => prev.map(f => {
+                    if (f.id !== bookingDetail.booking.id) return f;
+                    return {
+                        ...f,
+                        paid: newPaid,
+                        passengers: Array.isArray(f.passengers)
+                            ? f.passengers.map(p => ({ ...p, price: perPassenger }))
+                            : f.passengers
+                    };
+                }));
                 setEditField(null);
                 setEditValue('');
                 setSavingEdit(false);
@@ -5389,6 +5430,7 @@ const Manifest = () => {
                                     : (parseFloat(f.weight) || 0);
                                 return sum + passengerWeight;
                             }, 0).toFixed(2);
+                            const totalPaidDisplay = getManifestGroupPaidTotal(groupFlights).toFixed(2);
                             
                             // Debug logging for status calculation
                             console.log('Status calculation:', {
@@ -6352,7 +6394,7 @@ const Manifest = () => {
                                                                     width: '100%'
                                                                 }}
                                                             >
-                                                                Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0).toFixed(2)} | Total Weight: {totalWeightDisplay} kg | Total Pax: {passengerCountDisplay}
+                                                                Total Price: £{totalPaidDisplay} | Total Weight: {totalWeightDisplay} kg | Total Pax: {passengerCountDisplay}
                                                             </TableCell>
                                                         ) : (
                                                             <TableCell 
@@ -6366,7 +6408,7 @@ const Manifest = () => {
                                                                     whiteSpace: 'normal'
                                                                 }}
                                                             >
-                                                                                                            Total Price: £{groupFlights.reduce((sum, f) => sum + (parseFloat(f.paid) || 0), 0).toFixed(2)} &nbsp;&nbsp;|
+                                                                                                            Total Price: £{totalPaidDisplay} &nbsp;&nbsp;|
                                                 Total Weight: {totalWeightDisplay} kg &nbsp;&nbsp;|
                                                 Total Pax: {passengerCountDisplay}
                                                         </TableCell>
@@ -9948,31 +9990,9 @@ const Manifest = () => {
                             }
                         }, 0);
                         
-                        // Get total price - calculate across all bookings in selectedGroupFlightsForClose
-                        // First try to calculate from passenger prices
-                        let totalPriceSum = 0;
-                        let hasPassengerPrices = false;
-                        
-                        selectedGroupFlightsForClose.forEach(flight => {
-                            if (Array.isArray(flight.passengers) && flight.passengers.length > 0) {
-                                const priceSum = flight.passengers.reduce((sum, p) => {
-                                    const price = parseFloat(p.price || 0);
-                                    return sum + (isNaN(price) ? 0 : price);
-                                }, 0);
-                                if (priceSum > 0) {
-                                    totalPriceSum += priceSum;
-                                    hasPassengerPrices = true;
-                                }
-                            }
-                        });
-                        
-                        // If no passenger prices, use paid field (same as manifest page)
-                        if (!hasPassengerPrices || totalPriceSum === 0) {
-                            totalPriceSum = selectedGroupFlightsForClose.reduce((sum, flight) => {
-                                return sum + (parseFloat(flight.paid) || 0);
-                            }, 0);
-                        }
-                        
+                        // Keep this aligned with the manifest card summary: paid on the booking is
+                        // the authoritative operational total, especially after manual adjustments.
+                        const totalPriceSum = getManifestGroupPaidTotal(selectedGroupFlightsForClose);
                         const totalPrice = totalPriceSum > 0 ? `£${totalPriceSum.toFixed(2)}` : 'N/A';
                         
                         return (
