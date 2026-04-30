@@ -1279,8 +1279,12 @@ export const getPreviewHtml = (message, personalNote = '') => {
 };
 
 // Replace prompt placeholders with actual booking data
-export const replacePrompts = (html = '', booking = {}) => {
+export const replacePrompts = (html = '', booking = {}, options = {}) => {
     if (!html || !booking) return html;
+    const preserveCustomerPortalLinkPlaceholders =
+        options.preserveCustomerPortalLinkPlaceholders ||
+        booking.preserveCustomerPortalLinkPlaceholders ||
+        booking.__preserveCustomerPortalLinkPlaceholders;
     
     // Extract first name from booking name (e.g., "te te" -> "te")
     const bookingName = booking.name || booking.customer_name || '';
@@ -1375,26 +1379,28 @@ export const replacePrompts = (html = '', booking = {}) => {
     }
     result = result.replace(/\[Experience Data\]/gi, escapeHtml(experienceData));
     
-    // Replace [Customer Portal Link] and [Customer Portal Link:Link Text]
-    const customerPortalLink = getCustomerPortalLink(booking);
-    
-    // Replace [Customer Portal Link:Link Text] format (with custom link text)
-    result = result.replace(
-        /\[Customer Portal Link:([^\]]+)\]/gi,
-        (match, linkText) => {
-            if (!customerPortalLink) return '';
-            const escapedLinkText = escapeHtml(linkText.trim());
-            return `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${escapedLinkText}</a>`;
-        }
-    );
-    
-    // Replace [Customer Portal Link] (without custom text, use URL as text)
-    result = result.replace(
-        /\[Customer Portal Link\]/gi,
-        customerPortalLink
-            ? `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${customerPortalLink}</a>`
-            : ''
-    );
+    if (!preserveCustomerPortalLinkPlaceholders) {
+        // Replace [Customer Portal Link] and [Customer Portal Link:Link Text]
+        const customerPortalLink = getCustomerPortalLink(booking);
+
+        // Replace [Customer Portal Link:Link Text] format (with custom link text)
+        result = result.replace(
+            /\[Customer Portal Link:([^\]]+)\]/gi,
+            (match, linkText) => {
+                if (!customerPortalLink) return '';
+                const escapedLinkText = escapeHtml(linkText.trim());
+                return `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${escapedLinkText}</a>`;
+            }
+        );
+
+        // Replace [Customer Portal Link] (without custom text, use URL as text)
+        result = result.replace(
+            /\[Customer Portal Link\]/gi,
+            customerPortalLink
+                ? `<a href="${customerPortalLink}" target="_blank" rel="noopener noreferrer">${customerPortalLink}</a>`
+                : ''
+        );
+    }
     
     // Replace [Receipt] or [receipt] or [RECEIPT] with receipt HTML
     // Use replace directly with global flag to replace all occurrences
@@ -1410,12 +1416,16 @@ export const replacePrompts = (html = '', booking = {}) => {
 };
 
 // Replace SMS template placeholders with booking data (plain text, no HTML)
-export const replaceSmsPrompts = (text = '', booking = {}) => {
+export const replaceSmsPrompts = (text = '', booking = {}, options = {}) => {
     if (!text) return text;
     if (!booking || Object.keys(booking).length === 0) {
         console.warn('⚠️ replaceSmsPrompts: booking is empty, placeholders will not be replaced');
         return text;
     }
+    const preserveCustomerPortalLinkPlaceholders =
+        options.preserveCustomerPortalLinkPlaceholders ||
+        booking.preserveCustomerPortalLinkPlaceholders ||
+        booking.__preserveCustomerPortalLinkPlaceholders;
     
     // Extract name parts from booking name - try multiple field names
     const bookingName = booking.name || booking.customer_name || booking.booking_name || '';
@@ -1452,9 +1462,11 @@ export const replaceSmsPrompts = (text = '', booking = {}) => {
     // Replace [Booking ID] (case-insensitive)
     result = result.replace(/\[Booking ID\]/gi, booking.id ? String(booking.id) : '');
     
-    // Replace [Customer Portal Link] (case-insensitive) - for SMS, just return the URL
-    const customerPortalLink = getCustomerPortalLink(booking);
-    result = result.replace(/\[Customer Portal Link\]/gi, customerPortalLink || '');
+    if (!preserveCustomerPortalLinkPlaceholders) {
+        // Replace [Customer Portal Link] (case-insensitive) - for SMS, just return the URL
+        const customerPortalLink = getCustomerPortalLink(booking);
+        result = result.replace(/\[Customer Portal Link(?::[^\]]+)?\]/gi, customerPortalLink || '');
+    }
     
     // Replace [Flight Date] (case-insensitive)
     const flightDate = booking.flight_date || booking.flightDate || '';
@@ -1518,7 +1530,13 @@ export const replaceSmsPrompts = (text = '', booking = {}) => {
     return result;
 };
 
-export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNote }) => {
+export const buildEmailHtml = ({
+    templateName,
+    messageHtml,
+    booking,
+    personalNote,
+    preserveCustomerPortalLinkPlaceholders = false
+}) => {
     const effectiveTemplateName = templateName || 'Custom Message';
     const baseMessage = messageHtml && messageHtml.trim() !== ''
         ? normalizeTemplateBodyStyles(sanitizeTemplateHtml(messageHtml))
@@ -1535,7 +1553,8 @@ export const buildEmailHtml = ({ templateName, messageHtml, booking, personalNot
     // This matches the structure used in server-side generateFlightVoucherConfirmationEmail
     let bookingWithTemplate = {
         ...booking,
-        templateName: effectiveTemplateName
+        templateName: effectiveTemplateName,
+        preserveCustomerPortalLinkPlaceholders
     };
     
     // If this is a Flight Voucher template, ensure Flight Voucher fields are set correctly

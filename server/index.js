@@ -40834,12 +40834,35 @@ app.post('/api/sendVoucherEmail', async (req, res) => {
     }
 });
 
-// Inject a Customer Portal link into the email HTML for a given booking record
-function injectPortalLinkIntoHtml(html, bookingRecord) {
+const CUSTOMER_PORTAL_LINK_PROMPT_REGEX = /\[Customer Portal Link(?::[^\]]+)?\]/i;
+
+function hasCustomerPortalLinkPrompt(content = '') {
+    return CUSTOMER_PORTAL_LINK_PROMPT_REGEX.test(String(content || ''));
+}
+
+function renderCustomerPortalLinkPromptsInHtml(html, bookingRecord) {
     if (!bookingRecord) return html;
     const portalLink = getCustomerPortalLink(bookingRecord);
     if (!portalLink) return html;
-    const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${portalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank">Customer Portal</a></div>`;
+
+    const safePortalLink = escapeHtml(portalLink);
+    return String(html || '')
+        .replace(/\[Customer Portal Link:([^\]]+)\]/gi, (match, linkText) => {
+            const escapedLinkText = escapeHtml(String(linkText || '').trim() || 'Customer Portal');
+            return `<a href="${safePortalLink}" target="_blank" rel="noopener noreferrer">${escapedLinkText}</a>`;
+        })
+        .replace(
+            /\[Customer Portal Link\]/gi,
+            `<a href="${safePortalLink}" target="_blank" rel="noopener noreferrer">${safePortalLink}</a>`
+        );
+}
+
+function appendCustomerPortalLinkToHtml(html, bookingRecord) {
+    if (!bookingRecord) return html;
+    const portalLink = getCustomerPortalLink(bookingRecord);
+    if (!portalLink) return html;
+    const safePortalLink = escapeHtml(portalLink);
+    const linkHtml = `<div style="margin-top:20px; text-align:center;"><a href="${safePortalLink}" style="color:#2563eb;text-decoration:underline;font-weight:600;font-size:16px;" target="_blank" rel="noopener noreferrer">Customer Portal</a></div>`;
     const closingPattern = /(<\/div>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
     if (closingPattern.test(html)) {
         return html.replace(closingPattern, linkHtml + '$1');
@@ -40847,13 +40870,34 @@ function injectPortalLinkIntoHtml(html, bookingRecord) {
     return html + linkHtml;
 }
 
+function appendCustomerPortalLinkToSmsBody(body, bookingRecord) {
+    if (!bookingRecord) return body;
+    const portalLink = getCustomerPortalLink(bookingRecord);
+    if (!portalLink) return body;
+    const baseBody = String(body || '').trim();
+    const portalBlock = `Customer Portal\n${portalLink}`;
+    return baseBody ? `${baseBody}\n\n${portalBlock}` : portalBlock;
+}
+
+// Inject a Customer Portal link into the email HTML for a given booking record
+function injectPortalLinkIntoHtml(html, bookingRecord) {
+    if (!bookingRecord) return html;
+    if (hasCustomerPortalLinkPrompt(html)) {
+        return renderCustomerPortalLinkPromptsInHtml(html, bookingRecord);
+    }
+    return appendCustomerPortalLinkToHtml(html, bookingRecord);
+}
+
 // Send bulk booking email via SendGrid
 app.post('/api/sendBulkBookingEmail', async (req, res) => {
     console.log('POST /api/sendBulkBookingEmail called');
     const { bookingIds, to, bookingRecipients, subject, message, template, addLink } = req.body;
+    const rawRecipientEmails = Array.isArray(to)
+        ? to
+        : (Array.isArray(bookingRecipients) ? bookingRecipients.map(recipient => recipient?.to) : []);
 
     try {
-        if (!Array.isArray(to) || to.length === 0) {
+        if (!Array.isArray(rawRecipientEmails) || rawRecipientEmails.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Recipient list is empty'
@@ -40882,8 +40926,10 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
 
         const htmlBody = containsHtml ? normalizeHtml(message) : (message || '').replace(/\n/g, '<br>');
         const textBody = containsHtml ? convertHtmlToText(message) : message;
+        const htmlHasPortalPrompt = hasCustomerPortalLinkPrompt(htmlBody);
+        const requiresPerRecipientPortal = Boolean(addLink || htmlHasPortalPrompt);
 
-        const uniqueRecipients = Array.from(new Set(to.map(e => String(e || '').trim()).filter(Boolean)));
+        const uniqueRecipients = Array.from(new Set(rawRecipientEmails.map(e => String(e || '').trim()).filter(Boolean)));
         if (uniqueRecipients.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -40891,10 +40937,31 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
             });
         }
 
-        // When addLink is true and we have per-booking mapping, send individual
-        // emails so each recipient gets their own Customer Portal link.
-        if (addLink && Array.isArray(bookingRecipients) && bookingRecipients.length > 0) {
-            console.log('Sending per-booking portal-link emails to', bookingRecipients.length, 'recipients');
+        const normalizedBookingRecipients = Array.from(new Map(
+            (Array.isArray(bookingRecipients) ? bookingRecipients : [])
+                .map((recipient) => {
+                    const bookingId = recipient?.bookingId || recipient?.id;
+                    const recipientEmail = String(recipient?.to || '').trim();
+                    if (!bookingId || !recipientEmail) return null;
+                    return [`${bookingId}:${recipientEmail.toLowerCase()}`, {
+                        bookingId,
+                        to: recipientEmail
+                    }];
+                })
+                .filter(Boolean)
+        ).values());
+
+        // Portal links must be rendered one email at a time so each recipient
+        // receives a link tied to their own booking.
+        if (requiresPerRecipientPortal) {
+            if (normalizedBookingRecipients.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Booking recipient mapping is required for bulk emails with customer portal links'
+                });
+            }
+
+            console.log('Sending per-booking portal-link emails to', normalizedBookingRecipients.length, 'recipients');
 
             const logSql = `
                 INSERT INTO email_logs (
@@ -40905,28 +40972,26 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
             `;
 
             const results = await Promise.allSettled(
-                bookingRecipients.map(async (recipient) => {
+                normalizedBookingRecipients.map(async (recipient) => {
                     const recipientEmail = String(recipient.to || '').trim();
                     if (!recipientEmail) throw new Error('Empty recipient email');
 
                     let perRecipientHtml = htmlBody;
-                    try {
-                        const rows = await new Promise((resolve, reject) => {
-                            con.query('SELECT * FROM all_booking WHERE id = ? LIMIT 1',
-                                [recipient.bookingId], (err, r) => err ? reject(err) : resolve(r));
-                        });
-                        if (rows && rows.length > 0) {
-                            perRecipientHtml = injectPortalLinkIntoHtml(htmlBody, rows[0]);
-                        }
-                    } catch (lookupErr) {
-                        console.warn('Portal link lookup failed for booking', recipient.bookingId, lookupErr.message);
+                    const rows = await new Promise((resolve, reject) => {
+                        con.query('SELECT * FROM all_booking WHERE id = ? LIMIT 1',
+                            [recipient.bookingId], (err, r) => err ? reject(err) : resolve(r));
+                    });
+                    if (!rows || rows.length === 0) {
+                        throw new Error(`Booking ${recipient.bookingId} not found for portal link`);
                     }
+                    perRecipientHtml = injectPortalLinkIntoHtml(htmlBody, rows[0]);
+                    const perRecipientText = convertHtmlToText(perRecipientHtml);
 
                     const emailContent = {
                         to: recipientEmail,
                         from: { email: 'info@flyawayballooning.com', name: 'Fly Away Ballooning' },
                         subject,
-                        text: textBody,
+                        text: perRecipientText,
                         html: perRecipientHtml,
                         custom_args: {
                             booking_ids: String(recipient.bookingId || ''),
@@ -40943,7 +41008,7 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
                         ensureEmailLogsSchema(() => {
                             con.query(logSql, [
                                 recipient.bookingId, recipientEmail, subject,
-                                template || 'custom', perRecipientHtml, textBody,
+                                template || 'custom', perRecipientHtml, perRecipientText,
                                 messageId, 'bulk', recipientEmail
                             ], () => {});
                         });
@@ -40953,12 +41018,20 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
                 })
             );
 
-            const successes = results.filter(r => r.status === 'fulfilled').map(r => r.value);
-            const failures = results.filter(r => r.status === 'rejected').map((r, i) => ({
-                bookingId: bookingRecipients[i]?.bookingId,
-                to: bookingRecipients[i]?.to,
-                error: r.reason?.message
-            }));
+            const successes = [];
+            const failures = [];
+            results.forEach((result, index) => {
+                const recipient = normalizedBookingRecipients[index];
+                if (result.status === 'fulfilled') {
+                    successes.push(result.value);
+                } else {
+                    failures.push({
+                        bookingId: recipient?.bookingId,
+                        to: recipient?.to,
+                        error: result.reason?.message
+                    });
+                }
+            });
 
             return res.json({
                 success: successes.length > 0,
@@ -41076,6 +41149,7 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
         const normalizeHtml = (html) => sanitizeComments(html || '');
         const htmlBody = containsHtml ? normalizeEmailBodyStyles(normalizeHtml(message)) : (message || '').replace(/\n/g, '<br>');
         const textBody = containsHtml ? convertHtmlToText(htmlBody) : message;
+        const htmlHasPortalPrompt = hasCustomerPortalLinkPrompt(htmlBody);
         const resolvedTemplateName = await resolveOutboundEmailTemplateName(template);
         const shouldAttachGiftVoucherPdfForTemplate = shouldAttachGiftVoucherPdf({
             templateName: resolvedTemplateName,
@@ -41146,7 +41220,7 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                 let perRecipientHtml = htmlBody;
                 let voucherRow = null;
 
-                if (addLink || shouldAttachGiftVoucherPdfForTemplate) {
+                if (addLink || htmlHasPortalPrompt || shouldAttachGiftVoucherPdfForTemplate) {
                     try {
                         const vRows = await new Promise((resolve, reject) => {
                             con.query('SELECT * FROM all_vouchers WHERE id = ? LIMIT 1',
@@ -41156,7 +41230,7 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                             voucherRow = { ...vRows[0], voucher_id: vRows[0].id, _original: vRows[0] };
                         }
 
-                        if (addLink && voucherRow) {
+                        if ((addLink || htmlHasPortalPrompt) && voucherRow) {
                             const voucherData = voucherRow;
                             perRecipientHtml = injectPortalLinkIntoHtml(htmlBody, voucherData);
                         }
@@ -41164,6 +41238,12 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                         console.warn('Voucher lookup failed for voucher email', recipient.voucherId, lookupErr.message);
                     }
                 }
+
+                if ((addLink || htmlHasPortalPrompt) && !voucherRow) {
+                    throw new Error(`Voucher ${recipient.voucherId} not found for portal link`);
+                }
+
+                const perRecipientText = convertHtmlToText(perRecipientHtml);
 
                 const giftVoucherPdfAttachment = shouldAttachGiftVoucherPdfForTemplate
                     ? await createGiftVoucherPdfAttachment(voucherRow || { id: recipient.voucherId }, recipient.voucherId, resolvedTemplateName)
@@ -41176,7 +41256,7 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                         name: 'Fly Away Ballooning'
                     },
                     subject,
-                    text: textBody,
+                    text: perRecipientText,
                     html: perRecipientHtml,
                     custom_args: {
                         voucher_id: recipient.voucherId,
@@ -41207,8 +41287,8 @@ app.post('/api/sendBulkVoucherEmail', async (req, res) => {
                             recipient.to,
                             subject,
                             template || 'custom',
-                            htmlBody,
-                            textBody,
+                            perRecipientHtml,
+                            perRecipientText,
                             messageId,
                             'voucher',
                             recipient.voucherId
@@ -41728,9 +41808,9 @@ function replaceSmsPrompts(text = '', booking = {}) {
     // Replace [Booking ID] (case-insensitive)
     result = result.replace(/\[Booking ID\]/gi, booking.id ? String(booking.id) : '');
     
-    // Replace [Customer Portal Link] (case-insensitive) - for SMS, just return the URL
+    // Replace Customer Portal Link prompts - for SMS, just return the URL.
     const customerPortalLink = getCustomerPortalLink(booking);
-    result = result.replace(/\[Customer Portal Link\]/gi, customerPortalLink || '');
+    result = result.replace(/\[Customer Portal Link(?::[^\]]+)?\]/gi, customerPortalLink || '');
     
     // Replace [Flight Date] (case-insensitive)
     const flightDate = booking.flight_date || booking.flightDate || '';
@@ -41971,16 +42051,9 @@ app.post('/api/sendBookingSms', async (req, res) => {
 // Bulk SMS endpoint
 app.post('/api/sendBulkBookingSms', async (req, res) => {
     console.log('POST /api/sendBulkBookingSms called');
-    const { bookingIds, to, body, templateId } = req.body;
+    const { bookingIds, to, bookingRecipients, body, templateId, addLink } = req.body;
 
     try {
-        if (!Array.isArray(to) || to.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Recipient list is empty'
-            });
-        }
-
         if (!body) {
             return res.status(400).json({
                 success: false,
@@ -41998,14 +42071,42 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
         }
 
         const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-        const uniqueRecipients = Array.from(new Set(
-            to.map(p => normalizeUkPhoneForTwilio(String(p || '').trim())).filter(Boolean)
-        ));
+        const fallbackRecipients = Array.isArray(to)
+            ? to.map((recipient, index) => ({
+                bookingId: Array.isArray(bookingIds) ? bookingIds[index] : '',
+                to: normalizeUkPhoneForTwilio(String(recipient || '').trim())
+            }))
+            : [];
+
+        const preparedRecipients = Array.isArray(bookingRecipients) && bookingRecipients.length > 0
+            ? bookingRecipients
+            : fallbackRecipients;
+
+        const normalizedRecipients = Array.from(new Map(
+            preparedRecipients
+                .map((recipient) => {
+                    const bookingId = recipient?.bookingId || recipient?.id || '';
+                    const phone = normalizeUkPhoneForTwilio(String(recipient?.to || '').trim());
+                    if (!phone) return null;
+                    const key = bookingId ? `${bookingId}:${phone}` : phone;
+                    return [key, { bookingId, to: phone }];
+                })
+                .filter(Boolean)
+        ).values());
         
-        if (uniqueRecipients.length === 0) {
+        if (normalizedRecipients.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: 'No valid recipient phone numbers'
+            });
+        }
+
+        const bodyHasPortalPrompt = hasCustomerPortalLinkPrompt(body);
+        const requiresPortalLink = Boolean(addLink || bodyHasPortalPrompt);
+        if (requiresPortalLink && normalizedRecipients.some(recipient => !recipient.bookingId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking recipient mapping is required for bulk SMS with customer portal links'
             });
         }
 
@@ -42029,15 +42130,22 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
         let successCount = 0;
         const failures = [];
 
-        // Fetch booking data for each booking to replace placeholders
+        // Fetch booking data by explicit recipient mapping. Phone-number matching is
+        // intentionally avoided because shared or edited numbers can point at the wrong booking.
         const bookingDataMap = new Map();
-        if (Array.isArray(bookingIds) && bookingIds.length > 0) {
-            for (const bookingId of bookingIds) {
+        const bookingIdsToFetch = Array.from(new Set(
+            normalizedRecipients
+                .map(recipient => recipient.bookingId)
+                .filter(Boolean)
+                .map(bookingId => String(bookingId))
+        ));
+        if (bookingIdsToFetch.length > 0) {
+            for (const bookingId of bookingIdsToFetch) {
                 try {
                     const bookingQuery = `SELECT * FROM all_booking WHERE id = ?`;
                     const [bookingRows] = await con.promise().query(bookingQuery, [bookingId]);
                     if (bookingRows && bookingRows.length > 0) {
-                        bookingDataMap.set(bookingId, bookingRows[0]);
+                        bookingDataMap.set(String(bookingId), bookingRows[0]);
                     }
                 } catch (err) {
                     console.warn(`Error fetching booking ${bookingId} for SMS:`, err.message);
@@ -42046,32 +42154,24 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
         }
 
         // Send SMS to each recipient
-        for (const recipientPhone of uniqueRecipients) {
+        for (const recipient of normalizedRecipients) {
+            const recipientPhone = recipient.to;
             try {
-                // Find the corresponding booking for this phone number
-                let bookingForThisPhone = null;
-                if (Array.isArray(bookingIds) && bookingIds.length > 0) {
-                    for (const bookingId of bookingIds) {
-                        const booking = bookingDataMap.get(bookingId);
-                        if (booking) {
-                            // Clean and normalize for comparison (booking may have +440... format)
-                            const bookingPhone = normalizeUkPhoneForTwilio(cleanPhoneNumber(booking.phone || booking.mobile || ''));
-                            if (bookingPhone && bookingPhone === recipientPhone) {
-                                bookingForThisPhone = booking;
-                                break;
-                            }
-                        }
-                    }
-                }
+                const bookingForThisPhone = recipient.bookingId
+                    ? bookingDataMap.get(String(recipient.bookingId))
+                    : null;
 
-                if (bookingForThisPhone) {
-                    getCustomerPortalLink(bookingForThisPhone);
+                if (requiresPortalLink && !bookingForThisPhone) {
+                    throw new Error(`Booking ${recipient.bookingId || '(missing)'} not found for portal link`);
                 }
 
                 // Replace placeholders for this specific booking
-                const bodyWithPrompts = bookingForThisPhone 
+                let bodyWithPrompts = bookingForThisPhone
                     ? replaceSmsPrompts(body, bookingForThisPhone)
                     : body;
+                if (addLink && bookingForThisPhone && !bodyHasPortalPrompt) {
+                    bodyWithPrompts = appendCustomerPortalLinkToSmsBody(bodyWithPrompts, bookingForThisPhone);
+                }
 
                 const msgParams = {
                     ...createParams,
@@ -42099,6 +42199,16 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
 
         console.log(`Bulk SMS sent: ${successCount} successful, ${failures.length} failed`);
 
+        if (successCount === 0) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to send booking SMS messages',
+                sentCount: 0,
+                failedCount: failures.length,
+                failures
+            });
+        }
+
         res.json({
             success: true,
             sentCount: successCount,
@@ -42116,7 +42226,7 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
 
 app.post('/api/sendBulkVoucherSms', async (req, res) => {
     console.log('POST /api/sendBulkVoucherSms called');
-    const { voucherIds, voucherRecipients, to, body } = req.body;
+    const { voucherIds, voucherRecipients, to, body, addLink } = req.body;
 
     try {
         if (!body) {
@@ -42167,6 +42277,9 @@ app.post('/api/sendBulkVoucherSms', async (req, res) => {
             });
         }
 
+        const bodyHasPortalPrompt = hasCustomerPortalLinkPrompt(body);
+        const requiresPortalLink = Boolean(addLink || bodyHasPortalPrompt);
+
         const client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
         const createParams = {
             statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL || undefined
@@ -42184,10 +42297,13 @@ app.post('/api/sendBulkVoucherSms', async (req, res) => {
         }
 
         const voucherDataMap = new Map();
-        if (Array.isArray(voucherIds) && voucherIds.length > 0) {
-            for (const voucherId of voucherIds) {
-                const normalizedVoucherId = normalizeVoucherContextId(voucherId);
-                if (!normalizedVoucherId) continue;
+        const voucherIdsToFetch = Array.from(new Set(
+            normalizedRecipients
+                .map(recipient => normalizeVoucherContextId(recipient.voucherId))
+                .filter(Boolean)
+        ));
+        if (voucherIdsToFetch.length > 0) {
+            for (const normalizedVoucherId of voucherIdsToFetch) {
                 try {
                     const [voucherRows] = await con.promise().query('SELECT * FROM all_vouchers WHERE id = ?', [normalizedVoucherId]);
                     if (voucherRows && voucherRows.length > 0) {
@@ -42210,13 +42326,18 @@ app.post('/api/sendBulkVoucherSms', async (req, res) => {
         const results = await Promise.allSettled(
             normalizedRecipients.map(async (recipient) => {
                 const voucher = voucherDataMap.get(recipient.voucherId) || {};
-                if (voucher && Object.keys(voucher).length > 0) {
-                    getCustomerPortalLink(voucher);
+                const hasVoucherData = voucher && Object.keys(voucher).length > 0;
+
+                if (requiresPortalLink && !hasVoucherData) {
+                    throw new Error(`Voucher ${recipient.voucherId} not found for portal link`);
                 }
 
-                const bodyWithPrompts = voucher && Object.keys(voucher).length > 0
+                let bodyWithPrompts = hasVoucherData
                     ? replaceSmsPrompts(body, voucher)
                     : body;
+                if (addLink && hasVoucherData && !bodyHasPortalPrompt) {
+                    bodyWithPrompts = appendCustomerPortalLinkToSmsBody(bodyWithPrompts, voucher);
+                }
 
                 const msg = await client.messages.create({
                     ...createParams,

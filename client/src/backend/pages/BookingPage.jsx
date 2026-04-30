@@ -1245,6 +1245,10 @@ const BookingPage = () => {
         const isBulk = isBulkBooking || isBulkVoucher;
         const isVoucher = selectedBookingForEmail?.contextType === 'voucher' || isBulkVoucher;
         const primaryVoucherContextId = getPrimaryVoucherContextId(selectedBookingForEmail);
+        const selectedBookingIdSet = new Set((selectedBookingIds || []).map(id => String(id)));
+        const selectedVoucherIdSet = new Set((selectedVoucherIds || []).map(id => String(id)));
+        const isSelectedBookingId = (id) => selectedBookingIdSet.has(String(id));
+        const isSelectedVoucherId = (id) => selectedVoucherIdSet.has(String(id));
 
         // Check if at least one checkbox is selected
         if (!sendMessageEmailChecked && !sendMessageSmsChecked) {
@@ -1319,7 +1323,8 @@ const BookingPage = () => {
                     templateName,
                     messageHtml: emailForm.message,
                     booking: selectedBookingForEmail,
-                    personalNote
+                    personalNote,
+                    preserveCustomerPortalLinkPlaceholders: isBulk
                 });
 
                 // Append Customer Portal link if Add Link checkbox is checked
@@ -1362,7 +1367,7 @@ const BookingPage = () => {
                     if (isBulkVoucher) {
                         // Bulk email to selected vouchers
                         const voucherRecipients = filteredData
-                            .filter(v => selectedVoucherIds.includes(v.id))
+                            .filter(v => isSelectedVoucherId(v.id))
                             .map(v => {
                                 const originalVoucher = v._original || v;
                                 const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
@@ -1401,7 +1406,7 @@ const BookingPage = () => {
                     } else {
                         // Bulk email to selected bookings
                         const bookingRecipients = booking
-                            .filter(b => selectedBookingIds.includes(b.id))
+                            .filter(b => isSelectedBookingId(b.id))
                             .map(b => {
                                 const email = (b.email || '').trim();
                                 if (!email) return null;
@@ -1478,7 +1483,9 @@ const BookingPage = () => {
                         smsMessage = smsForm.message;
                         smsTemplateId = smsForm.template;
                         const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
-                        smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
+                        smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms, {
+                            preserveCustomerPortalLinkPlaceholders: isBulk
+                        });
                     } else if (emailForm.message && emailForm.message.trim().length > 0) {
                         // Fallback: Convert email template to SMS format (only when not Custom Message)
                         smsMessage = stripHtml(emailForm.message);
@@ -1490,7 +1497,9 @@ const BookingPage = () => {
                             .replace(/\n{3,}/g, '\n\n')
                             .trim();
                         const bookingDataForSms = bookingDetail?.booking || selectedBookingForEmail || {};
-                        smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms);
+                        smsMessage = replaceSmsPrompts(smsMessage, bookingDataForSms, {
+                            preserveCustomerPortalLinkPlaceholders: isBulk
+                        });
                     }
 
                     if (personalNote && personalNote.trim()) {
@@ -1511,7 +1520,7 @@ const BookingPage = () => {
                 }
 
                 // Append Customer Portal link if Add Link checkbox is checked
-                if (addLink && selectedBookingForEmail) {
+                if (addLink && selectedBookingForEmail && !isBulk) {
                     try {
                         const portalRes = await axios.post('/api/customerPortalShortLink', {
                             bookingId: isVoucher ? primaryVoucherContextId : selectedBookingForEmail.id,
@@ -1550,7 +1559,7 @@ const BookingPage = () => {
                     if (isBulkVoucher) {
                         // Bulk SMS to selected vouchers
                         const voucherRecipients = filteredData
-                            .filter(v => selectedVoucherIds.includes(v.id))
+                            .filter(v => isSelectedVoucherId(v.id))
                             .map(v => {
                                 const originalVoucher = v._original || v;
                                 const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
@@ -1573,27 +1582,32 @@ const BookingPage = () => {
                                     voucherIds: selectedVoucherIds,
                                     voucherRecipients,
                                     body: smsMessageToSend,
-                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null)
+                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null),
+                                    addLink: !!addLink
                                 })
                             );
                         }
                     } else {
                         // Bulk SMS to selected bookings
-                        const recipients = booking
-                            .filter(b => selectedBookingIds.includes(b.id))
+                        const bookingRecipients = booking
+                            .filter(b => isSelectedBookingId(b.id))
                             .map(b => {
                                 const phone = cleanPhoneNumber(b.phone || b.mobile || '');
-                                return phone && phone.startsWith('+') ? phone : null;
+                                if (!phone || !phone.startsWith('+')) return null;
+                                return { bookingId: b.id, to: phone };
                             })
-                            .filter(p => p !== null);
+                            .filter(Boolean);
+                        const recipients = bookingRecipients.map(r => r.to);
 
                         if (recipients.length > 0) {
                             smsPromises.push(
                                 axios.post('/api/sendBulkBookingSms', {
                                     bookingIds: selectedBookingIds,
                                     to: recipients,
+                                    bookingRecipients,
                                     body: smsMessageToSend,
-                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null)
+                                    templateId: smsTemplateId || (smsForm.template && smsForm.template !== 'custom' ? smsForm.template : null),
+                                    addLink: !!addLink
                                 })
                             );
                         }
@@ -5469,6 +5483,10 @@ setBookingDetail(finalVoucherDetail);
         const isBulk = isBulkBooking || isBulkVoucher;
         const isVoucher = selectedBookingForEmail?.contextType === 'voucher' || isBulkVoucher;
         const primaryVoucherContextId = getPrimaryVoucherContextId(selectedBookingForEmail);
+        const selectedBookingIdSet = new Set((selectedBookingIds || []).map(id => String(id)));
+        const selectedVoucherIdSet = new Set((selectedVoucherIds || []).map(id => String(id)));
+        const isSelectedBookingId = (id) => selectedBookingIdSet.has(String(id));
+        const isSelectedVoucherId = (id) => selectedVoucherIdSet.has(String(id));
 
         if (!isBulk && !smsForm.to) {
             alert('Please fill phone number');
@@ -5486,7 +5504,7 @@ setBookingDetail(finalVoucherDetail);
                 if (isBulkVoucher) {
                     // Bulk SMS to selected vouchers
                     const voucherRecipients = filteredData
-                        .filter(v => selectedVoucherIds.includes(v.id))
+                        .filter(v => isSelectedVoucherId(v.id))
                         .map(v => {
                             const originalVoucher = v._original || v;
                             const isFlightVoucher = originalVoucher.book_flight === 'Flight Voucher';
@@ -5514,7 +5532,8 @@ setBookingDetail(finalVoucherDetail);
                         voucherIds: selectedVoucherIds,
                         voucherRecipients,
                         body: finalMessage,
-                        templateId: smsForm.template !== 'custom' ? smsForm.template : null
+                        templateId: smsForm.template !== 'custom' ? smsForm.template : null,
+                        addLink: !!addLink
                     });
 
                     if (response.data.success) {
@@ -5527,14 +5546,16 @@ setBookingDetail(finalVoucherDetail);
                     }
                 } else {
                     // Bulk SMS to selected bookings
-                    const recipients = booking
-                        .filter(b => selectedBookingIds.includes(b.id))
+                    const bookingRecipients = booking
+                        .filter(b => isSelectedBookingId(b.id))
                         .map(b => {
                             const phone = cleanPhoneNumber(b.phone || b.mobile || '');
                             // Accept any phone number that starts with + (international format)
-                            return phone && phone.startsWith('+') ? phone : null;
+                            if (!phone || !phone.startsWith('+')) return null;
+                            return { bookingId: b.id, to: phone };
                         })
-                        .filter(p => p !== null);
+                        .filter(Boolean);
+                    const recipients = bookingRecipients.map(r => r.to);
 
                     if (recipients.length === 0) {
                         alert('No valid international phone numbers found for selected bookings.');
@@ -5545,8 +5566,10 @@ setBookingDetail(finalVoucherDetail);
                     const response = await axios.post('/api/sendBulkBookingSms', {
                         bookingIds: selectedBookingIds,
                         to: recipients,
+                        bookingRecipients,
                         body: finalMessage,
-                        templateId: smsForm.template !== 'custom' ? smsForm.template : null
+                        templateId: smsForm.template !== 'custom' ? smsForm.template : null,
+                        addLink: !!addLink
                     });
 
                     if (response.data.success) {
