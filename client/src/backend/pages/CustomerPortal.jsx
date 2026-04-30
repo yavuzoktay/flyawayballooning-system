@@ -69,6 +69,7 @@ const normalizeInviteFriendsTitle = (title, availableSpaces) => {
 };
 
 const formatPounds = (value) => `£${Number(value || 0).toFixed(2)}`;
+const SINGLE_DISCOUNT_DESCRIPTION = 'Add another passenger to your booking and save 20% on their flight.';
 
 const getPrivateUpgradeDescription = (offer) =>
     `Your flight is eligible for a private upgrade. Enjoy your own private balloon for an additional ${formatPounds(offer?.totalCharge || 0)}.`;
@@ -119,7 +120,7 @@ const normalizeUpsellOfferDescription = (offer) => {
     }
 
     if (offer.mode === 'single_discount') {
-        return `Add another passenger to your flight for ${formatPounds(offer.discountedSeatPrice || offer.totalCharge)} and save ${formatPounds(offer.discountAmount)}.`;
+        return SINGLE_DISCOUNT_DESCRIPTION;
     }
 
     if (offer.mode === 'private_upgrade') {

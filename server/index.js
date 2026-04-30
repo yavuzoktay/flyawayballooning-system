@@ -8205,11 +8205,8 @@ const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPri
 };
 
 const CUSTOMER_PORTAL_UPSELL_SESSION_TYPE = 'customer_portal_upsell';
-const CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP = {
-    'weekday morning': 50,
-    'flexible weekday': 60,
-    'any day': 70
-};
+const CUSTOMER_PORTAL_UPSELL_DISCOUNT_RATE = 0.2;
+const CUSTOMER_PORTAL_SINGLE_DISCOUNT_DESCRIPTION = 'Add another passenger to your booking and save 20% on their flight.';
 const INVITE_FRIENDS_DISCOUNT_CODE = 'FLYFAB10';
 const CUSTOMER_PORTAL_ATTEMPT_EXTENSION_THRESHOLD = 6;
 const CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULTS = [
@@ -8436,23 +8433,21 @@ const buildCustomerPortalFlightAttemptNotification = async ({
     };
 };
 
-const getCustomerPortalUpsellDiscount = (voucherTitle) => {
+const getCustomerPortalUpsellDiscount = (voucherTitle, regularSeatPrice) => {
     const normalizedTitle = normalizeVoucherTitle(voucherTitle);
     if (!normalizedTitle) return null;
 
-    if (normalizedTitle.includes('weekday morning')) {
-        return CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP['weekday morning'];
+    const isSupportedSharedVoucher =
+        normalizedTitle.includes('weekday morning') ||
+        normalizedTitle.includes('flexible weekday') ||
+        normalizedTitle.includes('any day');
+
+    const parsedRegularSeatPrice = Number(regularSeatPrice);
+    if (!isSupportedSharedVoucher || !Number.isFinite(parsedRegularSeatPrice) || parsedRegularSeatPrice <= 0) {
+        return null;
     }
 
-    if (normalizedTitle.includes('flexible weekday')) {
-        return CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP['flexible weekday'];
-    }
-
-    if (normalizedTitle.includes('any day')) {
-        return CUSTOMER_PORTAL_UPSELL_DISCOUNT_MAP['any day'];
-    }
-
-    return null;
+    return roundCurrency(parsedRegularSeatPrice * CUSTOMER_PORTAL_UPSELL_DISCOUNT_RATE);
 };
 
 const CUSTOMER_PORTAL_PRIVATE_UPGRADE_TARGET_PRICE = 1800;
@@ -8734,7 +8729,7 @@ const buildCustomerPortalUpsellOffer = async ({
 
     const effectiveVoucherType = voucherType || booking.voucher_type_detail || booking.voucher_type || '';
     const regularSeatPrice = await resolveCustomerPortalSharedSeatPrice(effectiveVoucherType, effectiveLocation);
-    const discountAmount = getCustomerPortalUpsellDiscount(effectiveVoucherType);
+    const discountAmount = getCustomerPortalUpsellDiscount(effectiveVoucherType, regularSeatPrice);
     const discountedSeatPrice = regularSeatPrice != null && discountAmount != null
         ? roundCurrency(Math.max(regularSeatPrice - discountAmount, 0))
         : null;
@@ -8810,7 +8805,7 @@ const buildCustomerPortalUpsellOffer = async ({
         eligible: true,
         mode: 'single_discount',
         title: '🎈Bring a Friend & Save',
-        description: `Add another passenger to your flight for £${discountedSeatPrice.toFixed(2)} and save £${discountAmount.toFixed(2)}.`,
+        description: CUSTOMER_PORTAL_SINGLE_DISCOUNT_DESCRIPTION,
         buttonLabel: 'Add Passenger',
         requiredPassengerCount: 1,
         totalCharge: discountedSeatPrice,

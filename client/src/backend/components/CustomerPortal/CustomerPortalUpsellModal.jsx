@@ -20,6 +20,7 @@ const createEmptyPassengers = (count) =>
     }));
 
 const formatCurrency = (amount) => `£${Number(amount || 0).toFixed(2)}`;
+const SINGLE_DISCOUNT_DESCRIPTION = 'Add another passenger to your booking and save 20% on their flight.';
 
 const getUpsellModalTitle = (offer) => {
     if (offer?.mode === 'private_upgrade') {
@@ -43,7 +44,7 @@ const getUpsellDescription = (offer) => {
     }
 
     if (offer.mode === 'single_discount') {
-        return `Add another passenger to your flight for ${formatCurrency(offer.discountedSeatPrice || offer.totalCharge)} and save ${formatCurrency(offer.discountAmount)}.`;
+        return SINGLE_DISCOUNT_DESCRIPTION;
     }
 
     if (offer.mode === 'season_saver_upgrade') {
