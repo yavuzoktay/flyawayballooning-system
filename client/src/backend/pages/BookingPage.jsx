@@ -678,7 +678,12 @@ const BookingPage = () => {
 
     const stripHtml = (input = '') => {
         if (!input) return '';
-        return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        return input
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
     };
 
     const resolveTemplateName = (templateValue, dbTemplate) => {
@@ -1129,6 +1134,7 @@ const BookingPage = () => {
         if (!html) return '';
         return html
             .replace(/<!DOCTYPE[^>]*>/gi, '')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
             .replace(/<\/?(html|head|body)[^>]*>/gi, '')
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     };
@@ -1208,14 +1214,23 @@ const BookingPage = () => {
     const getStatusDisplay = (status) => {
         if (!status) return { label: 'Unknown', color: '#adb5bd' };
         const normalized = status.toLowerCase();
+        if (normalized.includes('open')) {
+            return { label: 'Opened', color: '#0d6efd' };
+        }
         if (normalized.includes('delivered') || normalized.includes('sent')) {
             return { label: 'Sent', color: '#28a745' };
+        }
+        if (normalized.includes('processed') || normalized.includes('queued') || normalized.includes('accepted')) {
+            return { label: 'Accepted', color: '#6c757d' };
+        }
+        if (normalized.includes('deferred')) {
+            return { label: 'Deferred', color: '#fd7e14' };
         }
         if (normalized.includes('bounce')) {
             return { label: 'Bounced', color: '#dc3545' };
         }
-        if (normalized.includes('open')) {
-            return { label: 'Opened', color: '#0d6efd' };
+        if (normalized.includes('dropped') || normalized.includes('blocked') || normalized.includes('failed') || normalized.includes('undelivered')) {
+            return { label: 'Failed', color: '#dc3545' };
         }
         return { label: status, color: '#6c757d' };
     };
@@ -11567,14 +11582,21 @@ setBookingDetail(finalVoucherDetail);
                                                             fontSize: isMobile ? 9 : '14px', 
                                                             padding: isMobile ? '6px 4px' : '16px'
                                                         }}>
-                                                        <span style={{
-                                                                padding: isMobile ? '1px 4px' : '4px 8px',
-                                                            borderRadius: isMobile ? 4 : '6px',
-                                                            background: log.status === 'delivered' ? '#d4edda' : (log.status === 'open' || log.opens > 0 ? '#e3f2fd' : '#fff3cd'),
-                                                            color: '#000',
-                                                                fontSize: isMobile ? 9 : '12px',
-                                                                fontWeight: isMobile ? 'inherit' : 500
-                                                        }}>{log.last_event || log.status}</span>
+                                                        {(() => {
+                                                            const statusDisplay = getStatusDisplay(log.last_event || log.status);
+                                                            return (
+                                                                <span style={{
+                                                                    padding: isMobile ? '1px 4px' : '4px 8px',
+                                                                    borderRadius: isMobile ? 4 : '6px',
+                                                                    background: statusDisplay.color,
+                                                                    color: '#fff',
+                                                                    fontSize: isMobile ? 9 : '12px',
+                                                                    fontWeight: isMobile ? 'inherit' : 500
+                                                                }}>
+                                                                    {statusDisplay.label}
+                                                                </span>
+                                                            );
+                                                        })()}
                                                     </TableCell>
                                                         <TableCell align="right" sx={{ 
                                                             fontSize: isMobile ? 9 : '14px', 
@@ -11985,7 +12007,21 @@ setBookingDetail(finalVoucherDetail);
                                                             fontSize: isMobile ? 9 : '14px', 
                                                             padding: isMobile ? '6px 4px' : '16px'
                                                         }}>
-                                                            {log.status}
+                                                            {(() => {
+                                                                const statusDisplay = getStatusDisplay(log.status);
+                                                                return (
+                                                                    <span style={{
+                                                                        padding: isMobile ? '1px 4px' : '4px 8px',
+                                                                        borderRadius: isMobile ? 4 : '6px',
+                                                                        background: statusDisplay.color,
+                                                                        color: '#fff',
+                                                                        fontSize: isMobile ? 9 : '12px',
+                                                                        fontWeight: isMobile ? 'inherit' : 500
+                                                                    }}>
+                                                                        {statusDisplay.label}
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </TableCell>
                                                 </TableRow>
                                             ))}

@@ -41649,6 +41649,71 @@ function ensureSmsLogsSchema(callback) {
     });
 }
 
+const PENDING_TWILIO_STATUSES = new Set(['queued', 'accepted', 'scheduled', 'sending']);
+
+function normalizeTwilioStatusPayload(body = {}) {
+    return {
+        sid: body.MessageSid || body.SmsSid || body.SmsMessageSid || body.Sid || null,
+        status: body.MessageStatus || body.SmsStatus || body.SmsMessageStatus || body.Status || null,
+        errorMessage: body.ErrorMessage || body.error_message || null
+    };
+}
+
+async function refreshPendingSmsStatuses(rows = []) {
+    const pendingRows = (rows || []).filter((row) => {
+        const status = String(row.status || '').toLowerCase();
+        return row.sid && (!status || PENDING_TWILIO_STATUSES.has(status));
+    });
+
+    if (pendingRows.length === 0) return rows || [];
+
+    const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) return rows || [];
+
+    let client;
+    try {
+        client = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    } catch (error) {
+        console.warn('[refreshPendingSmsStatuses] Unable to initialise Twilio client:', error.message);
+        return rows || [];
+    }
+
+    const updatesById = new Map();
+
+    await Promise.all(pendingRows.map(async (row) => {
+        try {
+            const message = await client.messages(row.sid).fetch();
+            const nextStatus = message.status || row.status || 'queued';
+            const nextError = message.errorMessage || row.error_message || null;
+            updatesById.set(row.id, {
+                status: nextStatus,
+                error_message: nextError,
+                last_event_at: message.dateUpdated || row.last_event_at || new Date()
+            });
+
+            if (nextStatus !== row.status || nextError !== row.error_message) {
+                await con.promise().query(
+                    `UPDATE sms_logs
+                     SET status = ?, error_message = ?, last_event_at = COALESCE(?, NOW())
+                     WHERE id = ?`,
+                    [nextStatus, nextError, message.dateUpdated || null, row.id]
+                );
+            }
+        } catch (error) {
+            console.warn('[refreshPendingSmsStatuses] Unable to refresh SMS status:', {
+                id: row.id,
+                sid: row.sid,
+                message: error.message
+            });
+        }
+    }));
+
+    return (rows || []).map((row) => {
+        const update = updatesById.get(row.id);
+        return update ? { ...row, ...update } : row;
+    });
+}
+
 // Send SMS for vouchers (Flight Voucher / Gift Voucher)
 // Reuses the same Twilio configuration as booking SMS, but fetches data from all_vouchers
 app.post('/api/sendVoucherSms', async (req, res) => {
@@ -43364,11 +43429,11 @@ async function sendAutomaticFlightVoucherConfirmationSms(voucherId, purchasingCo
 // Twilio status callback webhook
 app.post('/api/twilio/sms-status', (req, res) => {
     try {
-        const { MessageSid, MessageStatus, ErrorMessage } = req.body || {};
-        if (!MessageSid) return res.status(200).send('ok');
+        const { sid, status, errorMessage } = normalizeTwilioStatusPayload(req.body || {});
+        if (!sid) return res.status(200).send('ok');
         ensureSmsLogsSchema(() => {
             const sql = `UPDATE sms_logs SET status = ?, error_message = COALESCE(?, error_message), last_event_at = NOW() WHERE sid = ?`;
-            con.query(sql, [MessageStatus || 'unknown', ErrorMessage || null, MessageSid], (err) => {
+            con.query(sql, [status || 'unknown', errorMessage || null, sid], (err) => {
                 if (err) console.error('SMS status update error:', err);
             });
         });
@@ -43384,9 +43449,10 @@ app.get('/api/bookingSms/:bookingId', (req, res) => {
     const { bookingId } = req.params;
     ensureSmsLogsSchema(() => {
         const sql = `SELECT * FROM sms_logs WHERE booking_id = ? ORDER BY sent_at DESC`;
-        con.query(sql, [bookingId], (err, rows) => {
+        con.query(sql, [bookingId], async (err, rows) => {
             if (err) return res.status(500).json({ success: false, message: err.message });
-            res.json({ success: true, data: rows || [] });
+            const hydratedRows = await refreshPendingSmsStatuses(rows || []);
+            res.json({ success: true, data: hydratedRows });
         });
     });
 });
@@ -43397,9 +43463,10 @@ app.get('/api/voucherSms/:voucherId', (req, res) => {
     const normalizedVoucherId = normalizeVoucherContextId(voucherId);
     ensureSmsLogsSchema(() => {
         const sql = `SELECT * FROM sms_logs WHERE booking_id = ? ORDER BY sent_at DESC`;
-        con.query(sql, [normalizedVoucherId], (err, rows) => {
+        con.query(sql, [normalizedVoucherId], async (err, rows) => {
             if (err) return res.status(500).json({ success: false, message: err.message });
-            res.json({ success: true, data: rows || [] });
+            const hydratedRows = await refreshPendingSmsStatuses(rows || []);
+            res.json({ success: true, data: hydratedRows });
         });
     });
 });
@@ -43410,9 +43477,10 @@ app.get('/api/recipientSms', (req, res) => {
     if (!to) return res.status(400).json({ success: false, message: 'to is required' });
     ensureSmsLogsSchema(() => {
         const sql = `SELECT * FROM sms_logs WHERE to_number = ? ORDER BY sent_at DESC`;
-        con.query(sql, [to], (err, rows) => {
+        con.query(sql, [to], async (err, rows) => {
             if (err) return res.status(500).json({ success: false, message: err.message });
-            res.json({ success: true, data: rows || [] });
+            const hydratedRows = await refreshPendingSmsStatuses(rows || []);
+            res.json({ success: true, data: hydratedRows });
         });
     });
 });
