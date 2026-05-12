@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useTransition } from 'react';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import config from '../../config';
 import { 
     Plus, 
     Edit, 
@@ -15,8 +16,10 @@ import {
     XCircle,
     AlertCircle,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    ExternalLink
 } from 'lucide-react';
+import { ADMIN_MANUAL_BOOKING_AUTH } from '../auth/adminCredentials';
 import { 
     getDefaultTemplateMessageHtml,
     extractMessageFromTemplateBody
@@ -33,6 +36,10 @@ const Settings = () => {
     const [selectedVoucher, setSelectedVoucher] = useState(null);
     const [usageData, setUsageData] = useState([]);
     const [isMobile, setIsMobile] = useState(false);
+    const [isLaunchingKaleidoscopeBooking, setIsLaunchingKaleidoscopeBooking] = useState(false);
+    const [isLaunchingTheNewtBooking, setIsLaunchingTheNewtBooking] = useState(false);
+    const [isLaunchingHotelManualBooking, setIsLaunchingHotelManualBooking] = useState(false);
+    const API_BASE_URL = config.API_BASE_URL;
 
     // Detect mobile device
     useEffect(() => {
@@ -1176,6 +1183,7 @@ const Settings = () => {
     };
     
     // Collapsible sections state
+    const [bookingLinksExpanded, setBookingLinksExpanded] = useState(false);
     const [voucherCodesExpanded, setVoucherCodesExpanded] = useState(false);
     const [experiencesExpanded, setExperiencesExpanded] = useState(false);
     const [voucherTypesExpanded, setVoucherTypesExpanded] = useState(false);
@@ -1205,6 +1213,101 @@ const Settings = () => {
         } catch (e) {
             console.warn('safeParseJourneyTypes error:', e, val);
             return [];
+        }
+    };
+
+    const getBookingBaseUrl = () => {
+        if (typeof window === 'undefined') {
+            return 'https://flyawayballooning-book.com';
+        }
+
+        const hostname = window.location.hostname;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3000';
+        }
+
+        return 'https://flyawayballooning-book.com';
+    };
+
+    const requestManualBookingToken = async () => {
+        const response = await axios.post(
+            `${API_BASE_URL}/api/admin/manual-booking-token`,
+            ADMIN_MANUAL_BOOKING_AUTH
+        );
+
+        const token = response.data?.token;
+        if (!response.data?.success || !token) {
+            throw new Error(response.data?.message || 'Could not start manual booking.');
+        }
+
+        return token;
+    };
+
+    const navigateToManualBooking = (path, token, options = {}) => {
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        const { tokenParam = 'manualBookingToken', includeLegacyParams = true } = options;
+        const queryParams = new URLSearchParams();
+
+        if (includeLegacyParams) {
+            queryParams.set('manualBooking', '1');
+            queryParams.set('source', 'admin');
+        }
+
+        queryParams.set(tokenParam, token);
+        window.location.assign(`${getBookingBaseUrl()}${normalizedPath}?${queryParams.toString()}`);
+    };
+
+    const buildKaleidoscopeBookingUrl = () => {
+        const queryParams = new URLSearchParams({
+            source: 'system',
+            hideWeatherRefundablePresentation: 'true',
+            refresh: Date.now().toString()
+        });
+
+        return `${getBookingBaseUrl()}/kaleidoscope?${queryParams.toString()}`;
+    };
+
+    const handleKaleidoscopeBookingClick = () => {
+        if (isLaunchingKaleidoscopeBooking) return;
+
+        try {
+            setIsLaunchingKaleidoscopeBooking(true);
+            window.location.assign(buildKaleidoscopeBookingUrl());
+        } catch (error) {
+            console.error('Error opening Kaleidoscope balloon booking:', error);
+            alert(error?.message || 'Could not open Kaleidoscope balloon booking.');
+            setIsLaunchingKaleidoscopeBooking(false);
+        }
+    };
+
+    const handleTheNewtManualBookingClick = async () => {
+        if (isLaunchingTheNewtBooking) return;
+
+        try {
+            setIsLaunchingTheNewtBooking(true);
+            const token = await requestManualBookingToken();
+            navigateToManualBooking('/thenewt', token, {
+                tokenParam: 't',
+                includeLegacyParams: false
+            });
+        } catch (error) {
+            console.error('Error starting The Newt manual booking:', error);
+            alert(error?.response?.data?.message || error.message || 'Could not start The Newt balloon booking.');
+            setIsLaunchingTheNewtBooking(false);
+        }
+    };
+
+    const handleHotelManualBookingClick = async () => {
+        if (isLaunchingHotelManualBooking) return;
+
+        try {
+            setIsLaunchingHotelManualBooking(true);
+            const token = await requestManualBookingToken();
+            navigateToManualBooking('/hotel-manual-booking', token);
+        } catch (error) {
+            console.error('Error starting hotel manual booking:', error);
+            alert(error?.response?.data?.message || error.message || 'Could not start hotel manual booking.');
+            setIsLaunchingHotelManualBooking(false);
         }
     };
     
@@ -2762,6 +2865,29 @@ const Settings = () => {
         return <span className="status-badge active">Active</span>;
     };
 
+    const bookingLinkButtonStyle = (isLaunching) => ({
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '8px',
+        padding: isMobile ? '11px 14px' : '12px 18px',
+        fontSize: '13px',
+        fontWeight: 700,
+        letterSpacing: '0.03em',
+        textTransform: 'uppercase',
+        textAlign: 'center',
+        textDecoration: 'none',
+        cursor: isLaunching ? 'wait' : 'pointer',
+        boxShadow: '0 8px 20px rgba(15, 118, 110, 0.14)',
+        width: isMobile ? '100%' : 'auto',
+        minWidth: isMobile ? '100%' : '220px',
+        opacity: isLaunching ? 0.75 : 1
+    });
+
     if (loading) {
         return (
             <div className="settings-container">
@@ -2777,6 +2903,74 @@ const Settings = () => {
             </div>
 
             <div className="settings-content">
+                <div className="settings-card" style={{ marginBottom: '24px' }}>
+                    <div
+                        className="card-header"
+                        onClick={() => setBookingLinksExpanded(!bookingLinksExpanded)}
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '20px',
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+                        }}
+                    >
+                        <div>
+                            <h2 style={{ margin: 0, color: '#1f2937' }}>Booking Links</h2>
+                            <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                                Internal booking shortcuts moved off the homepage but kept available here.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {bookingLinksExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                        </div>
+                    </div>
+
+                    {bookingLinksExpanded && (
+                        <div style={{
+                            padding: '20px',
+                            background: '#f9fafb',
+                            borderRadius: '0 0 12px 12px',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '12px'
+                        }}>
+                            <button
+                                type="button"
+                                onClick={handleKaleidoscopeBookingClick}
+                                disabled={isLaunchingKaleidoscopeBooking}
+                                style={bookingLinkButtonStyle(isLaunchingKaleidoscopeBooking)}
+                            >
+                                <ExternalLink size={16} />
+                                {isLaunchingKaleidoscopeBooking ? 'Opening...' : 'Kaleidoscope Balloon Booking'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleTheNewtManualBookingClick}
+                                disabled={isLaunchingTheNewtBooking}
+                                style={bookingLinkButtonStyle(isLaunchingTheNewtBooking)}
+                            >
+                                <ExternalLink size={16} />
+                                {isLaunchingTheNewtBooking ? 'Opening...' : 'Newt Booking Link'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleHotelManualBookingClick}
+                                disabled={isLaunchingHotelManualBooking}
+                                style={bookingLinkButtonStyle(isLaunchingHotelManualBooking)}
+                            >
+                                <ExternalLink size={16} />
+                                {isLaunchingHotelManualBooking ? 'Opening...' : 'Hotel Booking'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 {/* Voucher Codes Management Section */}
                 <div className="settings-card" style={{ marginBottom: '24px' }}>
                     <div 

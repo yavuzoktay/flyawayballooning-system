@@ -1247,6 +1247,7 @@ const CustomerPortal = () => {
         return Number.isFinite(num) ? num : fallback;
     };
     const genericBookingVoucherTypes = ['book flight', 'flight voucher', 'gift voucher', 'buy gift', 'buy gift voucher', 'shared', 'shared flight', 'private', 'private flight'];
+    const sharedAvailabilitySignalTerms = ['shared', 'any day flight', 'any day', 'weekday morning', 'flexible weekday', 'anytime'];
     const getAvailabilityFlightTypeParamForPortal = () => {
         const signals = [
             bookingData?.flight_type,
@@ -1260,7 +1261,7 @@ const CustomerPortal = () => {
             .join(' ');
 
         if (signals.includes('private') || signals.includes('proposal')) return 'Private';
-        if (signals.includes('shared')) return 'Shared';
+        if (sharedAvailabilitySignalTerms.some((term) => signals.includes(term))) return 'Shared';
         return '';
     };
     const getAvailabilityVoucherTypeParamForPortal = () => {

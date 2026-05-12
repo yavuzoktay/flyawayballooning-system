@@ -521,7 +521,7 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
             .join(' ');
 
         if (signals.includes('private') || signals.includes('proposal')) return 'Private';
-        if (signals.includes('shared')) return 'Shared';
+        if (sharedExperienceTerms.some((term) => signals.includes(term))) return 'Shared';
         return '';
     };
 

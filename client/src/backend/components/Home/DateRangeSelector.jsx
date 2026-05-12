@@ -11,9 +11,6 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
     const [isLaunchingManualBooking, setIsLaunchingManualBooking] = useState(false);
-    const [isLaunchingKaleidoscopeBooking, setIsLaunchingKaleidoscopeBooking] = useState(false);
-    const [isLaunchingTheNewtBooking, setIsLaunchingTheNewtBooking] = useState(false);
-    const [isLaunchingHotelManualBooking, setIsLaunchingHotelManualBooking] = useState(false);
     const API_BASE_URL = config.API_BASE_URL;
 
     const getBookingBaseUrl = () => {
@@ -321,16 +318,6 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         }
     };
 
-    const buildKaleidoscopeBookingUrl = () => {
-        const queryParams = new URLSearchParams({
-            source: 'system',
-            hideWeatherRefundablePresentation: 'true',
-            refresh: Date.now().toString()
-        });
-
-        return `${getBookingBaseUrl()}/kaleidoscope?${queryParams.toString()}`;
-    };
-
     const handleManualBookingClick = async () => {
         if (isLaunchingManualBooking) return;
 
@@ -343,56 +330,6 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             alert(error?.response?.data?.message || error.message || 'Could not start manual booking.');
         } finally {
             setIsLaunchingManualBooking(false);
-        }
-    };
-
-    const handleHotelManualBookingClick = async () => {
-        if (isLaunchingHotelManualBooking) return;
-
-        try {
-            setIsLaunchingHotelManualBooking(true);
-            const token = await requestManualBookingToken();
-            navigateToManualBooking('/hotel-manual-booking', token);
-        } catch (error) {
-            console.error('Error starting hotel manual booking:', error);
-            alert(error?.response?.data?.message || error.message || 'Could not start hotel manual booking.');
-        } finally {
-            setIsLaunchingHotelManualBooking(false);
-        }
-    };
-
-    const handleTheNewtManualBookingClick = async () => {
-        if (isLaunchingTheNewtBooking) return;
-
-        try {
-            setIsLaunchingTheNewtBooking(true);
-            const token = await requestManualBookingToken();
-            navigateToManualBooking('/thenewt', token, {
-                tokenParam: 't',
-                includeLegacyParams: false
-            });
-        } catch (error) {
-            console.error('Error starting The Newt manual booking:', error);
-            alert(error?.response?.data?.message || error.message || 'Could not start The Newt balloon booking.');
-        } finally {
-            setIsLaunchingTheNewtBooking(false);
-        }
-    };
-
-    const handleKaleidoscopeBookingClick = () => {
-        if (isLaunchingKaleidoscopeBooking) return;
-
-        try {
-            setIsLaunchingKaleidoscopeBooking(true);
-            const bookingUrl = buildKaleidoscopeBookingUrl();
-            if (typeof window !== 'undefined') {
-                window.location.assign(bookingUrl);
-            }
-        } catch (error) {
-            console.error('Error opening Kaleidoscope balloon booking:', error);
-            alert(error?.message || 'Could not open Kaleidoscope balloon booking.');
-        } finally {
-            setIsLaunchingKaleidoscopeBooking(false);
         }
     };
 
@@ -557,84 +494,6 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                             )}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, minWidth: 210, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
-                            <button
-                                type="button"
-                                onClick={handleKaleidoscopeBookingClick}
-                                disabled={isLaunchingKaleidoscopeBooking}
-                                style={{
-                                    display: 'inline-block',
-                                    background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 10,
-                                    padding: '10px 20px',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    letterSpacing: '0.04em',
-                                    textTransform: 'uppercase',
-                                    textAlign: 'center',
-                                    textDecoration: 'none',
-                                    cursor: isLaunchingKaleidoscopeBooking ? 'wait' : 'pointer',
-                                    boxShadow: '0 8px 20px rgba(15, 118, 110, 0.18)',
-                                    width: '100%',
-                                    maxWidth: 210,
-                                    opacity: isLaunchingKaleidoscopeBooking ? 0.75 : 1
-                                }}
-                            >
-                                {isLaunchingKaleidoscopeBooking ? 'Opening...' : 'Kaleidoscope Balloon Booking'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleTheNewtManualBookingClick}
-                                disabled={isLaunchingTheNewtBooking}
-                                style={{
-                                    display: 'inline-block',
-                                    background: 'linear-gradient(135deg, #0f766e 0%, #115e59 100%)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 10,
-                                    padding: '10px 20px',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    letterSpacing: '0.04em',
-                                    textTransform: 'uppercase',
-                                    textAlign: 'center',
-                                    textDecoration: 'none',
-                                    cursor: isLaunchingTheNewtBooking ? 'wait' : 'pointer',
-                                    boxShadow: '0 8px 20px rgba(15, 118, 110, 0.18)',
-                                    width: '100%',
-                                    maxWidth: 210,
-                                    opacity: isLaunchingTheNewtBooking ? 0.75 : 1
-                                }}
-                            >
-                                {isLaunchingTheNewtBooking ? 'Opening...' : 'Newt Booking Link'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleHotelManualBookingClick}
-                                disabled={isLaunchingHotelManualBooking}
-                                style={{
-                                    display: 'inline-block',
-                                    background: 'linear-gradient(135deg, #15746d 0%, #115e59 100%)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 10,
-                                    padding: '10px 20px',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    letterSpacing: '0.04em',
-                                    textTransform: 'uppercase',
-                                    textAlign: 'center',
-                                    textDecoration: 'none',
-                                    cursor: isLaunchingHotelManualBooking ? 'wait' : 'pointer',
-                                    boxShadow: '0 8px 20px rgba(17, 94, 89, 0.18)',
-                                    width: '100%',
-                                    maxWidth: 210,
-                                    opacity: isLaunchingHotelManualBooking ? 0.75 : 1
-                                }}
-                            >
-                                {isLaunchingHotelManualBooking ? 'Opening...' : 'Hotel Booking'}
-                            </button>
                             <button
                                 type="button"
                                 onClick={handleManualBookingClick}

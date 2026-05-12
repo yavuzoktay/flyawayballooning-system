@@ -25648,11 +25648,37 @@ const GENERIC_BOOKING_VOUCHER_TYPES = new Set([
     'private flight'
 ]);
 
+const SHARED_AVAILABILITY_SIGNAL_TERMS = [
+    'shared',
+    'any day flight',
+    'any day',
+    'weekday morning',
+    'flexible weekday',
+    'anytime'
+];
+
+const inferAvailabilityFlightTypeFromSignals = (...values) => {
+    const combinedSignals = values
+        .flat()
+        .map((value) => normalizeAvailabilityTypeValue(value))
+        .filter(Boolean)
+        .join(' ');
+
+    if (!combinedSignals) return null;
+    if (combinedSignals.includes('private') || combinedSignals.includes('proposal') || combinedSignals.includes('charter')) {
+        return 'Private';
+    }
+    if (SHARED_AVAILABILITY_SIGNAL_TERMS.some((term) => combinedSignals.includes(term))) {
+        return 'Shared';
+    }
+    return null;
+};
+
 const normalizeAvailabilityFlightTypeForRequest = (value) => {
     const normalized = normalizeAvailabilityTypeValue(value);
     if (!normalized) return null;
-    if (normalized.includes('private') || normalized.includes('proposal')) return 'Private';
-    if (normalized.includes('shared')) return 'Shared';
+    const inferredFlightType = inferAvailabilityFlightTypeFromSignals(normalized);
+    if (inferredFlightType) return inferredFlightType;
     return String(value).trim();
 };
 
@@ -25697,7 +25723,14 @@ const getAvailabilityVisibilityContextForBooking = (booking = {}) => {
         }
     }
 
-    return { flightType, voucherType };
+    return {
+        flightType: flightType || inferAvailabilityFlightTypeFromSignals(
+            booking.voucher_type_detail,
+            booking.actual_voucher_type,
+            booking.voucher_type
+        ),
+        voucherType
+    };
 };
 
 const resolveAvailabilityVisibilityContextForBooking = async (booking = {}) => {
@@ -25778,9 +25811,15 @@ const resolveAvailabilityVisibilityContextForBooking = async (booking = {}) => {
         }
     }
 
+    const resolvedVoucherType = context.voucherType || voucherCandidates.map(normalizeAvailabilityVoucherTypeForRequest).find(Boolean) || null;
+
     return {
-        flightType: context.flightType || flightCandidates.map(normalizeAvailabilityFlightTypeForRequest).find(Boolean) || null,
-        voucherType: context.voucherType || voucherCandidates.map(normalizeAvailabilityVoucherTypeForRequest).find(Boolean) || null
+        flightType:
+            context.flightType ||
+            flightCandidates.map(normalizeAvailabilityFlightTypeForRequest).find(Boolean) ||
+            inferAvailabilityFlightTypeFromSignals(voucherCandidates, resolvedVoucherType) ||
+            null,
+        voucherType: resolvedVoucherType
     };
 };
 
@@ -25823,8 +25862,8 @@ const isAvailabilityHiddenForRequest = (row = {}, { flightType, voucherType } = 
     return (
         requestedFlightTypeIsHidden ||
         requestedVoucherTypeIsHidden ||
-        (hasNoVisibleConfiguredFlightTypes &&
-            (rawVoucherTypesArray.length === 0 || hasNoVisibleConfiguredVoucherTypes))
+        hasNoVisibleConfiguredFlightTypes ||
+        hasNoVisibleConfiguredVoucherTypes
     );
 };
 
@@ -26452,12 +26491,9 @@ app.get('/api/availabilities/filter', (req, res) => {
     // values stored in the database ("Private", "Shared", or "All").
     let normalizedFlightType = flightType;
     if (flightType && flightType !== 'All') {
-        const ft = String(flightType).toLowerCase();
-        if (ft.includes('private')) {
-            normalizedFlightType = 'Private';
-        } else if (ft.includes('shared')) {
-            normalizedFlightType = 'Shared';
-        }
+        normalizedFlightType = normalizeAvailabilityFlightTypeForRequest(flightType) || flightType;
+    } else if (voucherTypes && voucherTypes !== 'All') {
+        normalizedFlightType = inferAvailabilityFlightTypeFromSignals(parseList(voucherTypes));
     }
 
     const requestedFlightTypes = normalizedFlightType && normalizedFlightType !== 'All'
@@ -26596,8 +26632,8 @@ app.get('/api/availabilities/filter', (req, res) => {
             const excludeFromBooking =
                 requestedFlightTypeIsHidden ||
                 requestedVoucherTypeIsHidden ||
-                (hasNoVisibleConfiguredFlightTypes &&
-                    (rawVoucherTypesArray.length === 0 || hasNoVisibleConfiguredVoucherTypes));
+                hasNoVisibleConfiguredFlightTypes ||
+                hasNoVisibleConfiguredVoucherTypes;
 
             const sharedCapacity = row.shared_capacity
                 ? Number(row.shared_capacity)
