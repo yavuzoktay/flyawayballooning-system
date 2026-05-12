@@ -667,6 +667,35 @@ const buildBookingConfirmationEmail = ({ template, booking }) => {
     });
 };
 
+const isRedeemedVoucherBookingConfirmation = (booking = {}) => {
+    const isTruthyFlag = (value) => {
+        if (value === true || value === 1) return true;
+        if (typeof value === 'string') {
+            return ['yes', 'true', '1'].includes(value.trim().toLowerCase());
+        }
+        return false;
+    };
+
+    const source = String(booking?.flight_type_source || booking?.flightTypeSource || '').trim().toLowerCase();
+    const activity = String(booking?.activitySelect || booking?.activity_select || booking?.journey_type || booking?.journeyType || '').trim().toLowerCase();
+    const notes = String(booking?.additional_notes || booking?.additionalNotes || '').trim().toLowerCase();
+    const templateName = String(booking?.templateName || booking?.template_name || '').trim().toLowerCase();
+
+    if (['flight voucher confirmation', 'gift voucher confirmation', 'gift card confirmation'].includes(templateName)) {
+        return false;
+    }
+
+    return (
+        source === 'redeem voucher' ||
+        activity === 'redeem voucher' ||
+        notes.includes('created from redeem voucher') ||
+        isTruthyFlag(booking?.redeemed_voucher) ||
+        isTruthyFlag(booking?.is_voucher_redeemed) ||
+        isTruthyFlag(booking?._original?.redeemed_voucher) ||
+        isTruthyFlag(booking?._original?.is_voucher_redeemed)
+    );
+};
+
 const getBookingConfirmationReceiptHtml = (booking = {}) => {
     const receiptItems = Array.isArray(booking?.passengers) ? booking.passengers : [];
     
@@ -1451,7 +1480,9 @@ export const replacePrompts = (html = '', booking = {}, options = {}) => {
     const receiptPromptRegex = /\[Receipt\]/gi;
     // Check if [Receipt] exists using indexOf to avoid regex lastIndex issues
     if (result.toLowerCase().indexOf('[receipt]') !== -1) {
-        const receiptHtml = getBookingConfirmationReceiptHtml(booking);
+        const receiptHtml = isRedeemedVoucherBookingConfirmation(booking)
+            ? ''
+            : getBookingConfirmationReceiptHtml(booking);
         // Replace all occurrences of [Receipt] (case-insensitive)
         result = result.replace(receiptPromptRegex, receiptHtml);
     }
