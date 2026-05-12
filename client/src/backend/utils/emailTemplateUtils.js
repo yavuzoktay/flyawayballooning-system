@@ -662,10 +662,7 @@ const buildBookingConfirmationEmail = ({ template, booking }) => {
         bodyHtml,
         customerName,
         signatureLines: [],
-        footerLinks: [
-            { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
-            { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
-        ],
+        footerLinks: [],
         disableFormatDetection: true
     });
 };
@@ -758,6 +755,18 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
     if (subtotal == null && (paidAmount === 0 || paidAmount == null) && originalAmount != null && originalAmount > 0) {
         subtotal = originalAmount;
     }
+
+    const VAT_RATE = 0.2;
+    const VAT_RATE_PERCENT = VAT_RATE * 100;
+    const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+    const grossTotal = subtotal != null ? roundMoney(subtotal) : null;
+    const vatAmount = grossTotal != null ? roundMoney(grossTotal * VAT_RATE / (1 + VAT_RATE)) : null;
+    const netSubtotal = grossTotal != null && vatAmount != null ? roundMoney(grossTotal - vatAmount) : null;
+    const effectivePaidAmount = (paidAmount === 0 || paidAmount == null) && originalAmount != null && originalAmount > 0
+        ? originalAmount
+        : paidAmount;
+    const formatReceiptMoney = (value) => value != null ? Number(value).toFixed(2) : '—';
+
     const receiptId = booking?.receipt_number || booking?.booking_reference || booking?.id || '';
     
     // Format receipt sold date (DD/MM/YYYY format)
@@ -892,20 +901,21 @@ const getBookingConfirmationReceiptHtml = (booking = {}) => {
                             ${(isFlightVoucher || isGiftVoucher) ? `—${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (location ? `${location}${guestCount > 0 ? `<div style="margin-top:4px; font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''}` : (guestCount > 0 ? `<div style="font-size:12px; color:#64748b;">Guests: ${guestCount}</div>` : ''))}
                         </td>
                         <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
-                            £${subtotal != null ? subtotal.toFixed(2) : '—'}
+                            £${formatReceiptMoney(grossTotal)}
                         </td>
                         <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
-                            £${subtotal != null ? subtotal.toFixed(2) : '—'}
+                            £${formatReceiptMoney(grossTotal)}
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
         <div style="margin-top:16px; font-size:13px; color:#475569;">
-            <div style="text-align:right; margin-bottom:8px;"><strong>Subtotal:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
-            <div style="text-align:right; margin-bottom:8px;"><strong>Total:</strong> £${subtotal != null ? subtotal.toFixed(2) : '—'}</div>
-            <div style="text-align:right; margin-bottom:8px;"><strong>Paid:</strong> £${paidAmount != null ? paidAmount.toFixed(2) : '—'}</div>
-            <div style="text-align:right;"><strong>Due:</strong> £${dueAmount != null ? dueAmount.toFixed(2) : '—'}</div>
+            <div style="text-align:right; margin-bottom:8px;"><strong>Subtotal (ex VAT):</strong> £${formatReceiptMoney(netSubtotal)}</div>
+            <div style="text-align:right; margin-bottom:8px;"><strong>VAT (${VAT_RATE_PERCENT}%):</strong> £${formatReceiptMoney(vatAmount)}</div>
+            <div style="text-align:right; margin-bottom:8px;"><strong>Total (inc VAT):</strong> £${formatReceiptMoney(grossTotal)}</div>
+            <div style="text-align:right; margin-bottom:8px;"><strong>Paid:</strong> £${formatReceiptMoney(effectivePaidAmount)}</div>
+            <div style="text-align:right;"><strong>Due:</strong> £${formatReceiptMoney(dueAmount)}</div>
         </div>
     </div>`;
 };
@@ -1101,10 +1111,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             bodyHtml: bodyHtmlWithPrompts,
             customerName,
             signatureLines: [],
-            footerLinks: [
-                { label: 'View FAQs', url: 'https://flyawayballooning.com/faq' },
-                { label: 'Contact us', url: 'mailto:hello@flyawayballooning.com' }
-            ]
+            footerLinks: []
         });
     },
     'Gift Card Confirmation': ({ template, booking }) => {
@@ -1185,10 +1192,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
             customerName,
             signatureLines: [],
-            footerLinks: [
-                { label: 'Manage booking', url: 'https://flyawayballooning.com/manage' },
-                { label: 'Weather FAQs', url: 'https://flyawayballooning.com/weather' }
-            ]
+            footerLinks: []
         });
     },
     'To Be Updated': ({ template, booking }) => {

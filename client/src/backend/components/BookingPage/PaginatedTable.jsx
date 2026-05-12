@@ -44,7 +44,7 @@ const PaginatedTable = ({
     const OPT_OUT_EMOJI = '📵';
     const NEWT_EMOJI = '🦎';
     const KALEIDOSCOPE_EMOJI = '🌈';
-    const WEATHER_REFUND_EMOJI = '🌧️';
+    const WEATHER_REFUND_EMOJI = '☔️';
     const FOREIGN_CUSTOMER_EMOJI = '🌍';
 
     const getPassengerDetailsForWeatherRefund = (item) => {

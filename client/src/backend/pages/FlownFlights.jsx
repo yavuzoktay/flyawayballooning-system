@@ -35,6 +35,27 @@ import PaginatedTable from "../components/BookingPage/PaginatedTable";
 import { getAssignedResourceInfo } from '../utils/resourceAssignment';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
+const MONTH_FILTER_OPTIONS = [
+    { value: '1', label: 'January' },
+    { value: '2', label: 'February' },
+    { value: '3', label: 'March' },
+    { value: '4', label: 'April' },
+    { value: '5', label: 'May' },
+    { value: '6', label: 'June' },
+    { value: '7', label: 'July' },
+    { value: '8', label: 'August' },
+    { value: '9', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' }
+];
+
+const getFlightDate = (flight) => {
+    if (!flight?.flight_date) return null;
+    const flightDate = dayjs(flight.flight_date);
+    return flightDate.isValid() ? flightDate : null;
+};
+
 const FlownFlights = () => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -49,6 +70,7 @@ const FlownFlights = () => {
     const [experienceFilter, setExperienceFilter] = useState('');
     const [pilotFilter, setPilotFilter] = useState('');
     const [yearFilter, setYearFilter] = useState('');
+    const [monthFilter, setMonthFilter] = useState('');
     const [operationalFields, setOperationalFields] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
     
@@ -180,6 +202,11 @@ const FlownFlights = () => {
     useEffect(() => {
         fetchFlownFlights();
     }, []);
+
+    const handleYearFilterChange = (value) => {
+        setYearFilter(value);
+        setMonthFilter('');
+    };
     
     // Fetch booking details when popup opens
     useEffect(() => {
@@ -512,9 +539,8 @@ const FlownFlights = () => {
         // Year filter
         if (yearFilter) {
             filtered = filtered.filter(flight => {
-                if (!flight.flight_date) return false;
-                const flightDate = dayjs(flight.flight_date);
-                if (flightDate.isValid()) {
+                const flightDate = getFlightDate(flight);
+                if (flightDate) {
                     const flightYear = flightDate.year().toString();
                     return flightYear === yearFilter;
                 }
@@ -522,8 +548,16 @@ const FlownFlights = () => {
             });
         }
 
+        // Month filter is intentionally applied after a year is selected.
+        if (yearFilter && monthFilter) {
+            filtered = filtered.filter(flight => {
+                const flightDate = getFlightDate(flight);
+                return flightDate ? String(flightDate.month() + 1) === monthFilter : false;
+            });
+        }
+
         setFilteredFlights(filtered);
-    }, [searchTerm, locationFilter, experienceFilter, pilotFilter, yearFilter, flownFlights]);
+    }, [searchTerm, locationFilter, experienceFilter, pilotFilter, yearFilter, monthFilter, flownFlights]);
 
     // Get unique locations for filter
     const locations = useMemo(() => {
@@ -544,15 +578,30 @@ const FlownFlights = () => {
     // Get unique years for filter
     const years = useMemo(() => {
         const uniqueYears = [...new Set(flownFlights.map(f => {
-            if (!f.flight_date) return null;
-            const flightDate = dayjs(f.flight_date);
-            if (flightDate.isValid()) {
+            const flightDate = getFlightDate(f);
+            if (flightDate) {
                 return flightDate.year().toString();
             }
             return null;
         }).filter(Boolean))];
         return uniqueYears.sort((a, b) => parseInt(b) - parseInt(a)); // Sort descending (newest first)
     }, [flownFlights]);
+
+    const monthsForSelectedYear = useMemo(() => {
+        if (!yearFilter) return [];
+
+        const availableMonthValues = new Set(
+            flownFlights
+                .map((flight) => {
+                    const flightDate = getFlightDate(flight);
+                    if (!flightDate || flightDate.year().toString() !== yearFilter) return null;
+                    return String(flightDate.month() + 1);
+                })
+                .filter(Boolean)
+        );
+
+        return MONTH_FILTER_OPTIONS.filter((monthOption) => availableMonthValues.has(monthOption.value));
+    }, [flownFlights, yearFilter]);
 
     // Summary totals: flight hours per balloon, pilot flight hours, pilot duty hours, total passengers
     const flightSummary = useMemo(() => {
@@ -628,6 +677,7 @@ const FlownFlights = () => {
     const activeDropdownFilterCount = [
         experienceFilter,
         yearFilter,
+        monthFilter,
         pilotFilter,
         locationFilter
     ].filter(Boolean).length;
@@ -635,6 +685,7 @@ const FlownFlights = () => {
     const clearDropdownFilters = () => {
         setExperienceFilter('');
         setYearFilter('');
+        setMonthFilter('');
         setPilotFilter('');
         setLocationFilter('');
     };
@@ -706,11 +757,19 @@ const FlownFlights = () => {
             options: ['Shared', 'Private']
         },
         {
-            label: 'By Year',
+            label: 'Year',
             value: yearFilter,
-            onChange: setYearFilter,
+            onChange: handleYearFilterChange,
             allLabel: 'All years',
             options: years
+        },
+        {
+            label: 'Month',
+            value: monthFilter,
+            onChange: setMonthFilter,
+            allLabel: yearFilter ? 'All months' : 'Select year first',
+            options: monthsForSelectedYear,
+            disabled: !yearFilter
         },
         {
             label: 'Pilot',
@@ -727,6 +786,12 @@ const FlownFlights = () => {
             options: locations
         }
     ];
+
+    const getFilterOptionValue = (option) =>
+        typeof option === 'object' && option !== null ? option.value : option;
+
+    const getFilterOptionLabel = (option) =>
+        typeof option === 'object' && option !== null ? option.label : option;
 
     const renderFilterControls = () => (
         <Box
@@ -747,11 +812,16 @@ const FlownFlights = () => {
                         onChange={(e) => control.onChange(e.target.value)}
                         MenuProps={filterMenuProps}
                         sx={filterSelectSx}
+                        disabled={control.disabled}
                     >
                         <MenuItem value="" sx={filterMenuItemSx}>{control.allLabel}</MenuItem>
                         {control.options.map(option => (
-                            <MenuItem key={option} value={option} sx={filterMenuItemSx}>
-                                {option}
+                            <MenuItem
+                                key={getFilterOptionValue(option)}
+                                value={getFilterOptionValue(option)}
+                                sx={filterMenuItemSx}
+                            >
+                                {getFilterOptionLabel(option)}
                             </MenuItem>
                         ))}
                     </Select>

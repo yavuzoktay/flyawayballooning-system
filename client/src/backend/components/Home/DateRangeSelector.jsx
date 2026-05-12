@@ -49,6 +49,13 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
 
     const isExpired = (rawDate) => isAdminDateExpired(rawDate);
 
+    const formatDateInputValue = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const computeTotalLiability = (bookings = [], vouchers = []) => {
         const bookingsLiability = (bookings || []).reduce((sum, b) => {
             if (!b || typeof b !== 'object') return sum;
@@ -155,8 +162,15 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             const today = new Date();
             const lastYear = new Date(today);
             lastYear.setFullYear(today.getFullYear() - 1);
-            const start = lastYear.toISOString().split("T")[0];
-            const end = new Date().toISOString().split("T")[0];
+            const start = formatDateInputValue(lastYear);
+            const end = formatDateInputValue(today);
+            filterData(start, end);
+        },
+        monthToDate: () => {
+            const today = new Date();
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            const start = formatDateInputValue(monthStart);
+            const end = formatDateInputValue(today);
             filterData(start, end);
         },
         quarter1: () => {
@@ -500,6 +514,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                     marginTop: '10px'
                 }}>
                     <button onClick={quickLinks.allTime} style={quickFilterButtonStyle}>All Time</button>
+                    <button onClick={quickLinks.monthToDate} style={quickFilterButtonStyle}>MTD</button>
                     <button onClick={quickLinks.last12Months} style={quickFilterButtonStyle}>Last 12 Months</button>
                     <button onClick={quickLinks.quarter1} style={quickFilterButtonStyle}>Q1</button>
                     <button onClick={quickLinks.quarter2} style={quickFilterButtonStyle}>Q2</button>
