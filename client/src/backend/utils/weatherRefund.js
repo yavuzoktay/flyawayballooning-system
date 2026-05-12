@@ -13,17 +13,21 @@ const parseWeatherRefundTotal = (value) => {
 export const bookingHasWeatherRefund = (bookingDetail) => {
     if (!bookingDetail) return false;
 
-    if (typeof bookingDetail?.booking?.has_weather_refund === 'boolean') {
-        return bookingDetail.booking.has_weather_refund;
+    if (isTruthyWeatherRefund(bookingDetail?.booking?.has_weather_refund)) {
+        return true;
     }
 
-    if (typeof bookingDetail?.has_weather_refund === 'boolean') {
-        return bookingDetail.has_weather_refund;
+    if (isTruthyWeatherRefund(bookingDetail?.has_weather_refund)) {
+        return true;
     }
 
     const passengers = Array.isArray(bookingDetail?.passengers)
         ? bookingDetail.passengers
-        : [];
+        : (Array.isArray(bookingDetail?.booking?.passengers)
+            ? bookingDetail.booking.passengers
+            : (Array.isArray(bookingDetail?.booking?.passenger_details)
+                ? bookingDetail.booking.passenger_details
+                : []));
 
     if (passengers.some((passenger) =>
         isTruthyWeatherRefund(passenger?.weather_refund) ||

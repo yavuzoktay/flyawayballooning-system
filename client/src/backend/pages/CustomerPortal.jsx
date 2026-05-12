@@ -15,6 +15,7 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import SmsIcon from '@mui/icons-material/Sms';
 import '../components/CustomerPortal/CustomerPortalHeader.css';
 import CustomerPortalUpsellModal from '../components/CustomerPortal/CustomerPortalUpsellModal';
+import CustomerPortalVoucherUpgradeModal from '../components/CustomerPortal/CustomerPortalVoucherUpgradeModal';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 
 const getApiBaseUrl = () => {
@@ -160,6 +161,11 @@ const CustomerPortal = () => {
     const [isFullyRefunded, setIsFullyRefunded] = useState(false);
     const [upsellModalOpen, setUpsellModalOpen] = useState(false);
     const [submittingUpsell, setSubmittingUpsell] = useState(false);
+    const [voucherUpgradeOptions, setVoucherUpgradeOptions] = useState([]);
+    const [voucherUpgradeContext, setVoucherUpgradeContext] = useState(null);
+    const [voucherUpgradeLoading, setVoucherUpgradeLoading] = useState(false);
+    const [voucherUpgradeModalOpen, setVoucherUpgradeModalOpen] = useState(false);
+    const [submittingVoucherUpgrade, setSubmittingVoucherUpgrade] = useState(false);
     const [inviteFriendsExpanded, setInviteFriendsExpanded] = useState(false);
     const [inviteFriendsCopyMessage, setInviteFriendsCopyMessage] = useState('');
 
@@ -303,6 +309,38 @@ const CustomerPortal = () => {
         }
     });
 
+    const fetchVoucherUpgradeOptions = async ({ silent = false } = {}) => {
+        if (!token) {
+            setVoucherUpgradeOptions([]);
+            setVoucherUpgradeContext(null);
+            return;
+        }
+
+        try {
+            if (!silent) {
+                setVoucherUpgradeLoading(true);
+            }
+            const encodedToken = encodeURIComponent(token);
+            const response = await axios.get(buildApiUrl(`/api/customer-portal-voucher-upgrade-options/${encodedToken}`));
+            if (response.data?.success) {
+                const upgradeData = response.data.data || {};
+                setVoucherUpgradeOptions(Array.isArray(upgradeData.options) ? upgradeData.options : []);
+                setVoucherUpgradeContext(upgradeData);
+            } else {
+                setVoucherUpgradeOptions([]);
+                setVoucherUpgradeContext(null);
+            }
+        } catch (upgradeError) {
+            console.warn('Customer Portal - Could not load voucher upgrade options:', upgradeError);
+            setVoucherUpgradeOptions([]);
+            setVoucherUpgradeContext(null);
+        } finally {
+            if (!silent) {
+                setVoucherUpgradeLoading(false);
+            }
+        }
+    };
+
     const fetchBookingData = async ({ silent = false, refreshPaymentHistory = true } = {}) => {
         if (!token) {
             if (!silent) {
@@ -327,6 +365,7 @@ const CustomerPortal = () => {
             if (response.data.success) {
                 const bookingDataResponse = response.data.data;
                 setBookingData(bookingDataResponse);
+                fetchVoucherUpgradeOptions({ silent: true });
                 // Fetch payment history after booking data is loaded
                 // Only fetch if we have a valid booking_id (not just voucher ID for Flight Voucher)
                 // For Flight Voucher, payment history might not exist or might be linked differently
@@ -629,6 +668,8 @@ const CustomerPortal = () => {
             handlePaymentSuccess();
         } else if (paymentSuccess && paymentType === 'customer_portal_upsell') {
             handleCustomerPortalUpsellPaymentSuccess(paymentSessionId);
+        } else if (paymentSuccess && paymentType === 'customer_portal_voucher_upgrade') {
+            handleCustomerPortalVoucherUpgradePaymentSuccess(paymentSessionId);
         } else {
             fetchBookingData();
         }
@@ -840,6 +881,45 @@ const CustomerPortal = () => {
         }
     };
 
+    const handleSubmitVoucherUpgrade = async (option) => {
+        if (!option?.targetType || !token) {
+            alert('This upgrade is no longer available. Please refresh the page and try again.');
+            return;
+        }
+
+        setSubmittingVoucherUpgrade(true);
+        try {
+            const sessionRes = await axios.post(buildApiUrl('/api/customer-portal-voucher-upgrade/create-session'), {
+                token,
+                targetType: option.targetType
+            });
+
+            if (!sessionRes.data?.success) {
+                alert(sessionRes.data?.message || 'Payment could not be initiated.');
+                return;
+            }
+
+            if (sessionRes.data.sessionUrl) {
+                setVoucherUpgradeModalOpen(false);
+                window.location.href = sessionRes.data.sessionUrl;
+                return;
+            }
+
+            if (sessionRes.data.sessionId) {
+                setVoucherUpgradeModalOpen(false);
+                window.location.href = `https://checkout.stripe.com/c/pay/${sessionRes.data.sessionId}`;
+                return;
+            }
+
+            alert('Payment session could not be created. Please try again.');
+        } catch (error) {
+            console.error('Customer Portal - Error creating voucher upgrade session:', error);
+            alert(error.response?.data?.message || 'Failed to initiate payment. Please try again later.');
+        } finally {
+            setSubmittingVoucherUpgrade(false);
+        }
+    };
+
     const handleCustomerPortalUpsellPaymentSuccess = async (sessionId) => {
         const processedKey = sessionId ? `fab_customer_portal_upsell_${sessionId}` : null;
         const alreadyProcessed = processedKey && typeof window !== 'undefined'
@@ -888,6 +968,63 @@ const CustomerPortal = () => {
             }
 
             alert(error.response?.data?.message || 'Payment was received, but we could not refresh your booking automatically. Please reload the page in a few moments.');
+        } finally {
+            if (typeof window !== 'undefined') {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+    };
+
+    const handleCustomerPortalVoucherUpgradePaymentSuccess = async (sessionId) => {
+        const processedKey = sessionId ? `fab_customer_portal_voucher_upgrade_${sessionId}` : null;
+        const alreadyProcessed = processedKey && typeof window !== 'undefined'
+            ? window.localStorage.getItem(processedKey) === '1'
+            : false;
+
+        try {
+            if (sessionId && !alreadyProcessed) {
+                let sessionProcessed = await waitForUpsellSessionProcessing(sessionId, 1);
+
+                if (!sessionProcessed) {
+                    try {
+                        await axios.post(buildApiUrl('/api/createBookingFromSession'), {
+                            session_id: sessionId,
+                            type: 'customer_portal_voucher_upgrade'
+                        });
+                    } catch (createError) {
+                        if (createError.response?.status !== 202) {
+                            throw createError;
+                        }
+                    }
+                }
+
+                if (!sessionProcessed) {
+                    sessionProcessed = await waitForUpsellSessionProcessing(sessionId, 6);
+                }
+
+                if (!sessionProcessed) {
+                    throw new Error('Your payment is still being processed. Please refresh the page in a moment.');
+                }
+
+                if (sessionProcessed && processedKey && typeof window !== 'undefined') {
+                    window.localStorage.setItem(processedKey, '1');
+                }
+            }
+
+            await refreshBookingAfterPortalPayment();
+            await fetchVoucherUpgradeOptions({ silent: true });
+            alert('Payment successful! Your voucher has been upgraded.');
+        } catch (error) {
+            console.error('Customer Portal - Error finalising voucher upgrade payment:', error);
+
+            try {
+                await refreshBookingAfterPortalPayment(2);
+                await fetchVoucherUpgradeOptions({ silent: true });
+            } catch (refreshError) {
+                console.warn('Customer Portal - Booking refresh failed after voucher upgrade:', refreshError);
+            }
+
+            alert(error.response?.data?.message || 'Payment was received, but we could not refresh your voucher automatically. Please reload the page in a few moments.');
         } finally {
             if (typeof window !== 'undefined') {
                 window.history.replaceState({}, document.title, window.location.pathname);
@@ -1079,6 +1216,13 @@ const CustomerPortal = () => {
         !isFullyRefunded &&
         hasScheduledFlightDate
     );
+    const shouldShowVoucherUpgrade = Boolean(
+        voucherUpgradeOptions.length > 0 &&
+        !isFullyRefunded
+    );
+    const voucherUpgradeTitle = voucherUpgradeOptions.length === 1
+        ? `Upgrade to ${voucherUpgradeOptions[0].targetLabel}`
+        : 'Upgrade Voucher';
     const isPrivateChangeLocationBooking = ([
         bookingData?.flight_type,
         bookingData?.experience,
@@ -1101,6 +1245,76 @@ const CustomerPortal = () => {
     const parseAvailabilityNumber = (value, fallback = 0) => {
         const num = Number(value);
         return Number.isFinite(num) ? num : fallback;
+    };
+    const genericBookingVoucherTypes = ['book flight', 'flight voucher', 'gift voucher', 'buy gift', 'buy gift voucher', 'shared', 'shared flight', 'private', 'private flight'];
+    const getAvailabilityFlightTypeParamForPortal = () => {
+        const signals = [
+            bookingData?.flight_type,
+            bookingData?.experience,
+            bookingData?.voucher_type_detail,
+            bookingData?.voucher_type,
+            bookingData?.book_flight
+        ]
+            .map((value) => String(value || '').toLowerCase().trim())
+            .filter(Boolean)
+            .join(' ');
+
+        if (signals.includes('private') || signals.includes('proposal')) return 'Private';
+        if (signals.includes('shared')) return 'Shared';
+        return '';
+    };
+    const getAvailabilityVoucherTypeParamForPortal = () => {
+        const candidates = [
+            bookingData?.voucher_type_detail,
+            bookingData?.voucher?.voucher_type_detail,
+            bookingData?.voucher?.actual_voucher_type,
+            bookingData?.voucher?.voucher_type,
+            bookingData?.voucher_type
+        ];
+
+        for (const candidate of candidates) {
+            const trimmed = String(candidate || '').trim();
+            if (!trimmed) continue;
+            if (genericBookingVoucherTypes.includes(trimmed.toLowerCase())) continue;
+            return trimmed;
+        }
+
+        const signals = [
+            bookingData?.flight_type,
+            bookingData?.experience,
+            bookingData?.voucher_type_detail,
+            bookingData?.voucher_type,
+            bookingData?.book_flight
+        ]
+            .map((value) => String(value || '').toLowerCase().trim())
+            .filter(Boolean)
+            .join(' ');
+
+        if (signals.includes('proposal')) return 'Proposal Flight';
+        if (signals.includes('private') || signals.includes('charter')) return 'Private Charter';
+        return '';
+    };
+    const buildPortalAvailabilityParams = (targetLocation, targetActivityId) => {
+        const params = new URLSearchParams({
+            location: targetLocation,
+            activityId: String(targetActivityId)
+        });
+        const flightTypeParam = getAvailabilityFlightTypeParamForPortal();
+        const voucherTypeParam = getAvailabilityVoucherTypeParamForPortal();
+
+        if (flightTypeParam) params.append('flightType', flightTypeParam);
+        if (voucherTypeParam) params.append('voucherTypes', voucherTypeParam);
+
+        params.append('startDate', dayjs().format('YYYY-MM-DD'));
+        const expiry = bookingData?.expires && dayjs(bookingData.expires).isValid()
+            ? dayjs(bookingData.expires)
+            : null;
+        const endDate = expiry && expiry.isAfter(dayjs(), 'day')
+            ? expiry
+            : dayjs().add(24, 'month');
+        params.append('endDate', endDate.format('YYYY-MM-DD'));
+
+        return params;
     };
     const getRemainingSeatsForChangeLocation = (slot) => {
         if (!slot) return 0;
@@ -1843,6 +2057,71 @@ const CustomerPortal = () => {
                     </Paper>
                 )}
 
+                {shouldShowVoucherUpgrade && (
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            mb: 3,
+                            borderRadius: 4,
+                            border: '1px solid #2e7d32',
+                            background: 'linear-gradient(135deg, rgba(240,253,244,0.97) 0%, rgba(220,252,231,0.97) 100%)'
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                flexDirection: { xs: 'column', md: 'row' },
+                                alignItems: { xs: 'flex-start', md: 'center' },
+                                justifyContent: 'space-between',
+                                gap: 2
+                            }}
+                        >
+                            <Box sx={{ maxWidth: '760px' }}>
+                                <Typography
+                                    variant="h5"
+                                    sx={{
+                                        fontWeight: 700,
+                                        mb: 1,
+                                        color: '#14532d'
+                                    }}
+                                >
+                                    {voucherUpgradeTitle}
+                                </Typography>
+                                <Typography
+                                    variant="body1"
+                                    sx={{
+                                        mb: 1.5,
+                                        color: '#166534'
+                                    }}
+                                >
+                                    {voucherUpgradeContext?.currentLabel || 'Current voucher'} upgrade available from £{Number(voucherUpgradeOptions[0]?.totalCharge || 0).toFixed(2)}.
+                                </Typography>
+                            </Box>
+                            <Button
+                                variant="contained"
+                                onClick={() => setVoucherUpgradeModalOpen(true)}
+                                disabled={submittingVoucherUpgrade || voucherUpgradeLoading}
+                                sx={{
+                                    minWidth: { xs: '100%', md: 220 },
+                                    ...primaryActionButtonSx,
+                                    py: 1.4,
+                                    px: 2.5,
+                                    borderRadius: 2.5,
+                                    fontWeight: 700,
+                                    '&:hover': {
+                                        boxShadow: 'none',
+                                        backgroundColor: actionGreenPalette.hover,
+                                        borderColor: actionGreenPalette.hover
+                                    }
+                                }}
+                            >
+                                {submittingVoucherUpgrade ? 'Redirecting...' : 'Upgrade Voucher'}
+                            </Button>
+                        </Box>
+                    </Paper>
+                )}
+
                 {shouldShowInviteFriends && (
                     <Paper
                         elevation={0}
@@ -2250,6 +2529,19 @@ const CustomerPortal = () => {
                 onSubmit={handleSubmitUpsell}
             />
 
+            <CustomerPortalVoucherUpgradeModal
+                open={voucherUpgradeModalOpen}
+                currentLabel={voucherUpgradeContext?.currentLabel || ''}
+                options={voucherUpgradeOptions}
+                submitting={submittingVoucherUpgrade}
+                onClose={() => {
+                    if (!submittingVoucherUpgrade) {
+                        setVoucherUpgradeModalOpen(false);
+                    }
+                }}
+                onSubmit={handleSubmitVoucherUpgrade}
+            />
+
             {/* Reschedule Flight Modal */}
             <RescheduleFlightModal
                 open={rescheduleModalOpen}
@@ -2432,8 +2724,10 @@ const CustomerPortal = () => {
                                                     if (activityForLocation) {
                                                         setSelectedActivityId(activityForLocation.id);
 
-                                                        // Fetch availabilities for this location
-                                                        const availResponse = await axios.get(`/api/activity/${activityForLocation.id}/availabilities`);
+                                                        // Fetch customer-visible availabilities for this location.
+                                                        // Hidden availability remains in admin, but must not be bookable from the portal.
+                                                        const availabilityParams = buildPortalAvailabilityParams(location, activityForLocation.id);
+                                                        const availResponse = await axios.get(`/api/availabilities/filter?${availabilityParams.toString()}`);
                                                         if (availResponse.data?.success) {
                                                             const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
 

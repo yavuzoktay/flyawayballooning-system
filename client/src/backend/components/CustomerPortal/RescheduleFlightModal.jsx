@@ -506,6 +506,80 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
     };
 
     const voucherWildcardTerms = ['any voucher', 'any vouchers', 'all voucher types', 'all vouchers', 'any', 'all', 'any voucher type', 'any voucher types', 'any voucher option'];
+    const genericBookingVoucherTypes = ['book flight', 'flight voucher', 'gift voucher', 'buy gift', 'buy gift voucher', 'shared', 'shared flight', 'private', 'private flight'];
+
+    const getAvailabilityFlightTypeParam = () => {
+        const signals = [
+            experience,
+            bookingData?.flight_type,
+            bookingData?.experience,
+            bookingData?.voucher_type_detail,
+            bookingData?.voucher_type
+        ]
+            .map((value) => String(value || '').toLowerCase().trim())
+            .filter(Boolean)
+            .join(' ');
+
+        if (signals.includes('private') || signals.includes('proposal')) return 'Private';
+        if (signals.includes('shared')) return 'Shared';
+        return '';
+    };
+
+    const getAvailabilityVoucherTypeParam = () => {
+        const candidates = [
+            bookingData?.voucher_type_detail,
+            bookingData?.voucher?.voucher_type_detail,
+            bookingData?.voucher?.actual_voucher_type,
+            bookingData?.voucher?.voucher_type,
+            voucherType,
+            bookingData?.voucher_type
+        ];
+
+        for (const candidate of candidates) {
+            const trimmed = String(candidate || '').trim();
+            if (!trimmed) continue;
+            if (genericBookingVoucherTypes.includes(trimmed.toLowerCase())) continue;
+            return trimmed;
+        }
+
+        const signals = [
+            experience,
+            bookingData?.flight_type,
+            bookingData?.experience,
+            bookingData?.voucher_type_detail,
+            bookingData?.voucher_type
+        ]
+            .map((value) => String(value || '').toLowerCase().trim())
+            .filter(Boolean)
+            .join(' ');
+
+        if (signals.includes('proposal')) return 'Proposal Flight';
+        if (signals.includes('private') || signals.includes('charter')) return 'Private Charter';
+        return '';
+    };
+
+    const buildPortalAvailabilityParams = (targetLocation, targetActivityId) => {
+        const params = new URLSearchParams({
+            location: targetLocation,
+            activityId: String(targetActivityId)
+        });
+        const flightTypeParam = getAvailabilityFlightTypeParam();
+        const voucherTypeParam = getAvailabilityVoucherTypeParam();
+
+        if (flightTypeParam) params.append('flightType', flightTypeParam);
+        if (voucherTypeParam) params.append('voucherTypes', voucherTypeParam);
+
+        params.append('startDate', dayjs().format('YYYY-MM-DD'));
+        const expiry = bookingData?.expires && dayjs(bookingData.expires).isValid()
+            ? dayjs(bookingData.expires)
+            : null;
+        const endDate = expiry && expiry.isAfter(dayjs(), 'day')
+            ? expiry
+            : dayjs().add(24, 'month');
+        params.append('endDate', endDate.format('YYYY-MM-DD'));
+
+        return params;
+    };
 
     const getLocalDateStr = (date) => {
         const year = date.getFullYear();
@@ -698,7 +772,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                     }
 
                     try {
-                        const availResponse = await axios.get(`/api/activity/${finalActivityId}/availabilities`);
+                        const availabilityParams = buildPortalAvailabilityParams(loc, finalActivityId);
+                        const availResponse = await axios.get(`/api/availabilities/filter?${availabilityParams.toString()}`);
                         if (availResponse.data?.success) {
                             const data = Array.isArray(availResponse.data.data) ? availResponse.data.data : [];
                             // Preserve location on slots (fallback to loc)

@@ -32,6 +32,11 @@ import {
 } from '../utils/additionalInfo';
 import { formatAdminDate, isAdminDateExpired } from '../utils/adminDateUtils';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
+import {
+    isNonUkPhoneNumber,
+    normalizeUkPhoneForSms,
+    recordHasNonUkPhoneNumber
+} from '../utils/phoneRegion';
 
 const SHORT_NOTICE_QUESTION_TEXT = 'Would you like to receive short notice flight availability?';
 
@@ -659,21 +664,14 @@ const BookingPage = () => {
         setSelectedVoucherIds(selectedIds);
     }, []);
 
-    // Clean and normalize UK phone numbers for SMS (E.164: +44 + 10 digits)
-    const cleanPhoneNumber = (raw) => {
-        if (!raw) return '';
-        let s = String(raw).trim().replace(/[\s\-()]/g, '');
-        if (s.startsWith('00')) s = '+' + s.slice(2);
-        if (s.startsWith('44') && !s.startsWith('+')) s = '+' + s;
-        if (s.startsWith('+')) {
-            if (s.startsWith('+44') && s[3] === '0' && /^\+440[0-9]{9,10}$/.test(s)) {
-                return '+44' + s.slice(4).replace(/^0/, '');
-            }
-            return s;
-        }
-        if (s.startsWith('0')) return '+44' + s.slice(1);
-        if (/^7\d{8,9}$/.test(s)) return '+44' + s;
-        return s;
+    const NON_UK_SMS_MESSAGE = 'SMS can only be sent to UK phone numbers. This customer appears to have a non-UK number.';
+
+    // Clean and normalize UK phone numbers for SMS while preserving explicit non-UK numbers for blocking.
+    const cleanPhoneNumber = (raw) => normalizeUkPhoneForSms(raw);
+
+    const isNonUkSmsRecipient = (rawPhone) => {
+        const cleanedPhone = cleanPhoneNumber(rawPhone);
+        return isNonUkPhoneNumber(rawPhone) || isNonUkPhoneNumber(cleanedPhone);
     };
 
     const stripHtml = (input = '') => {
@@ -1264,6 +1262,7 @@ const BookingPage = () => {
         const selectedVoucherIdSet = new Set((selectedVoucherIds || []).map(id => String(id)));
         const isSelectedBookingId = (id) => selectedBookingIdSet.has(String(id));
         const isSelectedVoucherId = (id) => selectedVoucherIdSet.has(String(id));
+        let skipSingleSmsForNonUkNumber = false;
 
         // Check if at least one checkbox is selected
         if (!sendMessageEmailChecked && !sendMessageSmsChecked) {
@@ -1295,32 +1294,44 @@ const BookingPage = () => {
                     : (bookingData.phone || bookingData.mobile || selectedBookingForEmail?.phone || selectedBookingForEmail?.mobile || '');
                 const cleanedPhone = cleanPhoneNumber(phone);
                 
-                if (!cleanedPhone || !cleanedPhone.startsWith('+')) {
+                if (isNonUkSmsRecipient(phone)) {
+                    if (!sendMessageEmailChecked) {
+                        alert(NON_UK_SMS_MESSAGE);
+                        return;
+                    }
+                    skipSingleSmsForNonUkNumber = true;
+                }
+
+                if (!skipSingleSmsForNonUkNumber && (!cleanedPhone || !cleanedPhone.startsWith('+'))) {
                     alert('Recipient phone number is required for SMS. Please ensure the booking has a valid international phone number.');
                     return;
                 }
             }
 
-            // Validate SMS message - accept Message field OR either personalized note field (popup has two: personalNote and smsPersonalNote)
-            const messageValue = smsForm.message || '';
-            const trimmedMessage = messageValue.trim();
-            const trimmedSmsNote = (smsPersonalNote || '').trim();
-            const trimmedSharedNote = (personalNote || '').trim();
-            const effectiveSmsMessage = trimmedMessage || trimmedSmsNote || trimmedSharedNote;
-            
-            if (!effectiveSmsMessage) {
-                console.error('❌ SMS validation failed - message and personal notes are empty or only whitespace');
-                alert('SMS message is required. Please enter a custom message in the Message field, or in the personalized note field below.');
-                return;
+            if (skipSingleSmsForNonUkNumber) {
+                console.warn('🌍 Skipping SMS validation because the selected customer has a non-UK phone number.');
+            } else {
+                // Validate SMS message - accept Message field OR either personalized note field (popup has two: personalNote and smsPersonalNote)
+                const messageValue = smsForm.message || '';
+                const trimmedMessage = messageValue.trim();
+                const trimmedSmsNote = (smsPersonalNote || '').trim();
+                const trimmedSharedNote = (personalNote || '').trim();
+                const effectiveSmsMessage = trimmedMessage || trimmedSmsNote || trimmedSharedNote;
+
+                if (!effectiveSmsMessage) {
+                    console.error('❌ SMS validation failed - message and personal notes are empty or only whitespace');
+                    alert('SMS message is required. Please enter a custom message in the Message field, or in the personalized note field below.');
+                    return;
+                }
+
+                if (trimmedMessage.length === 0 && (trimmedSmsNote || trimmedSharedNote)) {
+                    setSmsForm(prev => ({ ...prev, message: trimmedSmsNote || trimmedSharedNote }));
+                } else if (messageValue !== trimmedMessage) {
+                    setSmsForm(prev => ({ ...prev, message: trimmedMessage }));
+                }
+
+                console.log('✅ SMS validation passed - effective message length:', effectiveSmsMessage.length);
             }
-            
-            if (trimmedMessage.length === 0 && (trimmedSmsNote || trimmedSharedNote)) {
-                setSmsForm(prev => ({ ...prev, message: trimmedSmsNote || trimmedSharedNote }));
-            } else if (messageValue !== trimmedMessage) {
-                setSmsForm(prev => ({ ...prev, message: trimmedMessage }));
-            }
-            
-            console.log('✅ SMS validation passed - effective message length:', effectiveSmsMessage.length);
         }
 
         setSendingEmail(true);
@@ -1483,7 +1494,7 @@ const BookingPage = () => {
             }
 
             // Prepare SMS data if SMS is checked
-            if (sendMessageSmsChecked) {
+            if (sendMessageSmsChecked && !skipSingleSmsForNonUkNumber) {
                 let smsMessage = '';
                 let smsTemplateId = null;
                 const isCustomSmsTemplate = !smsForm.template || smsForm.template === 'custom';
@@ -1586,6 +1597,7 @@ const BookingPage = () => {
                                         : (v.phone || ''));
                                 const cleanedPhone = cleanPhoneNumber(phone);
                                 const voucherId = normalizeVoucherContextId(originalVoucher.id || v.id);
+                                if (isNonUkSmsRecipient(phone)) return null;
                                 if (!voucherId || !cleanedPhone || !cleanedPhone.startsWith('+')) return null;
                                 return { voucherId, to: cleanedPhone };
                             })
@@ -1607,7 +1619,9 @@ const BookingPage = () => {
                         const bookingRecipients = booking
                             .filter(b => isSelectedBookingId(b.id))
                             .map(b => {
-                                const phone = cleanPhoneNumber(b.phone || b.mobile || '');
+                                const rawPhone = b.phone || b.mobile || '';
+                                const phone = cleanPhoneNumber(rawPhone);
+                                if (isNonUkSmsRecipient(rawPhone)) return null;
                                 if (!phone || !phone.startsWith('+')) return null;
                                 return { bookingId: b.id, to: phone };
                             })
@@ -1637,7 +1651,9 @@ const BookingPage = () => {
                         : (bookingData.phone || bookingData.mobile || selectedBookingForEmail?.phone || selectedBookingForEmail?.mobile || '');
                     const cleanedPhone = cleanPhoneNumber(phone);
                     
-                    if (cleanedPhone && cleanedPhone.startsWith('+') && smsMessageToSend && smsMessageToSend.trim().length > 0) {
+                    if (isNonUkSmsRecipient(phone)) {
+                        console.warn('🌍 Skipping SMS for non-UK phone number:', phone);
+                    } else if (cleanedPhone && cleanedPhone.startsWith('+') && smsMessageToSend && smsMessageToSend.trim().length > 0) {
                         // Use bookingDetail.booking if available, otherwise selectedBookingForEmail
                         const dataForApi = bookingDetail?.booking || selectedBookingForEmail || {};
                         
@@ -1999,6 +2015,13 @@ const BookingPage = () => {
                     book_flight: item.book_flight || '', // Add book_flight from getAllVoucherData
                     email: item.email || '',
                     phone: item.phone || '',
+                    mobile: item.mobile || '',
+                    purchaser_phone: item.purchaser_phone || '',
+                    purchaser_mobile: item.purchaser_mobile || '',
+                    recipient_phone: item.recipient_phone || '',
+                    recipient_mobile: item.recipient_mobile || '',
+                    booking_phone: item.booking_phone || '',
+                    is_foreign_customer: recordHasNonUkPhoneNumber(item),
                     expires: item.expires || '',
                     redeemed: item.redeemed || '',
                     paid: item.paid || '',
@@ -2038,7 +2061,7 @@ const BookingPage = () => {
                 flight_type: item.flight_type || "",
                 email: item.email || "",
                 location: item.location || "",
-                date_requested: item.date_requested ? dayjs(item.date_requested).format('DD/MM/YYYY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YYYY') : ""),
+                date_requested: item.date_requested ? dayjs(item.date_requested).format('DD/MM/YY') : (item.created_at ? dayjs(item.created_at).format('DD/MM/YY') : ""),
                 preferred_time: item.preferred_time || "-",
                 id: item.id || "",
                 _original: item
@@ -5561,15 +5584,15 @@ setBookingDetail(finalVoucherDetail);
                                     ? (originalVoucher.recipient_phone || v.phone || '')
                                     : (v.phone || ''));
                             const cleanedPhone = cleanPhoneNumber(phone);
-                            // Accept any phone number that starts with + (international format)
                             const voucherId = normalizeVoucherContextId(originalVoucher.id || v.id);
+                            if (isNonUkSmsRecipient(phone)) return null;
                             if (!voucherId || !cleanedPhone || !cleanedPhone.startsWith('+')) return null;
                             return { voucherId, to: cleanedPhone };
                         })
                         .filter(Boolean);
 
                     if (voucherRecipients.length === 0) {
-                        alert('No valid international phone numbers found for selected vouchers.');
+                        alert('No valid UK phone numbers found for selected vouchers.');
                         setSmsSending(false);
                         return;
                     }
@@ -5582,7 +5605,7 @@ setBookingDetail(finalVoucherDetail);
                         addLink: !!addLink
                     });
 
-                    if (response.data.success) {
+                    if (response.data.success || response.data.partialSuccess) {
                         alert(response.data.message || `SMS sent to ${voucherRecipients.length} vouchers successfully!`);
                         setSmsModalOpen(false);
                         setSmsForm({ to: '', message: '', template: 'custom' });
@@ -5595,8 +5618,9 @@ setBookingDetail(finalVoucherDetail);
                     const bookingRecipients = booking
                         .filter(b => isSelectedBookingId(b.id))
                         .map(b => {
-                            const phone = cleanPhoneNumber(b.phone || b.mobile || '');
-                            // Accept any phone number that starts with + (international format)
+                            const rawPhone = b.phone || b.mobile || '';
+                            const phone = cleanPhoneNumber(rawPhone);
+                            if (isNonUkSmsRecipient(rawPhone)) return null;
                             if (!phone || !phone.startsWith('+')) return null;
                             return { bookingId: b.id, to: phone };
                         })
@@ -5604,7 +5628,7 @@ setBookingDetail(finalVoucherDetail);
                     const recipients = bookingRecipients.map(r => r.to);
 
                     if (recipients.length === 0) {
-                        alert('No valid international phone numbers found for selected bookings.');
+                        alert('No valid UK phone numbers found for selected bookings.');
                         setSmsSending(false);
                         return;
                     }
@@ -5618,8 +5642,8 @@ setBookingDetail(finalVoucherDetail);
                         addLink: !!addLink
                     });
 
-                    if (response.data.success) {
-                        alert(`SMS sent to ${recipients.length} bookings successfully!`);
+                    if (response.data.success || response.data.partialSuccess) {
+                        alert(response.data.message || `SMS sent to ${recipients.length} bookings successfully!`);
                         setSmsModalOpen(false);
                         setSmsForm({ to: '', message: '', template: 'custom' });
                         setSmsPersonalNote('');
@@ -5630,8 +5654,13 @@ setBookingDetail(finalVoucherDetail);
             } else {
                 // Single SMS (booking or voucher)
                 const cleanedPhone = cleanPhoneNumber(smsForm.to);
+                if (isNonUkSmsRecipient(smsForm.to)) {
+                    alert(NON_UK_SMS_MESSAGE);
+                    setSmsSending(false);
+                    return;
+                }
                 if (!cleanedPhone || !cleanedPhone.startsWith('+')) {
-                    alert('Please enter a valid international phone number (must start with +)');
+                    alert('Please enter a valid UK phone number.');
                     setSmsSending(false);
                     return;
                 }
@@ -6419,6 +6448,9 @@ setBookingDetail(finalVoucherDetail);
                                             is_kaleidoscope_booking: isKaleidoscopeBooking(item),
                                             short_notice_opt_out: getShortNoticeAvailabilityOptOut(item),
                                             email: item.email || '',
+                                            phone: item.phone || '',
+                                            mobile: item.mobile || '',
+                                            is_foreign_customer: recordHasNonUkPhoneNumber(item),
                                             flight_type: item.flight_type || '',
                                             voucher_type: (item.voucher_type || '') + (item.season_saver ? ' ☘️' : ''),
                                             location: item.location || '',
@@ -6431,7 +6463,14 @@ setBookingDetail(finalVoucherDetail);
                                             voucher_code: item.voucher_code || '',
                                             flight_attempts: item.flight_attempts ?? 0,
                                             expires: item.expires || '',
-                                            has_refund: item.has_refund || 0
+                                            has_refund: item.has_refund || 0,
+                                            has_weather_refund: bookingHasWeatherRefund({
+                                                booking: item,
+                                                passengers: item.passengers || item.passenger_details || []
+                                            }),
+                                            weather_refund_total_price: item.weather_refund_total_price ?? 0,
+                                            passenger_details: item.passenger_details || item.passengers || [],
+                                            _original: item
                                         }))}
                                         selectable={true}
                                         onSelectionChange={handleBookingSelectionChange}
@@ -6876,13 +6915,20 @@ setBookingDetail(finalVoucherDetail);
                                         return true;
                                     }).map(item => ({
                                         ...item,
+                                        flight_date: item.flight_date || item.booking_flight_date || '',
+                                        has_weather_refund: bookingHasWeatherRefund({
+                                            booking: item,
+                                            passengers: item.passenger_details || item.passengers || []
+                                        }),
+                                        weather_refund_total_price: item.weather_refund_total_price ?? item.booking_weather_refund_total_price ?? 0,
                                         voucher_type: (item.voucher_type || '') + (item.season_saver ? ' ☘️' : ''),
                                         actual_voucher_type: normalizeVoucherTypeLabel(item.actual_voucher_type || ''),
-                                        short_notice_opt_out: getShortNoticeAvailabilityOptOut(item)
+                                        short_notice_opt_out: getShortNoticeAvailabilityOptOut(item),
+                                        is_foreign_customer: recordHasNonUkPhoneNumber(item)
                                     }))}
                                     columns={isMobile
-                                        ? ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
-                                        : ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
+                                        ? ["created", "name", "voucher_type", "actual_voucher_type", "flight_date", "expires", "redeemed", "paid", "voucher_ref"]
+                                        : ["created", "name", "voucher_type", "actual_voucher_type", "flight_date", "expires", "redeemed", "paid", "voucher_ref"]
                                     }
                                     onNameClick={handleNameClick}
                                     onVoucherRefClick={handleVoucherRefClick}
@@ -10042,7 +10088,11 @@ setBookingDetail(finalVoucherDetail);
                                                                 display: 'block',
                                                                 marginBottom: isMobile ? 'inherit' : '4px'
                                                             }}>
-                                                                {payment.payment_status === 'refunded' || payment.origin === 'refund' ? 'Refund Amount' : 'Guest Charge'}
+                                                                {payment.payment_status === 'refunded' || payment.origin === 'refund'
+                                                                    ? 'Refund Amount'
+                                                                    : String(payment.refund_comment || '').toLowerCase().includes('voucher upgrade')
+                                                                        ? 'Voucher Upgrade'
+                                                                        : 'Guest Charge'}
                                                             </Typography>
                                                             <Typography variant="body2" sx={{ 
                                                                 fontWeight: 600,

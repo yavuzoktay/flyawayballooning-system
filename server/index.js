@@ -159,9 +159,9 @@ const ensureStandardEmailLayout = (html = '') => {
     if (!html) return html;
     const lower = html.toLowerCase();
     if (lower.includes('<html') || lower.includes('<body') || lower.includes('data-upcoming-layout')) {
-        return html;
+        return appendSocialFooterToEmailHtml(html);
     }
-    const wrapper = `<div data-upcoming-layout="true" style="font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; font-size:16px; line-height:1.7; color:#1f2937;">${html}</div>`;
+    const wrapper = `<div data-upcoming-layout="true" style="font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; font-size:16px; line-height:1.7; color:#1f2937;">${appendSocialFooterToEmailHtml(html)}</div>`;
     return wrapper;
 };
 
@@ -6654,11 +6654,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
             // Session ID kontrolü - session data var mı kontrol et
             // For extend_voucher type, we don't need bookingData or voucherData
-            if (!storeData.bookingData && !storeData.voucherData && !storeData.extendVoucherData && !storeData.customerPortalUpsellData) {
-                console.log('❌ No booking/voucher/extendVoucher/customerPortalUpsell data found for session:', session_id);
+            if (!storeData.bookingData && !storeData.voucherData && !storeData.extendVoucherData && !storeData.customerPortalUpsellData && !storeData.voucherUpgradeData) {
+                console.log('❌ No booking/voucher/extendVoucher/customerPortalUpsell/voucherUpgrade data found for session:', session_id);
                 console.log('❌ Store data type:', storeData.type);
                 console.log('❌ Store data keys:', Object.keys(storeData));
-                return res.status(400).send('No booking/voucher/extendVoucher/customerPortalUpsell data found');
+                return res.status(400).send('No booking/voucher/extendVoucher/customerPortalUpsell/voucherUpgrade data found');
             }
 
             console.log('🔄 Processing webhook for session:', session_id, 'Type:', storeData.type);
@@ -7002,6 +7002,16 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
                     const upsellResult = await applyCustomerPortalUpsell(session, storeData);
                     console.log('✅ Webhook: Customer portal upsell applied:', upsellResult);
+                    storeData.processed = true;
+                    return res.json({ received: true });
+                } else if (storeData.type === CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE) {
+                    if (storeData.voucherUpgradeData?.applied) {
+                        console.log('Customer portal voucher upgrade already applied for session:', session_id);
+                        return res.json({ received: true });
+                    }
+
+                    const upgradeResult = await applyCustomerPortalVoucherUpgrade(session, storeData);
+                    console.log('✅ Webhook: Customer portal voucher upgrade applied:', upgradeResult);
                     storeData.processed = true;
                     return res.json({ received: true });
                 } else if (storeData.type === 'extend_voucher') {
@@ -8205,10 +8215,20 @@ const inferPrivateCharterPassengersFromPrice = (voucherTitle, location, totalPri
 };
 
 const CUSTOMER_PORTAL_UPSELL_SESSION_TYPE = 'customer_portal_upsell';
+const CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE = 'customer_portal_voucher_upgrade';
 const CUSTOMER_PORTAL_UPSELL_DISCOUNT_RATE = 0.2;
 const CUSTOMER_PORTAL_SINGLE_DISCOUNT_DESCRIPTION = 'Add another passenger to your booking and save 20% on their flight.';
 const INVITE_FRIENDS_DISCOUNT_CODE = 'FLYFAB10';
 const CUSTOMER_PORTAL_ATTEMPT_EXTENSION_THRESHOLD = 6;
+const CUSTOMER_PORTAL_VOUCHER_UPGRADE_LABELS = {
+    weekday_morning: 'Weekday Morning',
+    flexible_weekday: 'Flexible Weekday',
+    any_day_flight: 'Any Day Flight'
+};
+const CUSTOMER_PORTAL_VOUCHER_UPGRADE_RULES = {
+    weekday_morning: ['flexible_weekday', 'any_day_flight'],
+    flexible_weekday: ['any_day_flight']
+};
 const CUSTOMER_PORTAL_FLIGHT_ATTEMPT_NOTIFICATION_DEFAULTS = [
     {
         attempt_bucket: 'attempt_3',
@@ -8271,6 +8291,16 @@ const runPoolQuery = (sql, params = []) => new Promise((resolve, reject) => {
         }
     });
 });
+
+const getExistingTableColumns = async (tableName) => {
+    try {
+        const rows = await runPoolQuery('SHOW COLUMNS FROM ??', [tableName]);
+        return new Set((rows || []).map((row) => row.Field));
+    } catch (error) {
+        console.warn(`Could not inspect table columns for ${tableName}:`, error?.message || error);
+        return new Set();
+    }
+};
 
 const isCustomerPortalSharedBooking = (booking = {}) => {
     const haystack = `${booking.flight_type || ''} ${booking.experience || ''}`.toLowerCase();
@@ -8819,6 +8849,443 @@ const buildCustomerPortalUpsellOffer = async ({
         hasOtherBookings: slotMetrics.hasOtherBookings,
         scheduled: slotMetrics.isScheduled,
         voucherType: effectiveVoucherType
+    };
+};
+
+const normalizeCustomerPortalVoucherUpgradeType = (value) => {
+    const normalized = normalizeVoucherTitle(value);
+    if (!normalized) return null;
+
+    if (normalized.includes('weekday morning')) {
+        return 'weekday_morning';
+    }
+    if (normalized.includes('flexible weekday')) {
+        return 'flexible_weekday';
+    }
+    if (
+        normalized.includes('any day') ||
+        normalized.includes('anyday') ||
+        normalized.includes('anytime')
+    ) {
+        return 'any_day_flight';
+    }
+
+    return null;
+};
+
+const getCustomerPortalVoucherUpgradeLabel = (typeKey) =>
+    CUSTOMER_PORTAL_VOUCHER_UPGRADE_LABELS[typeKey] || '';
+
+const parseVoucherPassengerDetailsCount = (rawValue) => {
+    if (!rawValue) return null;
+
+    let parsed = rawValue;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (typeof parsed !== 'string') break;
+        try {
+            parsed = JSON.parse(parsed);
+        } catch (_) {
+            break;
+        }
+    }
+
+    if (Array.isArray(parsed)) {
+        return parsed.length || null;
+    }
+
+    if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed.passengers)) {
+            return parsed.passengers.length || null;
+        }
+        if (Array.isArray(parsed.passengerData)) {
+            return parsed.passengerData.length || null;
+        }
+        const numericCount = parsePositiveInt(parsed.numberOfPassengers || parsed.passenger_count || parsed.pax);
+        if (numericCount) {
+            return numericCount;
+        }
+    }
+
+    return null;
+};
+
+const resolveCustomerPortalVoucherPassengerCount = ({ booking, voucher, portalBooking }) => {
+    const candidates = [
+        booking?.pax,
+        portalBooking?.pax,
+        voucher?.numberOfPassengers,
+        voucher?.number_of_passengers,
+        voucher?.pax,
+        parseVoucherPassengerDetailsCount(voucher?.voucher_passenger_details),
+        parseVoucherPassengerDetailsCount(portalBooking?.voucher_passenger_details)
+    ];
+
+    for (const candidate of candidates) {
+        const parsed = parsePositiveInt(candidate);
+        if (parsed) {
+            return parsed;
+        }
+    }
+
+    return 1;
+};
+
+const decodeCustomerPortalTokenParts = (token) => {
+    if (!token || typeof token !== 'string') {
+        return [];
+    }
+
+    let decodedToken = token;
+    try {
+        decodedToken = decodeURIComponent(decodedToken);
+    } catch (_) {}
+
+    try {
+        const base64Token = decodedToken.replace(/-/g, '+').replace(/_/g, '/');
+        return Buffer.from(base64Token, 'base64').toString('utf8').split('|');
+    } catch (_) {
+        return [];
+    }
+};
+
+const resolveCustomerPortalVoucherUpgradeContext = async (token, req = null) => {
+    if (!token || typeof token !== 'string') {
+        throw new Error('A valid customer portal token is required.');
+    }
+
+    const internalBaseUrl = process.env.INTERNAL_API_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3002}`;
+    const portalResponse = await axios.get(`${internalBaseUrl}/api/customer-portal-booking/${encodeURIComponent(token)}`);
+    const portalBooking = portalResponse?.data?.data || null;
+
+    if (!portalResponse?.data?.success || !portalBooking) {
+        throw new Error('Booking not found for this customer portal session.');
+    }
+
+    const tokenParts = decodeCustomerPortalTokenParts(token);
+    const tokenFirstPart = String(tokenParts[0] || '').trim();
+    const syntheticVoucherId = tokenFirstPart.startsWith('voucher-')
+        ? parsePositiveInt(tokenFirstPart.replace('voucher-', ''))
+        : null;
+    const tokenVoucherRef = String(tokenParts[1] || '').trim() || null;
+    const voucherRefCandidates = [
+        portalBooking.voucher_ref,
+        portalBooking.voucher_code,
+        tokenVoucherRef
+    ].map((value) => String(value || '').trim()).filter(Boolean);
+    const voucherRef = voucherRefCandidates[0] || null;
+
+    let voucher = null;
+    if (voucherRef) {
+        const voucherRows = await runPoolQuery(
+            'SELECT * FROM all_vouchers WHERE UPPER(voucher_ref) = UPPER(?) LIMIT 1',
+            [voucherRef]
+        );
+        voucher = voucherRows?.[0] || null;
+    }
+    if (!voucher && syntheticVoucherId) {
+        const voucherRows = await runPoolQuery('SELECT * FROM all_vouchers WHERE id = ? LIMIT 1', [syntheticVoucherId]);
+        voucher = voucherRows?.[0] || null;
+    }
+
+    let booking = null;
+    const effectiveVoucherRef = voucher?.voucher_ref || voucherRef;
+    if (effectiveVoucherRef) {
+        const bookingRows = await runPoolQuery(
+            'SELECT * FROM all_booking WHERE UPPER(voucher_code) = UPPER(?) ORDER BY created_at DESC LIMIT 1',
+            [effectiveVoucherRef]
+        );
+        booking = bookingRows?.[0] || null;
+    }
+    if (!booking && portalBooking.id && !portalBooking.is_flight_voucher) {
+        const bookingRows = await runPoolQuery('SELECT * FROM all_booking WHERE id = ? LIMIT 1', [portalBooking.id]);
+        booking = bookingRows?.[0] || null;
+    }
+
+    const currentTypeCandidates = [
+        booking?.voucher_type_detail,
+        booking?.voucher_type,
+        voucher?.voucher_type_detail,
+        voucher?.voucher_type,
+        portalBooking?.voucher_type_detail,
+        portalBooking?.voucher_type
+    ];
+    let currentType = null;
+    let currentTypeRaw = '';
+    for (const candidate of currentTypeCandidates) {
+        const normalizedType = normalizeCustomerPortalVoucherUpgradeType(candidate);
+        if (normalizedType) {
+            currentType = normalizedType;
+            currentTypeRaw = String(candidate || '').trim();
+            break;
+        }
+    }
+
+    const passengerCount = resolveCustomerPortalVoucherPassengerCount({ booking, voucher, portalBooking });
+    const location = (
+        portalBooking.location ||
+        booking?.location ||
+        voucher?.preferred_location ||
+        voucher?.location ||
+        null
+    );
+
+    return {
+        portalBooking,
+        booking,
+        voucher,
+        voucherRef: effectiveVoucherRef || voucherRef,
+        currentType,
+        currentTypeLabel: getCustomerPortalVoucherUpgradeLabel(currentType) || currentTypeRaw,
+        passengerCount,
+        location
+    };
+};
+
+const buildCustomerPortalVoucherUpgradeOptions = async (context) => {
+    if (!context?.currentType) {
+        return [];
+    }
+
+    const targetTypes = CUSTOMER_PORTAL_VOUCHER_UPGRADE_RULES[context.currentType] || [];
+    if (targetTypes.length === 0) {
+        return [];
+    }
+
+    const currentLabel = getCustomerPortalVoucherUpgradeLabel(context.currentType);
+    const currentUnitPrice = await resolveCustomerPortalSharedSeatPrice(currentLabel, context.location);
+    if (!currentUnitPrice || currentUnitPrice <= 0) {
+        return [];
+    }
+
+    const passengerCount = Math.max(1, parsePositiveInt(context.passengerCount) || 1);
+    const options = [];
+
+    for (const targetType of targetTypes) {
+        const targetLabel = getCustomerPortalVoucherUpgradeLabel(targetType);
+        const targetUnitPrice = await resolveCustomerPortalSharedSeatPrice(targetLabel, context.location);
+        if (!targetUnitPrice || targetUnitPrice <= currentUnitPrice) {
+            continue;
+        }
+
+        const totalCharge = roundCurrency((targetUnitPrice - currentUnitPrice) * passengerCount);
+        if (totalCharge <= 0) {
+            continue;
+        }
+
+        options.push({
+            targetType,
+            targetLabel,
+            currentType: context.currentType,
+            currentLabel,
+            currentUnitPrice: roundCurrency(currentUnitPrice),
+            targetUnitPrice: roundCurrency(targetUnitPrice),
+            passengerCount,
+            totalCharge,
+            amountPence: Math.round(totalCharge * 100)
+        });
+    }
+
+    return options;
+};
+
+const updateVoucherUpgradeRecord = async ({
+    tableName,
+    whereSql,
+    whereParams,
+    targetLabel,
+    amount,
+    includeOriginalAmount = false,
+    includePaidAmount = false
+}) => {
+    const columns = await getExistingTableColumns(tableName);
+    if (columns.size === 0) return;
+
+    const setClauses = [];
+    const params = [];
+
+    if (columns.has('voucher_type')) {
+        setClauses.push('voucher_type = ?');
+        params.push(targetLabel);
+    }
+    if (columns.has('voucher_type_detail')) {
+        setClauses.push('voucher_type_detail = ?');
+        params.push(targetLabel);
+    }
+    if (includeOriginalAmount && columns.has('original_amount')) {
+        const bookingTotalExpression = columns.has('due')
+            ? 'COALESCE(paid, 0) + COALESCE(due, 0)'
+            : 'COALESCE(paid, 0)';
+        setClauses.push(`original_amount = ROUND(GREATEST(COALESCE(original_amount, 0), ${bookingTotalExpression}) + ?, 2)`);
+        params.push(amount);
+    }
+    if (tableName === 'all_vouchers') {
+        ['total', 'subtotal', 'original_amount'].forEach((columnName) => {
+            if (columns.has(columnName)) {
+                setClauses.push(`${columnName} = ROUND(GREATEST(COALESCE(${columnName}, 0), COALESCE(paid, 0)) + ?, 2)`);
+                params.push(amount);
+            }
+        });
+    }
+    if (columns.has('paid')) {
+        setClauses.push('paid = ROUND(COALESCE(paid, 0) + ?, 2)');
+        params.push(amount);
+    }
+    if (includePaidAmount && columns.has('paid_amount')) {
+        setClauses.push('paid_amount = ROUND(COALESCE(paid_amount, 0) + ?, 2)');
+        params.push(amount);
+    }
+
+    if (setClauses.length === 0) return;
+
+    await runPoolQuery(
+        `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE ${whereSql}`,
+        [...params, ...whereParams]
+    );
+};
+
+const updateVoucherUpgradePassengerTickets = async ({ bookingId, fromLabel, targetLabel }) => {
+    if (!bookingId) return;
+
+    const passengerColumns = await getExistingTableColumns('passenger');
+    if (!passengerColumns.has('ticket_type')) return;
+
+    const aliases = [
+        fromLabel,
+        `${fromLabel} Flight`,
+        `${fromLabel} Voucher`,
+        normalizeVoucherTitle(fromLabel)
+    ].map((value) => String(value || '').trim().toLowerCase()).filter(Boolean);
+
+    if (aliases.length === 0) return;
+
+    const placeholders = aliases.map(() => '?').join(', ');
+    await runPoolQuery(
+        `
+            UPDATE passenger
+            SET ticket_type = ?
+            WHERE booking_id = ?
+              AND (
+                ticket_type IS NULL
+                OR TRIM(ticket_type) = ''
+                OR LOWER(TRIM(ticket_type)) IN (${placeholders})
+              )
+        `,
+        [targetLabel, bookingId, ...aliases]
+    );
+};
+
+const applyCustomerPortalVoucherUpgrade = async (session, storeData) => {
+    const upgradeData = storeData?.voucherUpgradeData;
+    if (!upgradeData?.token || !upgradeData?.toType) {
+        throw new Error('Customer portal voucher upgrade data is incomplete');
+    }
+
+    if (upgradeData.applied) {
+        return {
+            success: true,
+            bookingId: upgradeData.bookingId || null,
+            voucherId: upgradeData.voucherId || null,
+            mode: 'voucher_upgrade'
+        };
+    }
+
+    const context = await resolveCustomerPortalVoucherUpgradeContext(upgradeData.token);
+    const options = await buildCustomerPortalVoucherUpgradeOptions(context);
+    const targetType = normalizeCustomerPortalVoucherUpgradeType(upgradeData.toType) || upgradeData.toType;
+    const selectedOption = options.find((option) => option.targetType === targetType);
+
+    if (!selectedOption) {
+        throw new Error('This voucher upgrade is no longer available.');
+    }
+
+    const authoritativeAmounts = getAuthoritativeStripeAmounts(session, selectedOption.totalCharge);
+    const paidAmount = roundCurrency(authoritativeAmounts.paidAmount || selectedOption.totalCharge || 0);
+
+    if (paidAmount <= 0) {
+        throw new Error('Invalid voucher upgrade payment amount');
+    }
+
+    const bookingId = context.booking?.id || upgradeData.bookingId || null;
+    const voucherId = context.voucher?.id || upgradeData.voucherId || null;
+    const voucherRef = context.voucherRef || upgradeData.voucherRef || null;
+    const fromLabel = context.currentTypeLabel || upgradeData.fromLabel || selectedOption.currentLabel;
+    const targetLabel = selectedOption.targetLabel || upgradeData.toLabel;
+
+    if (bookingId) {
+        await updateVoucherUpgradeRecord({
+            tableName: 'all_booking',
+            whereSql: 'id = ?',
+            whereParams: [bookingId],
+            targetLabel,
+            amount: paidAmount,
+            includeOriginalAmount: true
+        });
+        await updateVoucherUpgradePassengerTickets({ bookingId, fromLabel, targetLabel });
+    }
+
+    if (voucherId) {
+        await updateVoucherUpgradeRecord({
+            tableName: 'all_vouchers',
+            whereSql: 'id = ?',
+            whereParams: [voucherId],
+            targetLabel,
+            amount: paidAmount
+        });
+    } else if (voucherRef) {
+        await updateVoucherUpgradeRecord({
+            tableName: 'all_vouchers',
+            whereSql: 'UPPER(voucher_ref) = UPPER(?)',
+            whereParams: [voucherRef],
+            targetLabel,
+            amount: paidAmount
+        });
+    }
+
+    if (voucherRef) {
+        await updateVoucherUpgradeRecord({
+            tableName: 'voucher_codes',
+            whereSql: 'UPPER(code) = UPPER(?)',
+            whereParams: [voucherRef],
+            targetLabel,
+            amount: paidAmount,
+            includePaidAmount: true
+        });
+    }
+
+    await savePaymentHistory(session, bookingId || null, voucherId || null, voucherRef || null);
+    await runPoolQuery(
+        'UPDATE payment_history SET refund_comment = ? WHERE stripe_session_id = ?',
+        [`Voucher Upgrade: ${fromLabel} to ${targetLabel}`, session.id]
+    ).catch((error) => {
+        if (error?.code !== 'ER_BAD_FIELD_ERROR') {
+            console.warn('Could not annotate voucher upgrade payment history:', error?.message || error);
+        }
+    });
+
+    storeData.processed = true;
+    storeData.voucherUpgradeData = {
+        ...upgradeData,
+        applied: true,
+        bookingId,
+        booking_id: bookingId,
+        voucherId,
+        voucher_id: voucherId,
+        voucherRef,
+        voucher_ref: voucherRef,
+        fromLabel,
+        toLabel: targetLabel,
+        totalAmount: paidAmount
+    };
+
+    return {
+        success: true,
+        bookingId,
+        voucherId,
+        voucherRef,
+        fromLabel,
+        toLabel: targetLabel,
+        paidAmount,
+        mode: 'voucher_upgrade'
     };
 };
 
@@ -10080,8 +10547,8 @@ app.get('/api/getAllBookingData', (req, res) => {
                 if (/^7\d{9}$/.test(phoneValue)) {
                     return '+44' + phoneValue;
                 }
-                // If no pattern matches, add default country code
-                return `${defaultCountryCode}${phoneValue}`;
+                // If no UK pattern matches, keep the original number so non-UK numbers stay detectable.
+                return phoneValue;
             };
 
             // Priority: 1) passenger table phone with country code, 2) booking phone with country code, 3) infer from pattern
@@ -10129,6 +10596,7 @@ app.get('/api/getAllBookingData', (req, res) => {
                 experience: normalizedExperience,
                 flight_type: normalizedFlightType,
                 phone: rest.phone, // Ensure phone with country code is included
+                is_foreign_customer: isNonUkPhoneNumberForSms(rest.phone),
                 status: finalStatus,
                 voucher_type: finalVoucherType,
                 expires: expiresValue,
@@ -10218,8 +10686,14 @@ app.get('/api/getAllBookingData', (req, res) => {
 
                 // Group passengers by booking_id and calculate weather refund total
                 const weatherRefundByBooking = {};
+                const passengersByBooking = {};
                 const WEATHER_REFUND_PRICE = 47.5;
                 passengersRows.forEach(passenger => {
+                    if (!passengersByBooking[passenger.booking_id]) {
+                        passengersByBooking[passenger.booking_id] = [];
+                    }
+                    passengersByBooking[passenger.booking_id].push(passenger);
+
                     if (!weatherRefundByBooking[passenger.booking_id]) {
                         weatherRefundByBooking[passenger.booking_id] = 0;
                     }
@@ -10719,6 +11193,11 @@ app.get('/api/getAllBookingData', (req, res) => {
 
                         enriched[index].weather_refund_total_price = finalWeatherRefundTotal;
                     }
+
+                    enriched[index].has_weather_refund = bookingHasWeatherRefund(
+                        enriched[index],
+                        passengersByBooking[booking.id] || []
+                    );
                 });
             }
         } catch (error) {
@@ -10746,8 +11225,8 @@ app.get('/api/getAllBookingData', (req, res) => {
             if (/^7\d{9}$/.test(phoneValue)) {
                 return '+44' + phoneValue;
             }
-            // If no pattern matches, add default country code
-            return `${defaultCountryCode}${phoneValue}`;
+            // If no UK pattern matches, keep the original number so non-UK numbers stay detectable.
+            return phoneValue;
         };
 
         // Normalize phone numbers for all bookings one final time
@@ -11021,6 +11500,17 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
                 // OR refunds that reference payments from that session
                 // This prevents showing payments from other bookings that were incorrectly associated with this booking_id
                 if (bookingStripeSessionId) {
+                    const isPortalAdditionalPayment = (payment) => {
+                        const paymentSessionId = payment?.stripe_session_id;
+                        if (!paymentSessionId || paymentSessionId === bookingStripeSessionId) {
+                            return false;
+                        }
+                        const sessionStoreData = stripeSessionStore[paymentSessionId];
+                        return [
+                            CUSTOMER_PORTAL_UPSELL_SESSION_TYPE,
+                            CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE
+                        ].includes(sessionStoreData?.type);
+                    };
                     // Get payment IDs that belong to this booking's session
                     const sessionPaymentIds = new Set(
                         filteredResults
@@ -11037,12 +11527,16 @@ app.get('/api/booking-payment-history/:bookingId', (req, res) => {
                     const refundPayments = filteredResults.filter(p => 
                         p.refunded_payment_id && sessionPaymentIds.has(p.refunded_payment_id)
                     );
+                    const portalAdditionalPayments = filteredResults.filter(isPortalAdditionalPayment);
                     const legacyPayments = filteredResults.filter(p => !p.stripe_session_id);
                     
                     if (sessionPayments.length > 0) {
-                        // If we have session payments, only return those + their refunds
-                        filteredResults = [...sessionPayments, ...refundPayments];
+                        // If we have session payments, return those + their refunds + verified portal add-on payments.
+                        filteredResults = [...sessionPayments, ...refundPayments, ...portalAdditionalPayments];
                         console.log(`[PaymentHistory] Strict filtering: ${results.length} total, ${filteredResults.length} match booking session ${bookingStripeSessionId}`);
+                    } else if (portalAdditionalPayments.length > 0) {
+                        filteredResults = [...portalAdditionalPayments, ...legacyPayments];
+                        console.log(`[PaymentHistory] No primary session payments found, using ${portalAdditionalPayments.length} portal additional payments for booking ${bookingId}`);
                     } else if (legacyPayments.length > 0) {
                         // If no session payments but we have legacy payments, include those (old data)
                         filteredResults = legacyPayments;
@@ -12694,6 +13188,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                v.voucher_passenger_details,
                b.email as booking_email, b.phone as booking_phone,
                b.id as booking_id,
+               b.flight_date as booking_flight_date,
+               COALESCE(b.weather_refund_total_price, 0) as booking_weather_refund_total_price,
                CASE 
                    WHEN b.additional_information_json IS NOT NULL AND b.additional_information_json != 'null' 
                    THEN b.additional_information_json 
@@ -13126,6 +13622,12 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     includePriceFallback: !isPrivateCharterVoucher
                 });
                 const paidDisplay = paidNumber > 0 ? paidNumber.toFixed(2) : '0.00';
+                const voucherHasWeatherRefund = bookingHasWeatherRefund(
+                    {
+                        weather_refund_total_price: row.booking_weather_refund_total_price || row.weather_refund_total_price || 0
+                    },
+                    passengerDetails
+                );
 
                 // Normalize book_flight again at response-build stage to ensure correct labeling
                 // Priority: recipient signals (Gift Voucher) > voucher_type > stored book_flight
@@ -13169,8 +13671,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     if (phoneStr.startsWith('0') || /^7\d{9}$/.test(phoneStr)) {
                         return '+44' + phoneStr.replace(/^0/, '');
                     }
-                    // If no pattern matches, add default country code
-                    return `${defaultCountryCode}${phoneStr}`;
+                    // If no UK pattern matches, keep the original number so non-UK numbers stay detectable.
+                    return phoneStr;
                 };
 
                 // Update phone numbers to include country code if missing
@@ -13198,6 +13700,15 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     purchaser_mobile: ensurePhoneWithCountryCode(row.purchaser_mobile || row.mobile) ?? '',
                     // Recipient information fields (for Gift Vouchers)
                     recipient_phone: recipientPhoneWithCode ?? (row.recipient_phone ?? ''),
+                    is_foreign_customer: [
+                        phoneWithCode,
+                        mobileWithCode,
+                        purchaserPhoneWithCode,
+                        recipientPhoneWithCode,
+                        bookingPhoneWithCode,
+                        row.purchaser_mobile,
+                        row.recipient_mobile
+                    ].some(isNonUkPhoneNumberForSms),
                     expires: expiresVal ? (() => {
                         if (typeof expiresVal === 'string') {
                             const strictSlashDate = moment(
@@ -13261,6 +13772,11 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     booking_email: row.booking_email ?? '',
                     booking_phone: bookingPhoneWithCode ?? '',
                     booking_id: row.booking_id ?? '',
+                    flight_date: row.booking_flight_date || row.flight_date || '',
+                    booking_flight_date: row.booking_flight_date || '',
+                    weather_refund_total_price: row.booking_weather_refund_total_price || row.weather_refund_total_price || 0,
+                    booking_weather_refund_total_price: row.booking_weather_refund_total_price || 0,
+                    has_weather_refund: voucherHasWeatherRefund,
                     passenger_info: row.passenger_info ?? '',
                     passenger_count: row.passenger_count ?? 0,
                     passenger_details: passengerDetails, // Add parsed passenger details
@@ -22020,6 +22536,152 @@ app.post('/api/customer-portal-extend-voucher', async (req, res) => {
     }
 });
 
+app.get('/api/customer-portal-voucher-upgrade-options/:token', async (req, res) => {
+    const { token } = req.params;
+
+    try {
+        const context = await resolveCustomerPortalVoucherUpgradeContext(token, req);
+        const options = await buildCustomerPortalVoucherUpgradeOptions(context);
+
+        return res.json({
+            success: true,
+            data: {
+                eligible: options.length > 0,
+                currentType: context.currentType,
+                currentLabel: context.currentTypeLabel,
+                passengerCount: context.passengerCount,
+                location: context.location,
+                voucherRef: context.voucherRef,
+                options
+            }
+        });
+    } catch (error) {
+        console.error('Customer Portal - Error loading voucher upgrade options:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to load voucher upgrade options.'
+        });
+    }
+});
+
+app.post('/api/customer-portal-voucher-upgrade/create-session', async (req, res) => {
+    const { token, targetType } = req.body || {};
+
+    if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, message: 'A valid customer portal token is required.' });
+    }
+
+    if (!targetType || typeof targetType !== 'string') {
+        return res.status(400).json({ success: false, message: 'Please select a voucher upgrade option.' });
+    }
+
+    if (!stripeSecretKey) {
+        return res.status(500).json({ success: false, message: 'Stripe configuration error: Secret key not found' });
+    }
+
+    try {
+        const context = await resolveCustomerPortalVoucherUpgradeContext(token, req);
+        const options = await buildCustomerPortalVoucherUpgradeOptions(context);
+        const normalizedTargetType = normalizeCustomerPortalVoucherUpgradeType(targetType) || targetType;
+        const selectedOption = options.find((option) => option.targetType === normalizedTargetType);
+
+        if (!selectedOption) {
+            return res.status(400).json({ success: false, message: 'This voucher upgrade is no longer available.' });
+        }
+
+        const totalPrice = roundCurrency(selectedOption.totalCharge || 0);
+        const amount = Math.round(totalPrice * 100);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid voucher upgrade amount.' });
+        }
+
+        const isProd = process.env.NODE_ENV === 'production';
+        const reqOrigin = (req.headers && (req.headers.origin || req.headers.referer)) || '';
+        let derivedOrigin = '';
+
+        if (reqOrigin) {
+            const match = String(reqOrigin).match(/^https?:\/\/[^/]+/);
+            if (match) {
+                derivedOrigin = match[0];
+            }
+        }
+
+        const baseUrl = process.env.CHECKOUT_RETURN_BASE_URL || derivedOrigin || (isProd ? 'https://flyawayballooning-system.com' : 'http://localhost:3000');
+        const sessionMetadata = {
+            type: CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE,
+            booking_id: context.booking?.id ? String(context.booking.id) : '',
+            voucher_id: context.voucher?.id ? String(context.voucher.id) : '',
+            voucher_ref: context.voucherRef || '',
+            from_voucher_type: selectedOption.currentLabel || context.currentTypeLabel || '',
+            to_voucher_type: selectedOption.targetLabel || '',
+            passenger_count: String(selectedOption.passengerCount || context.passengerCount || 1),
+            session_id: 'PLACEHOLDER'
+        };
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'GBP',
+                        product_data: {
+                            name: 'Voucher Upgrade',
+                            description: `${selectedOption.currentLabel} to ${selectedOption.targetLabel}`
+                        },
+                        unit_amount: amount
+                    },
+                    quantity: 1
+                }
+            ],
+            mode: 'payment',
+            success_url: `${baseUrl}/customerPortal/${token}?payment=success&session_id={CHECKOUT_SESSION_ID}&type=${CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE}`,
+            cancel_url: `${baseUrl}/customerPortal/${token}`,
+            allow_promotion_codes: false,
+            metadata: sessionMetadata
+        });
+
+        stripeSessionStore[session.id] = {
+            type: CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE,
+            totalPrice,
+            voucherUpgradeData: {
+                token,
+                bookingId: context.booking?.id || null,
+                voucherId: context.voucher?.id || null,
+                voucherRef: context.voucherRef || null,
+                fromType: selectedOption.currentType,
+                fromLabel: selectedOption.currentLabel,
+                toType: selectedOption.targetType,
+                toLabel: selectedOption.targetLabel,
+                passengerCount: selectedOption.passengerCount,
+                currentUnitPrice: selectedOption.currentUnitPrice,
+                targetUnitPrice: selectedOption.targetUnitPrice,
+                totalAmount: totalPrice,
+                optionSnapshot: selectedOption
+            }
+        };
+
+        await stripe.checkout.sessions.update(session.id, {
+            metadata: {
+                ...sessionMetadata,
+                session_id: session.id
+            }
+        });
+
+        return res.json({
+            success: true,
+            sessionId: session.id,
+            sessionUrl: session.url
+        });
+    } catch (error) {
+        console.error('Customer Portal - Error creating voucher upgrade checkout session:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to create payment session for the voucher upgrade.'
+        });
+    }
+});
+
 app.post('/api/customer-portal-upsell/create-session', async (req, res) => {
     const { token, offerMode, passengers } = req.body || {};
 
@@ -22248,6 +22910,13 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
             }
         }
 
+        const targetActivityId = activity_id || booking.activity_id;
+        await assertAvailabilityVisibleForBooking({
+            activityId: targetActivityId,
+            flightDate: flight_date,
+            booking
+        });
+
         // Update booking
         const updateSql = `
             UPDATE all_booking
@@ -22260,7 +22929,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
         `;
 
         await new Promise((resolve, reject) => {
-            con.query(updateSql, [flight_date, location || booking.location, activity_id || booking.activity_id, flight_date, bookingId], (err, result) => {
+            con.query(updateSql, [flight_date, location || booking.location, targetActivityId, flight_date, bookingId], (err, result) => {
                 if (err) {
                     console.error('Error updating booking:', err);
                     reject(err);
@@ -22686,7 +23355,7 @@ app.patch('/api/customer-portal-reschedule/:bookingId', async (req, res) => {
         res.json(response);
     } catch (error) {
         console.error('❌ Customer Portal Reschedule - Error:', error);
-        res.status(500).json({
+        res.status(error.statusCode || 500).json({
             success: false,
             message: 'Failed to reschedule flight',
             error: error.message
@@ -24960,6 +25629,275 @@ const subtractHiddenAvailabilityTypes = (visibleValues, hiddenValues) =>
         if (isAvailabilityAllToken(value)) return true;
         return !availabilityTypeListContains(hiddenValues, value);
     });
+
+const GENERIC_BOOKING_VOUCHER_TYPES = new Set([
+    'book flight',
+    'flight voucher',
+    'gift voucher',
+    'buy gift',
+    'buy gift voucher',
+    'shared',
+    'shared flight',
+    'private',
+    'private flight'
+]);
+
+const normalizeAvailabilityFlightTypeForRequest = (value) => {
+    const normalized = normalizeAvailabilityTypeValue(value);
+    if (!normalized) return null;
+    if (normalized.includes('private') || normalized.includes('proposal')) return 'Private';
+    if (normalized.includes('shared')) return 'Shared';
+    return String(value).trim();
+};
+
+const normalizeAvailabilityVoucherTypeForRequest = (value) => {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return null;
+    const normalized = normalizeAvailabilityTypeValue(trimmed);
+    if (GENERIC_BOOKING_VOUCHER_TYPES.has(normalized)) return null;
+    return trimmed;
+};
+
+const getAvailabilityVisibilityContextForBooking = (booking = {}) => {
+    const flightType = normalizeAvailabilityFlightTypeForRequest(
+        booking.flight_type || booking.experience || booking.flight_type_source
+    );
+
+    let voucherType = [
+        booking.voucher_type_detail,
+        booking.actual_voucher_type,
+        booking.voucher_type
+    ]
+        .map(normalizeAvailabilityVoucherTypeForRequest)
+        .find(Boolean) || null;
+
+    if (!voucherType) {
+        const combinedSignals = [
+            booking.flight_type,
+            booking.experience,
+            booking.voucher_type_detail,
+            booking.actual_voucher_type,
+            booking.voucher_type,
+            booking.book_flight
+        ]
+            .map((value) => normalizeAvailabilityTypeValue(value))
+            .filter(Boolean)
+            .join(' ');
+
+        if (combinedSignals.includes('proposal')) {
+            voucherType = 'Proposal Flight';
+        } else if (combinedSignals.includes('private') || combinedSignals.includes('charter')) {
+            voucherType = 'Private Charter';
+        }
+    }
+
+    return { flightType, voucherType };
+};
+
+const resolveAvailabilityVisibilityContextForBooking = async (booking = {}) => {
+    const context = getAvailabilityVisibilityContextForBooking(booking);
+    if (context.flightType && context.voucherType) {
+        return context;
+    }
+
+    const voucherCandidates = [];
+    const flightCandidates = [];
+
+    const pushVisibilityCandidates = (row = {}) => {
+        voucherCandidates.push(
+            row.voucher_type_detail,
+            row.actual_voucher_type,
+            row.voucher_type,
+            row.code_voucher_type
+        );
+        flightCandidates.push(
+            row.experience_type,
+            row.flight_type,
+            row.book_flight
+        );
+    };
+
+    const voucherCode = booking.voucher_code || booking.voucher_ref || booking.vc_code;
+    if (voucherCode) {
+        try {
+            const [voucherRows] = await con.promise().query(
+                `
+                SELECT
+                    voucher_type,
+                    voucher_type_detail,
+                    experience_type,
+                    book_flight
+                FROM all_vouchers
+                WHERE UPPER(voucher_ref) = UPPER(?)
+                   OR UPPER(vc_code) = UPPER(?)
+                ORDER BY id DESC
+                LIMIT 1
+                `,
+                [voucherCode, voucherCode]
+            );
+            if (voucherRows && voucherRows.length > 0) {
+                pushVisibilityCandidates(voucherRows[0]);
+            }
+        } catch (err) {
+            console.warn('Availability visibility lookup: failed to resolve all_vouchers data:', err?.message || err);
+        }
+    }
+
+    if (booking.id) {
+        try {
+            const [usageRows] = await con.promise().query(
+                `
+                SELECT
+                    vc.voucher_type AS code_voucher_type,
+                    av.voucher_type,
+                    av.voucher_type_detail,
+                    av.experience_type,
+                    av.book_flight
+                FROM voucher_code_usage vcu
+                INNER JOIN voucher_codes vc
+                    ON vc.id = vcu.voucher_code_id
+                LEFT JOIN all_vouchers av
+                    ON UPPER(av.voucher_ref) = UPPER(vc.code)
+                WHERE vcu.booking_id = ?
+                ORDER BY vcu.used_at DESC, vcu.id DESC
+                LIMIT 1
+                `,
+                [booking.id]
+            );
+            if (usageRows && usageRows.length > 0) {
+                pushVisibilityCandidates(usageRows[0]);
+            }
+        } catch (err) {
+            console.warn('Availability visibility lookup: failed to resolve voucher_code_usage data:', err?.message || err);
+        }
+    }
+
+    return {
+        flightType: context.flightType || flightCandidates.map(normalizeAvailabilityFlightTypeForRequest).find(Boolean) || null,
+        voucherType: context.voucherType || voucherCandidates.map(normalizeAvailabilityVoucherTypeForRequest).find(Boolean) || null
+    };
+};
+
+const isAvailabilityHiddenForRequest = (row = {}, { flightType, voucherType } = {}) => {
+    const requestedFlightTypes = flightType ? parseAvailabilityTypeList(flightType) : [];
+    const requestedVoucherTypes = voucherType ? parseAvailabilityTypeList(voucherType) : [];
+    const hiddenFlightTypesArray = parseAvailabilityTypeList(row.hidden_flight_types);
+    const hiddenVoucherTypesArray = parseAvailabilityTypeList(row.hidden_voucher_types);
+
+    const requestedFlightTypeIsHidden =
+        requestedFlightTypes.length > 0 &&
+        requestedFlightTypes.some((requestedType) =>
+            availabilityTypeListContains(hiddenFlightTypesArray, requestedType)
+        );
+    const requestedVoucherTypeIsHidden =
+        requestedVoucherTypes.length > 0 &&
+        requestedVoucherTypes.some((requestedType) =>
+            availabilityTypeListContains(hiddenVoucherTypesArray, requestedType)
+        );
+
+    const rawFlightTypesArray = parseAvailabilityTypeList(row.flight_types, { preserveAll: true });
+    const rawVoucherTypesArray = parseAvailabilityTypeList(row.voucher_types, { preserveAll: true });
+    const flightTypesAreAll = rawFlightTypesArray.length === 1 && isAvailabilityAllToken(rawFlightTypesArray[0]);
+    const voucherTypesAreAll = rawVoucherTypesArray.length === 1 && isAvailabilityAllToken(rawVoucherTypesArray[0]);
+    const visibleFlightTypesArray = flightTypesAreAll
+        ? rawFlightTypesArray
+        : subtractHiddenAvailabilityTypes(rawFlightTypesArray, hiddenFlightTypesArray);
+    const visibleVoucherTypesArray = voucherTypesAreAll
+        ? rawVoucherTypesArray
+        : subtractHiddenAvailabilityTypes(rawVoucherTypesArray, hiddenVoucherTypesArray);
+    const hasNoVisibleConfiguredFlightTypes =
+        !flightTypesAreAll &&
+        rawFlightTypesArray.length > 0 &&
+        visibleFlightTypesArray.length === 0;
+    const hasNoVisibleConfiguredVoucherTypes =
+        !voucherTypesAreAll &&
+        rawVoucherTypesArray.length > 0 &&
+        visibleVoucherTypesArray.length === 0;
+
+    return (
+        requestedFlightTypeIsHidden ||
+        requestedVoucherTypeIsHidden ||
+        (hasNoVisibleConfiguredFlightTypes &&
+            (rawVoucherTypesArray.length === 0 || hasNoVisibleConfiguredVoucherTypes))
+    );
+};
+
+const parseAvailabilityDateTimeForValidation = (flightDate, explicitTime = null) => {
+    const parsedDate = moment(
+        flightDate,
+        [moment.ISO_8601, 'YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DD HH:mm', 'YYYY-MM-DDTHH:mm:ss', 'YYYY-MM-DDTHH:mm'],
+        true
+    );
+    const fallbackDate = parsedDate.isValid() ? parsedDate : moment(flightDate);
+    if (!fallbackDate.isValid()) {
+        return { date: null, time: null };
+    }
+
+    const date = fallbackDate.format('YYYY-MM-DD');
+    const parsedTime = explicitTime
+        ? moment(`2000-01-01 ${explicitTime}`, ['YYYY-MM-DD HH:mm:ss', 'YYYY-MM-DD HH:mm', 'YYYY-MM-DD h:mm A'], true)
+        : null;
+    const time = parsedTime && parsedTime.isValid()
+        ? parsedTime.format('HH:mm')
+        : fallbackDate.format('HH:mm');
+
+    return { date, time };
+};
+
+const assertAvailabilityVisibleForBooking = async ({
+    activityId,
+    flightDate,
+    time,
+    booking
+}) => {
+    const numericActivityId = Number(activityId);
+    const { date, time: timeKey } = parseAvailabilityDateTimeForValidation(flightDate, time);
+    if (!Number.isFinite(numericActivityId) || numericActivityId <= 0 || !date || !timeKey) {
+        const err = new Error('Availability slot could not be validated.');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const [rows] = await con.promise().query(
+        `
+        SELECT
+            id,
+            activity_id,
+            date,
+            time,
+            flight_types,
+            voucher_types,
+            hidden_flight_types,
+            hidden_voucher_types
+        FROM activity_availability
+        WHERE activity_id = ?
+          AND DATE(date) = ?
+          AND COALESCE(
+              TIME_FORMAT(TIME(time), '%H:%i'),
+              TIME_FORMAT(STR_TO_DATE(time, '%H:%i:%s'), '%H:%i'),
+              TIME_FORMAT(STR_TO_DATE(time, '%H:%i'), '%H:%i'),
+              TIME_FORMAT(STR_TO_DATE(time, '%h:%i %p'), '%H:%i')
+          ) = ?
+        LIMIT 1
+        `,
+        [numericActivityId, date, timeKey]
+    );
+
+    if (!rows || rows.length === 0) {
+        const err = new Error('Availability slot not found.');
+        err.statusCode = 404;
+        throw err;
+    }
+
+    const visibilityContext = await resolveAvailabilityVisibilityContextForBooking(booking);
+    if (isAvailabilityHiddenForRequest(rows[0], visibilityContext)) {
+        const err = new Error('This flight date is no longer available for your booking type. Please choose another date.');
+        err.statusCode = 409;
+        throw err;
+    }
+
+    return rows[0];
+};
 
 // Create Availabilities for an activity
 app.post('/api/activity/:id/availabilities', (req, res) => {
@@ -31258,6 +32196,13 @@ app.post('/api/createBookingFromSession', async (req, res) => {
                     message: 'customer portal upsell already applied'
                 });
             }
+            if (type === CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE && storeData.voucherUpgradeData?.applied) {
+                return res.json({
+                    success: true,
+                    id: storeData.voucherUpgradeData.booking_id || storeData.voucherUpgradeData.voucher_id || null,
+                    message: 'customer portal voucher upgrade already applied'
+                });
+            }
         }
 
         let result;
@@ -32019,6 +32964,42 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             } finally {
                 storeData.processing = false;
             }
+        } else if (type === CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE && storeData.voucherUpgradeData) {
+            if (storeData.processing) {
+                for (let i = 0; i < 10; i++) {
+                    if (!storeData.processing) break;
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+
+                if (storeData.processed && storeData.voucherUpgradeData?.applied) {
+                    return res.json({
+                        success: true,
+                        id: storeData.voucherUpgradeData.booking_id || storeData.voucherUpgradeData.voucher_id || null,
+                        message: 'customer portal voucher upgrade already applied'
+                    });
+                }
+
+                if (storeData.processing) {
+                    return res.status(202).json({ success: false, message: 'Customer portal voucher upgrade is already being processed' });
+                }
+            }
+
+            let stripeSession = null;
+            try {
+                stripeSession = await stripe.checkout.sessions.retrieve(session_id);
+            } catch (error) {
+                console.warn('Could not fetch Stripe session for customer portal voucher upgrade fallback:', error?.message);
+            }
+
+            storeData.processing = true;
+            try {
+                const resolvedSession = stripeSession || await stripe.checkout.sessions.retrieve(session_id);
+                const upgradeResult = await applyCustomerPortalVoucherUpgrade(resolvedSession, storeData);
+                result = upgradeResult.bookingId || upgradeResult.voucherId || null;
+                storeData.processed = true;
+            } finally {
+                storeData.processing = false;
+            }
         } else {
             return res.status(400).json({ success: false, message: 'Invalid type or missing data' });
         }
@@ -32034,6 +33015,8 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             finalVoucherCode = storeData.voucherData?.generated_voucher_code || null;
         } else if (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE) {
             finalVoucherCode = null;
+        } else if (type === CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE) {
+            finalVoucherCode = storeData.voucherUpgradeData?.voucherRef || storeData.voucherUpgradeData?.voucher_ref || null;
         }
 
         console.log('=== FINAL RESPONSE DEBUG ===');
@@ -32073,8 +33056,8 @@ app.post('/api/createBookingFromSession', async (req, res) => {
             customer_email: bookingResponseExtras?.customer_email || storeData.voucherData?.email || storeData.bookingData?.passengerData?.[0]?.email || null,
             customer_phone: bookingResponseExtras?.customer_phone || storeData.voucherData?.phone || storeData.voucherData?.purchaser_phone || storeData.bookingData?.passengerData?.[0]?.phone || null,
             paid_amount: bookingResponseExtras?.paid_amount ?? getAuthoritativePaidAmountFromSessionStore(storeData) ?? null,
-            voucher_type: storeData.voucherData?.voucher_type || (type === 'booking' ? 'Book Flight' : (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE ? 'Customer Portal Upsell' : null)),
-            voucher_type_detail: bookingResponseExtras?.voucher_type_detail || storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || storeData.customerPortalUpsellData?.voucherType || null,
+            voucher_type: storeData.voucherData?.voucher_type || (type === 'booking' ? 'Book Flight' : (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE ? 'Customer Portal Upsell' : (type === CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE ? 'Voucher Upgrade' : null))),
+            voucher_type_detail: bookingResponseExtras?.voucher_type_detail || storeData.voucherData?.voucher_type_detail || storeData.bookingData?.selectedVoucherType?.title || storeData.customerPortalUpsellData?.voucherType || storeData.voucherUpgradeData?.toLabel || null,
             experience_type: bookingResponseExtras?.experience_type || (type === CUSTOMER_PORTAL_UPSELL_SESSION_TYPE
                 ? (storeData.customerPortalUpsellData?.offerSnapshot?.mode === 'private_upgrade' ? 'private' : 'shared')
                 : ((storeData.bookingData?.chooseFlightType?.type || storeData.voucherData?.flight_type || '').toLowerCase().includes('private') ? 'private' : 'shared')),
@@ -33593,6 +34576,29 @@ const runDatabaseMigrations = () => {
             console.error('Error creating payment_history table:', err);
         } else {
             console.log('✅ payment_history table ready');
+            const ensurePaymentHistoryColumn = (columnName, definition) => {
+                con.query(`SHOW COLUMNS FROM payment_history LIKE ?`, [columnName], (checkErr, rows) => {
+                    if (checkErr) {
+                        console.error(`Error checking payment_history.${columnName} column:`, checkErr);
+                        return;
+                    }
+                    if (rows && rows.length > 0) {
+                        return;
+                    }
+                    con.query(`ALTER TABLE payment_history ADD COLUMN ${columnName} ${definition}`, (alterErr) => {
+                        if (alterErr) {
+                            console.error(`Error adding payment_history.${columnName} column:`, alterErr);
+                        } else {
+                            console.log(`✅ payment_history.${columnName} column added successfully`);
+                        }
+                    });
+                });
+            };
+
+            ensurePaymentHistoryColumn('voucher_id', "INT NULL COMMENT 'Reference to all_vouchers.id'");
+            ensurePaymentHistoryColumn('voucher_ref', "VARCHAR(255) NULL COMMENT 'Voucher reference/code for voucher-linked payments'");
+            ensurePaymentHistoryColumn('refund_comment', "TEXT NULL COMMENT 'Refund note or payment context'");
+            ensurePaymentHistoryColumn('refunded_payment_id', "INT NULL COMMENT 'Original payment_history id for refund records'");
         }
     });
 
@@ -34163,8 +35169,14 @@ app.get('/api/session-status', (req, res) => {
     const result = { processed, type: data?.type || null };
 
     // When processed, include conversion_data so frontend can fire gtag conversion (webhook may have run first)
-    // Skip extend_voucher and customer portal upsell - not primary purchase conversions
-    if (processed && data && data.type !== 'extend_voucher' && data.type !== CUSTOMER_PORTAL_UPSELL_SESSION_TYPE) {
+    // Skip extend_voucher and customer portal upgrade/upsell payments - not primary purchase conversions
+    if (
+        processed &&
+        data &&
+        data.type !== 'extend_voucher' &&
+        data.type !== CUSTOMER_PORTAL_UPSELL_SESSION_TYPE &&
+        data.type !== CUSTOMER_PORTAL_VOUCHER_UPGRADE_SESSION_TYPE
+    ) {
         const source = data.bookingData || data.voucherData || {};
         const chooseFlightType = source.chooseFlightType || {};
         const flightTypeStr = (chooseFlightType.type || '').toLowerCase();
@@ -35936,6 +36948,61 @@ function escapeHtml(unsafe) {
         .replace(/'/g, '&#039;');
 }
 
+const SOCIAL_LINKS = [
+    {
+        label: 'Facebook',
+        url: 'https://www.facebook.com/flyawayballooning',
+        path: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2m13 2h-2.5A3.5 3.5 0 0 0 12 8.5V11h-2v3h2v7h3v-7h3v-3h-3V9a1 1 0 0 1 1-1h2V5z'
+    },
+    {
+        label: 'Instagram',
+        url: 'https://www.instagram.com/flyawayballooning',
+        path: 'M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8 1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3z'
+    },
+    {
+        label: 'TikTok',
+        url: 'https://www.tiktok.com/@flyawayballooning',
+        path: 'M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25h-3.13v12.9a2.85 2.85 0 1 1-2.85-3.12c.31 0 .61.04.9.14V9.17a6.01 6.01 0 0 0-.9-.07A6 6 0 1 0 15.82 15V8.46a8 8 0 0 0 4.69 1.51V6.69h-.92Z'
+    },
+    {
+        label: 'YouTube',
+        url: 'https://www.youtube.com/channel/UCYJtQ_ah8mdR4wgsPXsL8eg',
+        path: 'M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z'
+    }
+];
+
+function buildSocialLinksHtml() {
+    return `
+    <div data-social-footer="true" style="margin-top:32px; text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto; border-collapse:separate; border-spacing:10px 0;">
+            <tr>
+                ${SOCIAL_LINKS.map(({ label, url, path }) => `
+                    <td align="center" style="padding:0;">
+                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" style="display:inline-block; width:40px; height:40px; line-height:40px; text-align:center; background:#f1f3f6; border:1px solid #edf0f4; border-radius:999px; color:#0f172a; text-decoration:none;">
+                            <svg aria-hidden="true" focusable="false" width="21" height="21" viewBox="0 0 24 24" style="display:inline-block; width:21px; height:21px; margin-top:9px; vertical-align:top;">
+                                <path fill="#0f172a" d="${path}" />
+                            </svg>
+                        </a>
+                    </td>
+                `).join('')}
+            </tr>
+        </table>
+    </div>`;
+}
+
+function appendSocialFooterToEmailHtml(html = '') {
+    if (!html || String(html).includes('data-social-footer="true"')) {
+        return html;
+    }
+
+    const socialFooterHtml = buildSocialLinksHtml();
+    if (/<\/body>/i.test(html)) {
+        return String(html).replace(/<\/body>/i, `${socialFooterHtml}</body>`);
+    }
+
+    return `${html}${socialFooterHtml}`;
+}
+
 // Helper function to format date and time (matches frontend formatDateTime)
 function formatDateTime(value) {
     if (!value) return null;
@@ -35973,6 +37040,7 @@ function buildMinimalEmailDocument({ subject = '', bodyHtml = '' }) {
         <div style="font-size:16px; line-height:1.7; color:#1f2937;">
             ${bodyHtml}
         </div>
+        ${buildSocialLinksHtml()}
     </div>
 </body>
 </html>`;
@@ -37375,6 +38443,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                 ${footerLinks.map(({ label, url }) => `<a href="${url}" style="font-size:14px; color:#1976d2; text-decoration:none; margin:0 8px;">${escapeHtml(label)}</a>`).join('')}
            </div>`
         : '';
+    const socialFooterHtml = buildSocialLinksHtml();
 
     const highlightSection = highlightHtml
         ? `<div style="background:#e8e7ff; border-radius:12px; padding:16px 18px; margin-bottom:24px; color:#4338ca; font-size:15px; line-height:1.5;">${highlightHtml}</div>`
@@ -37636,6 +38705,7 @@ function buildEmailLayout({ subject, headline = '', heroImage, highlightHtml = '
                                 ${signatureHtml}
                             </div>
                             ${footerHtml}
+                            ${socialFooterHtml}
                         </td>
                     </tr>
                 </table>
@@ -41724,6 +42794,9 @@ app.post('/api/sendVoucherSms', async (req, res) => {
             return res.status(400).json({ success: false, message: 'to and body required' });
         }
         const effectiveTo = normalizeUkPhoneForTwilio(String(to).trim());
+        if (isNonUkPhoneNumberForSms(to) || isNonUkPhoneNumberForSms(effectiveTo)) {
+            return res.status(400).json(getNonUkSmsSkipResponse(effectiveTo || to));
+        }
 
         // Fetch voucher data to replace placeholders
         let voucher = voucherData && typeof voucherData === 'object' ? voucherData : {};
@@ -42022,6 +43095,9 @@ app.post('/api/sendBookingSms', async (req, res) => {
                 effectiveTo = '+44' + after44.replace(/^0/, '');
             }
         }
+        if (isNonUkPhoneNumberForSms(toTrimmed) || isNonUkPhoneNumberForSms(effectiveTo)) {
+            return res.status(400).json(getNonUkSmsSkipResponse(effectiveTo || toTrimmed));
+        }
         if (effectiveTo.length < 12) {
             return res.status(400).json({ success: false, message: 'Invalid or incomplete phone number. Please update the booking with a full UK number (e.g. 07563035823).' });
         }
@@ -42150,12 +43226,22 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
             ? bookingRecipients
             : fallbackRecipients;
 
+        const skippedForeignRecipients = [];
         const normalizedRecipients = Array.from(new Map(
             preparedRecipients
                 .map((recipient) => {
                     const bookingId = recipient?.bookingId || recipient?.id || '';
-                    const phone = normalizeUkPhoneForTwilio(String(recipient?.to || '').trim());
+                    const rawPhone = String(recipient?.to || '').trim();
+                    const phone = normalizeUkPhoneForTwilio(rawPhone);
                     if (!phone) return null;
+                    if (isNonUkPhoneNumberForSms(rawPhone) || isNonUkPhoneNumberForSms(phone)) {
+                        skippedForeignRecipients.push({
+                            bookingId: bookingId || null,
+                            phone,
+                            error: 'Skipped: non-UK phone number'
+                        });
+                        return null;
+                    }
                     const key = bookingId ? `${bookingId}:${phone}` : phone;
                     return [key, { bookingId, to: phone }];
                 })
@@ -42165,7 +43251,10 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
         if (normalizedRecipients.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: 'No valid recipient phone numbers'
+                message: skippedForeignRecipients.length > 0
+                    ? 'No valid UK recipient phone numbers'
+                    : 'No valid recipient phone numbers',
+                failures: skippedForeignRecipients.length > 0 ? skippedForeignRecipients : undefined
             });
         }
 
@@ -42196,7 +43285,7 @@ app.post('/api/sendBulkBookingSms', async (req, res) => {
         }
 
         let successCount = 0;
-        const failures = [];
+        const failures = [...skippedForeignRecipients];
 
         // Fetch booking data by explicit recipient mapping. Phone-number matching is
         // intentionally avoided because shared or edited numbers can point at the wrong booking.
@@ -42324,12 +43413,22 @@ app.post('/api/sendBulkVoucherSms', async (req, res) => {
             ? voucherRecipients
             : fallbackRecipients;
 
+        const skippedForeignRecipients = [];
         const normalizedRecipients = Array.from(new Map(
             preparedRecipients
                 .map((recipient) => {
                     const voucherContextId = normalizeVoucherContextId(recipient?.voucherId || recipient?.id);
-                    const phone = normalizeUkPhoneForTwilio(String(recipient?.to || '').trim());
+                    const rawPhone = String(recipient?.to || '').trim();
+                    const phone = normalizeUkPhoneForTwilio(rawPhone);
                     if (!voucherContextId || !phone) return null;
+                    if (isNonUkPhoneNumberForSms(rawPhone) || isNonUkPhoneNumberForSms(phone)) {
+                        skippedForeignRecipients.push({
+                            voucherId: voucherContextId || null,
+                            phone,
+                            error: 'Skipped: non-UK phone number'
+                        });
+                        return null;
+                    }
                     return [`${voucherContextId}:${phone}`, {
                         voucherId: voucherContextId,
                         to: phone
@@ -42341,7 +43440,10 @@ app.post('/api/sendBulkVoucherSms', async (req, res) => {
         if (normalizedRecipients.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: 'No valid voucher phone numbers were provided'
+                message: skippedForeignRecipients.length > 0
+                    ? 'No valid UK voucher phone numbers were provided'
+                    : 'No valid voucher phone numbers were provided',
+                failures: skippedForeignRecipients.length > 0 ? skippedForeignRecipients : undefined
             });
         }
 
@@ -42434,7 +43536,7 @@ app.post('/api/sendBulkVoucherSms', async (req, res) => {
         );
 
         const successes = [];
-        const failures = [];
+        const failures = [...skippedForeignRecipients];
         results.forEach((result, index) => {
             const recipient = normalizedRecipients[index];
             if (result.status === 'fulfilled') {
@@ -42479,24 +43581,50 @@ app.post('/api/sendBulkVoucherSms', async (req, res) => {
 // Helper function to clean phone numbers (remove whitespace, dashes, parentheses) but keep international format
 function cleanPhoneNumber(raw) {
     if (!raw) return '';
-    let s = String(raw).trim();
-    // Replace whitespace, dashes, parentheses
-    s = s.replace(/[\s\-()]/g, '');
-    // Convert leading 00 to +
-    if (s.startsWith('00')) s = '+' + s.slice(2);
-    return s; // Return cleaned phone number as-is (no country code assumption)
+    return normalizeUkPhoneForTwilio(raw);
 }
 
 // Normalize UK +440... to +447... (E.164) for Twilio
 function normalizeUkPhoneForTwilio(phone) {
     if (!phone) return phone;
-    let s = String(phone).trim().replace(/[\s\-()]/g, '');
+    let s = String(phone).trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
     if (s.startsWith('00')) s = '+' + s.slice(2);
     if (s.startsWith('44') && !s.startsWith('+')) s = '+' + s;
     if (s.startsWith('+44') && s[3] === '0' && /^\+440[0-9]{9,10}$/.test(s)) {
         return '+44' + s.slice(4).replace(/^0/, '');
     }
+    if (s.startsWith('0')) return '+44' + s.slice(1);
+    if (/^7\d{8,9}$/.test(s)) return '+44' + s;
     return s;
+}
+
+function isUkSmsPhoneNumber(phone) {
+    const normalizedPhone = normalizeUkPhoneForTwilio(phone);
+    return /^\+44\d{9,10}$/.test(normalizedPhone || '');
+}
+
+function isNonUkPhoneNumberForSms(phone) {
+    if (!phone) return false;
+    const compactPhone = String(phone).trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');
+    if (!compactPhone) return false;
+    if (isUkSmsPhoneNumber(compactPhone)) return false;
+    if (compactPhone.startsWith('+44') || compactPhone.startsWith('0044')) return false;
+
+    const internationalNumber = compactPhone.startsWith('+') || compactPhone.startsWith('00');
+    if (internationalNumber) return true;
+
+    const digits = compactPhone.replace(/\D/g, '');
+    if (digits.startsWith('44') && digits.length >= 11) return false;
+    if (digits.startsWith('0') || /^7\d{8,9}$/.test(digits)) return false;
+    return digits.length >= 8;
+}
+
+function getNonUkSmsSkipResponse(phone) {
+    return {
+        success: false,
+        message: 'SMS can only be sent to UK phone numbers. This customer appears to have a non-UK number.',
+        phone
+    };
 }
 
 // Automatic SMS sending function (similar to sendAutomaticBookingConfirmationEmail)
@@ -42579,6 +43707,10 @@ async function sendAutomaticBookingConfirmationSms(bookingId) {
             const normalizedPhone = cleanPhoneNumber(phoneNumber);
             if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
                 console.warn('⚠️ [sendAutomaticBookingConfirmationSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
+                return;
+            }
+            if (isNonUkPhoneNumberForSms(phoneNumber) || isNonUkPhoneNumberForSms(normalizedPhone)) {
+                console.log('🌍 [sendAutomaticBookingConfirmationSms] Skipping SMS for non-UK phone number:', normalizedPhone);
                 return;
             }
 
@@ -42732,6 +43864,10 @@ async function sendAutomaticGiftVoucherConfirmationSms(voucherId, purchasingCont
             const normalizedPhone = cleanPhoneNumber(phoneNumber);
             if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
                 console.warn('⚠️ [sendAutomaticGiftVoucherConfirmationSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
+                return;
+            }
+            if (isNonUkPhoneNumberForSms(phoneNumber) || isNonUkPhoneNumberForSms(normalizedPhone)) {
+                console.log('🌍 [sendAutomaticGiftVoucherConfirmationSms] Skipping SMS for non-UK phone number:', normalizedPhone);
                 return;
             }
 
@@ -42902,6 +44038,10 @@ async function sendAutomaticBookingConfirmationSms(bookingId) {
                 console.warn('⚠️ [sendAutomaticBookingConfirmationSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
                 return;
             }
+            if (isNonUkPhoneNumberForSms(phoneNumber) || isNonUkPhoneNumberForSms(normalizedPhone)) {
+                console.log('🌍 [sendAutomaticBookingConfirmationSms] Skipping SMS for non-UK phone number:', normalizedPhone);
+                return;
+            }
 
             console.log('📋 [sendAutomaticBookingConfirmationSms] Booking found:', {
                 id: booking.id,
@@ -43065,6 +44205,10 @@ async function sendAutomaticBookingRescheduledSms(bookingId) {
                 console.warn('⚠️ [sendAutomaticBookingRescheduledSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
                 return;
             }
+            if (isNonUkPhoneNumberForSms(phoneNumber) || isNonUkPhoneNumberForSms(normalizedPhone)) {
+                console.log('🌍 [sendAutomaticBookingRescheduledSms] Skipping SMS for non-UK phone number:', normalizedPhone);
+                return;
+            }
 
             console.log('📋 [sendAutomaticBookingRescheduledSms] Booking found:', {
                 id: booking.id,
@@ -43171,6 +44315,10 @@ async function sendAutomaticBookingRescheduledSms(bookingId) {
                 const normalizedPhone = cleanPhoneNumber(phoneNumber);
                 if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
                     console.warn('⚠️ [sendAutomaticBookingRescheduledSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
+                    return;
+                }
+                if (isNonUkPhoneNumberForSms(phoneNumber) || isNonUkPhoneNumberForSms(normalizedPhone)) {
+                    console.log('🌍 [sendAutomaticBookingRescheduledSms] Skipping SMS for non-UK phone number:', normalizedPhone);
                     return;
                 }
 
@@ -43318,6 +44466,10 @@ async function sendAutomaticFlightVoucherConfirmationSms(voucherId, purchasingCo
             const normalizedPhone = cleanPhoneNumber(phoneNumber);
             if (!normalizedPhone || !normalizedPhone.startsWith('+')) {
                 console.warn('⚠️ [sendAutomaticFlightVoucherConfirmationSms] Invalid international phone number:', phoneNumber, 'cleaned:', normalizedPhone);
+                return;
+            }
+            if (isNonUkPhoneNumberForSms(phoneNumber) || isNonUkPhoneNumberForSms(normalizedPhone)) {
+                console.log('🌍 [sendAutomaticFlightVoucherConfirmationSms] Skipping SMS for non-UK phone number:', normalizedPhone);
                 return;
             }
 

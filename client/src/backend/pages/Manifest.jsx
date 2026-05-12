@@ -7938,7 +7938,11 @@ const Manifest = () => {
                                                     </Grid>
                                                     <Grid item xs={6}>
                                                         <Typography variant="caption" color="text.secondary">
-                                                            {payment.payment_status === 'refunded' || payment.origin === 'refund' ? 'Refund Amount' : 'Guest Charge'}
+                                                            {payment.payment_status === 'refunded' || payment.origin === 'refund'
+                                                                ? 'Refund Amount'
+                                                                : String(payment.refund_comment || '').toLowerCase().includes('voucher upgrade')
+                                                                    ? 'Voucher Upgrade'
+                                                                    : 'Guest Charge'}
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ 
                                                             fontWeight: 600,

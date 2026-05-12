@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 import { useTheme, useMediaQuery } from "@mui/material";
 import { formatAdminDate, isAdminDateExpired } from "../../utils/adminDateUtils";
+import { bookingHasWeatherRefund } from "../../utils/weatherRefund";
+import { recordHasNonUkPhoneNumber } from "../../utils/phoneRegion";
 
 const PaginatedTable = ({
     data,
@@ -42,6 +44,64 @@ const PaginatedTable = ({
     const OPT_OUT_EMOJI = '📵';
     const NEWT_EMOJI = '🦎';
     const KALEIDOSCOPE_EMOJI = '🌈';
+    const WEATHER_REFUND_EMOJI = '🌧️';
+    const FOREIGN_CUSTOMER_EMOJI = '🌍';
+
+    const getPassengerDetailsForWeatherRefund = (item) => {
+        if (Array.isArray(item?.passenger_details)) return item.passenger_details;
+        if (Array.isArray(item?.passengers)) return item.passengers;
+        if (Array.isArray(item?._original?.passenger_details)) return item._original.passenger_details;
+        if (Array.isArray(item?._original?.passengers)) return item._original.passengers;
+        return [];
+    };
+
+    const hasWeatherRefundIndicator = (item) => {
+        if (!item) return false;
+
+        const passengers = getPassengerDetailsForWeatherRefund(item);
+        const originalPassengers = getPassengerDetailsForWeatherRefund(item?._original);
+
+        return (
+            bookingHasWeatherRefund({ booking: item, passengers }) ||
+            bookingHasWeatherRefund({ booking: item?._original, passengers: originalPassengers.length ? originalPassengers : passengers })
+        );
+    };
+
+    const renderFlightDateWithWeatherRefund = (flightDateContent, item) => {
+        if (!flightDateContent || flightDateContent === '-') return flightDateContent;
+        if (!hasWeatherRefundIndicator(item)) return flightDateContent;
+
+        return (
+            <span
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    maxWidth: '100%',
+                    minWidth: 0
+                }}
+            >
+                <span
+                    style={{
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    {flightDateContent}
+                </span>
+                <span
+                    role="img"
+                    aria-label="Weather refundable"
+                    title="Weather refundable"
+                    style={{ flex: '0 0 auto', lineHeight: 1 }}
+                >
+                    {WEATHER_REFUND_EMOJI}
+                </span>
+            </span>
+        );
+    };
 
     const getDisplayNameParts = (item, key) => {
         const rawName = (item?.[key] || '').toString();
@@ -49,18 +109,21 @@ const PaginatedTable = ({
         const hasOptOutEmojiInText = rawName.includes(OPT_OUT_EMOJI);
         const hasNewtEmojiInText = rawName.includes(NEWT_EMOJI);
         const hasKaleidoscopeEmojiInText = rawName.includes(KALEIDOSCOPE_EMOJI);
+        const hasForeignCustomerEmojiInText = rawName.includes(FOREIGN_CUSTOMER_EMOJI);
         const shouldShowOptOutEmoji = Boolean(item?.short_notice_opt_out) || hasOptOutEmojiInText;
         const shouldShowNewtEmoji = Boolean(item?.is_newt_booking) || hasNewtEmojiInText;
         const shouldShowKaleidoscopeEmoji = Boolean(item?.is_kaleidoscope_booking) || hasKaleidoscopeEmojiInText;
+        const shouldShowForeignCustomerEmoji = recordHasNonUkPhoneNumber(item) || hasForeignCustomerEmojiInText;
 
         // Remove inline status markers from the text part so they are always rendered consistently.
         const nameText = rawName
             .replaceAll(OPT_OUT_EMOJI, '')
             .replaceAll(NEWT_EMOJI, '')
             .replaceAll(KALEIDOSCOPE_EMOJI, '')
+            .replaceAll(FOREIGN_CUSTOMER_EMOJI, '')
             .trim();
 
-        return { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji, shouldShowKaleidoscopeEmoji };
+        return { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji, shouldShowKaleidoscopeEmoji, shouldShowForeignCustomerEmoji };
     };
 
     const getColLabel = (col) => {
@@ -651,7 +714,13 @@ const PaginatedTable = ({
                                                         }}>
                                                             {id === 'name' ? (
                                                                 (() => {
-                                                                    const { nameText, shouldShowOptOutEmoji, shouldShowNewtEmoji, shouldShowKaleidoscopeEmoji } = getDisplayNameParts(item, id);
+                                                                    const {
+                                                                        nameText,
+                                                                        shouldShowOptOutEmoji,
+                                                                        shouldShowNewtEmoji,
+                                                                        shouldShowKaleidoscopeEmoji,
+                                                                        shouldShowForeignCustomerEmoji
+                                                                    } = getDisplayNameParts(item, id);
 
                                                                     // Keep the name clickable without the browser-style underline.
                                                                     const nameSpanStyles = {
@@ -698,7 +767,7 @@ const PaginatedTable = ({
                                                                             >
                                                                                 {nameText}
                                                                             </span>
-                                                                            {(shouldShowKaleidoscopeEmoji || shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
+                                                                            {(shouldShowKaleidoscopeEmoji || shouldShowNewtEmoji || shouldShowOptOutEmoji || shouldShowForeignCustomerEmoji) && (
                                                                                 <span style={nameIndicatorStyles}>
                                                                                     {shouldShowKaleidoscopeEmoji && (
                                                                                         <span role="img" aria-label="Kaleidoscope booking" title="Kaleidoscope booking" style={emojiStyles}>
@@ -713,6 +782,11 @@ const PaginatedTable = ({
                                                                                     {shouldShowOptOutEmoji && (
                                                                                         <span role="img" aria-label="Short notice availability opt-out" title="Short notice availability opt-out" style={emojiStyles}>
                                                                                             {OPT_OUT_EMOJI}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {shouldShowForeignCustomerEmoji && (
+                                                                                        <span role="img" aria-label="Non-UK phone number" title="Non-UK phone number" style={emojiStyles}>
+                                                                                            {FOREIGN_CUSTOMER_EMOJI}
                                                                                         </span>
                                                                                     )}
                                                                                 </span>
@@ -741,7 +815,7 @@ const PaginatedTable = ({
                                                                             >
                                                                                 {nameText}
                                                                             </span>
-                                                                            {(shouldShowKaleidoscopeEmoji || shouldShowNewtEmoji || shouldShowOptOutEmoji) && (
+                                                                            {(shouldShowKaleidoscopeEmoji || shouldShowNewtEmoji || shouldShowOptOutEmoji || shouldShowForeignCustomerEmoji) && (
                                                                                 <span style={nameIndicatorStyles}>
                                                                                     {shouldShowKaleidoscopeEmoji && (
                                                                                         <span role="img" aria-label="Kaleidoscope booking" title="Kaleidoscope booking" style={emojiStyles}>
@@ -756,6 +830,11 @@ const PaginatedTable = ({
                                                                                     {shouldShowOptOutEmoji && (
                                                                                         <span role="img" aria-label="Short notice availability opt-out" title="Short notice availability opt-out" style={emojiStyles}>
                                                                                             {OPT_OUT_EMOJI}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {shouldShowForeignCustomerEmoji && (
+                                                                                        <span role="img" aria-label="Non-UK phone number" title="Non-UK phone number" style={emojiStyles}>
+                                                                                            {FOREIGN_CUSTOMER_EMOJI}
                                                                                         </span>
                                                                                     )}
                                                                                 </span>
@@ -868,7 +947,7 @@ const PaginatedTable = ({
                                                 (() => {
                                                     if (item.flight_date_display !== undefined) {
                                                         if (item.flight_date_display === '-') return '-';
-                                                        return item.flight_date_display;
+                                                        return renderFlightDateWithWeatherRefund(item.flight_date_display, item);
                                                     }
                                                     if (item[id] === '-') return '-';
                                                     if (!item[id]) return '';
@@ -901,7 +980,7 @@ const PaginatedTable = ({
                                                             const displayDateTime = `${dayStr}/${monthStr}/${yearStr} ${timeString}`;
                                                             
                                                             
-                                                            return (
+                                                            return renderFlightDateWithWeatherRefund(
                                                                 <a
                                                                     href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
                                                                     style={{ color: '#2d69c5', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '14px', fontFamily: "'Gilroy', sans-serif" }}
@@ -909,7 +988,8 @@ const PaginatedTable = ({
                                                                     rel="noopener noreferrer"
                                                                 >
                                                                     {displayDateTime}
-                                                                </a>
+                                                                </a>,
+                                                                item
                                                             );
                                                         }
                                                         
@@ -959,7 +1039,7 @@ const PaginatedTable = ({
                                                         const urlDate = `${year}-${month}-${day}`;
                                                         const displayDateTime = timeString ? `${day}/${month}/${year} ${timeString}` : `${day}/${month}/${year}`;
                                                         
-                                                        return (
+                                                        return renderFlightDateWithWeatherRefund(
                                                             <a
                                                                 href={`https://flyawayballooning-system.com/manifest?date=${urlDate}`}
                                                                 style={{ color: '#2d69c5', textDecoration: 'none', cursor: 'pointer', fontWeight: 'normal', fontSize: '14px', fontFamily: "'Gilroy', sans-serif" }}
@@ -967,7 +1047,8 @@ const PaginatedTable = ({
                                                                 rel="noopener noreferrer"
                                                             >
                                                                 {displayDateTime}
-                                                            </a>
+                                                            </a>,
+                                                            item
                                                         );
                                                     } catch (e) {
                                                         console.error('Flight date parsing error:', e, item[id]);
@@ -977,12 +1058,21 @@ const PaginatedTable = ({
                                             ) : id === 'date_requested' ? (
                                                 (() => {
                                                     if (!item[id]) return '';
-                                                    let isoString = item[id].includes('T') ? item[id] : item[id].replace(' ', 'T');
+                                                    const rawValue = String(item[id]).trim();
+                                                    const ukDateMatch = rawValue.match(/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})(?:\s.*)?$/);
+                                                    if (ukDateMatch) {
+                                                        return `${ukDateMatch[1]}/${ukDateMatch[2]}/${ukDateMatch[3].slice(-2)}`;
+                                                    }
+                                                    const isoDateOnlyMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                                                    if (isoDateOnlyMatch) {
+                                                        return `${isoDateOnlyMatch[3]}/${isoDateOnlyMatch[2]}/${isoDateOnlyMatch[1].slice(-2)}`;
+                                                    }
+                                                    let isoString = rawValue.includes('T') ? rawValue : rawValue.replace(' ', 'T');
                                                     const date = new Date(isoString);
                                                     if (isNaN(date.getTime())) return String(item[id]);
                                                     const day = String(date.getDate()).padStart(2, '0');
                                                     const month = String(date.getMonth() + 1).padStart(2, '0');
-                                                    const year = date.getFullYear();
+                                                    const year = String(date.getFullYear()).slice(-2);
                                                     return `${day}/${month}/${year}`;
                                                 })()
                                             ) : id === 'expires' ? (

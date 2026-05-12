@@ -271,6 +271,46 @@ const escapeHtml = (unsafe = '') => {
         .replace(/'/g, '&#039;');
 };
 
+const SOCIAL_LINKS = [
+    {
+        label: 'Facebook',
+        url: 'https://www.facebook.com/flyawayballooning',
+        path: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2m13 2h-2.5A3.5 3.5 0 0 0 12 8.5V11h-2v3h2v7h3v-7h3v-3h-3V9a1 1 0 0 1 1-1h2V5z'
+    },
+    {
+        label: 'Instagram',
+        url: 'https://www.instagram.com/flyawayballooning',
+        path: 'M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8 1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3z'
+    },
+    {
+        label: 'TikTok',
+        url: 'https://www.tiktok.com/@flyawayballooning',
+        path: 'M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25h-3.13v12.9a2.85 2.85 0 1 1-2.85-3.12c.31 0 .61.04.9.14V9.17a6.01 6.01 0 0 0-.9-.07A6 6 0 1 0 15.82 15V8.46a8 8 0 0 0 4.69 1.51V6.69h-.92Z'
+    },
+    {
+        label: 'YouTube',
+        url: 'https://www.youtube.com/channel/UCYJtQ_ah8mdR4wgsPXsL8eg',
+        path: 'M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z'
+    }
+];
+
+const buildSocialLinksHtml = () => `
+    <div data-social-footer="true" style="margin-top:32px; text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto; border-collapse:separate; border-spacing:10px 0;">
+            <tr>
+                ${SOCIAL_LINKS.map(({ label, url, path }) => `
+                    <td align="center" style="padding:0;">
+                        <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}" style="display:inline-block; width:40px; height:40px; line-height:40px; text-align:center; background:#f1f3f6; border:1px solid #edf0f4; border-radius:999px; color:#0f172a; text-decoration:none;">
+                            <svg aria-hidden="true" focusable="false" width="21" height="21" viewBox="0 0 24 24" style="display:inline-block; width:21px; height:21px; margin-top:9px; vertical-align:top;">
+                                <path fill="#0f172a" d="${path}" />
+                            </svg>
+                        </a>
+                    </td>
+                `).join('')}
+            </tr>
+        </table>
+    </div>`;
+
 export const appendCustomerPortalLinkToEmailHtml = (html = '', booking = {}, linkText = 'Customer Portal') => {
     const portalLink = getCustomerPortalLink(booking);
     if (!portalLink) {
@@ -452,6 +492,7 @@ const buildEmailLayout = ({
                         .join('')}
                </div>`
             : '';
+    const socialFooterHtml = buildSocialLinksHtml();
 
     const highlightSection = normalizedHighlightHtml
         ? `<div style="background:#e8e7ff; border-radius:12px; padding:16px 18px; margin-bottom:24px; color:#4338ca; font-size:15px; line-height:1.5;">
@@ -545,6 +586,8 @@ const buildEmailLayout = ({
                             <div style="font-size:16px; line-height:1.7; color:#1f2937; margin-top:24px;">
                                 ${signatureHtml}
                             </div>
+                            ${footerHtml}
+                            ${socialFooterHtml}
                         </td>
                     </tr>
                 </table>
@@ -981,10 +1024,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             bodyHtml: bodyHtmlWithPrompts,
             customerName,
             signatureLines: [],
-            footerLinks: [
-                { label: 'Instagram', url: 'https://www.instagram.com/flyawayballooning' },
-                { label: 'Facebook', url: 'https://www.facebook.com/flyawayballooning' }
-            ]
+            footerLinks: []
         });
     },
     'Flight Voucher Confirmation': ({ template, booking }) => {
