@@ -25687,7 +25687,61 @@ const normalizeAvailabilityVoucherTypeForRequest = (value) => {
     if (!trimmed) return null;
     const normalized = normalizeAvailabilityTypeValue(trimmed);
     if (GENERIC_BOOKING_VOUCHER_TYPES.has(normalized)) return null;
+
+    const withoutAudiencePrefix = normalized
+        .replace(/^(shared|private)\s*-\s*/i, '')
+        .trim();
+
+    if (withoutAudiencePrefix.includes('weekday morning')) {
+        return 'Weekday Morning';
+    }
+    if (withoutAudiencePrefix.includes('flexible weekday')) {
+        return 'Flexible Weekday';
+    }
+    if (
+        withoutAudiencePrefix.includes('any day') ||
+        withoutAudiencePrefix.includes('anytime') ||
+        withoutAudiencePrefix.includes('any time')
+    ) {
+        return 'Any Day Flight';
+    }
+    if (withoutAudiencePrefix.includes('proposal')) {
+        return 'Proposal Flight';
+    }
+    if (withoutAudiencePrefix.includes('private') || withoutAudiencePrefix.includes('charter')) {
+        return 'Private Charter';
+    }
+
     return trimmed;
+};
+
+const expandAvailabilityVoucherTypesForRequest = (value) => {
+    const seen = new Set();
+    const expanded = [];
+
+    const add = (candidate) => {
+        const normalized = normalizeAvailabilityVoucherTypeForRequest(candidate);
+        if (!normalized) return;
+        const key = normalizeAvailabilityTypeValue(normalized);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        expanded.push(normalized);
+    };
+
+    parseAvailabilityTypeList(value).forEach((item) => {
+        add(item);
+
+        const rawKey = normalizeAvailabilityTypeValue(item);
+        const cleanedRawKey = rawKey.replace(/^(shared|private)\s*-\s*/i, '').trim();
+        if (!GENERIC_BOOKING_VOUCHER_TYPES.has(cleanedRawKey)) {
+            if (!seen.has(cleanedRawKey)) {
+                seen.add(cleanedRawKey);
+                expanded.push(String(item).trim());
+            }
+        }
+    });
+
+    return expanded;
 };
 
 const getAvailabilityVisibilityContextForBooking = (booking = {}) => {
@@ -26500,7 +26554,7 @@ app.get('/api/availabilities/filter', (req, res) => {
         ? parseAvailabilityTypeList(normalizedFlightType)
         : [];
     const requestedVoucherTypes = voucherTypes && voucherTypes !== 'All'
-        ? parseAvailabilityTypeList(voucherTypes)
+        ? expandAvailabilityVoucherTypesForRequest(voucherTypes)
         : [];
 
     if (normalizedFlightType && normalizedFlightType !== 'All') {
@@ -26512,9 +26566,6 @@ app.get('/api/availabilities/filter', (req, res) => {
     }
 
     if (voucherTypes && voucherTypes !== 'All') {
-        // Parse voucherTypes to handle comma-separated values and trim whitespace
-        const requestedVoucherTypes = parseList(voucherTypes).map(vt => vt.trim());
-        
         if (requestedVoucherTypes.length > 0) {
             // Build conditions for each requested voucher type
             // Use both FIND_IN_SET (for exact match in comma-separated list) and LIKE (for substring match)

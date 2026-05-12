@@ -1073,6 +1073,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                     ? '#f0f0f0'
                                 : isBlockedBySeason
                                     ? '#f0f0f0'
+                                : !hasAnySlots
+                                    ? '#f0f0f0'
                                 : soldOut
                                     ? '#888'
                                     : '#22c55e',  // Green for available dates (like Change Flight Location)
@@ -1083,6 +1085,8 @@ const RescheduleFlightModal = ({ open, onClose, bookingData, onRescheduleSuccess
                                 : isAfterExpiry
                                     ? '#999'
                                 : isBlockedBySeason
+                                    ? '#999'
+                                : !hasAnySlots
                                     ? '#999'
                                 : soldOut
                                     ? '#fff'
