@@ -24324,6 +24324,400 @@ app.get('/api/analytics', async (req, res) => {
         if (!name || value <= 0) return;
         map[name] = roundCurrencyAmount((map[name] || 0) + value);
     };
+    const isRefundedGrossSalesStatus = (value = '') => {
+        const status = normalizeAnalyticsStatus(value);
+        return status === 'refund' || status === 'refunded';
+    };
+    const createGrossSalesMetric = () => ({
+        revenue: 0,
+        count: 0
+    });
+    const createGrossSalesBreakdown = () => ({
+        total: createGrossSalesMetric(),
+        private: createGrossSalesMetric(),
+        shared: createGrossSalesMetric()
+    });
+    const finalizeGrossSalesBreakdown = (breakdown) => ({
+        total: {
+            revenue: roundCurrencyAmount(breakdown.total.revenue),
+            count: Number(breakdown.total.count) || 0
+        },
+        private: {
+            revenue: roundCurrencyAmount(breakdown.private.revenue),
+            count: Number(breakdown.private.count) || 0
+        },
+        shared: {
+            revenue: roundCurrencyAmount(breakdown.shared.revenue),
+            count: Number(breakdown.shared.count) || 0
+        }
+    });
+    const calculateGrossSalesPercentChange = (current, comparison) => {
+        const currentValue = Number(current) || 0;
+        const comparisonValue = Number(comparison) || 0;
+        if (comparisonValue === 0) return currentValue === 0 ? 0 : null;
+        return Math.round(((currentValue - comparisonValue) / comparisonValue) * 1000) / 10;
+    };
+    const buildGrossSalesComparisonMetric = (currentMetric, comparisonMetric) => ({
+        revenue: roundCurrencyAmount(comparisonMetric?.revenue || 0),
+        count: Number(comparisonMetric?.count || 0),
+        revenueDelta: roundCurrencyAmount((currentMetric?.revenue || 0) - (comparisonMetric?.revenue || 0)),
+        revenueDeltaPercent: calculateGrossSalesPercentChange(currentMetric?.revenue || 0, comparisonMetric?.revenue || 0),
+        countDelta: (Number(currentMetric?.count || 0) - Number(comparisonMetric?.count || 0)),
+        countDeltaPercent: calculateGrossSalesPercentChange(currentMetric?.count || 0, comparisonMetric?.count || 0)
+    });
+    const buildGrossSalesComparison = (currentBreakdown, comparisonBreakdown, range) => ({
+        range,
+        total: buildGrossSalesComparisonMetric(currentBreakdown.total, comparisonBreakdown.total),
+        private: buildGrossSalesComparisonMetric(currentBreakdown.private, comparisonBreakdown.private),
+        shared: buildGrossSalesComparisonMetric(currentBreakdown.shared, comparisonBreakdown.shared)
+    });
+    const buildGrossSalesRanges = () => {
+        const today = moment();
+        const todayDate = today.format('YYYY-MM-DD');
+        const currentDayOfMonth = today.date();
+        const previousMonthStart = today.clone().subtract(1, 'month').startOf('month');
+        const previousMonthEnd = previousMonthStart
+            .clone()
+            .date(Math.min(currentDayOfMonth, previousMonthStart.daysInMonth()));
+        const lastYearStart = today.clone().subtract(1, 'year').startOf('month');
+        const lastYearEnd = lastYearStart
+            .clone()
+            .date(Math.min(currentDayOfMonth, lastYearStart.daysInMonth()));
+
+        return {
+            today: {
+                start: todayDate,
+                end: todayDate
+            },
+            monthToDate: {
+                start: today.clone().startOf('month').format('YYYY-MM-DD'),
+                end: todayDate
+            },
+            previousMonthToDate: {
+                start: previousMonthStart.format('YYYY-MM-DD'),
+                end: previousMonthEnd.format('YYYY-MM-DD')
+            },
+            samePeriodLastYear: {
+                start: lastYearStart.format('YYYY-MM-DD'),
+                end: lastYearEnd.format('YYYY-MM-DD')
+            }
+        };
+    };
+    const getGrossSalesRevenue = (row = {}) => {
+        if (isRefundedGrossSalesStatus(row.status)) return 0;
+
+        const paid = roundCurrencyAmount(row.paid);
+        const paymentHistoryCount = Number(row.payment_history_count || 0);
+        const paymentTotal = roundCurrencyAmount(row.payment_total);
+        const refundTotal = roundCurrencyAmount(row.refund_total);
+
+        if (paymentHistoryCount > 0 && paymentTotal > 0) {
+            if (refundTotal >= paymentTotal) return 0;
+
+            const netPaymentTotal = roundCurrencyAmount(paymentTotal - refundTotal);
+            if (refundTotal > 0) return netPaymentTotal;
+
+            return Math.max(paid, paymentTotal);
+        }
+
+        return paid > 0 ? paid : 0;
+    };
+    const getGrossSalesSegment = (row = {}) => {
+        const typeSignals = [
+            row.experience,
+            row.flight_type,
+            row.flight_type_source,
+            row.voucher_type,
+            row.voucher_type_detail,
+            row.experience_type,
+            row.book_flight,
+            row.linked_voucher_type,
+            row.linked_voucher_type_detail,
+            row.linked_experience_type
+        ];
+        return typeSignals.some(isPrivateCharterTypeValue) ? 'private' : 'shared';
+    };
+    const summarizeGrossSalesRows = (rows = []) => {
+        const breakdown = createGrossSalesBreakdown();
+
+        rows.forEach((row) => {
+            const revenue = getGrossSalesRevenue(row);
+            if (!(revenue > 0)) return;
+
+            const segment = getGrossSalesSegment(row);
+            breakdown[segment].revenue += revenue;
+            breakdown[segment].count += 1;
+            breakdown.total.revenue += revenue;
+            breakdown.total.count += 1;
+        });
+
+        return finalizeGrossSalesBreakdown(breakdown);
+    };
+    const getGrossSalesSnapshot = async () => {
+        const [
+            hasPaymentHistoryAmount,
+            hasPaymentHistoryStatus,
+            hasPaymentHistoryOrigin,
+            hasPaymentHistoryVoucherId,
+            hasPaymentHistoryVoucherRef,
+            hasBookingRedeemedVoucher,
+            hasBookingVoucherRedeemed,
+            hasBookingIsVoucherRedeemed,
+            hasBookingFlightTypeSource,
+            hasBookingVoucherTypeDetail,
+            hasVoucherTypeDetail
+        ] = await Promise.all([
+            tableHasColumn('payment_history', 'amount'),
+            tableHasColumn('payment_history', 'payment_status'),
+            tableHasColumn('payment_history', 'origin'),
+            tableHasColumn('payment_history', 'voucher_id'),
+            tableHasColumn('payment_history', 'voucher_ref'),
+            tableHasColumn('all_booking', 'redeemed_voucher'),
+            tableHasColumn('all_booking', 'voucher_redeemed'),
+            tableHasColumn('all_booking', 'is_voucher_redeemed'),
+            tableHasColumn('all_booking', 'flight_type_source'),
+            tableHasColumn('all_booking', 'voucher_type_detail'),
+            tableHasColumn('all_vouchers', 'voucher_type_detail')
+        ]);
+        const hasPaymentHistory = hasPaymentHistoryAmount && hasPaymentHistoryStatus;
+        const paymentStatusSql = `TRIM(LOWER(COALESCE(payment_status, '')))`;
+        const paymentOriginSql = hasPaymentHistoryOrigin
+            ? `TRIM(LOWER(COALESCE(origin, ''))) != 'refund'`
+            : '1 = 1';
+        const refundOriginSql = hasPaymentHistoryOrigin
+            ? `OR TRIM(LOWER(COALESCE(origin, ''))) = 'refund'`
+            : '';
+        const paymentHistoryBookingJoin = hasPaymentHistory
+            ? `
+                LEFT JOIN (
+                    SELECT
+                        booking_id,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN amount > 0
+                                  AND ${paymentOriginSql}
+                                  AND ${paymentStatusSql} NOT IN ('refunded', 'refund', 'failed', 'pending', 'cancelled', 'canceled')
+                                THEN amount
+                                ELSE 0
+                            END
+                        ), 0) AS payment_total,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN amount < 0
+                                  OR ${paymentStatusSql} IN ('refunded', 'refund')
+                                  ${refundOriginSql}
+                                THEN ABS(amount)
+                                ELSE 0
+                            END
+                        ), 0) AS refund_total,
+                        COUNT(*) AS payment_history_count
+                    FROM payment_history
+                    WHERE booking_id IS NOT NULL
+                    GROUP BY booking_id
+                ) ph ON ph.booking_id = ab.id
+            `
+            : `
+                LEFT JOIN (
+                    SELECT NULL AS booking_id, 0 AS payment_total, 0 AS refund_total, 0 AS payment_history_count
+                ) ph ON 1 = 0
+            `;
+        const voucherPaymentJoins = [];
+        const voucherPaymentTotalExpressions = [];
+        const voucherRefundTotalExpressions = [];
+        const voucherPaymentHistoryCountExpressions = [];
+
+        if (hasPaymentHistory && hasPaymentHistoryVoucherId) {
+            voucherPaymentJoins.push(`
+                LEFT JOIN (
+                    SELECT
+                        voucher_id,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN amount > 0
+                                  AND ${paymentOriginSql}
+                                  AND ${paymentStatusSql} NOT IN ('refunded', 'refund', 'failed', 'pending', 'cancelled', 'canceled')
+                                THEN amount
+                                ELSE 0
+                            END
+                        ), 0) AS payment_total,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN amount < 0
+                                  OR ${paymentStatusSql} IN ('refunded', 'refund')
+                                  ${refundOriginSql}
+                                THEN ABS(amount)
+                                ELSE 0
+                            END
+                        ), 0) AS refund_total,
+                        COUNT(*) AS payment_history_count
+                    FROM payment_history
+                    WHERE voucher_id IS NOT NULL
+                    GROUP BY voucher_id
+                ) ph_voucher_id ON ph_voucher_id.voucher_id = v.id
+            `);
+            voucherPaymentTotalExpressions.push('COALESCE(ph_voucher_id.payment_total, 0)');
+            voucherRefundTotalExpressions.push('COALESCE(ph_voucher_id.refund_total, 0)');
+            voucherPaymentHistoryCountExpressions.push('COALESCE(ph_voucher_id.payment_history_count, 0)');
+        }
+
+        if (hasPaymentHistory && hasPaymentHistoryVoucherRef) {
+            voucherPaymentJoins.push(`
+                LEFT JOIN (
+                    SELECT
+                        voucher_ref,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN amount > 0
+                                  AND ${paymentOriginSql}
+                                  AND ${paymentStatusSql} NOT IN ('refunded', 'refund', 'failed', 'pending', 'cancelled', 'canceled')
+                                THEN amount
+                                ELSE 0
+                            END
+                        ), 0) AS payment_total,
+                        COALESCE(SUM(
+                            CASE
+                                WHEN amount < 0
+                                  OR ${paymentStatusSql} IN ('refunded', 'refund')
+                                  ${refundOriginSql}
+                                THEN ABS(amount)
+                                ELSE 0
+                            END
+                        ), 0) AS refund_total,
+                        COUNT(*) AS payment_history_count
+                    FROM payment_history
+                    WHERE voucher_ref IS NOT NULL AND voucher_ref != ''
+                    GROUP BY voucher_ref
+                ) ph_voucher_ref ON ph_voucher_ref.voucher_ref = v.voucher_ref
+            `);
+            voucherPaymentTotalExpressions.push('COALESCE(ph_voucher_ref.payment_total, 0)');
+            voucherRefundTotalExpressions.push('COALESCE(ph_voucher_ref.refund_total, 0)');
+            voucherPaymentHistoryCountExpressions.push('COALESCE(ph_voucher_ref.payment_history_count, 0)');
+        }
+
+        const voucherPaymentTotalExpression = voucherPaymentTotalExpressions.length > 0
+            ? `GREATEST(${voucherPaymentTotalExpressions.join(', ')})`
+            : '0';
+        const voucherRefundTotalExpression = voucherRefundTotalExpressions.length > 0
+            ? `GREATEST(${voucherRefundTotalExpressions.join(', ')})`
+            : '0';
+        const voucherPaymentHistoryCountExpression = voucherPaymentHistoryCountExpressions.length > 0
+            ? `GREATEST(${voucherPaymentHistoryCountExpressions.join(', ')})`
+            : '0';
+        const voucherPaymentTotalSelect = `${voucherPaymentTotalExpression} AS payment_total`;
+        const voucherRefundTotalSelect = `${voucherRefundTotalExpression} AS refund_total`;
+        const voucherPaymentHistoryCountSelect = `${voucherPaymentHistoryCountExpression} AS payment_history_count`;
+        const redeemedBookingConditions = [];
+        if (hasBookingRedeemedVoucher) {
+            redeemedBookingConditions.push(`TRIM(LOWER(COALESCE(ab.redeemed_voucher, ''))) IN ('yes', 'redeemed', 'true', '1')`);
+        }
+        if (hasBookingVoucherRedeemed) {
+            redeemedBookingConditions.push(`TRIM(LOWER(COALESCE(ab.voucher_redeemed, ''))) IN ('yes', 'redeemed', 'true', '1')`);
+        }
+        if (hasBookingIsVoucherRedeemed) {
+            redeemedBookingConditions.push(`TRIM(LOWER(COALESCE(ab.is_voucher_redeemed, ''))) IN ('yes', 'redeemed', 'true', '1')`);
+        }
+        if (hasBookingFlightTypeSource) {
+            redeemedBookingConditions.push(`TRIM(LOWER(COALESCE(ab.flight_type_source, ''))) = 'redeem voucher'`);
+        }
+        const redeemedBookingFilter = redeemedBookingConditions.length > 0
+            ? `AND NOT (${redeemedBookingConditions.join(' OR ')})`
+            : '';
+
+        const fetchGrossSalesRange = async (range) => {
+            const bookingRows = await queryAsync(`
+                SELECT
+                    'booking' AS source_type,
+                    ab.id,
+                    ab.paid,
+                    ab.status,
+                    ab.experience,
+                    ab.flight_type,
+                    ${hasBookingFlightTypeSource ? 'ab.flight_type_source' : 'NULL AS flight_type_source'},
+                    ab.voucher_type,
+                    ${hasBookingVoucherTypeDetail ? 'ab.voucher_type_detail' : 'NULL AS voucher_type_detail'},
+                    v.voucher_type AS linked_voucher_type,
+                    ${hasVoucherTypeDetail ? 'v.voucher_type_detail AS linked_voucher_type_detail' : 'NULL AS linked_voucher_type_detail'},
+                    v.experience_type AS linked_experience_type,
+                    NULL AS experience_type,
+                    NULL AS book_flight,
+                    COALESCE(ph.payment_total, 0) AS payment_total,
+                    COALESCE(ph.refund_total, 0) AS refund_total,
+                    COALESCE(ph.payment_history_count, 0) AS payment_history_count
+                FROM all_booking ab
+                LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                ${paymentHistoryBookingJoin}
+                WHERE ab.created_at IS NOT NULL
+                  AND DATE(ab.created_at) >= ?
+                  AND DATE(ab.created_at) <= ?
+                  ${redeemedBookingFilter}
+                  AND (
+                        COALESCE(ab.paid, 0) > 0
+                        OR COALESCE(ph.payment_total, 0) > 0
+                      )
+            `, [range.start, range.end]);
+
+            const voucherRows = await queryAsync(`
+                SELECT
+                    'voucher' AS source_type,
+                    v.id,
+                    v.paid,
+                    v.status,
+                    NULL AS experience,
+                    NULL AS flight_type,
+                    NULL AS flight_type_source,
+                    v.voucher_type,
+                    ${hasVoucherTypeDetail ? 'v.voucher_type_detail' : 'NULL AS voucher_type_detail'},
+                    NULL AS linked_voucher_type,
+                    NULL AS linked_voucher_type_detail,
+                    NULL AS linked_experience_type,
+                    v.experience_type,
+                    v.book_flight,
+                    ${voucherPaymentTotalSelect},
+                    ${voucherRefundTotalSelect},
+                    ${voucherPaymentHistoryCountSelect}
+                FROM all_vouchers v
+                ${voucherPaymentJoins.join('\n')}
+                WHERE v.created_at IS NOT NULL
+                  AND DATE(v.created_at) >= ?
+                  AND DATE(v.created_at) <= ?
+                  AND (
+                        COALESCE(v.paid, 0) > 0
+                        OR ${voucherPaymentTotalExpression} > 0
+                      )
+            `, [range.start, range.end]);
+
+            return summarizeGrossSalesRows([...(bookingRows || []), ...(voucherRows || [])]);
+        };
+
+        const ranges = buildGrossSalesRanges();
+        const [
+            today,
+            monthToDate,
+            previousMonthToDate,
+            samePeriodLastYear
+        ] = await Promise.all([
+            fetchGrossSalesRange(ranges.today),
+            fetchGrossSalesRange(ranges.monthToDate),
+            fetchGrossSalesRange(ranges.previousMonthToDate),
+            fetchGrossSalesRange(ranges.samePeriodLastYear)
+        ]);
+
+        return {
+            generatedAt: moment().toISOString(),
+            today: {
+                range: ranges.today,
+                ...today
+            },
+            monthToDate: {
+                range: ranges.monthToDate,
+                ...monthToDate,
+                comparisons: {
+                    previousMonthToDate: buildGrossSalesComparison(monthToDate, previousMonthToDate, ranges.previousMonthToDate),
+                    samePeriodLastYear: buildGrossSalesComparison(monthToDate, samePeriodLastYear, ranges.samePeriodLastYear)
+                }
+            }
+        };
+    };
     // 1. Booking Attempts
     // Query all bookings from all_booking table (matching the "All Booking" table view)
     // flight_attempts represents the number of cancellations/reschedules:
@@ -24550,6 +24944,7 @@ app.get('/api/analytics', async (req, res) => {
                             (async () => {
                                 try {
                                     const hasVoucherLocationColumn = await tableHasColumn('all_vouchers', 'location');
+                                    const grossSalesPromise = getGrossSalesSnapshot();
                                     const [
                                         nonRedemptionBookingRows,
                                         nonRedemptionVoucherRows,
@@ -25027,9 +25422,11 @@ app.get('/api/analytics', async (req, res) => {
                                         activeBookingLiabilityRows.reduce((sum, row) => sum + (Number(row.paid) || 0), 0)
                                     );
                                     const totalLiability = roundCurrencyAmount(totalBookingLiability + voucherLiability);
+                                    const grossSales = await grossSalesPromise;
 
                                     res.json({
                                         bookingAttempts,
+                                        grossSales,
                                         salesBySource,
                                         nonRedemption,
                                         addOns,
