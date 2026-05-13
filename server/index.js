@@ -24471,6 +24471,185 @@ app.get('/api/analytics', async (req, res) => {
 
         return finalizeGrossSalesBreakdown(breakdown);
     };
+    const createOperationalMetric = () => ({
+        flights: 0,
+        passengers: 0,
+        revenue: 0
+    });
+    const finalizeOperationalMetric = (metric = {}) => ({
+        flights: Number(metric.flights) || 0,
+        passengers: Number(metric.passengers) || 0,
+        revenue: roundCurrencyAmount(metric.revenue)
+    });
+    const getOperationalPassengerCount = (row = {}) => {
+        const candidates = [row.pax, row.passenger_count];
+        for (const candidate of candidates) {
+            const parsed = parseInt(candidate, 10);
+            if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        }
+        return 0;
+    };
+    const getOperationalFlightRevenue = (row = {}) => {
+        if (isRefundedGrossSalesStatus(row.status)) return 0;
+        return roundCurrencyAmount(row.paid);
+    };
+    const getOperationalSlotKey = (row = {}, segment = 'shared') => [
+        segment,
+        normalizeAnalyticsText(row.flight_date_only),
+        normalizeAnalyticsText(row.flight_time_only),
+        normalizeAnalyticsText(row.location).toLowerCase(),
+        normalizeAnalyticsText(row.activity_id)
+    ].join('|');
+    const summarizeOperationalPerformanceRows = (rows = []) => {
+        const privateMetric = createOperationalMetric();
+        const sharedSlots = new Map();
+
+        rows.forEach((row) => {
+            const segment = getGrossSalesSegment(row);
+            const passengers = getOperationalPassengerCount(row);
+            const revenue = getOperationalFlightRevenue(row);
+
+            if (segment === 'private') {
+                privateMetric.flights += 1;
+                privateMetric.passengers += passengers;
+                privateMetric.revenue += revenue;
+                return;
+            }
+
+            const slotKey = getOperationalSlotKey(row, 'shared');
+            const existingSlot = sharedSlots.get(slotKey) || {
+                passengers: 0,
+                revenue: 0,
+                capacity: 0
+            };
+            const capacity = parseInt(row.shared_capacity, 10) || BALLOON_210_CAPACITY;
+            existingSlot.passengers += passengers;
+            existingSlot.revenue += revenue;
+            existingSlot.capacity = Math.max(existingSlot.capacity, capacity);
+            sharedSlots.set(slotKey, existingSlot);
+        });
+
+        const sharedMetric = createOperationalMetric();
+        let sharedSeatCapacity = 0;
+        sharedSlots.forEach((slot) => {
+            sharedMetric.flights += 1;
+            sharedMetric.passengers += Number(slot.passengers) || 0;
+            sharedMetric.revenue += Number(slot.revenue) || 0;
+            sharedSeatCapacity += Number(slot.capacity) || BALLOON_210_CAPACITY;
+        });
+
+        const totalMetric = {
+            flights: privateMetric.flights + sharedMetric.flights,
+            passengers: privateMetric.passengers + sharedMetric.passengers,
+            revenue: privateMetric.revenue + sharedMetric.revenue
+        };
+        const sharedSeatUtilisationPercent = sharedSeatCapacity > 0
+            ? Math.round((sharedMetric.passengers / sharedSeatCapacity) * 1000) / 10
+            : 0;
+
+        return {
+            flightsFlown: {
+                total: finalizeOperationalMetric(totalMetric),
+                private: finalizeOperationalMetric(privateMetric),
+                shared: finalizeOperationalMetric(sharedMetric)
+            },
+            seatUtilisation: {
+                shared: {
+                    percent: sharedSeatUtilisationPercent,
+                    passengers: Number(sharedMetric.passengers) || 0,
+                    capacity: Number(sharedSeatCapacity) || 0,
+                    flights: Number(sharedMetric.flights) || 0
+                }
+            }
+        };
+    };
+    const buildOperationalRange = () => ({
+        start: analyticsStartDate || null,
+        end: analyticsEndDate || null
+    });
+    const getOperationalPerformanceSnapshot = async () => {
+        const [
+            hasBookingFlightTypeSource,
+            hasBookingVoucherTypeDetail,
+            hasVoucherTypeDetail,
+            hasBookingManualStatusOverride
+        ] = await Promise.all([
+            tableHasColumn('all_booking', 'flight_type_source'),
+            tableHasColumn('all_booking', 'voucher_type_detail'),
+            tableHasColumn('all_vouchers', 'voucher_type_detail'),
+            tableHasColumn('all_booking', 'manual_status_override')
+        ]);
+        const slotTimeSql = `
+            COALESCE(
+                TIME_FORMAT(STR_TO_DATE(NULLIF(ab.time_slot, ''), '%H:%i:%s'), '%H:%i:%s'),
+                TIME_FORMAT(STR_TO_DATE(NULLIF(ab.time_slot, ''), '%H:%i'), '%H:%i:%s'),
+                TIME_FORMAT(ab.flight_date, '%H:%i:%s')
+            )
+        `;
+        const availabilityTimeSql = `
+            COALESCE(
+                TIME_FORMAT(TIME(aa.time), '%H:%i:%s'),
+                TIME_FORMAT(STR_TO_DATE(aa.time, '%H:%i:%s'), '%H:%i:%s'),
+                TIME_FORMAT(STR_TO_DATE(aa.time, '%H:%i'), '%H:%i:%s'),
+                TIME_FORMAT(STR_TO_DATE(aa.time, '%h:%i %p'), '%H:%i:%s')
+            )
+        `;
+        const manualStatusFilter = hasBookingManualStatusOverride
+            ? `AND TRIM(LOWER(COALESCE(ab.manual_status_override, ''))) != 'cancelled'`
+            : '';
+        const flownRows = await queryAsync(`
+            SELECT
+                ab.id,
+                ab.paid,
+                ab.status,
+                ab.experience,
+                ab.flight_type,
+                ${hasBookingFlightTypeSource ? 'ab.flight_type_source' : 'NULL AS flight_type_source'},
+                ab.voucher_type,
+                ${hasBookingVoucherTypeDetail ? 'ab.voucher_type_detail' : 'NULL AS voucher_type_detail'},
+                v.voucher_type AS linked_voucher_type,
+                ${hasVoucherTypeDetail ? 'v.voucher_type_detail AS linked_voucher_type_detail' : 'NULL AS linked_voucher_type_detail'},
+                v.experience_type AS linked_experience_type,
+                NULL AS experience_type,
+                NULL AS book_flight,
+                ab.location,
+                ab.activity_id,
+                ab.pax,
+                (
+                    SELECT COUNT(*)
+                    FROM passenger p
+                    WHERE p.booking_id = ab.id
+                ) AS passenger_count,
+                DATE_FORMAT(ab.flight_date, '%Y-%m-%d') AS flight_date_only,
+                ${slotTimeSql} AS flight_time_only,
+                COALESCE((
+                    SELECT LEAST(COALESCE(NULLIF(aa.capacity, 0), ${BALLOON_210_CAPACITY}), ${BALLOON_210_CAPACITY})
+                    FROM activity_availability aa
+                    WHERE DATE(aa.date) = DATE(ab.flight_date)
+                      AND ${availabilityTimeSql} = ${slotTimeSql}
+                      AND (
+                            ab.activity_id IS NULL
+                            OR aa.activity_id = ab.activity_id
+                          )
+                    ORDER BY
+                        CASE WHEN aa.activity_id = ab.activity_id THEN 0 ELSE 1 END,
+                        aa.id ASC
+                    LIMIT 1
+                ), ${BALLOON_210_CAPACITY}) AS shared_capacity
+            FROM all_booking ab
+            LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            WHERE ab.flight_date IS NOT NULL
+              AND TRIM(LOWER(COALESCE(ab.status, ''))) = 'flown'
+              ${manualStatusFilter}
+              ${dateFilter('ab.flight_date')}
+        `);
+
+        return {
+            generatedAt: moment().toISOString(),
+            range: buildOperationalRange(),
+            ...summarizeOperationalPerformanceRows(flownRows || [])
+        };
+    };
     const getGrossSalesSnapshot = async () => {
         const [
             hasPaymentHistoryAmount,
@@ -24965,6 +25144,7 @@ app.get('/api/analytics', async (req, res) => {
                                 try {
                                     const hasVoucherLocationColumn = await tableHasColumn('all_vouchers', 'location');
                                     const grossSalesPromise = getGrossSalesSnapshot();
+                                    const operationalPerformancePromise = getOperationalPerformanceSnapshot();
                                     const [
                                         nonRedemptionBookingRows,
                                         nonRedemptionVoucherRows,
@@ -25443,10 +25623,12 @@ app.get('/api/analytics', async (req, res) => {
                                     );
                                     const totalLiability = roundCurrencyAmount(totalBookingLiability + voucherLiability);
                                     const grossSales = await grossSalesPromise;
+                                    const operationalPerformance = await operationalPerformancePromise;
 
                                     res.json({
                                         bookingAttempts,
                                         grossSales,
+                                        operationalPerformance,
                                         salesBySource,
                                         nonRedemption,
                                         addOns,

@@ -21,10 +21,28 @@ const grossMetricFallback = {
     averageBookingValue: 0
 };
 
+const operationalMetricFallback = {
+    flights: 0,
+    passengers: 0,
+    revenue: 0
+};
+
 const getGrossMetric = (grossSalesData, key) => grossSalesData?.[key] || grossMetricFallback;
 const formatMoney = (value) => `£${formatGbp(value || 0)}`;
 const formatSoldCount = (value) => `${integerFormatter.format(Number(value) || 0)} sold`;
 const formatBookingCount = (value) => integerFormatter.format(Number(value) || 0);
+const formatSeatCount = (value) => integerFormatter.format(Number(value) || 0);
+const formatCountWithLabel = (value, singularLabel, pluralLabel) => {
+    const count = Number(value) || 0;
+    return `${integerFormatter.format(count)} ${count === 1 ? singularLabel : pluralLabel}`;
+};
+const formatFlightCount = (value) => formatCountWithLabel(value, 'flight', 'flights');
+const formatPassengerCount = (value) => formatCountWithLabel(value, 'passenger', 'passengers');
+
+const formatUtilisationPercent = (value) => {
+    const numericValue = Number(value) || 0;
+    return `${Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(1)}%`;
+};
 
 const getAverageBookingValueFromMetric = (metric) => {
     if (metric?.averageBookingValue !== undefined) return Number(metric.averageBookingValue) || 0;
@@ -53,6 +71,17 @@ const getFinancialTracking = (grossSalesData) => {
         }
     };
 };
+
+const getOperationalMetric = (operationalData, key) =>
+    operationalData?.flightsFlown?.[key] || operationalMetricFallback;
+
+const getSharedSeatUtilisation = (operationalData) =>
+    operationalData?.seatUtilisation?.shared || {
+        percent: 0,
+        passengers: 0,
+        capacity: 0,
+        flights: 0
+    };
 
 const formatUpdatedAt = (date) => {
     if (!date) return '';
@@ -209,7 +238,7 @@ const FinancialTrackingRow = ({ label, value, supportingValue, accentColor }) =>
     <Box
         sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) auto' },
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) auto' },
             gap: { xs: 0.5, sm: 1.5 },
             alignItems: 'center',
             py: 1.35,
@@ -230,12 +259,12 @@ const FinancialTrackingRow = ({ label, value, supportingValue, accentColor }) =>
                 {label}
             </Typography>
         </Box>
-        <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+        <Box sx={{ textAlign: { xs: 'left', lg: 'right' }, minWidth: 0 }}>
             <Typography sx={{ color: '#102844', fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}>
                 {value}
             </Typography>
             {supportingValue ? (
-                <Typography sx={{ color: '#667b98', fontWeight: 700, fontSize: 12, mt: 0.25 }}>
+                <Typography sx={{ color: '#667b98', fontWeight: 700, fontSize: 12, mt: 0.25, overflowWrap: 'anywhere' }}>
                     {supportingValue}
                 </Typography>
             ) : null}
@@ -354,6 +383,167 @@ const BookingVolumeCard = ({ todayData, monthToDateData }) => {
     );
 };
 
+const OperationalPerformanceRow = ({ label, metric, accentColor }) => (
+    <Box
+        sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) auto' },
+            gap: { xs: 0.5, sm: 1.5 },
+            alignItems: 'center',
+            py: 1.35,
+            borderTop: '1px solid #e7eef7'
+        }}
+    >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+            <Box
+                sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: accentColor,
+                    flex: '0 0 auto'
+                }}
+            />
+            <Typography sx={{ color: '#1c3458', fontWeight: 700, fontSize: 14 }}>
+                {label}
+            </Typography>
+        </Box>
+        <Box sx={{ textAlign: { xs: 'left', lg: 'right' }, minWidth: 0 }}>
+            <Typography sx={{ color: '#102844', fontWeight: 800, fontSize: 18, lineHeight: 1.1 }}>
+                {formatMoney(metric.revenue)}
+            </Typography>
+            <Typography sx={{ color: '#667b98', fontWeight: 700, fontSize: 12, mt: 0.25, overflowWrap: 'anywhere' }}>
+                {formatFlightCount(metric.flights)} · {formatPassengerCount(metric.passengers)}
+            </Typography>
+        </Box>
+    </Box>
+);
+
+const FlightsFlownCard = ({ operationalData }) => {
+    const total = getOperationalMetric(operationalData, 'total');
+    const privateMetric = getOperationalMetric(operationalData, 'private');
+    const sharedMetric = getOperationalMetric(operationalData, 'shared');
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Operational Performance
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                            Flights Flown + Passenger Count
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#6d4d00',
+                            background: '#fff7d8',
+                            border: '1px solid #efe1a4',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Flown
+                    </Box>
+                </Box>
+                <Box sx={{ mb: 0.75, minWidth: 0 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 800, lineHeight: 1 }}>
+                        {formatBookingCount(total.flights)}
+                    </Typography>
+                    <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700, mt: 0.5, width: '100%', maxWidth: '100%', minWidth: 0, overflowWrap: 'anywhere' }}>
+                        flights flown · {formatPassengerCount(total.passengers)} · {formatMoney(total.revenue)} revenue
+                    </Typography>
+                </Box>
+                <OperationalPerformanceRow
+                    label="Private flights"
+                    metric={privateMetric}
+                    accentColor="#d78d38"
+                />
+                <OperationalPerformanceRow
+                    label="Shared flights"
+                    metric={sharedMetric}
+                    accentColor="#2d69c5"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
+const SeatUtilisationCard = ({ operationalData }) => {
+    const sharedUtilisation = getSharedSeatUtilisation(operationalData);
+    const utilisationPercent = Math.max(0, Math.min(100, Number(sharedUtilisation.percent) || 0));
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Shared Flight Efficiency
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                            Seat Utilisation
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#0f5f8a',
+                            background: '#e8f3fb',
+                            border: '1px solid #cfe3f3',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Shared
+                    </Box>
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 1.5 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 800, lineHeight: 1 }}>
+                        {formatUtilisationPercent(sharedUtilisation.percent)}
+                    </Typography>
+                    <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
+                        completed shared flights
+                    </Typography>
+                </Box>
+                <Box sx={{ height: 10, borderRadius: '999px', background: '#e7eef7', overflow: 'hidden', mb: 1.25 }}>
+                    <Box
+                        sx={{
+                            width: `${utilisationPercent}%`,
+                            height: '100%',
+                            borderRadius: '999px',
+                            background: 'linear-gradient(90deg, #2d69c5 0%, #67b8a7 100%)'
+                        }}
+                    />
+                </Box>
+                <FinancialTrackingRow
+                    label="Shared passengers flown"
+                    value={formatSeatCount(sharedUtilisation.passengers)}
+                    supportingValue={`${formatFlightCount(sharedUtilisation.flights)}`}
+                    accentColor="#2d69c5"
+                />
+                <FinancialTrackingRow
+                    label="Shared seat capacity"
+                    value={formatSeatCount(sharedUtilisation.capacity)}
+                    supportingValue="completed flight seats"
+                    accentColor="#67b8a7"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
 const AnalyticsDashboard = ({ dateRange }) => {
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -422,6 +612,7 @@ const AnalyticsDashboard = ({ dateRange }) => {
         return items.map(renderItem);
     };
     const grossSales = analytics?.grossSales || {};
+    const operationalPerformance = analytics?.operationalPerformance || {};
     const lastUpdatedLabel = formatUpdatedAt(lastUpdated);
 
     return (
@@ -438,10 +629,10 @@ const AnalyticsDashboard = ({ dateRange }) => {
             >
                 <Box>
                     <Typography sx={{ color: '#1c3458', fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>
-                        Real-time Sales Overview
+                        Real-time Performance Overview
                     </Typography>
                     <Typography sx={{ color: '#667b98', fontSize: 13, mt: 0.5 }}>
-                        Completed purchases only, with fully refunded orders excluded.
+                        Sales, operations, and booking behaviour updated near real-time.
                     </Typography>
                 </Box>
                 <Typography sx={{ color: '#667b98', fontSize: 12, fontWeight: 700 }}>
@@ -482,6 +673,14 @@ const AnalyticsDashboard = ({ dateRange }) => {
                         todayData={grossSales.today}
                         monthToDateData={grossSales.monthToDate}
                     />
+                </Grid>
+            </Grid>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={6}>
+                    <FlightsFlownCard operationalData={operationalPerformance} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                    <SeatUtilisationCard operationalData={operationalPerformance} />
                 </Grid>
             </Grid>
             <Grid container spacing={2}>
