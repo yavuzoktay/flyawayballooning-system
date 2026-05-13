@@ -13189,6 +13189,7 @@ app.get('/api/getAllVoucherData', (req, res) => {
                b.email as booking_email, b.phone as booking_phone,
                b.id as booking_id,
                b.flight_date as booking_flight_date,
+               b.due as booking_due,
                COALESCE(b.weather_refund_total_price, 0) as booking_weather_refund_total_price,
                CASE 
                    WHEN b.additional_information_json IS NOT NULL AND b.additional_information_json != 'null' 
@@ -13772,6 +13773,8 @@ app.get('/api/getAllVoucherData', (req, res) => {
                     booking_email: row.booking_email ?? '',
                     booking_phone: bookingPhoneWithCode ?? '',
                     booking_id: row.booking_id ?? '',
+                    due: row.due ?? row.booking_due ?? '',
+                    booking_due: row.booking_due ?? '',
                     flight_date: row.booking_flight_date || row.flight_date || '',
                     booking_flight_date: row.booking_flight_date || '',
                     weather_refund_total_price: row.booking_weather_refund_total_price || row.weather_refund_total_price || 0,

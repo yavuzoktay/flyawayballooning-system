@@ -2025,6 +2025,8 @@ const BookingPage = () => {
                     expires: item.expires || '',
                     redeemed: item.redeemed || '',
                     paid: item.paid || '',
+                    due: item.due ?? item.booking_due ?? '',
+                    booking_due: item.booking_due ?? '',
                     offer_code: item.offer_code || '',
                     voucher_ref: item.voucher_ref || '',
                     _original: item

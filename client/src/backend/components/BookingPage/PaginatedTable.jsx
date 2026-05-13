@@ -267,6 +267,19 @@ const PaginatedTable = ({
         return Boolean(value);
     };
 
+    const parseAmount = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+        const parsed = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const formatAmount = (value) => {
+        const parsed = parseAmount(value);
+        return parsed === null ? '' : parsed.toFixed(2);
+    };
+
     // Build header labels
     var mainHead = [];
     if (selectable) mainHead.push(''); // For checkbox column
@@ -1204,10 +1217,31 @@ const PaginatedTable = ({
                                                             ) : id === 'paid' ? (
                                                                 // Paid: show visual state (refund/redeemed)
                                                                 (() => {
-                                                                    const paidValue = parseFloat(item[id] || 0);
+                                                                    const paidAmount = parseAmount(item[id]);
+                                                                    const dueAmount = [
+                                                                        item.due,
+                                                                        item.booking_due,
+                                                                        item._original?.due,
+                                                                        item._original?.booking_due
+                                                                    ]
+                                                                        .map(parseAmount)
+                                                                        .find(value => value !== null && value > 0.01);
+                                                                    const paidValue = paidAmount || 0;
+                                                                    const shouldShowDueAmount = (paidAmount === null || Math.abs(paidAmount) <= 0.01) && dueAmount !== undefined;
                                                                     const hasRefund = item.has_refund === 1 || item.has_refund === true;
                                                                     const isFullyRefunded = hasRefund && paidValue <= 0.01;
                                                                     const hasNormalPayment = !hasRefund && paidValue > 0.01;
+
+                                                                    if (shouldShowDueAmount) {
+                                                                        return (
+                                                                            <span
+                                                                                style={{ color: '#2d69c5', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
+                                                                                title="Due amount"
+                                                                            >
+                                                                                {formatAmount(dueAmount)}
+                                                                            </span>
+                                                                        );
+                                                                    }
 
                                                                     // For redeemed vouchers/bookings, always grey out the paid value
                                                                     // so it's clear this amount came from a voucher redemption (sale already counted).
