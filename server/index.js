@@ -11101,9 +11101,22 @@ app.get('/api/getAllBookingData', (req, res) => {
 
                     // Check if this is a Private Charter booking
                     const isPrivateCharter = booking.experience === 'Private Charter' || booking.experience === 'Private';
+                    const manualBookingProfile = extractManualBookingProfileFromStoredBooking({
+                        ...booking,
+                        additional_information_json: booking.additional_information_json || additionalInfo.additional_information_json
+                    });
+                    const isTheNewtManualBooking = isTheNewtManualBookingProfile(manualBookingProfile);
 
                     // For Private Charter, recalculate original_amount and weather_refund_total_price
-                    if (isPrivateCharter) {
+                    if (isPrivateCharter && isTheNewtManualBooking && Number.isFinite(Number(booking.due))) {
+                        // The Newt manual bookings store their hotel invoice total in all_booking.due.
+                        // Preserve that authoritative amount instead of replacing it with activity rate-card pricing.
+                        const paid = Number(booking.paid) || 0;
+                        const due = Number(booking.due) || 0;
+                        enriched[index].due = roundCurrency(due);
+                        enriched[index].original_amount = roundCurrency(paid + due);
+                        enriched[index].weather_refund_total_price = Number(booking.weather_refund_total_price) || 0;
+                    } else if (isPrivateCharter) {
                         const voucherTypePrice = getPrivateCharterPrice(booking);
 
                         if (voucherTypePrice !== null && voucherTypePrice > 0) {

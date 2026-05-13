@@ -7757,6 +7757,18 @@ setBookingDetail(finalVoucherDetail);
                                                                     booking: { ...prev.booking, due: newDue },
                                                                     passengers: prev.passengers.map(p => ({ ...p, price: perPassenger }))
                                                                 }));
+                                                                const updateBookingDueAndPassengerPrices = (b) => {
+                                                                    if (b.id !== bookingDetail.booking.id) return b;
+                                                                    return {
+                                                                        ...b,
+                                                                        due: newDue,
+                                                                        passengers: Array.isArray(b.passengers)
+                                                                            ? b.passengers.map(p => ({ ...p, price: perPassenger }))
+                                                                            : b.passengers
+                                                                    };
+                                                                };
+                                                                setBooking(prev => prev.map(updateBookingDueAndPassengerPrices));
+                                                                setFilteredData(prev => prev.map(updateBookingDueAndPassengerPrices));
                                                                 setEditField(null);
                                                                 setEditValue('');
                                                             }} disabled={savingEdit}>Save</Button>
