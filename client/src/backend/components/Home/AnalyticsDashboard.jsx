@@ -17,12 +17,42 @@ const grossSalesCardSx = {
 
 const grossMetricFallback = {
     revenue: 0,
-    count: 0
+    count: 0,
+    averageBookingValue: 0
 };
 
 const getGrossMetric = (grossSalesData, key) => grossSalesData?.[key] || grossMetricFallback;
 const formatMoney = (value) => `£${formatGbp(value || 0)}`;
 const formatSoldCount = (value) => `${integerFormatter.format(Number(value) || 0)} sold`;
+const formatBookingCount = (value) => integerFormatter.format(Number(value) || 0);
+
+const getAverageBookingValueFromMetric = (metric) => {
+    if (metric?.averageBookingValue !== undefined) return Number(metric.averageBookingValue) || 0;
+    const count = Number(metric?.count) || 0;
+    if (count <= 0) return 0;
+    return (Number(metric?.revenue) || 0) / count;
+};
+
+const getFinancialTracking = (grossSalesData) => {
+    if (grossSalesData?.financialTracking) return grossSalesData.financialTracking;
+
+    const total = getGrossMetric(grossSalesData, 'total');
+    const shared = getGrossMetric(grossSalesData, 'shared');
+    const privateMetric = getGrossMetric(grossSalesData, 'private');
+
+    return {
+        averageBookingValue: {
+            total: getAverageBookingValueFromMetric(total),
+            shared: getAverageBookingValueFromMetric(shared),
+            private: getAverageBookingValueFromMetric(privateMetric)
+        },
+        bookings: {
+            total: Number(total.count) || 0,
+            shared: Number(shared.count) || 0,
+            private: Number(privateMetric.count) || 0
+        }
+    };
+};
 
 const formatUpdatedAt = (date) => {
     if (!date) return '';
@@ -175,6 +205,155 @@ const GrossSalesCard = ({ title, label, grossSalesData, comparisons }) => {
     );
 };
 
+const FinancialTrackingRow = ({ label, value, supportingValue, accentColor }) => (
+    <Box
+        sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) auto' },
+            gap: { xs: 0.5, sm: 1.5 },
+            alignItems: 'center',
+            py: 1.35,
+            borderTop: '1px solid #e7eef7'
+        }}
+    >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+            <Box
+                sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: accentColor,
+                    flex: '0 0 auto'
+                }}
+            />
+            <Typography sx={{ color: '#1c3458', fontWeight: 700, fontSize: 14 }}>
+                {label}
+            </Typography>
+        </Box>
+        <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+            <Typography sx={{ color: '#102844', fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}>
+                {value}
+            </Typography>
+            {supportingValue ? (
+                <Typography sx={{ color: '#667b98', fontWeight: 700, fontSize: 12, mt: 0.25 }}>
+                    {supportingValue}
+                </Typography>
+            ) : null}
+        </Box>
+    </Box>
+);
+
+const AverageBookingValueCard = ({ todayData, monthToDateData }) => {
+    const today = getFinancialTracking(todayData);
+    const monthToDate = getFinancialTracking(monthToDateData);
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Financial Tracking
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                            Average Booking Value
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#8a5b12',
+                            background: '#fff3df',
+                            border: '1px solid #f3d7aa',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        MTD
+                    </Box>
+                </Box>
+                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.5 }}>
+                    Revenue per completed booking, separated by experience type.
+                </Typography>
+                <FinancialTrackingRow
+                    label="Shared flight ABV"
+                    value={formatMoney(monthToDate.averageBookingValue.shared)}
+                    supportingValue={`Today ${formatMoney(today.averageBookingValue.shared)}`}
+                    accentColor="#2d69c5"
+                />
+                <FinancialTrackingRow
+                    label="Private flight ABV"
+                    value={formatMoney(monthToDate.averageBookingValue.private)}
+                    supportingValue={`Today ${formatMoney(today.averageBookingValue.private)}`}
+                    accentColor="#d78d38"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
+const BookingVolumeCard = ({ todayData, monthToDateData }) => {
+    const today = getFinancialTracking(todayData);
+    const monthToDate = getFinancialTracking(monthToDateData);
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Booking Behaviour
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                            Number of Bookings
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#0f5f8a',
+                            background: '#e8f3fb',
+                            border: '1px solid #cfe3f3',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Live
+                    </Box>
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.75 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 800, lineHeight: 1 }}>
+                        {formatBookingCount(monthToDate.bookings.total)}
+                    </Typography>
+                    <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
+                        total bookings MTD · {formatBookingCount(today.bookings.total)} today
+                    </Typography>
+                </Box>
+                <FinancialTrackingRow
+                    label="Shared bookings"
+                    value={formatBookingCount(monthToDate.bookings.shared)}
+                    supportingValue={`${formatBookingCount(today.bookings.shared)} today`}
+                    accentColor="#2d69c5"
+                />
+                <FinancialTrackingRow
+                    label="Private bookings"
+                    value={formatBookingCount(monthToDate.bookings.private)}
+                    supportingValue={`${formatBookingCount(today.bookings.private)} today`}
+                    accentColor="#d78d38"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
 const AnalyticsDashboard = ({ dateRange }) => {
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -288,6 +467,20 @@ const AnalyticsDashboard = ({ dateRange }) => {
                         label="MTD"
                         grossSalesData={grossSales.monthToDate}
                         comparisons={grossSales.monthToDate?.comparisons}
+                    />
+                </Grid>
+            </Grid>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={6}>
+                    <AverageBookingValueCard
+                        todayData={grossSales.today}
+                        monthToDateData={grossSales.monthToDate}
+                    />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                    <BookingVolumeCard
+                        todayData={grossSales.today}
+                        monthToDateData={grossSales.monthToDate}
                     />
                 </Grid>
             </Grid>

@@ -24337,18 +24337,36 @@ app.get('/api/analytics', async (req, res) => {
         private: createGrossSalesMetric(),
         shared: createGrossSalesMetric()
     });
+    const calculateAverageBookingValue = (metric = {}) => {
+        const count = Number(metric.count) || 0;
+        if (count <= 0) return 0;
+        return roundCurrencyAmount((Number(metric.revenue) || 0) / count);
+    };
+    const finalizeGrossSalesMetric = (metric = {}) => {
+        const finalized = {
+            revenue: roundCurrencyAmount(metric.revenue),
+            count: Number(metric.count) || 0
+        };
+        return {
+            ...finalized,
+            averageBookingValue: calculateAverageBookingValue(finalized)
+        };
+    };
     const finalizeGrossSalesBreakdown = (breakdown) => ({
-        total: {
-            revenue: roundCurrencyAmount(breakdown.total.revenue),
-            count: Number(breakdown.total.count) || 0
+        total: finalizeGrossSalesMetric(breakdown.total),
+        private: finalizeGrossSalesMetric(breakdown.private),
+        shared: finalizeGrossSalesMetric(breakdown.shared)
+    });
+    const buildFinancialTrackingSummary = (breakdown = {}) => ({
+        averageBookingValue: {
+            total: calculateAverageBookingValue(breakdown.total),
+            shared: calculateAverageBookingValue(breakdown.shared),
+            private: calculateAverageBookingValue(breakdown.private)
         },
-        private: {
-            revenue: roundCurrencyAmount(breakdown.private.revenue),
-            count: Number(breakdown.private.count) || 0
-        },
-        shared: {
-            revenue: roundCurrencyAmount(breakdown.shared.revenue),
-            count: Number(breakdown.shared.count) || 0
+        bookings: {
+            total: Number(breakdown.total?.count || 0),
+            shared: Number(breakdown.shared?.count || 0),
+            private: Number(breakdown.private?.count || 0)
         }
     });
     const calculateGrossSalesPercentChange = (current, comparison) => {
@@ -24587,7 +24605,7 @@ app.get('/api/analytics', async (req, res) => {
                     FROM payment_history
                     WHERE voucher_ref IS NOT NULL AND voucher_ref != ''
                     GROUP BY voucher_ref
-                ) ph_voucher_ref ON ph_voucher_ref.voucher_ref = v.voucher_ref
+                ) ph_voucher_ref ON CONVERT(ph_voucher_ref.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci
             `);
             voucherPaymentTotalExpressions.push('COALESCE(ph_voucher_ref.payment_total, 0)');
             voucherRefundTotalExpressions.push('COALESCE(ph_voucher_ref.refund_total, 0)');
@@ -24644,7 +24662,7 @@ app.get('/api/analytics', async (req, res) => {
                     COALESCE(ph.refund_total, 0) AS refund_total,
                     COALESCE(ph.payment_history_count, 0) AS payment_history_count
                 FROM all_booking ab
-                LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
                 ${paymentHistoryBookingJoin}
                 WHERE ab.created_at IS NOT NULL
                   AND DATE(ab.created_at) >= ?
@@ -24706,11 +24724,13 @@ app.get('/api/analytics', async (req, res) => {
             generatedAt: moment().toISOString(),
             today: {
                 range: ranges.today,
-                ...today
+                ...today,
+                financialTracking: buildFinancialTrackingSummary(today)
             },
             monthToDate: {
                 range: ranges.monthToDate,
                 ...monthToDate,
+                financialTracking: buildFinancialTrackingSummary(monthToDate),
                 comparisons: {
                     previousMonthToDate: buildGrossSalesComparison(monthToDate, previousMonthToDate, ranges.previousMonthToDate),
                     samePeriodLastYear: buildGrossSalesComparison(monthToDate, samePeriodLastYear, ranges.samePeriodLastYear)
@@ -25023,7 +25043,7 @@ app.get('/api/analytics', async (req, res) => {
                                         queryAsync(`
                                             SELECT ab.location, COUNT(*) as count
                                             FROM all_booking ab
-                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                                            LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
                                             WHERE ab.flight_date IS NOT NULL
                                               AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
                                               AND ab.location IS NOT NULL AND ab.location != ''
@@ -25053,7 +25073,7 @@ app.get('/api/analytics', async (req, res) => {
                                                 COALESCE(NULLIF(v.voucher_type, ''), NULLIF(ab.voucher_type, ''), NULLIF(ab.voucher_type_detail, '')) as voucher_type,
                                                 COUNT(*) as count
                                             FROM all_booking ab
-                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                                            LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
                                             WHERE ab.flight_date IS NOT NULL
                                               AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
                                               ${dateFilter('ab.flight_date')}
@@ -25083,7 +25103,7 @@ app.get('/api/analytics', async (req, res) => {
                                                 COALESCE(ab.add_to_booking_items_total_price, 0) AS add_to_booking_items_total_price,
                                                 COALESCE(ab.weather_refund_total_price, 0) AS weather_refund_total_price
                                             FROM all_booking ab
-                                            LEFT JOIN all_vouchers v ON v.voucher_ref = ab.voucher_code
+                                            LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
                                             WHERE ab.paid IS NOT NULL
                                               AND ab.paid > 0
                                         `),
