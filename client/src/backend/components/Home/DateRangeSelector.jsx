@@ -5,9 +5,13 @@ import { ADMIN_MANUAL_BOOKING_AUTH } from "../../auth/adminCredentials";
 import { formatGbp } from "../../utils/formatGbp";
 import { isAdminDateExpired, parseAdminDate } from "../../utils/adminDateUtils";
 
+const ANALYTICS_LIVE_DATA_START_DATE =
+    process.env.REACT_APP_ANALYTICS_LIVE_DATA_START_DATE || "2026-01-01";
+
 const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
+    const [activeQuickFilter, setActiveQuickFilter] = useState("allTime");
     const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
     const [isLaunchingManualBooking, setIsLaunchingManualBooking] = useState(false);
@@ -38,6 +42,17 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         const parsedDate = parseAdminDate(raw);
         return parsedDate ? parsedDate.toDate() : null;
     };
+
+    const isLiveAnalyticsRecord = (item) => {
+        const liveStartDate = parseLooseDate(ANALYTICS_LIVE_DATA_START_DATE);
+        if (!liveStartDate) return true;
+
+        const createdDate = parseLooseDate(item?.created || item?.created_at || null);
+        return createdDate ? createdDate >= liveStartDate : false;
+    };
+
+    const getLiveAnalyticsRecords = (items = []) =>
+        (items || []).filter((item) => isLiveAnalyticsRecord(item));
 
     const isRedeemedLikeYes = (raw) => {
         const v = raw === null || raw === undefined ? '' : String(raw).trim().toLowerCase();
@@ -86,6 +101,9 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     }, []);
 
     useEffect(() => {
+        const liveBookings = getLiveAnalyticsRecords(bookingData);
+        const liveVouchers = getLiveAnalyticsRecords(voucherData);
+
         if (startDate && endDate) {
             const startDateObj = parseLooseDate(startDate);
             const endDateObj = parseLooseDate(endDate);
@@ -93,12 +111,12 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             if (startDateObj && endDateObj) {
                 endDateObj.setHours(23, 59, 59, 999);
 
-                const filteredBookings = (bookingData || []).filter((item) => {
+                const filteredBookings = liveBookings.filter((item) => {
                     const createdDate = parseLooseDate(item?.created || item?.created_at || null);
                     return createdDate ? createdDate >= startDateObj && createdDate <= endDateObj : false;
                 });
 
-                const filteredVouchers = (voucherData || []).filter((item) => {
+                const filteredVouchers = liveVouchers.filter((item) => {
                     const createdDate = parseLooseDate(item?.created || item?.created_at || null);
                     return createdDate ? createdDate >= startDateObj && createdDate <= endDateObj : false;
                 });
@@ -108,19 +126,22 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             }
         }
 
-        calculateSummary(bookingData, voucherData, { start: null, end: null });
+        calculateSummary(liveBookings, liveVouchers, { start: null, end: null });
     }, [bookingData, voucherData, startDate, endDate]);
 
-    const filterData = (start, end) => {
+    const filterData = (start, end, quickFilterKey = "custom") => {
         if (onDateRangeChange) {
             onDateRangeChange({ start, end });
         }
+        setActiveQuickFilter(quickFilterKey);
         setStartDate(start);
         setEndDate(end);
         const startDateObj = parseLooseDate(start);
         const endDateObj = parseLooseDate(end);
+        const liveBookings = getLiveAnalyticsRecords(bookingData);
+        const liveVouchers = getLiveAnalyticsRecords(voucherData);
         if (!startDateObj || !endDateObj) {
-            calculateSummary(bookingData, voucherData, { start: null, end: null });
+            calculateSummary(liveBookings, liveVouchers, { start: null, end: null });
             return;
         }
 
@@ -128,14 +149,14 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         endDateObj.setHours(23, 59, 59, 999);
 
         // Filter the data based on the date range
-        const filtered = bookingData.filter((item) => {
+        const filtered = liveBookings.filter((item) => {
             const dateStr = item?.created || item?.created_at || null;
             const createdDate = parseLooseDate(dateStr);
             if (!createdDate) return false;
             return createdDate >= startDateObj && createdDate <= endDateObj;
         });
 
-        const filteredVouchers = (voucherData || []).filter((item) => {
+        const filteredVouchers = liveVouchers.filter((item) => {
             const dateStr = item?.created || item?.created_at || null;
             const createdDate = parseLooseDate(dateStr);
             if (!createdDate) return false;
@@ -150,10 +171,16 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         allTime: () => {
             setStartDate("");
             setEndDate("");
+            setActiveQuickFilter("allTime");
             if (onDateRangeChange) {
                 onDateRangeChange({ start: null, end: null });
             }
-            calculateSummary(bookingData, voucherData, { start: null, end: null });
+            calculateSummary(getLiveAnalyticsRecords(bookingData), getLiveAnalyticsRecords(voucherData), { start: null, end: null });
+        },
+        today: () => {
+            const today = new Date();
+            const formattedToday = formatDateInputValue(today);
+            filterData(formattedToday, formattedToday, "today");
         },
         last12Months: () => {
             const today = new Date();
@@ -161,38 +188,45 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             lastYear.setFullYear(today.getFullYear() - 1);
             const start = formatDateInputValue(lastYear);
             const end = formatDateInputValue(today);
-            filterData(start, end);
+            filterData(start, end, "last12Months");
         },
         monthToDate: () => {
             const today = new Date();
             const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
             const start = formatDateInputValue(monthStart);
             const end = formatDateInputValue(today);
-            filterData(start, end);
+            filterData(start, end, "monthToDate");
+        },
+        yearToDate: () => {
+            const today = new Date();
+            const yearStart = new Date(today.getFullYear(), 0, 1);
+            const start = formatDateInputValue(yearStart);
+            const end = formatDateInputValue(today);
+            filterData(start, end, "yearToDate");
         },
         quarter1: () => {
             const year = new Date().getFullYear();
             const start = `${year}-01-01`;
             const end = `${year}-03-31`;
-            filterData(start, end);
+            filterData(start, end, "quarter1");
         },
         quarter2: () => {
             const year = new Date().getFullYear();
             const start = `${year}-04-01`;
             const end = `${year}-06-30`;
-            filterData(start, end);
+            filterData(start, end, "quarter2");
         },
         quarter3: () => {
             const year = new Date().getFullYear();
             const start = `${year}-07-01`;
             const end = `${year}-09-30`;
-            filterData(start, end);
+            filterData(start, end, "quarter3");
         },
         quarter4: () => {
             const year = new Date().getFullYear();
             const start = `${year}-10-01`;
             const end = `${year}-12-31`;
-            filterData(start, end);
+            filterData(start, end, "quarter4");
         },
     };
 
@@ -210,9 +244,11 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         const safeValue = (value) => isNaN(value) ? 0 : value;
         if(data){
             const flightRange = getFlightDateRange(range?.start, range?.end);
+            const liveBookings = getLiveAnalyticsRecords(bookingData);
+            const liveVouchers = getLiveAnalyticsRecords(voucherData);
 
-            const bookingsForFlights = (bookingData && bookingData.length > 0)
-                ? bookingData
+            const bookingsForFlights = (liveBookings && liveBookings.length > 0)
+                ? liveBookings
                 : (data || []);
 
             const isInFlightRange = (item) => {
@@ -261,7 +297,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             }, 0);
             const totalSales = bookingSales + voucherSales;
             // Liability must always reflect the current live balance, not the selected sales date range.
-            const totalLiability = computeTotalLiability(bookingData || [], voucherData || []);
+            const totalLiability = computeTotalLiability(liveBookings || [], liveVouchers || []);
 
             // VAT Portion: extract VAT from completed flights gross (paid includes VAT)
             const VAT_RATE = 0.2;
@@ -281,7 +317,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
 
     const handleFilter = () => {
         if (startDate && endDate) {
-            filterData(startDate, endDate);
+            filterData(startDate, endDate, "custom");
         }
     };
 
@@ -362,6 +398,25 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
         letterSpacing: '0.02em',
         textTransform: 'uppercase'
     };
+    const getQuickFilterButtonStyle = (key) => ({
+        ...quickFilterButtonStyle,
+        border: activeQuickFilter === key ? '2px solid #d78d38' : quickFilterButtonStyle.border,
+        background: activeQuickFilter === key ? '#f8fbff' : quickFilterButtonStyle.background,
+        color: activeQuickFilter === key ? '#1c3458' : quickFilterButtonStyle.color,
+        padding: activeQuickFilter === key
+            ? (isMobile ? '7px 11px' : '9px 13px')
+            : quickFilterButtonStyle.padding
+    });
+    const renderQuickFilterButton = (key, label, onClick) => (
+        <button
+            type="button"
+            onClick={onClick}
+            style={getQuickFilterButtonStyle(key)}
+            aria-pressed={activeQuickFilter === key}
+        >
+            {label}
+        </button>
+    );
 
     return (
         <div style={{ padding: isMobile ? "16px" : "24px", background: "#f4f7fc", borderRadius: "22px", border: "1px solid #e1e8f3" }} className="date-range-selector-container">
@@ -388,7 +443,10 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                     <input
                         type="date"
                         value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
+                        onChange={(e) => {
+                            setStartDate(e.target.value);
+                            setActiveQuickFilter("custom");
+                        }}
                         style={{
                             width: '100%', 
                             padding: isMobile ? '6px 8px' : '8px 10px',
@@ -416,7 +474,10 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                     <input
                         type="date"
                         value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
+                        onChange={(e) => {
+                            setEndDate(e.target.value);
+                            setActiveQuickFilter("custom");
+                        }}
                         style={{
                             width: '100%', 
                             padding: isMobile ? '6px 8px' : '8px 10px',
@@ -450,13 +511,15 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                     gap: '8px',
                     marginTop: '10px'
                 }}>
-                    <button onClick={quickLinks.allTime} style={quickFilterButtonStyle}>All Time</button>
-                    <button onClick={quickLinks.monthToDate} style={quickFilterButtonStyle}>MTD</button>
-                    <button onClick={quickLinks.last12Months} style={quickFilterButtonStyle}>Last 12 Months</button>
-                    <button onClick={quickLinks.quarter1} style={quickFilterButtonStyle}>Q1</button>
-                    <button onClick={quickLinks.quarter2} style={quickFilterButtonStyle}>Q2</button>
-                    <button onClick={quickLinks.quarter3} style={quickFilterButtonStyle}>Q3</button>
-                    <button onClick={quickLinks.quarter4} style={quickFilterButtonStyle}>Q4</button>
+                    {renderQuickFilterButton("today", "Today", quickLinks.today)}
+                    {renderQuickFilterButton("monthToDate", "MTD", quickLinks.monthToDate)}
+                    {renderQuickFilterButton("yearToDate", "YTD", quickLinks.yearToDate)}
+                    {renderQuickFilterButton("allTime", "All Time", quickLinks.allTime)}
+                    {renderQuickFilterButton("last12Months", "Last 12 Months", quickLinks.last12Months)}
+                    {renderQuickFilterButton("quarter1", "Q1", quickLinks.quarter1)}
+                    {renderQuickFilterButton("quarter2", "Q2", quickLinks.quarter2)}
+                    {renderQuickFilterButton("quarter3", "Q3", quickLinks.quarter3)}
+                    {renderQuickFilterButton("quarter4", "Q4", quickLinks.quarter4)}
                 </div>
             </div>
 

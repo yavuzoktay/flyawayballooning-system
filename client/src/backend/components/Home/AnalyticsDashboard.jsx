@@ -24,7 +24,27 @@ const grossMetricFallback = {
 const operationalMetricFallback = {
     flights: 0,
     passengers: 0,
-    revenue: 0
+    revenue: 0,
+    revenuePerPassenger: 0
+};
+
+const timingMetricFallback = {
+    averageDays: 0,
+    count: 0
+};
+
+const refundTrackingFallback = {
+    total: { amount: 0, count: 0 },
+    bookings: { amount: 0, count: 0 },
+    vouchers: { amount: 0, count: 0 },
+    other: { amount: 0, count: 0 }
+};
+
+const nonRedemptionFallback = {
+    value: 0,
+    count: 0,
+    bookings: { value: 0, count: 0 },
+    vouchers: { value: 0, count: 0 }
 };
 
 const getGrossMetric = (grossSalesData, key) => grossSalesData?.[key] || grossMetricFallback;
@@ -38,6 +58,22 @@ const formatCountWithLabel = (value, singularLabel, pluralLabel) => {
 };
 const formatFlightCount = (value) => formatCountWithLabel(value, 'flight', 'flights');
 const formatPassengerCount = (value) => formatCountWithLabel(value, 'passenger', 'passengers');
+const getRevenuePerPassenger = (metric = {}) => {
+    if (metric?.revenuePerPassenger !== undefined) {
+        return Number(metric.revenuePerPassenger) || 0;
+    }
+
+    const passengers = Number(metric?.passengers) || 0;
+    if (passengers <= 0) return 0;
+    return (Number(metric?.revenue) || 0) / passengers;
+};
+const formatDayCount = (value) => {
+    const numericValue = Number(value) || 0;
+    const formattedValue = Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(1);
+    return `${formattedValue} ${numericValue === 1 ? 'day' : 'days'}`;
+};
+const formatTimingSampleCount = (value, singularLabel = 'booking', pluralLabel = 'bookings') =>
+    `from ${formatCountWithLabel(value, singularLabel, pluralLabel)}`;
 
 const formatUtilisationPercent = (value) => {
     const numericValue = Number(value) || 0;
@@ -83,6 +119,25 @@ const getSharedSeatUtilisation = (operationalData) =>
         flights: 0
     };
 
+const getTimingMetric = (bookingTimingData, groupKey, metricKey) =>
+    bookingTimingData?.[groupKey]?.[metricKey] || timingMetricFallback;
+
+const getRefundTracking = (refundTrackingData) => ({
+    ...refundTrackingFallback,
+    ...(refundTrackingData || {}),
+    total: refundTrackingData?.total || refundTrackingFallback.total,
+    bookings: refundTrackingData?.bookings || refundTrackingFallback.bookings,
+    vouchers: refundTrackingData?.vouchers || refundTrackingFallback.vouchers,
+    other: refundTrackingData?.other || refundTrackingFallback.other
+});
+
+const getNonRedemption = (nonRedemptionData) => ({
+    ...nonRedemptionFallback,
+    ...(nonRedemptionData || {}),
+    bookings: nonRedemptionData?.bookings || nonRedemptionFallback.bookings,
+    vouchers: nonRedemptionData?.vouchers || nonRedemptionFallback.vouchers
+});
+
 const formatUpdatedAt = (date) => {
     if (!date) return '';
     return date.toLocaleTimeString('en-GB', {
@@ -127,7 +182,7 @@ const GrossSalesTypeRow = ({ label, metric, accentColor }) => (
                     flex: '0 0 auto'
                 }}
             />
-            <Typography sx={{ color: '#1c3458', fontWeight: 700, fontSize: 14 }}>
+            <Typography sx={{ color: '#1c3458', fontWeight: 600, fontSize: 14 }}>
                 {label}
             </Typography>
         </Box>
@@ -179,10 +234,10 @@ const GrossSalesCard = ({ title, label, grossSalesData, comparisons }) => {
             <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 2 }}>
                     <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                             Gross Sales
                         </Typography>
-                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
                             {title}
                         </Typography>
                     </Box>
@@ -195,7 +250,7 @@ const GrossSalesCard = ({ title, label, grossSalesData, comparisons }) => {
                             px: 1.25,
                             py: 0.5,
                             fontSize: 11,
-                            fontWeight: 800,
+                            fontWeight: 700,
                             textTransform: 'uppercase',
                             whiteSpace: 'nowrap'
                         }}
@@ -205,7 +260,7 @@ const GrossSalesCard = ({ title, label, grossSalesData, comparisons }) => {
                 </Box>
 
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 1.5 }}>
-                    <Typography sx={{ color: '#102844', fontSize: { xs: 30, md: 36 }, fontWeight: 800, lineHeight: 1 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 30, md: 36 }, fontWeight: 700, lineHeight: 1 }}>
                         {formatMoney(totalMetric.revenue)}
                     </Typography>
                     <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
@@ -260,7 +315,7 @@ const FinancialTrackingRow = ({ label, value, supportingValue, accentColor }) =>
             </Typography>
         </Box>
         <Box sx={{ textAlign: { xs: 'left', lg: 'right' }, minWidth: 0 }}>
-            <Typography sx={{ color: '#102844', fontWeight: 800, fontSize: 20, lineHeight: 1.1 }}>
+            <Typography sx={{ color: '#102844', fontWeight: 700, fontSize: 20, lineHeight: 1.1 }}>
                 {value}
             </Typography>
             {supportingValue ? (
@@ -281,10 +336,10 @@ const AverageBookingValueCard = ({ todayData, monthToDateData }) => {
             <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
                     <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                             Financial Tracking
                         </Typography>
-                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
                             Average Booking Value
                         </Typography>
                     </Box>
@@ -297,7 +352,7 @@ const AverageBookingValueCard = ({ todayData, monthToDateData }) => {
                             px: 1.25,
                             py: 0.5,
                             fontSize: 11,
-                            fontWeight: 800,
+                            fontWeight: 700,
                             textTransform: 'uppercase',
                             whiteSpace: 'nowrap'
                         }}
@@ -334,10 +389,10 @@ const BookingVolumeCard = ({ todayData, monthToDateData }) => {
             <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
                     <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                             Booking Behaviour
                         </Typography>
-                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
                             Number of Bookings
                         </Typography>
                     </Box>
@@ -350,7 +405,7 @@ const BookingVolumeCard = ({ todayData, monthToDateData }) => {
                             px: 1.25,
                             py: 0.5,
                             fontSize: 11,
-                            fontWeight: 800,
+                            fontWeight: 700,
                             textTransform: 'uppercase',
                             whiteSpace: 'nowrap'
                         }}
@@ -359,7 +414,7 @@ const BookingVolumeCard = ({ todayData, monthToDateData }) => {
                     </Box>
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.75 }}>
-                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 800, lineHeight: 1 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
                         {formatBookingCount(monthToDate.bookings.total)}
                     </Typography>
                     <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
@@ -376,6 +431,135 @@ const BookingVolumeCard = ({ todayData, monthToDateData }) => {
                     label="Private bookings"
                     value={formatBookingCount(monthToDate.bookings.private)}
                     supportingValue={`${formatBookingCount(today.bookings.private)} today`}
+                    accentColor="#d78d38"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
+const RefundTrackingCard = ({ refundTrackingData }) => {
+    const refundTracking = getRefundTracking(refundTrackingData);
+    const total = refundTracking.total;
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Financial Tracking
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
+                            Refund Tracking
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#8a2f1f',
+                            background: '#fff0eb',
+                            border: '1px solid #f3c4b7',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Period
+                    </Box>
+                </Box>
+                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.75 }}>
+                    Refunds issued from payment history within the selected period.
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.5 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
+                        {formatMoney(total.amount)}
+                    </Typography>
+                    <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
+                        {formatCountWithLabel(total.count, 'refund issued', 'refunds issued')}
+                    </Typography>
+                </Box>
+                <FinancialTrackingRow
+                    label="Booking refunds"
+                    value={formatMoney(refundTracking.bookings.amount)}
+                    supportingValue={formatCountWithLabel(refundTracking.bookings.count, 'refund', 'refunds')}
+                    accentColor="#bd4a2f"
+                />
+                <FinancialTrackingRow
+                    label="Voucher refunds"
+                    value={formatMoney(refundTracking.vouchers.amount)}
+                    supportingValue={formatCountWithLabel(refundTracking.vouchers.count, 'refund', 'refunds')}
+                    accentColor="#d78d38"
+                />
+                {refundTracking.other.count > 0 ? (
+                    <FinancialTrackingRow
+                        label="Other refunds"
+                        value={formatMoney(refundTracking.other.amount)}
+                        supportingValue={formatCountWithLabel(refundTracking.other.count, 'refund', 'refunds')}
+                        accentColor="#667b98"
+                    />
+                ) : null}
+            </CardContent>
+        </Card>
+    );
+};
+
+const NonRedemptionCard = ({ nonRedemptionData }) => {
+    const nonRedemption = getNonRedemption(nonRedemptionData);
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Booking Behaviour
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
+                            Non-Redemption
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#6d4d00',
+                            background: '#fff7d8',
+                            border: '1px solid #efe1a4',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Expired
+                    </Box>
+                </Box>
+                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.75 }}>
+                    Expired unused bookings and vouchers in the selected period.
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.5 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
+                        {formatMoney(nonRedemption.value)}
+                    </Typography>
+                    <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
+                        {formatCountWithLabel(nonRedemption.count, 'expired booking/voucher', 'expired bookings/vouchers')}
+                    </Typography>
+                </Box>
+                <FinancialTrackingRow
+                    label="Expired bookings"
+                    value={formatMoney(nonRedemption.bookings.value)}
+                    supportingValue={formatCountWithLabel(nonRedemption.bookings.count, 'booking', 'bookings')}
+                    accentColor="#2d69c5"
+                />
+                <FinancialTrackingRow
+                    label="Expired vouchers"
+                    value={formatMoney(nonRedemption.vouchers.value)}
+                    supportingValue={formatCountWithLabel(nonRedemption.vouchers.count, 'voucher', 'vouchers')}
                     accentColor="#d78d38"
                 />
             </CardContent>
@@ -409,11 +593,11 @@ const OperationalPerformanceRow = ({ label, metric, accentColor }) => (
             </Typography>
         </Box>
         <Box sx={{ textAlign: { xs: 'left', lg: 'right' }, minWidth: 0 }}>
-            <Typography sx={{ color: '#102844', fontWeight: 800, fontSize: 18, lineHeight: 1.1 }}>
+            <Typography sx={{ color: '#102844', fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>
                 {formatMoney(metric.revenue)}
             </Typography>
-            <Typography sx={{ color: '#667b98', fontWeight: 700, fontSize: 12, mt: 0.25, overflowWrap: 'anywhere' }}>
-                {formatFlightCount(metric.flights)} · {formatPassengerCount(metric.passengers)}
+            <Typography sx={{ color: '#667b98', fontWeight: 600, fontSize: 12, mt: 0.25, overflowWrap: 'anywhere' }}>
+                {formatFlightCount(metric.flights)} · {formatPassengerCount(metric.passengers)} · {formatMoney(getRevenuePerPassenger(metric))} per passenger
             </Typography>
         </Box>
     </Box>
@@ -429,10 +613,10 @@ const FlightsFlownCard = ({ operationalData }) => {
             <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
                     <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                             Operational Performance
                         </Typography>
-                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
                             Flights Flown + Passenger Count
                         </Typography>
                     </Box>
@@ -445,7 +629,7 @@ const FlightsFlownCard = ({ operationalData }) => {
                             px: 1.25,
                             py: 0.5,
                             fontSize: 11,
-                            fontWeight: 800,
+                            fontWeight: 700,
                             textTransform: 'uppercase',
                             whiteSpace: 'nowrap'
                         }}
@@ -454,7 +638,7 @@ const FlightsFlownCard = ({ operationalData }) => {
                     </Box>
                 </Box>
                 <Box sx={{ mb: 0.75, minWidth: 0 }}>
-                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 800, lineHeight: 1 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
                         {formatBookingCount(total.flights)}
                     </Typography>
                     <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700, mt: 0.5, width: '100%', maxWidth: '100%', minWidth: 0, overflowWrap: 'anywhere' }}>
@@ -485,10 +669,10 @@ const SeatUtilisationCard = ({ operationalData }) => {
             <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
                     <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                             Shared Flight Efficiency
                         </Typography>
-                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 800, lineHeight: 1.15 }}>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
                             Seat Utilisation
                         </Typography>
                     </Box>
@@ -501,7 +685,7 @@ const SeatUtilisationCard = ({ operationalData }) => {
                             px: 1.25,
                             py: 0.5,
                             fontSize: 11,
-                            fontWeight: 800,
+                            fontWeight: 700,
                             textTransform: 'uppercase',
                             whiteSpace: 'nowrap'
                         }}
@@ -510,7 +694,7 @@ const SeatUtilisationCard = ({ operationalData }) => {
                     </Box>
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 1.5 }}>
-                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 800, lineHeight: 1 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
                         {formatUtilisationPercent(sharedUtilisation.percent)}
                     </Typography>
                     <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
@@ -538,6 +722,164 @@ const SeatUtilisationCard = ({ operationalData }) => {
                     value={formatSeatCount(sharedUtilisation.capacity)}
                     supportingValue="completed flight seats"
                     accentColor="#67b8a7"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
+const TimingMetricRow = ({ label, metric, accentColor, countLabel = ['booking', 'bookings'] }) => (
+    <Box
+        sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) auto' },
+            gap: { xs: 0.5, sm: 1.5 },
+            alignItems: 'center',
+            py: 1.35,
+            borderTop: '1px solid #e7eef7'
+        }}
+    >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+            <Box
+                sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: accentColor,
+                    flex: '0 0 auto'
+                }}
+            />
+            <Typography sx={{ color: '#1c3458', fontWeight: 700, fontSize: 14 }}>
+                {label}
+            </Typography>
+        </Box>
+        <Box sx={{ textAlign: { xs: 'left', lg: 'right' }, minWidth: 0 }}>
+            <Typography sx={{ color: '#102844', fontWeight: 700, fontSize: 20, lineHeight: 1.1 }}>
+                {formatDayCount(metric.averageDays)}
+            </Typography>
+            <Typography sx={{ color: '#667b98', fontWeight: 700, fontSize: 12, mt: 0.25, overflowWrap: 'anywhere' }}>
+                {formatTimingSampleCount(metric.count, countLabel[0], countLabel[1])}
+            </Typography>
+        </Box>
+    </Box>
+);
+
+const BookingLeadTimeCard = ({ bookingTimingData }) => {
+    const total = getTimingMetric(bookingTimingData, 'leadTime', 'total');
+    const shared = getTimingMetric(bookingTimingData, 'leadTime', 'shared');
+    const privateMetric = getTimingMetric(bookingTimingData, 'leadTime', 'private');
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Booking Behaviour
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
+                            Booking Lead Time
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#8a5b12',
+                            background: '#fff3df',
+                            border: '1px solid #f3d7aa',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Avg Days
+                    </Box>
+                </Box>
+                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.75 }}>
+                    Booking created date to first booked flight date.
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.5 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
+                        {formatDayCount(total.averageDays)}
+                    </Typography>
+                    <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
+                        average · {formatBookingCount(total.count)} bookings
+                    </Typography>
+                </Box>
+                <TimingMetricRow
+                    label="Shared flight lead time"
+                    metric={shared}
+                    accentColor="#2d69c5"
+                />
+                <TimingMetricRow
+                    label="Private flight lead time"
+                    metric={privateMetric}
+                    accentColor="#d78d38"
+                />
+            </CardContent>
+        </Card>
+    );
+};
+
+const RedemptionTimeCard = ({ bookingTimingData }) => {
+    const total = getTimingMetric(bookingTimingData, 'redemptionTime', 'total');
+    const shared = getTimingMetric(bookingTimingData, 'redemptionTime', 'shared');
+    const privateMetric = getTimingMetric(bookingTimingData, 'redemptionTime', 'private');
+
+    return (
+        <Card sx={grossSalesCardSx}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', mb: 1.75 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ color: '#667b98', fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                            Booking Behaviour
+                        </Typography>
+                        <Typography sx={{ color: '#1c3458', fontSize: { xs: 20, md: 22 }, fontWeight: 700, lineHeight: 1.15 }}>
+                            Redemption Time
+                        </Typography>
+                    </Box>
+                    <Box
+                        sx={{
+                            color: '#6d4d00',
+                            background: '#fff7d8',
+                            border: '1px solid #efe1a4',
+                            borderRadius: '999px',
+                            px: 1.25,
+                            py: 0.5,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        Flown
+                    </Box>
+                </Box>
+                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.75 }}>
+                    Purchase or booking date to flight actually taken.
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.5 }}>
+                    <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
+                        {formatDayCount(total.averageDays)}
+                    </Typography>
+                    <Typography sx={{ color: '#617694', fontSize: 14, fontWeight: 700 }}>
+                        average redemption time
+                    </Typography>
+                </Box>
+                <TimingMetricRow
+                    label="Shared redemption time"
+                    metric={shared}
+                    accentColor="#2d69c5"
+                    countLabel={['flown booking', 'flown bookings']}
+                />
+                <TimingMetricRow
+                    label="Private redemption time"
+                    metric={privateMetric}
+                    accentColor="#d78d38"
+                    countLabel={['flown booking', 'flown bookings']}
                 />
             </CardContent>
         </Card>
@@ -613,6 +955,9 @@ const AnalyticsDashboard = ({ dateRange }) => {
     };
     const grossSales = analytics?.grossSales || {};
     const operationalPerformance = analytics?.operationalPerformance || {};
+    const bookingTiming = analytics?.bookingTiming || {};
+    const refundTracking = analytics?.refundTracking || {};
+    const nonRedemption = analytics?.nonRedemption || {};
     const lastUpdatedLabel = formatUpdatedAt(lastUpdated);
 
     return (
@@ -628,7 +973,7 @@ const AnalyticsDashboard = ({ dateRange }) => {
                 }}
             >
                 <Box>
-                    <Typography sx={{ color: '#1c3458', fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>
+                    <Typography sx={{ color: '#1c3458', fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>
                         Real-time Performance Overview
                     </Typography>
                     <Typography sx={{ color: '#667b98', fontSize: 13, mt: 0.5 }}>
@@ -673,6 +1018,22 @@ const AnalyticsDashboard = ({ dateRange }) => {
                         todayData={grossSales.today}
                         monthToDateData={grossSales.monthToDate}
                     />
+                </Grid>
+            </Grid>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={6}>
+                    <RefundTrackingCard refundTrackingData={refundTracking} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                    <NonRedemptionCard nonRedemptionData={nonRedemption} />
+                </Grid>
+            </Grid>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={6}>
+                    <BookingLeadTimeCard bookingTimingData={bookingTiming} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                    <RedemptionTimeCard bookingTimingData={bookingTiming} />
                 </Grid>
             </Grid>
             <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -764,15 +1125,6 @@ const AnalyticsDashboard = ({ dateRange }) => {
                         <CardContent>
                             <Typography sx={cardTitleSx}>Extras</Typography>
                             <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mb: 0.5 }}>
-                                Non-Redemption
-                            </Typography>
-                            <Typography sx={bodyTextSx}>
-                                Expired unused total: <span style={{color:'#16a085'}}>£{formatGbp(analytics?.nonRedemption?.value || 0)}</span>
-                            </Typography>
-                            <Typography sx={bodyTextSx}>
-                                Records: <span style={{color:'#465a79'}}>{analytics?.nonRedemption?.count || 0}</span>
-                            </Typography>
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
                                 Add On's
                             </Typography>
                             {renderList(analytics?.addOns, (addOnRow, index) => (

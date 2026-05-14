@@ -24175,6 +24175,14 @@ app.get('/api/analytics', async (req, res) => {
         if (analyticsEndDate) sql += ` AND DATE(${field}) <= ${con.escape(analyticsEndDate)}`;
         return sql;
     };
+    const analyticsLiveDataStartDate =
+        normalizeAnalyticsDateParam(process.env.ANALYTICS_LIVE_DATA_START_DATE) || '2026-01-01';
+    const shouldExcludeImportedAnalyticsData =
+        String(process.env.ANALYTICS_INCLUDE_IMPORTED_DATA || '').trim().toLowerCase() !== 'true';
+    const liveDataFilter = (field = 'created_at') => {
+        if (!shouldExcludeImportedAnalyticsData || !analyticsLiveDataStartDate) return '';
+        return ` AND DATE(${field}) >= ${con.escape(analyticsLiveDataStartDate)}`;
+    };
     const queryAsync = (sql, params = []) =>
         con.promise().query(sql, params).then(([rows]) => rows);
     const tableHasColumn = async (tableName, columnName) => {
@@ -24195,6 +24203,10 @@ app.get('/api/analytics', async (req, res) => {
     };
     const parseAnalyticsDate = (value) => {
         if (!value) return null;
+        if (value instanceof Date) {
+            const parsedDate = moment(value);
+            return parsedDate.isValid() ? parsedDate : null;
+        }
 
         const strictFormats = [
             'YYYY-MM-DD HH:mm:ss',
@@ -24357,6 +24369,54 @@ app.get('/api/analytics', async (req, res) => {
         private: finalizeGrossSalesMetric(breakdown.private),
         shared: finalizeGrossSalesMetric(breakdown.shared)
     });
+    const createRefundTrackingMetric = () => ({
+        amount: 0,
+        count: 0
+    });
+    const createRefundTrackingBreakdown = () => ({
+        total: createRefundTrackingMetric(),
+        bookings: createRefundTrackingMetric(),
+        vouchers: createRefundTrackingMetric(),
+        other: createRefundTrackingMetric()
+    });
+    const finalizeRefundTrackingMetric = (metric = {}) => ({
+        amount: roundCurrencyAmount(metric.amount),
+        count: Number(metric.count) || 0
+    });
+    const finalizeRefundTrackingBreakdown = (breakdown = {}) => ({
+        total: finalizeRefundTrackingMetric(breakdown.total),
+        bookings: finalizeRefundTrackingMetric(breakdown.bookings),
+        vouchers: finalizeRefundTrackingMetric(breakdown.vouchers),
+        other: finalizeRefundTrackingMetric(breakdown.other)
+    });
+    const getRefundTrackingSegment = (row = {}) => {
+        const bookingId = Number(row.booking_id);
+        if (Number.isFinite(bookingId) && bookingId > 0) return 'bookings';
+        if (
+            (Number.isFinite(bookingId) && bookingId === 0) ||
+            row.voucher_id ||
+            normalizeAnalyticsText(row.voucher_ref)
+        ) {
+            return 'vouchers';
+        }
+        return 'other';
+    };
+    const summarizeRefundTrackingRows = (rows = []) => {
+        const breakdown = createRefundTrackingBreakdown();
+
+        rows.forEach((row) => {
+            const amount = Math.abs(roundCurrencyAmount(row.amount));
+            if (!(amount > 0)) return;
+
+            const segment = getRefundTrackingSegment(row);
+            breakdown[segment].amount += amount;
+            breakdown[segment].count += 1;
+            breakdown.total.amount += amount;
+            breakdown.total.count += 1;
+        });
+
+        return finalizeRefundTrackingBreakdown(breakdown);
+    };
     const buildFinancialTrackingSummary = (breakdown = {}) => ({
         averageBookingValue: {
             total: calculateAverageBookingValue(breakdown.total),
@@ -24476,11 +24536,16 @@ app.get('/api/analytics', async (req, res) => {
         passengers: 0,
         revenue: 0
     });
-    const finalizeOperationalMetric = (metric = {}) => ({
-        flights: Number(metric.flights) || 0,
-        passengers: Number(metric.passengers) || 0,
-        revenue: roundCurrencyAmount(metric.revenue)
-    });
+    const finalizeOperationalMetric = (metric = {}) => {
+        const passengers = Number(metric.passengers) || 0;
+        const revenue = roundCurrencyAmount(metric.revenue);
+        return {
+            flights: Number(metric.flights) || 0,
+            passengers,
+            revenue,
+            revenuePerPassenger: passengers > 0 ? roundCurrencyAmount(revenue / passengers) : 0
+        };
+    };
     const getOperationalPassengerCount = (row = {}) => {
         const candidates = [row.pax, row.passenger_count];
         for (const candidate of candidates) {
@@ -24563,10 +24628,243 @@ app.get('/api/analytics', async (req, res) => {
             }
         };
     };
+    const createTimingMetric = () => ({
+        totalDays: 0,
+        count: 0
+    });
+    const createTimingBreakdown = () => ({
+        total: createTimingMetric(),
+        private: createTimingMetric(),
+        shared: createTimingMetric()
+    });
+    const finalizeTimingMetric = (metric = {}) => {
+        const count = Number(metric.count) || 0;
+        return {
+            averageDays: count > 0
+                ? Math.round((Number(metric.totalDays || 0) / count) * 10) / 10
+                : 0,
+            count
+        };
+    };
+    const finalizeTimingBreakdown = (breakdown = {}) => ({
+        total: finalizeTimingMetric(breakdown.total),
+        private: finalizeTimingMetric(breakdown.private),
+        shared: finalizeTimingMetric(breakdown.shared)
+    });
+    const getAnalyticsDayDifference = (startValue, endValue) => {
+        const startDate = parseAnalyticsDate(startValue);
+        const endDate = parseAnalyticsDate(endValue);
+        if (!startDate || !endDate) return null;
+
+        const days = endDate.clone().startOf('day').diff(startDate.clone().startOf('day'), 'days');
+        return Number.isFinite(days) && days >= 0 ? days : null;
+    };
+    const addTimingValue = (breakdown, segment, days) => {
+        if (!Number.isFinite(days) || days < 0) return;
+        breakdown[segment].totalDays += days;
+        breakdown[segment].count += 1;
+        breakdown.total.totalDays += days;
+        breakdown.total.count += 1;
+    };
+    const summarizeBookingLeadTimeRows = (rows = []) => {
+        const breakdown = createTimingBreakdown();
+
+        rows.forEach((row) => {
+            const days = getAnalyticsDayDifference(row.booking_created_at, row.first_booked_flight_date);
+            if (days === null) return;
+            addTimingValue(breakdown, getGrossSalesSegment(row), days);
+        });
+
+        return finalizeTimingBreakdown(breakdown);
+    };
+    const summarizeRedemptionTimeRows = (rows = []) => {
+        const breakdown = createTimingBreakdown();
+
+        rows.forEach((row) => {
+            const days = getAnalyticsDayDifference(row.purchase_date, row.flight_taken_date);
+            if (days === null) return;
+            addTimingValue(breakdown, getGrossSalesSegment(row), days);
+        });
+
+        return finalizeTimingBreakdown(breakdown);
+    };
     const buildOperationalRange = () => ({
         start: analyticsStartDate || null,
         end: analyticsEndDate || null
     });
+    const buildRefundTrackingRange = () => ({
+        start: analyticsStartDate || null,
+        end: analyticsEndDate || null,
+        dateField: 'refund_issued_at'
+    });
+    const getRefundTrackingSnapshot = async () => {
+        const [
+            hasPaymentHistoryAmount,
+            hasPaymentHistoryStatus,
+            hasPaymentHistoryOrigin,
+            hasPaymentHistoryCreatedAt,
+            hasPaymentHistoryBookingId,
+            hasPaymentHistoryVoucherId,
+            hasPaymentHistoryVoucherRef
+        ] = await Promise.all([
+            tableHasColumn('payment_history', 'amount'),
+            tableHasColumn('payment_history', 'payment_status'),
+            tableHasColumn('payment_history', 'origin'),
+            tableHasColumn('payment_history', 'created_at'),
+            tableHasColumn('payment_history', 'booking_id'),
+            tableHasColumn('payment_history', 'voucher_id'),
+            tableHasColumn('payment_history', 'voucher_ref')
+        ]);
+
+        if (!hasPaymentHistoryAmount) {
+            return {
+                generatedAt: moment().toISOString(),
+                range: buildRefundTrackingRange(),
+                ...finalizeRefundTrackingBreakdown(createRefundTrackingBreakdown())
+            };
+        }
+
+        const paymentStatusSql = hasPaymentHistoryStatus
+            ? `TRIM(LOWER(COALESCE(payment_status, '')))`
+            : `''`;
+        const paymentOriginSql = hasPaymentHistoryOrigin
+            ? `TRIM(LOWER(COALESCE(origin, '')))`
+            : `''`;
+        const legacyRefundStatusCondition = hasPaymentHistoryStatus
+            ? `OR (
+                    ${paymentStatusSql} IN ('refunded', 'refund')
+                    AND (${paymentOriginSql} = '' OR ${paymentOriginSql} = 'refund')
+               )`
+            : '';
+        const originRefundCondition = hasPaymentHistoryOrigin
+            ? `OR ${paymentOriginSql} = 'refund'`
+            : '';
+        const refundIssuedDateFilter = hasPaymentHistoryCreatedAt
+            ? dateFilter('created_at')
+            : '';
+        const refundIssuedLiveDataFilter = hasPaymentHistoryCreatedAt
+            ? liveDataFilter('created_at')
+            : '';
+
+        const refundRows = await queryAsync(`
+            SELECT
+                amount,
+                ${hasPaymentHistoryBookingId ? 'booking_id' : 'NULL AS booking_id'},
+                ${hasPaymentHistoryVoucherId ? 'voucher_id' : 'NULL AS voucher_id'},
+                ${hasPaymentHistoryVoucherRef ? 'voucher_ref' : 'NULL AS voucher_ref'}
+            FROM payment_history
+            WHERE amount IS NOT NULL
+              AND (
+                    amount < 0
+                    ${originRefundCondition}
+                    ${legacyRefundStatusCondition}
+                  )
+              ${refundIssuedLiveDataFilter}
+              ${refundIssuedDateFilter}
+        `);
+
+        return {
+            generatedAt: moment().toISOString(),
+            range: buildRefundTrackingRange(),
+            ...summarizeRefundTrackingRows(refundRows || [])
+        };
+    };
+    const buildBookingTimingRange = () => ({
+        start: analyticsStartDate || null,
+        end: analyticsEndDate || null,
+        leadTimeDateField: 'booking_created_at',
+        redemptionTimeDateField: 'flight_taken_date'
+    });
+    const getBookingTimingSnapshot = async () => {
+        const [
+            hasBookingFlightTypeSource,
+            hasBookingVoucherTypeDetail,
+            hasVoucherTypeDetail,
+            hasBookingManualStatusOverride,
+            hasHistoryFlightDate,
+            hasHistoryChangedAt
+        ] = await Promise.all([
+            tableHasColumn('all_booking', 'flight_type_source'),
+            tableHasColumn('all_booking', 'voucher_type_detail'),
+            tableHasColumn('all_vouchers', 'voucher_type_detail'),
+            tableHasColumn('all_booking', 'manual_status_override'),
+            tableHasColumn('booking_status_history', 'flight_date'),
+            tableHasColumn('booking_status_history', 'changed_at')
+        ]);
+        const manualStatusFilter = hasBookingManualStatusOverride
+            ? `AND TRIM(LOWER(COALESCE(ab.manual_status_override, ''))) != 'cancelled'`
+            : '';
+        const excludedBookingStatusFilter = `
+            AND TRIM(LOWER(COALESCE(ab.status, ''))) NOT IN ('cancelled', 'canceled', 'refund', 'refunded', 'expired')
+        `;
+        const historyOrderSql = hasHistoryChangedAt
+            ? `COALESCE(h.changed_at, '1970-01-01 00:00:00') ASC, h.id ASC`
+            : `h.id ASC`;
+        const firstBookedFlightDateSql = hasHistoryFlightDate
+            ? `
+                COALESCE((
+                    SELECT h.flight_date
+                    FROM booking_status_history h
+                    WHERE h.booking_id = ab.id
+                      AND h.flight_date IS NOT NULL
+                      AND h.flight_date != '0000-00-00 00:00:00'
+                    ORDER BY ${historyOrderSql}
+                    LIMIT 1
+                ), ab.flight_date)
+            `
+            : `ab.flight_date`;
+        const commonTypeSelect = `
+            ab.experience,
+            ab.flight_type,
+            ${hasBookingFlightTypeSource ? 'ab.flight_type_source' : 'NULL AS flight_type_source'},
+            ab.voucher_type,
+            ${hasBookingVoucherTypeDetail ? 'ab.voucher_type_detail' : 'NULL AS voucher_type_detail'},
+            v.voucher_type AS linked_voucher_type,
+            ${hasVoucherTypeDetail ? 'v.voucher_type_detail AS linked_voucher_type_detail' : 'NULL AS linked_voucher_type_detail'},
+            v.experience_type AS linked_experience_type,
+            NULL AS experience_type,
+            NULL AS book_flight
+        `;
+
+        const leadTimeRows = await queryAsync(`
+            SELECT
+                ab.id,
+                ab.created_at AS booking_created_at,
+                ${firstBookedFlightDateSql} AS first_booked_flight_date,
+                ${commonTypeSelect}
+            FROM all_booking ab
+            LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            WHERE ab.created_at IS NOT NULL
+              AND ab.flight_date IS NOT NULL
+              ${excludedBookingStatusFilter}
+              ${manualStatusFilter}
+              ${liveDataFilter('ab.created_at')}
+              ${dateFilter('ab.created_at')}
+        `);
+
+        const redemptionRows = await queryAsync(`
+            SELECT
+                ab.id,
+                COALESCE(v.created_at, ab.created_at) AS purchase_date,
+                ab.flight_date AS flight_taken_date,
+                ${commonTypeSelect}
+            FROM all_booking ab
+            LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            WHERE ab.created_at IS NOT NULL
+              AND ab.flight_date IS NOT NULL
+              AND TRIM(LOWER(COALESCE(ab.status, ''))) = 'flown'
+              ${manualStatusFilter}
+              ${liveDataFilter('ab.created_at')}
+              ${dateFilter('ab.flight_date')}
+        `);
+
+        return {
+            generatedAt: moment().toISOString(),
+            range: buildBookingTimingRange(),
+            leadTime: summarizeBookingLeadTimeRows(leadTimeRows || []),
+            redemptionTime: summarizeRedemptionTimeRows(redemptionRows || [])
+        };
+    };
     const getOperationalPerformanceSnapshot = async () => {
         const [
             hasBookingFlightTypeSource,
@@ -24641,6 +24939,7 @@ app.get('/api/analytics', async (req, res) => {
             WHERE ab.flight_date IS NOT NULL
               AND TRIM(LOWER(COALESCE(ab.status, ''))) = 'flown'
               ${manualStatusFilter}
+              ${liveDataFilter('ab.created_at')}
               ${dateFilter('ab.flight_date')}
         `);
 
@@ -24846,6 +25145,7 @@ app.get('/api/analytics', async (req, res) => {
                 WHERE ab.created_at IS NOT NULL
                   AND DATE(ab.created_at) >= ?
                   AND DATE(ab.created_at) <= ?
+                  ${liveDataFilter('ab.created_at')}
                   ${redeemedBookingFilter}
                   AND (
                         COALESCE(ab.paid, 0) > 0
@@ -24877,6 +25177,7 @@ app.get('/api/analytics', async (req, res) => {
                 WHERE v.created_at IS NOT NULL
                   AND DATE(v.created_at) >= ?
                   AND DATE(v.created_at) <= ?
+                  ${liveDataFilter('v.created_at')}
                   AND (
                         COALESCE(v.paid, 0) > 0
                         OR ${voucherPaymentTotalExpression} > 0
@@ -24931,6 +25232,7 @@ app.get('/api/analytics', async (req, res) => {
         FROM all_booking
         WHERE flight_date IS NOT NULL
         AND status IN ('Flown', 'Confirmed', 'Scheduled')
+        ${liveDataFilter('created_at')}
         ${dateFilter()}
     `;
     con.query(attemptsSql, [], (err, rows) => {
@@ -25039,6 +25341,7 @@ app.get('/api/analytics', async (req, res) => {
             WHERE flight_date IS NOT NULL
             AND status IN ('Flown', 'Confirmed', 'Scheduled')
                 AND hear_about_us IS NOT NULL AND hear_about_us != ''
+            ${liveDataFilter('created_at')}
             ${dateFilter()}
             GROUP BY hear_about_us
         `;
@@ -25065,11 +25368,12 @@ app.get('/api/analytics', async (req, res) => {
                         AND ab.flight_date IS NOT NULL
                         AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
                         AND aia.answer IS NOT NULL AND aia.answer != ''
+                        ${liveDataFilter('ab.created_at')}
                         ${dateFilter('ab.flight_date')}
                         GROUP BY aia.answer
                     `;
 
-                    con.query(answersSourceSql, [hearAboutUsQuestionId], (errAnswers, answerRows) => {
+                    con.query(answersSourceSql, [hearAboutUsQuestionId], async (errAnswers, answerRows) => {
                         if (errAnswers) {
                             console.warn('Error fetching answers from additional_information_answers:', errAnswers);
                         } else {
@@ -25083,13 +25387,15 @@ app.get('/api/analytics', async (req, res) => {
 
                         // 3. Get from all_vouchers (both additional_information_json and legacy fields)
                         // For vouchers, we count each voucher that has source information
+                        const hasVoucherHearAboutUsColumn = await tableHasColumn('all_vouchers', 'hear_about_us');
                         const vouchersSourceSql = `
                             SELECT 
                                 v.additional_information_json,
-                                v.hear_about_us,
+                                ${hasVoucherHearAboutUsColumn ? 'v.hear_about_us' : 'NULL AS hear_about_us'},
                                 v.created_at
                             FROM all_vouchers v
                             WHERE v.created_at IS NOT NULL
+                            ${liveDataFilter('v.created_at')}
                             ${dateFilter('v.created_at')}
                         `;
 
@@ -25145,6 +25451,8 @@ app.get('/api/analytics', async (req, res) => {
                                     const hasVoucherLocationColumn = await tableHasColumn('all_vouchers', 'location');
                                     const grossSalesPromise = getGrossSalesSnapshot();
                                     const operationalPerformancePromise = getOperationalPerformanceSnapshot();
+                                    const bookingTimingPromise = getBookingTimingSnapshot();
+                                    const refundTrackingPromise = getRefundTrackingSnapshot();
                                     const [
                                         nonRedemptionBookingRows,
                                         nonRedemptionVoucherRows,
@@ -25171,6 +25479,7 @@ app.get('/api/analytics', async (req, res) => {
                                                     OR (expires IS NOT NULL AND expires < CURDATE())
                                                   )
                                               AND TRIM(LOWER(COALESCE(status, ''))) != 'flown'
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter('expires')}
                                         `),
                                         queryAsync(`
@@ -25189,6 +25498,7 @@ app.get('/api/analytics', async (req, res) => {
                                                     status IS NULL
                                                     OR TRIM(LOWER(status)) NOT IN ('used', 'flown')
                                                   )
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter('expires')}
                                         `),
                                         queryAsync(`
@@ -25200,6 +25510,7 @@ app.get('/api/analytics', async (req, res) => {
                                                 paid
                                             FROM all_booking
                                             WHERE COALESCE(paid, 0) > 0
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter()}
                                         `),
                                         queryAsync(`
@@ -25214,6 +25525,7 @@ app.get('/api/analytics', async (req, res) => {
                                                 numberOfPassengers
                                             FROM all_vouchers
                                             WHERE COALESCE(paid, 0) > 0
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter('created_at')}
                                         `),
                                         queryAsync(`
@@ -25228,6 +25540,7 @@ app.get('/api/analytics', async (req, res) => {
                                               AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
                                               AND ab.location IS NOT NULL AND ab.location != ''
                                               AND v.id IS NULL
+                                              ${liveDataFilter('ab.created_at')}
                                               ${dateFilter('ab.flight_date')}
                                             GROUP BY ab.location
                                         `),
@@ -25236,6 +25549,7 @@ app.get('/api/analytics', async (req, res) => {
                                             FROM all_vouchers
                                             WHERE created_at IS NOT NULL
                                               AND preferred_location IS NOT NULL AND preferred_location != ''
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter('created_at')}
                                             GROUP BY preferred_location
                                         `),
@@ -25245,6 +25559,7 @@ app.get('/api/analytics', async (req, res) => {
                                             WHERE created_at IS NOT NULL
                                               AND location IS NOT NULL AND location != ''
                                               AND (preferred_location IS NULL OR preferred_location = '')
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter('created_at')}
                                             GROUP BY location
                                         `) : Promise.resolve([]),
@@ -25256,6 +25571,7 @@ app.get('/api/analytics', async (req, res) => {
                                             LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
                                             WHERE ab.flight_date IS NOT NULL
                                               AND ab.status IN ('Flown', 'Confirmed', 'Scheduled')
+                                              ${liveDataFilter('ab.created_at')}
                                               ${dateFilter('ab.flight_date')}
                                             GROUP BY voucher_type
                                         `),
@@ -25263,6 +25579,7 @@ app.get('/api/analytics', async (req, res) => {
                                             SELECT voucher_type, COUNT(*) as count
                                             FROM all_vouchers
                                             WHERE created_at IS NOT NULL
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter('created_at')}
                                             GROUP BY voucher_type
                                         `),
@@ -25286,6 +25603,7 @@ app.get('/api/analytics', async (req, res) => {
                                             LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
                                             WHERE ab.paid IS NOT NULL
                                               AND ab.paid > 0
+                                              ${liveDataFilter('ab.created_at')}
                                         `),
                                         queryAsync(`
                                             SELECT
@@ -25303,6 +25621,7 @@ app.get('/api/analytics', async (req, res) => {
                                             FROM all_vouchers v
                                             WHERE v.paid IS NOT NULL
                                               AND v.paid > 0
+                                              ${liveDataFilter('v.created_at')}
                                         `),
                                         queryAsync(`
                                             SELECT location, COUNT(*) as count
@@ -25310,6 +25629,7 @@ app.get('/api/analytics', async (req, res) => {
                                             WHERE status != 'Cancelled'
                                               AND flight_date IS NOT NULL
                                               AND flight_date < CURDATE()
+                                              ${liveDataFilter('created_at')}
                                               ${dateFilter('flight_date')}
                                             GROUP BY location
                                         `)
@@ -25323,7 +25643,15 @@ app.get('/api/analytics', async (req, res) => {
                                     nonRedemption = {
                                         value: roundCurrencyAmount(expiredBookingPaid + expiredVoucherPaid),
                                         percent: 0,
-                                        count: expiredBookingCount + expiredVoucherCount
+                                        count: expiredBookingCount + expiredVoucherCount,
+                                        bookings: {
+                                            value: roundCurrencyAmount(expiredBookingPaid),
+                                            count: expiredBookingCount
+                                        },
+                                        vouchers: {
+                                            value: roundCurrencyAmount(expiredVoucherPaid),
+                                            count: expiredVoucherCount
+                                        }
                                     };
 
                                     const addOnCatalogMap = {};
@@ -25624,11 +25952,19 @@ app.get('/api/analytics', async (req, res) => {
                                     const totalLiability = roundCurrencyAmount(totalBookingLiability + voucherLiability);
                                     const grossSales = await grossSalesPromise;
                                     const operationalPerformance = await operationalPerformancePromise;
+                                    const bookingTiming = await bookingTimingPromise;
+                                    const refundTracking = await refundTrackingPromise;
 
                                     res.json({
+                                        dataScope: {
+                                            importedDataExcluded: shouldExcludeImportedAnalyticsData,
+                                            liveDataStartDate: shouldExcludeImportedAnalyticsData ? analyticsLiveDataStartDate : null
+                                        },
                                         bookingAttempts,
                                         grossSales,
                                         operationalPerformance,
+                                        bookingTiming,
+                                        refundTracking,
                                         salesBySource,
                                         nonRedemption,
                                         addOns,
