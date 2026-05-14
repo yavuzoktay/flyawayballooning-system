@@ -3875,7 +3875,11 @@ setBookingDetail(finalVoucherDetail);
             return voucherContextId ? { type: 'voucher', id: voucherContextId, recipientEmail } : null;
         }
         if (entity.contextType === 'booking') {
-            return { type: 'booking', id: entity.id };
+            return {
+                type: 'booking',
+                id: entity.id,
+                recipientEmail: String(entity.email || '').trim()
+            };
         }
         if (entity.email) {
             return { type: 'email', email: entity.email };
@@ -3900,6 +3904,17 @@ setBookingDetail(finalVoucherDetail);
             const resp = await axios.get(url);
             setEmailLogs(resp.data?.data || []);
         } catch (error) {
+            if (params.type === 'booking' && params.recipientEmail) {
+                try {
+                    const fallbackResp = await axios.get(
+                        `/api/recipientEmails?summary=1&limit=50&email=${encodeURIComponent(params.recipientEmail)}`
+                    );
+                    setEmailLogs(fallbackResp.data?.data || []);
+                    return;
+                } catch (fallbackError) {
+                    console.error('Error fetching booking email logs via recipient fallback:', fallbackError);
+                }
+            }
             if (params.type === 'voucher' && params.recipientEmail) {
                 try {
                     const fallbackResp = await axios.get(

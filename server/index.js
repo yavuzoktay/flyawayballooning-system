@@ -43147,9 +43147,12 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
                         text: perRecipientText,
                         html: perRecipientHtml,
                         custom_args: {
+                            booking_id: String(recipient.bookingId || ''),
                             booking_ids: String(recipient.bookingId || ''),
                             template_type: template || 'custom',
-                            context_type: 'bulk'
+                            context_type: 'booking',
+                            context_id: String(recipient.bookingId || ''),
+                            send_mode: 'bulk'
                         }
                     };
 
@@ -43162,7 +43165,7 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
                             con.query(logSql, [
                                 recipient.bookingId, recipientEmail, subject,
                                 template || 'custom', perRecipientHtml, perRecipientText,
-                                messageId, 'bulk', recipientEmail
+                                messageId, 'booking', String(recipient.bookingId)
                             ], () => {});
                         });
                     }
@@ -43242,17 +43245,27 @@ app.post('/api/sendBulkBookingEmail', async (req, res) => {
                 VALUES (?, ?, ?, ?, ?, ?, NOW(), 'sent', ?, 0, 0, 'sent', NOW(), ?, ?)
             `;
             ensureEmailLogsSchema(() => {
-                uniqueRecipients.forEach((recipient) => {
+                const logRecipients = normalizedBookingRecipients.length > 0
+                    ? normalizedBookingRecipients
+                    : uniqueRecipients.map((recipientEmail) => ({ bookingId: null, to: recipientEmail }));
+
+                logRecipients.forEach((recipient) => {
+                    const bookingIdValue = recipient?.bookingId && !isNaN(Number(recipient.bookingId))
+                        ? Number(recipient.bookingId)
+                        : null;
+                    const recipientEmail = String(recipient?.to || recipient || '').trim();
+                    if (!recipientEmail) return;
+
                     con.query(logSql, [
-                        null,
-                        recipient,
+                        bookingIdValue,
+                        recipientEmail,
                         subject,
                         template || 'custom',
                         htmlBody,
                         textBody,
                         bulkMessageId,
-                        'bulk',
-                        recipient
+                        bookingIdValue ? 'booking' : 'bulk',
+                        bookingIdValue ? String(bookingIdValue) : recipientEmail
                     ], (err) => {
                         if (err) {
                             console.error('Error logging bulk email activity:', err);
@@ -43515,34 +43528,45 @@ app.get('/api/bookingEmails/:bookingId', (req, res) => {
     const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 200) : 50;
     const selectColumns = isSummary
         ? `
-            id,
-            booking_id,
-            recipient_email,
-            subject,
-            template_type,
-            sent_at,
-            status,
-            message_id,
-            opens,
-            clicks,
-            last_event,
-            last_event_at,
-            context_type,
-            context_id
+            el.id,
+            el.booking_id,
+            el.recipient_email,
+            el.subject,
+            el.template_type,
+            el.sent_at,
+            el.status,
+            el.message_id,
+            el.opens,
+            el.clicks,
+            el.last_event,
+            el.last_event_at,
+            el.context_type,
+            el.context_id
         `
-        : '*';
+        : 'el.*';
 
     const sql = `
-        SELECT ${selectColumns} FROM email_logs 
-        WHERE (booking_id = ? AND context_type = 'booking')
-           OR (context_type = 'booking' AND context_id = ?)
-        ORDER BY sent_at DESC
+        SELECT ${selectColumns}
+        FROM email_logs el
+        LEFT JOIN all_booking ab ON ab.id = ?
+        WHERE el.booking_id = ?
+           OR (el.context_type = 'booking' AND el.context_id = ?)
+           OR (el.context_type = 'bulk' AND el.context_id = ?)
+           OR (
+                ab.email IS NOT NULL
+                AND TRIM(ab.email) != ''
+                AND el.recipient_email IS NOT NULL
+                AND TRIM(el.recipient_email) != ''
+                AND LOWER(CONVERT(TRIM(el.recipient_email) USING utf8mb4) COLLATE utf8mb4_unicode_ci) =
+                    LOWER(CONVERT(TRIM(ab.email) USING utf8mb4) COLLATE utf8mb4_unicode_ci)
+              )
+        ORDER BY el.sent_at DESC
         ${isSummary ? 'LIMIT ?' : ''}
     `;
 
     const queryParams = isSummary
-        ? [bookingId, String(bookingId), limit]
-        : [bookingId, String(bookingId)];
+        ? [bookingId, bookingId, String(bookingId), String(bookingId), limit]
+        : [bookingId, bookingId, String(bookingId), String(bookingId)];
 
     con.query(sql, queryParams, (err, result) => {
         if (err) {
