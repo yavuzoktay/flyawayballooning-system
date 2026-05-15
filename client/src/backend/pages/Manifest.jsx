@@ -2051,6 +2051,9 @@ const Manifest = () => {
         if (normalized.includes('delivered') || normalized.includes('sent')) {
             return { label: 'Sent', color: '#28a745' };
         }
+        if (normalized.includes('deferred')) {
+            return { label: 'Sent', color: '#28a745' };
+        }
         if (normalized.includes('bounce')) {
             return { label: 'Bounced', color: '#dc3545' };
         }
@@ -6044,9 +6047,9 @@ const Manifest = () => {
                                                     }}
                                                     disabled={!globalMenuGroup || statusLoadingGroup === (globalMenuGroup?.id)}
                                                     sx={{
-                                                        color: '#d32f2f',
+                                                        color: '#10b981',
                                                         '&:hover': {
-                                                            backgroundColor: 'rgba(211, 47, 47, 0.08)'
+                                                            backgroundColor: 'rgba(16, 185, 129, 0.08)'
                                                         },
                                                         '&.Mui-disabled': {
                                                             color: 'rgba(0, 0, 0, 0.26)'
@@ -10191,7 +10194,7 @@ const Manifest = () => {
                     <Button
                         onClick={handleConfirmCloseFlight}
                         variant="contained"
-                        color="error"
+                        color="success"
                         disabled={statusLoadingGroup !== null}
                     >
                         {statusLoadingGroup !== null ? 'Logging...' : 'Log Flight'}

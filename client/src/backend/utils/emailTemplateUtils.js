@@ -1235,9 +1235,7 @@ const DEFAULT_TEMPLATE_BUILDERS = {
             bodyHtml: resolveBodyHtml(template, defaultBodyHtml),
             customerName,
             signatureLines: [],
-            footerLinks: [
-                { label: 'Contact support', url: 'mailto:hello@flyawayballooning.com' }
-            ]
+            footerLinks: []
         });
     }
 };

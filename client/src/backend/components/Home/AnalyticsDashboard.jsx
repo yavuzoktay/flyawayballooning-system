@@ -280,7 +280,7 @@ const GrossSalesCard = ({ title, label, grossSalesData, comparisons }) => {
                             mt: 1.5
                         }}
                     >
-                        <ComparisonPill label="Previous MTD" comparison={comparisons.previousMonthToDate} />
+                        <ComparisonPill label="Previous Month" comparison={comparisons.previousMonth || comparisons.previousMonthToDate} />
                         <ComparisonPill label="Same Period LY" comparison={comparisons.samePeriodLastYear} />
                     </Box>
                 ) : null}

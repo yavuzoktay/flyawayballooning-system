@@ -267,6 +267,16 @@ const PaginatedTable = ({
         return Boolean(value);
     };
 
+    const hasBookingRefund = (item = {}) => {
+        const refundFlag = item.has_refund ?? item._original?.has_refund;
+        if (refundFlag === 1 || refundFlag === true) return true;
+        if (typeof refundFlag === 'string') {
+            const normalized = refundFlag.trim().toLowerCase();
+            if (['1', 'true', 'yes', 'refund', 'refunded'].includes(normalized)) return true;
+        }
+        return false;
+    };
+
     const parseAmount = (value) => {
         if (value === null || value === undefined || value === '') return null;
         if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -681,15 +691,23 @@ const PaginatedTable = ({
                 </thead>
                 <tbody>
                     {visibleData.map((item, idx) => {
+                        const rowIsRefunded = context === 'bookings' && hasBookingRefund(item);
+
                         return (
-                            <tr key={idx} style={{ background: idx % 2 === 0 ? '#ffffff' : '#f8fbff' }}>
+                            <tr
+                                key={idx}
+                                style={{
+                                    background: rowIsRefunded ? '#f3f4f6' : (idx % 2 === 0 ? '#ffffff' : '#f8fbff')
+                                }}
+                            >
                                 {selectable && (
                                     <td style={{ 
                                         textAlign: "center",
                                         whiteSpace: "nowrap",
                                         overflow: "hidden",
                                         padding: "10px 8px",
-                                        borderBottom: "1px solid #ebf0f8"
+                                        borderBottom: "1px solid #ebf0f8",
+                                        color: rowIsRefunded ? "#8a94a6" : "#465a79"
                                     }}>
                                         <input
                                             type="checkbox"
@@ -723,7 +741,7 @@ const PaginatedTable = ({
                                                             fontWeight: "normal",
                                                             fontFamily: "'Gilroy', sans-serif",
                                                             borderBottom: "1px solid #ebf0f8",
-                                                            color: "#465a79"
+                                                            color: rowIsRefunded ? "#8a94a6" : "#465a79"
                                                         }}>
                                                             {id === 'name' ? (
                                                                 (() => {
@@ -737,7 +755,7 @@ const PaginatedTable = ({
 
                                                                     // Keep the name clickable without the browser-style underline.
                                                                     const nameSpanStyles = {
-                                                                        color: '#2d69c5',
+                                                                        color: rowIsRefunded ? '#6b7280' : '#2d69c5',
                                                                         cursor: onNameClick ? 'pointer' : 'default',
                                                                         textDecoration: 'none',
                                                                         fontSize: '14px',
@@ -759,7 +777,7 @@ const PaginatedTable = ({
                                                                     };
 
                                                                     const emojiStyles = {
-                                                                        color: onNameClick ? '#2d69c5' : 'inherit',
+                                                                        color: rowIsRefunded ? '#6b7280' : (onNameClick ? '#2d69c5' : 'inherit'),
                                                                         fontSize: '14px',
                                                                         fontWeight: 'normal',
                                                                         lineHeight: 1
@@ -1128,13 +1146,25 @@ const PaginatedTable = ({
                                                     );
                                                 })()
                                             ) : id === 'status' ? (
-                                                // Status with color coding: Scheduled (green), Cancelled (orange), Flown (blue), Expired (red)
+                                                // Status with color coding: Scheduled (green), Refunded (grey), Cancelled (red), Flown (blue), Expired (red)
                                                 (() => {
                                                     const statusValue = item[id];
                                                     let displayStatus = statusValue;
                                                     let statusColor = '#46607f';
                                                     let statusBg = '#eef3fb';
                                                     let fontWeight = 600;
+
+                                                    if (rowIsRefunded) {
+                                                        displayStatus = 'Refunded';
+                                                        statusColor = '#6b7280';
+                                                        statusBg = '#eef0f3';
+                                                        return (
+                                                            <span style={{ color: statusColor, background: statusBg, fontWeight, fontSize: '13px', fontFamily: "'Gilroy', sans-serif", padding: '4px 10px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, display: 'inline-block' }} />
+                                                                {displayStatus}
+                                                            </span>
+                                                        );
+                                                    }
                                                     
                                                     // Check if booking is expired (only for bookings context)
                                                     if (context === 'bookings' && item.expires) {
@@ -1228,7 +1258,7 @@ const PaginatedTable = ({
                                                                         .find(value => value !== null && value > 0.01);
                                                                     const paidValue = paidAmount || 0;
                                                                     const shouldShowDueAmount = (paidAmount === null || Math.abs(paidAmount) <= 0.01) && dueAmount !== undefined;
-                                                                    const hasRefund = item.has_refund === 1 || item.has_refund === true;
+                                                                    const hasRefund = hasBookingRefund(item);
                                                                     const isFullyRefunded = hasRefund && paidValue <= 0.01;
                                                                     const hasNormalPayment = !hasRefund && paidValue > 0.01;
 
@@ -1245,7 +1275,7 @@ const PaginatedTable = ({
 
                                                                     // For redeemed vouchers/bookings, always grey out the paid value
                                                                     // so it's clear this amount came from a voucher redemption (sale already counted).
-                                                                    if (isVoucherRedeemed(item)) {
+                                                                    if (isVoucherRedeemed(item) && !hasRefund) {
                                                                         return (
                                                                             <span style={{ color: '#9ca3af', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
                                                                                 {item[id]}
@@ -1260,6 +1290,10 @@ const PaginatedTable = ({
                                                                         // Full refund: red
                                                                         color = '#dc3545';
                                                                         fontWeight = 'normal';
+                                                                    } else if (hasRefund && paidValue > 0.01) {
+                                                                        // Partial refund / retained fee: green
+                                                                        color = '#28a745';
+                                                                        fontWeight = 600;
                                                                     } else if (hasNormalPayment) {
                                                                         // Normal payment: green
                                                                         color = '#28a745';

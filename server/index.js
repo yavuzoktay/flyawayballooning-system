@@ -24452,11 +24452,9 @@ app.get('/api/analytics', async (req, res) => {
     const buildGrossSalesRanges = () => {
         const today = moment();
         const todayDate = today.format('YYYY-MM-DD');
-        const currentDayOfMonth = today.date();
         const previousMonthStart = today.clone().subtract(1, 'month').startOf('month');
-        const previousMonthEnd = previousMonthStart
-            .clone()
-            .date(Math.min(currentDayOfMonth, previousMonthStart.daysInMonth()));
+        const previousMonthEnd = previousMonthStart.clone().endOf('month');
+        const currentDayOfMonth = today.date();
         const lastYearStart = today.clone().subtract(1, 'year').startOf('month');
         const lastYearEnd = lastYearStart
             .clone()
@@ -24472,6 +24470,10 @@ app.get('/api/analytics', async (req, res) => {
                 end: todayDate
             },
             previousMonthToDate: {
+                start: previousMonthStart.format('YYYY-MM-DD'),
+                end: previousMonthEnd.format('YYYY-MM-DD')
+            },
+            previousMonth: {
                 start: previousMonthStart.format('YYYY-MM-DD'),
                 end: previousMonthEnd.format('YYYY-MM-DD')
             },
@@ -24514,6 +24516,14 @@ app.get('/api/analytics', async (req, res) => {
             row.linked_experience_type
         ];
         return typeSignals.some(isPrivateCharterTypeValue) ? 'private' : 'shared';
+    };
+    const getOperationalFlightSegment = (row = {}) => {
+        const actualFlightSignals = [
+            row.flight_type,
+            row.experience,
+            row.flight_type_source
+        ];
+        return actualFlightSignals.some(isPrivateCharterTypeValue) ? 'private' : 'shared';
     };
     const summarizeGrossSalesRows = (rows = []) => {
         const breakdown = createGrossSalesBreakdown();
@@ -24570,7 +24580,7 @@ app.get('/api/analytics', async (req, res) => {
         const sharedSlots = new Map();
 
         rows.forEach((row) => {
-            const segment = getGrossSalesSegment(row);
+            const segment = getOperationalFlightSegment(row);
             const passengers = getOperationalPassengerCount(row);
             const revenue = getOperationalFlightRevenue(row);
 
@@ -24868,14 +24878,10 @@ app.get('/api/analytics', async (req, res) => {
     const getOperationalPerformanceSnapshot = async () => {
         const [
             hasBookingFlightTypeSource,
-            hasBookingVoucherTypeDetail,
-            hasVoucherTypeDetail,
-            hasBookingManualStatusOverride
+            hasBookingVoucherTypeDetail
         ] = await Promise.all([
             tableHasColumn('all_booking', 'flight_type_source'),
-            tableHasColumn('all_booking', 'voucher_type_detail'),
-            tableHasColumn('all_vouchers', 'voucher_type_detail'),
-            tableHasColumn('all_booking', 'manual_status_override')
+            tableHasColumn('all_booking', 'voucher_type_detail')
         ]);
         const slotTimeSql = `
             COALESCE(
@@ -24884,63 +24890,57 @@ app.get('/api/analytics', async (req, res) => {
                 TIME_FORMAT(ab.flight_date, '%H:%i:%s')
             )
         `;
-        const availabilityTimeSql = `
-            COALESCE(
-                TIME_FORMAT(TIME(aa.time), '%H:%i:%s'),
-                TIME_FORMAT(STR_TO_DATE(aa.time, '%H:%i:%s'), '%H:%i:%s'),
-                TIME_FORMAT(STR_TO_DATE(aa.time, '%H:%i'), '%H:%i:%s'),
-                TIME_FORMAT(STR_TO_DATE(aa.time, '%h:%i %p'), '%H:%i:%s')
-            )
-        `;
-        const manualStatusFilter = hasBookingManualStatusOverride
-            ? `AND TRIM(LOWER(COALESCE(ab.manual_status_override, ''))) != 'cancelled'`
-            : '';
         const flownRows = await queryAsync(`
             SELECT
-                ab.id,
-                ab.paid,
-                ab.status,
-                ab.experience,
-                ab.flight_type,
-                ${hasBookingFlightTypeSource ? 'ab.flight_type_source' : 'NULL AS flight_type_source'},
-                ab.voucher_type,
-                ${hasBookingVoucherTypeDetail ? 'ab.voucher_type_detail' : 'NULL AS voucher_type_detail'},
-                v.voucher_type AS linked_voucher_type,
-                ${hasVoucherTypeDetail ? 'v.voucher_type_detail AS linked_voucher_type_detail' : 'NULL AS linked_voucher_type_detail'},
-                v.experience_type AS linked_experience_type,
+                MIN(f.id) AS id,
+                SUM(COALESCE(f.paid, 0)) AS paid,
+                'Flown' AS status,
+                MIN(f.experience) AS experience,
+                f.flight_type,
+                ${hasBookingFlightTypeSource ? 'MIN(f.flight_type_source)' : 'NULL'} AS flight_type_source,
+                MIN(f.voucher_type) AS voucher_type,
+                ${hasBookingVoucherTypeDetail ? 'MIN(f.voucher_type_detail)' : 'NULL'} AS voucher_type_detail,
+                NULL AS linked_voucher_type,
+                NULL AS linked_voucher_type_detail,
+                NULL AS linked_experience_type,
                 NULL AS experience_type,
                 NULL AS book_flight,
-                ab.location,
-                ab.activity_id,
-                ab.pax,
-                (
-                    SELECT COUNT(*)
-                    FROM passenger p
-                    WHERE p.booking_id = ab.id
+                f.location,
+                MIN(f.activity_id) AS activity_id,
+                SUM(
+                    CASE
+                        WHEN f.pax IS NOT NULL AND f.pax > 0 THEN f.pax
+                        ELSE (
+                            SELECT COUNT(*)
+                            FROM passenger p
+                            WHERE p.booking_id = f.id
+                        )
+                    END
+                ) AS pax,
+                SUM(
+                    CASE
+                        WHEN f.pax IS NOT NULL AND f.pax > 0 THEN f.pax
+                        ELSE (
+                            SELECT COUNT(*)
+                            FROM passenger p
+                            WHERE p.booking_id = f.id
+                        )
+                    END
                 ) AS passenger_count,
-                DATE_FORMAT(ab.flight_date, '%Y-%m-%d') AS flight_date_only,
-                ${slotTimeSql} AS flight_time_only,
-                COALESCE((
-                    SELECT LEAST(COALESCE(NULLIF(aa.capacity, 0), ${BALLOON_210_CAPACITY}), ${BALLOON_210_CAPACITY})
-                    FROM activity_availability aa
-                    WHERE DATE(aa.date) = DATE(ab.flight_date)
-                      AND ${availabilityTimeSql} = ${slotTimeSql}
-                      AND (
-                            ab.activity_id IS NULL
-                            OR aa.activity_id = ab.activity_id
-                          )
-                    ORDER BY
-                        CASE WHEN aa.activity_id = ab.activity_id THEN 0 ELSE 1 END,
-                        aa.id ASC
-                    LIMIT 1
-                ), ${BALLOON_210_CAPACITY}) AS shared_capacity
-            FROM all_booking ab
-            LEFT JOIN all_vouchers v ON CONVERT(v.voucher_ref USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(ab.voucher_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
-            WHERE ab.flight_date IS NOT NULL
-              AND TRIM(LOWER(COALESCE(ab.status, ''))) = 'flown'
-              ${manualStatusFilter}
-              ${liveDataFilter('ab.created_at')}
-              ${dateFilter('ab.flight_date')}
+                f.slot_date AS flight_date_only,
+                f.slot_time AS flight_time_only,
+                ${BALLOON_210_CAPACITY} AS shared_capacity
+            FROM (
+                SELECT
+                    ab.*,
+                    DATE_FORMAT(ab.flight_date, '%Y-%m-%d') AS slot_date,
+                    ${slotTimeSql} AS slot_time
+                FROM all_booking ab
+                WHERE ab.flight_date IS NOT NULL
+                  AND ab.status = 'Flown'
+                  ${dateFilter('ab.flight_date')}
+            ) f
+            GROUP BY f.slot_date, f.slot_time, f.location, f.flight_type
         `);
 
         return {
@@ -25191,12 +25191,12 @@ app.get('/api/analytics', async (req, res) => {
         const [
             today,
             monthToDate,
-            previousMonthToDate,
+            previousMonth,
             samePeriodLastYear
         ] = await Promise.all([
             fetchGrossSalesRange(ranges.today),
             fetchGrossSalesRange(ranges.monthToDate),
-            fetchGrossSalesRange(ranges.previousMonthToDate),
+            fetchGrossSalesRange(ranges.previousMonth),
             fetchGrossSalesRange(ranges.samePeriodLastYear)
         ]);
 
@@ -25212,7 +25212,8 @@ app.get('/api/analytics', async (req, res) => {
                 ...monthToDate,
                 financialTracking: buildFinancialTrackingSummary(monthToDate),
                 comparisons: {
-                    previousMonthToDate: buildGrossSalesComparison(monthToDate, previousMonthToDate, ranges.previousMonthToDate),
+                    previousMonth: buildGrossSalesComparison(monthToDate, previousMonth, ranges.previousMonth),
+                    previousMonthToDate: buildGrossSalesComparison(monthToDate, previousMonth, ranges.previousMonth),
                     samePeriodLastYear: buildGrossSalesComparison(monthToDate, samePeriodLastYear, ranges.samePeriodLastYear)
                 }
             }
@@ -28574,6 +28575,42 @@ app.patch("/api/updateAdminNote", (req, res) => {
     });
 });
 
+const normalizeExpiresFieldValue = (field, value) => {
+    if (field !== 'expires') {
+        return { success: true, value };
+    }
+
+    if (value === null || value === undefined || String(value).trim() === '') {
+        return { success: true, value: null };
+    }
+
+    const parsedExpires = moment(value, [
+        'YYYY-MM-DD',
+        'DD/MM/YYYY',
+        'D/M/YYYY',
+        'DD/MM/YY',
+        'D/M/YY',
+        'DD-MM-YYYY',
+        'D-M-YYYY',
+        'DD-MM-YY',
+        'D-M-YY',
+        moment.ISO_8601
+    ], true);
+
+    if (!parsedExpires.isValid()) {
+        return { success: false, message: 'Invalid expires date' };
+    }
+
+    return { success: true, value: parsedExpires.format('YYYY-MM-DD') };
+};
+
+const clearBookingAndVoucherDataCaches = () => {
+    __getAllBookingDataCache.lastKey = null;
+    __getAllBookingDataCache.lastResponse = null;
+    __getAllVoucherDataCache.lastKey = null;
+    __getAllVoucherDataCache.lastResponse = null;
+};
+
 // Update Voucher Field
 app.patch("/api/updateVoucherField", (req, res) => {
     const { voucher_id, field, value } = req.body;
@@ -28594,13 +28631,20 @@ app.patch("/api/updateVoucherField", (req, res) => {
         return res.status(400).json({ success: false, message: "Field not allowed" });
     }
 
+    const normalizedField = normalizeExpiresFieldValue(field, value);
+    if (!normalizedField.success) {
+        return res.status(400).json({ success: false, message: normalizedField.message });
+    }
+    const normalizedValue = normalizedField.value;
+
     const sql = `UPDATE all_vouchers SET ${field} = ? WHERE id = ?`;
-    con.query(sql, [value, voucher_id], (err, result) => {
+    con.query(sql, [normalizedValue, voucher_id], (err, result) => {
         if (err) {
             console.error("Error updating voucher field:", err);
             return res.status(500).json({ success: false, message: "Database error" });
         }
-        res.json({ success: true });
+        clearBookingAndVoucherDataCaches();
+        res.json({ success: true, updatedValue: normalizedValue });
     });
 });
 
@@ -37694,10 +37738,19 @@ app.patch('/api/updateVoucherField', (req, res) => {
         });
     }
 
+    const normalizedField = normalizeExpiresFieldValue(field, value);
+    if (!normalizedField.success) {
+        return res.status(400).json({
+            success: false,
+            message: normalizedField.message
+        });
+    }
+    const normalizedValue = normalizedField.value;
+
     // Update voucher field
     const updateSql = `UPDATE all_vouchers SET ${field} = ? WHERE id = ?`;
 
-    con.query(updateSql, [value, voucher_id], (err, result) => {
+    con.query(updateSql, [normalizedValue, voucher_id], (err, result) => {
         if (err) {
             console.error('Error updating voucher field:', err);
             return res.status(500).json({
@@ -37714,15 +37767,17 @@ app.patch('/api/updateVoucherField', (req, res) => {
             });
         }
 
+        clearBookingAndVoucherDataCaches();
         console.log('✅ Voucher field updated successfully');
-        console.log('Voucher ID:', voucher_id, 'Field:', field, 'New Value:', value);
+        console.log('Voucher ID:', voucher_id, 'Field:', field, 'New Value:', normalizedValue);
 
         res.json({
             success: true,
             message: 'Voucher field updated successfully',
             voucher_id,
             field,
-            value,
+            value: normalizedValue,
+            updatedValue: normalizedValue,
             affectedRows: result.affectedRows
         });
     });
@@ -43772,7 +43827,22 @@ app.post('/api/sendgrid/webhook', (req, res) => {
             } else if (eventType === 'click') {
                 updateSql = `UPDATE email_logs SET clicks = clicks + 1, status = 'click', last_event = 'click', last_event_at = ? WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'} ORDER BY sent_at DESC LIMIT 1`;
                 params = [eventTime, messageId || email];
-            } else if (['delivered', 'processed', 'deferred', 'dropped', 'bounce', 'blocked', 'spamreport', 'unsubscribe'].includes(eventType)) {
+            } else if (eventType === 'deferred') {
+                updateSql = `
+                    UPDATE email_logs
+                    SET
+                        status = CASE
+                            WHEN status IN ('open', 'click', 'delivered') THEN status
+                            ELSE 'sent'
+                        END,
+                        last_event = 'deferred',
+                        last_event_at = ?
+                    WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'}
+                    ORDER BY sent_at DESC
+                    LIMIT 1
+                `;
+                params = [eventTime, messageId || email];
+            } else if (['delivered', 'processed', 'dropped', 'bounce', 'blocked', 'spamreport', 'unsubscribe'].includes(eventType)) {
                 updateSql = `UPDATE email_logs SET status = ?, last_event = ?, last_event_at = ? WHERE ${messageId ? 'message_id = ?' : 'recipient_email = ?'} ORDER BY sent_at DESC LIMIT 1`;
                 params = [eventType, eventType, eventTime, messageId || email];
             }

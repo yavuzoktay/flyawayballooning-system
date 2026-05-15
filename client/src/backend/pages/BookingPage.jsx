@@ -30,7 +30,7 @@ import {
     isTheNewtBooking,
     parseAdditionalInfoJson
 } from '../utils/additionalInfo';
-import { formatAdminDate, isAdminDateExpired } from '../utils/adminDateUtils';
+import { formatAdminDate, isAdminDateExpired, parseAdminDate } from '../utils/adminDateUtils';
 import { bookingHasWeatherRefund } from '../utils/weatherRefund';
 import {
     isNonUkPhoneNumber,
@@ -251,10 +251,10 @@ const BookingPage = () => {
     // Build filters for /api/getAllBookingData.
     // Important: "Expired" is a derived status on the client (based on expires date),
     // not always a raw ab.status value in the DB, so we should NOT pass it as a direct
-    // status filter to the backend; instead we filter "Expired" client‑side.
+    // status filter to the backend; instead we filter those statuses client-side.
     const buildGetAllBookingDataParams = (filters) => {
         const params = { ...filters };
-        if (params.status === 'Expired') {
+        if (params.status === 'Expired' || params.status === 'Refunded') {
             delete params.status;
         }
         return params;
@@ -262,9 +262,23 @@ const BookingPage = () => {
 
     // Compute the effective status used throughout the UI, matching the logic in PaginatedTable
     // (including derived "Expired" state based on expires date).
+    const hasBookingRefund = (item = {}) => {
+        const refundFlag = item.has_refund ?? item._original?.has_refund;
+        if (refundFlag === 1 || refundFlag === true) return true;
+        if (typeof refundFlag === 'string') {
+            const normalized = refundFlag.trim().toLowerCase();
+            if (['1', 'true', 'yes', 'refund', 'refunded'].includes(normalized)) return true;
+        }
+        return false;
+    };
+
     const getEffectiveBookingStatus = (item) => {
         const rawStatus = (item.status || '').toString().trim();
         let displayStatus = rawStatus || '';
+
+        if (hasBookingRefund(item)) {
+            return 'Refunded';
+        }
 
         // First, mirror the "Expired" logic from PaginatedTable for bookings context
         if (item.expires && isAdminDateExpired(item.expires)) {
@@ -292,13 +306,8 @@ const BookingPage = () => {
 
         // Collect all distinct, normalized status values from booking data
         booking.forEach(b => {
-            const raw = (b.status || '').toString().trim();
-            if (!raw) return;
-            const normalized =
-                raw.length > 1
-                    ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
-                    : raw.toUpperCase();
-            set.add(normalized);
+            const effectiveStatus = getEffectiveBookingStatus(b);
+            if (effectiveStatus) set.add(effectiveStatus);
         });
 
         // Remove statuses we explicitly do NOT want to expose in the filter
@@ -308,6 +317,7 @@ const BookingPage = () => {
         // records hidden from the default view
         set.add('Flown');
         set.add('Expired');
+        set.add('Refunded');
 
         return Array.from(set).sort();
     }, [booking]);
@@ -382,6 +392,16 @@ const BookingPage = () => {
     // Any 6-month extension must already be written by the backend.
     const formatExpiresDate = (expiresDate) => {
         return formatAdminDate(expiresDate, 'DD/MM/YY');
+    };
+
+    const normalizeExpiresEditValue = (value) => {
+        const parsedDate = parseAdminDate(value);
+        return parsedDate ? parsedDate.format('YYYY-MM-DD') : (value ? String(value) : '');
+    };
+
+    const getExpiresPickerValue = (value) => {
+        const parsedDate = parseAdminDate(value);
+        return parsedDate || null;
     };
 
     // History/timezone fix:
@@ -1222,7 +1242,7 @@ const BookingPage = () => {
             return { label: 'Accepted', color: '#6c757d' };
         }
         if (normalized.includes('deferred')) {
-            return { label: 'Deferred', color: '#fd7e14' };
+            return { label: 'Sent', color: '#28a745' };
         }
         if (normalized.includes('bounce')) {
             return { label: 'Bounced', color: '#dc3545' };
@@ -2437,20 +2457,9 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
         finalVoucherDetail.voucher.flight_attempts = listAttempts;
     }
     
-    // Use expires field from getAllVoucherData
-    if (voucherItem.expires) {
-        // Handle different date formats and convert to standard format
-        let expiresDate = voucherItem.expires;
-        if (typeof expiresDate === 'string') {
-            // If it's in DD/MM/YYYY format, convert to YYYY-MM-DD for dayjs
-            if (expiresDate.includes('/')) {
-                const parts = expiresDate.split('/');
-                if (parts.length === 3) {
-                    expiresDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                }
-            }
-        }
-        finalVoucherDetail.voucher.expires = expiresDate;
+    const normalizedVoucherExpires = normalizeExpiresEditValue(voucherItem.expires);
+    if (normalizedVoucherExpires) {
+        finalVoucherDetail.voucher.expires = normalizedVoucherExpires;
     }
     
     // Set created_at if available
@@ -2470,7 +2479,7 @@ if (finalVoucherDetail && finalVoucherDetail.voucher) {
     finalVoucherDetail.voucher.purchaser_phone = voucherItem.purchaser_phone || finalVoucherDetail.voucher.purchaser_phone;
     finalVoucherDetail.voucher.purchaser_mobile = voucherItem.purchaser_mobile || finalVoucherDetail.voucher.purchaser_mobile;
     finalVoucherDetail.voucher.weight = voucherItem.weight || finalVoucherDetail.voucher.weight;
-    finalVoucherDetail.voucher.expires = voucherItem.expires || finalVoucherDetail.voucher.expires;
+    finalVoucherDetail.voucher.expires = normalizedVoucherExpires || normalizeExpiresEditValue(finalVoucherDetail.voucher.expires);
     // Ensure voucher code fields and counts are populated from getAllVoucherData result
     finalVoucherDetail.voucher.voucher_ref = voucherItem.voucher_ref || finalVoucherDetail.voucher.voucher_ref;
     finalVoucherDetail.voucher.vc_code = voucherItem.vc_code || finalVoucherDetail.voucher.vc_code;
@@ -3122,7 +3131,7 @@ setBookingDetail(finalVoucherDetail);
     // Edit functions
     const handleEditClick = (field, currentValue) => {
         setEditField(field);
-        setEditValue(currentValue || '');
+        setEditValue(field === 'expires' ? normalizeExpiresEditValue(currentValue) : (currentValue || ''));
     };
 
     const handleEditCancel = () => {
@@ -3132,6 +3141,7 @@ setBookingDetail(finalVoucherDetail);
 
     const handleEditSave = async () => {
         if (!editField) return;
+        const saveValue = editField === 'expires' ? normalizeExpiresEditValue(editValue) : editValue;
         setSavingEdit(true);
         try {
             if (activeTab === 'vouchers') {
@@ -3200,7 +3210,7 @@ setBookingDetail(finalVoucherDetail);
                 console.log('Saving voucher field:', {
                     voucher_id: voucherId,
                     field: editField,
-                    value: editValue
+                    value: saveValue
                 });
                 
                 let response;
@@ -3214,7 +3224,7 @@ setBookingDetail(finalVoucherDetail);
                     response = await axios.patch('/api/updateBookingField', {
                         booking_id: bookingId,
                         field: editField,
-                        value: editValue
+                        value: saveValue
                     });
                 } else {
                     // For vouchers from all_vouchers table, use voucher field update
@@ -3223,7 +3233,7 @@ setBookingDetail(finalVoucherDetail);
                     response = await axios.patch('/api/updateVoucherField', {
                         voucher_id: voucherId,
                         field: editField,
-                        value: editValue
+                        value: saveValue
                     });
                 }
                 
@@ -3246,9 +3256,9 @@ setBookingDetail(finalVoucherDetail);
                             await axios.patch('/api/updateVoucherField', {
                                 voucher_id: voucherId,
                                 field: purchaserField,
-                                value: editValue
+                                value: saveValue
                             });
-                            console.log('✅ Purchaser field updated:', purchaserField, '=', editValue);
+                            console.log('✅ Purchaser field updated:', purchaserField, '=', saveValue);
                         }
                     } catch (err) {
                         console.error('Error updating purchaser field:', err);
@@ -3257,7 +3267,7 @@ setBookingDetail(finalVoucherDetail);
                 }
                 
                 // Local state güncelle
-                const updatedFieldValue = response?.data?.updatedValue ?? editValue;
+                const updatedFieldValue = response?.data?.updatedValue ?? saveValue;
 
                 setBookingDetail(prev => ({
                     ...prev,
@@ -3362,9 +3372,9 @@ setBookingDetail(finalVoucherDetail);
             const response = await axios.patch('/api/updateBookingField', {
                 booking_id: bookingDetail.booking.id,
                 field: editField,
-                value: editValue
+                value: saveValue
             });
-            const updatedFieldValue = response?.data?.updatedValue ?? editValue;
+            const updatedFieldValue = response?.data?.updatedValue ?? saveValue;
             if (editField === 'weight' && bookingDetail.passengers && bookingDetail.passengers.length > 0) {
                 setBookingDetail(prev => ({
                     ...prev,
@@ -3397,7 +3407,7 @@ setBookingDetail(finalVoucherDetail);
                     id: updateId,
                     bookingId: bookingDetail.booking.id,
                     field: editField,
-                    value: editValue
+                    value: updatedFieldValue
                 };
                 // Persist so Manifest can apply when it mounts (user may be on Booking page when event fires)
                 if (typeof window !== 'undefined') {
@@ -6239,6 +6249,7 @@ setBookingDetail(finalVoucherDetail);
                                                         >
                                                             <MenuItem value="" sx={{ fontSize: '11px' }}><em>Select</em></MenuItem>
                                                             <MenuItem value="Scheduled" sx={{ fontSize: '11px' }}>Scheduled</MenuItem>
+                                                            <MenuItem value="Refunded" sx={{ fontSize: '11px' }}>Refunded</MenuItem>
                                                             <MenuItem value="Expired" sx={{ fontSize: '11px' }}>Expired</MenuItem>
                                                             <MenuItem value="Flown" sx={{ fontSize: '11px' }}>Flown</MenuItem>
                                                             <MenuItem value="No Show" sx={{ fontSize: '11px' }}>No Show</MenuItem>
@@ -6318,6 +6329,7 @@ setBookingDetail(finalVoucherDetail);
                                                 >
                                                     <MenuItem value=""><em>Select</em></MenuItem>
                                                     <MenuItem value="Scheduled">Scheduled</MenuItem>
+                                                    <MenuItem value="Refunded">Refunded</MenuItem>
                                                     <MenuItem value="Expired">Expired</MenuItem>
                                                     <MenuItem value="Flown">Flown</MenuItem>
                                                     <MenuItem value="No Show">No Show</MenuItem>
@@ -6378,7 +6390,7 @@ setBookingDetail(finalVoucherDetail);
                                                 const phone = (item.phone || "").toLowerCase();
                                                 const location = (item.location || "").toLowerCase();
                                                 const flightType = (item.flight_type || "").toLowerCase();
-                                                const status = (item.status || "").toLowerCase();
+                                                const status = (getEffectiveBookingStatus(item) || item.status || "").toLowerCase();
                                                 const voucherType = (item.voucher_type || "").toLowerCase();
                                                 const bookingId = String(item.id || item.booking_id || item.bookingId || item.voucher_booking_id || "").toLowerCase();
                                                 return name.includes(search) || email.includes(search) || phone.includes(search) || location.includes(search) || flightType.includes(search) || status.includes(search) || voucherType.includes(search) || bookingId.includes(search);
@@ -6446,7 +6458,7 @@ setBookingDetail(finalVoucherDetail);
                                                 const phone = (item.phone || "").toLowerCase();
                                                 const location = (item.location || "").toLowerCase();
                                                 const flightType = (item.flight_type || "").toLowerCase();
-                                                const status = (item.status || "").toLowerCase();
+                                                const status = (getEffectiveBookingStatus(item) || item.status || "").toLowerCase();
                                                 const voucherType = (item.voucher_type || "").toLowerCase();
                                                 const bookingId = String(item.id || item.booking_id || item.bookingId || item.voucher_booking_id || "").toLowerCase();
                                                 if (!name.includes(search) && !email.includes(search) && !phone.includes(search) && !location.includes(search) && !flightType.includes(search) && !status.includes(search) && !voucherType.includes(search) && !bookingId.includes(search)) {
@@ -6944,8 +6956,8 @@ setBookingDetail(finalVoucherDetail);
                                         is_foreign_customer: recordHasNonUkPhoneNumber(item)
                                     }))}
                                     columns={isMobile
-                                        ? ["created", "name", "voucher_type", "actual_voucher_type", "flight_date", "expires", "redeemed", "paid", "voucher_ref"]
-                                        : ["created", "name", "voucher_type", "actual_voucher_type", "flight_date", "expires", "redeemed", "paid", "voucher_ref"]
+                                        ? ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
+                                        : ["created", "name", "voucher_type", "actual_voucher_type", "expires", "redeemed", "paid", "voucher_ref"]
                                     }
                                     onNameClick={handleNameClick}
                                     onVoucherRefClick={handleVoucherRefClick}
@@ -7452,7 +7464,7 @@ setBookingDetail(finalVoucherDetail);
                                                             <>
                                                                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                                                                     <DatePicker
-                                                                        value={editValue ? dayjs(editValue) : (bookingDetail.voucher.expires ? dayjs(bookingDetail.voucher.expires) : null)}
+                                                                        value={getExpiresPickerValue(editValue || bookingDetail.voucher.expires)}
                                                                         onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
                                                                         format="DD/MM/YYYY"
                                                                         slotProps={{ textField: { size: 'small' } }}
@@ -7823,7 +7835,7 @@ setBookingDetail(finalVoucherDetail);
                                                         <>
                                                             <LocalizationProvider dateAdapter={AdapterDayjs}>
                                                                 <DatePicker
-                                                                    value={editValue ? dayjs(editValue) : null}
+                                                                    value={getExpiresPickerValue(editValue || bookingDetail.booking.expires)}
                                                                     onChange={date => setEditValue(date ? date.format('YYYY-MM-DD') : '')}
                                                                     format="DD/MM/YYYY"
                                                                     slotProps={{ textField: { size: 'small' } }}
