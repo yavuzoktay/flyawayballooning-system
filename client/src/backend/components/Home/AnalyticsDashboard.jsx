@@ -360,9 +360,6 @@ const AverageBookingValueCard = ({ todayData, monthToDateData }) => {
                         MTD
                     </Box>
                 </Box>
-                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.5 }}>
-                    Revenue per completed booking, separated by experience type.
-                </Typography>
                 <FinancialTrackingRow
                     label="Shared flight ABV"
                     value={formatMoney(monthToDate.averageBookingValue.shared)}
@@ -471,9 +468,6 @@ const RefundTrackingCard = ({ refundTrackingData }) => {
                         Period
                     </Box>
                 </Box>
-                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.75 }}>
-                    Refunds issued from payment history within the selected period.
-                </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.5 }}>
                     <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
                         {formatMoney(total.amount)}
@@ -539,9 +533,6 @@ const NonRedemptionCard = ({ nonRedemptionData }) => {
                         Expired
                     </Box>
                 </Box>
-                <Typography sx={{ color: '#617694', fontSize: 13, fontWeight: 700, mb: 0.75 }}>
-                    Expired unused bookings and vouchers in the selected period.
-                </Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 1.25, mb: 0.5 }}>
                     <Typography sx={{ color: '#102844', fontSize: { xs: 34, md: 40 }, fontWeight: 700, lineHeight: 1 }}>
                         {formatMoney(nonRedemption.value)}
@@ -1026,9 +1017,6 @@ const AnalyticsDashboard = ({ dateRange, summary = {} }) => {
                 <Box>
                     <Typography sx={{ color: '#1c3458', fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>
                         Real-time Performance Overview
-                    </Typography>
-                    <Typography sx={{ color: '#667b98', fontSize: 13, mt: 0.5 }}>
-                        Sales, operations, and booking behaviour updated near real-time.
                     </Typography>
                 </Box>
                 <Typography sx={{ color: '#667b98', fontSize: 12, fontWeight: 700 }}>
