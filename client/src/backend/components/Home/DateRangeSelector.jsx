@@ -63,22 +63,27 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange, onSumm
         isRedeemedLikeYes(item?.voucher_redeemed) ||
         isRedeemedLikeYes(item?.is_voucher_redeemed);
 
-    const getCreatedDate = (item) => parseLooseDate(item?.created || item?.created_at || null);
-
     const getVatPortion = (grossAmount) => grossAmount * VAT_RATE / (1 + VAT_RATE);
 
-    const calculateVatByQuarter = (bookings = [], vouchers = []) => {
+    const getFlightDate = (item) => {
+        const raw = item?.flight_date || item?.flight_date_display || null;
+        if (!raw) return null;
+        const dateOnly = String(raw).split(' ')[0];
+        return parseLooseDate(dateOnly);
+    };
+
+    const calculateVatByQuarter = (flownFlights = []) => {
         const quarters = {};
 
-        const addPaymentToQuarter = (item) => {
+        const addFlownFlightToQuarter = (item) => {
             const paid = parseMoney(item?.paid);
             if (paid <= 0) return;
 
-            const createdDate = getCreatedDate(item);
-            if (!createdDate) return;
+            const flightDate = getFlightDate(item);
+            if (!flightDate) return;
 
-            const year = createdDate.getFullYear();
-            const quarter = Math.floor(createdDate.getMonth() / 3) + 1;
+            const year = flightDate.getFullYear();
+            const quarter = Math.floor(flightDate.getMonth() / 3) + 1;
             const key = `${year}-Q${quarter}`;
 
             if (!quarters[key]) {
@@ -98,12 +103,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange, onSumm
             quarters[key].count += 1;
         };
 
-        (bookings || []).forEach((item) => {
-            if (isRedeemedVoucherBooking(item)) return;
-            addPaymentToQuarter(item);
-        });
-
-        (vouchers || []).forEach(addPaymentToQuarter);
+        (flownFlights || []).forEach(addFlownFlightToQuarter);
 
         return Object.values(quarters).sort((a, b) => {
             if (a.year !== b.year) return a.year - b.year;
@@ -120,26 +120,55 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange, onSumm
         return `${year}-${month}-${day}`;
     };
 
-    const computeTotalLiability = (bookings = [], vouchers = []) => {
-        const bookingsLiability = (bookings || []).reduce((sum, b) => {
+    const getVoucherReference = (item = {}) =>
+        String(item?.voucher_ref || item?.voucher_code || item?.vc_code || '').trim().toLowerCase();
+
+    const isBookingLiabilityActive = (booking = {}) => {
+        if (!booking || typeof booking !== 'object') return false;
+        const status = String(booking.status || '').trim().toLowerCase();
+        if (status === 'flown') return false;
+        if (status === 'expired') return false;
+        if (booking.expires && isExpired(booking.expires)) return false;
+        return parseMoney(booking.paid) > 0;
+    };
+
+    const isVoucherLiabilityActive = (voucher = {}, redeemedBookingVoucherCodes = new Set()) => {
+        if (!voucher || typeof voucher !== 'object') return false;
+        if (isRedeemedLikeYes(voucher.redeemed)) return false;
+        const voucherRef = getVoucherReference(voucher);
+        if (voucherRef && redeemedBookingVoucherCodes.has(voucherRef)) return false;
+
+        const status = String(voucher.status || '').trim().toLowerCase();
+        if (status === 'used' || status === 'flown' || status === 'expired') return false;
+        if (voucher.expires && isExpired(voucher.expires)) return false;
+        return parseMoney(voucher.paid) > 0;
+    };
+
+    const computeLiabilitySummary = (bookings = [], vouchers = []) => {
+        const activeBookings = (bookings || []).filter(isBookingLiabilityActive);
+        const redeemedBookingVoucherCodes = new Set(
+            activeBookings
+                .filter(isRedeemedVoucherBooking)
+                .map(getVoucherReference)
+                .filter(Boolean)
+        );
+
+        const bookingsLiability = activeBookings.reduce((sum, b) => {
             if (!b || typeof b !== 'object') return sum;
-            const status = String(b.status || '').trim().toLowerCase();
-            if (status === 'flown') return sum;
-            if (status === 'expired') return sum;
-            if (b.expires && isExpired(b.expires)) return sum;
             return sum + parseMoney(b.paid);
         }, 0);
 
         const vouchersLiability = (vouchers || []).reduce((sum, v) => {
             if (!v || typeof v !== 'object') return sum;
-            if (isRedeemedLikeYes(v.redeemed)) return sum;
-            const status = String(v.status || '').trim().toLowerCase();
-            if (status === 'used' || status === 'flown' || status === 'expired') return sum;
-            if (v.expires && isExpired(v.expires)) return sum;
+            if (!isVoucherLiabilityActive(v, redeemedBookingVoucherCodes)) return sum;
             return sum + parseMoney(v.paid);
         }, 0);
 
-        return bookingsLiability + vouchersLiability;
+        return {
+            bookingLiability: bookingsLiability,
+            voucherLiability: vouchersLiability,
+            totalLiability: bookingsLiability + vouchersLiability
+        };
     };
 
     // Detect mobile device
@@ -305,10 +334,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange, onSumm
 
             const isInFlightRange = (item) => {
                 if (!flightRange) return true; // all time
-                const raw = item?.flight_date || item?.flight_date_display || null;
-                if (!raw) return false;
-                const dateOnly = String(raw).split(' ')[0]; // strip AM/PM etc.
-                const d = parseLooseDate(dateOnly);
+                const d = getFlightDate(item);
                 if (!d) return false;
                 return d >= flightRange.start && d <= flightRange.end;
             };
@@ -344,10 +370,10 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange, onSumm
             }, 0);
             const totalSales = bookingSales + voucherSales;
             // Liability must always reflect the current live balance, not the selected sales date range.
-            const totalLiability = computeTotalLiability(liveBookings || [], liveVouchers || []);
+            const liabilitySummary = computeLiabilitySummary(liveBookings || [], liveVouchers || []);
 
-            // VAT is split by payment quarter from gross sales values, where paid includes VAT.
-            const vatByQuarter = calculateVatByQuarter(data || [], vouchers || []);
+            // VAT is payable when flights are flown, so quarter totals use flight_date, not sales/payment date.
+            const vatByQuarter = calculateVatByQuarter(flownFlights || []);
             const totalVAT = vatByQuarter.reduce((sum, item) => sum + item.vat, 0);
             
             const summary = {
@@ -355,7 +381,9 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange, onSumm
                 totalPax: flownFlights?.reduce((sum, item) => sum + safeValue(parseInt(item.pax, 10)), 0) || 0,
                 completedFlights: completedFlightsGross,
                 totalSales: totalSales,
-                totalLiability: totalLiability,
+                bookingLiability: liabilitySummary.bookingLiability,
+                voucherLiability: liabilitySummary.voucherLiability,
+                totalLiability: liabilitySummary.totalLiability,
                 totalVAT: totalVAT,
                 vatByQuarter,
             };

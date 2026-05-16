@@ -999,6 +999,7 @@ const AnalyticsDashboard = ({ dateRange, summary = {} }) => {
     const lastUpdatedLabel = formatUpdatedAt(lastUpdated);
     const totalSales = Number(summary?.totalSales) || 0;
     const totalLiability = Number(summary?.totalLiability ?? analytics?.totalLiability) || 0;
+    const voucherLiability = Number(summary?.voucherLiability ?? analytics?.voucherLiability) || 0;
     const vatByQuarter = Array.isArray(summary?.vatByQuarter) ? summary.vatByQuarter : [];
     const totalVat = vatByQuarter.reduce((sum, item) => sum + (Number(item?.vat) || 0), 0) || Number(summary?.totalVAT) || 0;
 
@@ -1152,7 +1153,7 @@ const AnalyticsDashboard = ({ dateRange, summary = {} }) => {
                             </Box>
                             <Box sx={metricRowSx}>
                                 <Typography sx={metricLabelSx}>Voucher</Typography>
-                                <Typography sx={{ ...metricValueSx }}>£{formatGbp(analytics?.voucherLiability)}</Typography>
+                                <Typography sx={{ ...metricValueSx }}>£{formatGbp(voucherLiability)}</Typography>
                             </Box>
                         </CardContent>
                     </Card>
