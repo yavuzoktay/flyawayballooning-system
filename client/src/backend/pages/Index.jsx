@@ -8,6 +8,7 @@ const Index = () => {
     const [bookingData, setBookingData] = useState([]);
     const [voucherData, setVoucherData] = useState([]);
     const [dateRange, setDateRange] = useState({ start: null, end: null });
+    const [analyticsSummary, setAnalyticsSummary] = useState({});
 
     function getAllBookingData() {
         axios
@@ -49,8 +50,13 @@ const Index = () => {
                     <hr />
                 </div>
                 <div className="home-body-wrap">
-                    <DateRangeSelector bookingData={bookingData} voucherData={voucherData} onDateRangeChange={setDateRange} />
-                    <AnalyticsDashboard dateRange={dateRange} />
+                    <DateRangeSelector
+                        bookingData={bookingData}
+                        voucherData={voucherData}
+                        onDateRangeChange={setDateRange}
+                        onSummaryChange={setAnalyticsSummary}
+                    />
+                    <AnalyticsDashboard dateRange={dateRange} summary={analyticsSummary} />
                 </div>
             </Container>
         </div>

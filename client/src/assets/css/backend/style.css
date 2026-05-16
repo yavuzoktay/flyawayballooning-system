@@ -823,6 +823,19 @@ body {
 
 /* Start Activity Page */
 
+.activity-page-wrap .heading-wrap h2 {
+    font-size: 32px;
+    margin-bottom: 8px;
+    letter-spacing: 0.01em;
+}
+
+.activity-page-wrap .heading-wrap hr {
+    border: none;
+    height: 1px;
+    background: #e5ebf5;
+    margin-bottom: 26px;
+}
+
 .edit-activity {
     cursor: pointer;
 }
@@ -1154,6 +1167,23 @@ a.edit-activity svg {
     height: 1px;
     background: #e5ebf5;
     margin-bottom: 26px;
+}
+
+.flown-flights-page-wrap .flown-flights-page-content {
+    background: #f4f7fc;
+    border-radius: 22px;
+}
+
+.flown-flights-page-wrap .paginated-table-wrapper {
+    border: 1px solid #e1e8f3;
+    border-radius: 14px;
+    background: #ffffff;
+    margin-top: 10px;
+    box-shadow: none;
+}
+
+.flown-flights-page-wrap .booking-table {
+    margin-top: 0 !important;
 }
 
 .final-menifest-wrap .manifest-date-selector .MuiInputBase-root {

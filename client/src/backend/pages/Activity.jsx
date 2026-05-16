@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Container, Paper, Typography } from "@mui/material";
+import { Box, CircularProgress, Container, Paper } from "@mui/material";
 import React from "react";
 import ActivityList from "../components/ActivityPage/ActivityList";
 import useActivity from "../api/useActivity";
@@ -9,21 +9,12 @@ const Activity = () => {
     return (
         <div className="activity-page-wrap">
             <Container maxWidth={false}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography
-                        variant="h3"
-                        sx={{
-                            fontSize: { xs: "28px", md: "32px" },
-                            fontWeight: 700,
-                            letterSpacing: "0.01em",
-                            color: "#111827",
-                            mb: 1
-                        }}
-                    >
+                <div className="heading-wrap">
+                    <h2>
                         ACTIVITY
-                    </Typography>
-                    <Box sx={{ height: 1, bgcolor: "#dbe4f0", borderRadius: 999 }} />
-                </Box>
+                    </h2>
+                    <hr />
+                </div>
                 <Paper
                     elevation={0}
                     sx={{

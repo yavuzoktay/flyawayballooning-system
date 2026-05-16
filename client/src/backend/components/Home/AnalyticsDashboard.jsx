@@ -886,28 +886,75 @@ const RedemptionTimeCard = ({ bookingTimingData }) => {
     );
 };
 
-const AnalyticsDashboard = ({ dateRange }) => {
+const AnalyticsDashboard = ({ dateRange, summary = {} }) => {
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
     const cardSx = {
-        borderRadius: '14px',
-        border: '1px solid #e1e8f3',
-        boxShadow: 'none',
-        background: '#ffffff',
-        height: '100%'
+        ...grossSalesCardSx
     };
     const cardTitleSx = {
-        fontSize: 24,
+        fontSize: { xs: 20, md: 22 },
         fontWeight: 700,
         color: '#1c3458',
-        mb: 1.25
+        lineHeight: 1.15,
+        mb: 1.75
     };
     const bodyTextSx = {
         fontSize: 14,
         color: '#465a79',
         lineHeight: 1.45
+    };
+    const metricSectionTitleSx = {
+        color: '#667b98',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        mt: 1.5,
+        mb: 0.75
+    };
+    const metricRowSx = {
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: 1.5,
+        py: 1,
+        borderTop: '1px solid #e7eef7'
+    };
+    const metricLabelSx = {
+        color: '#1c3458',
+        fontSize: 14,
+        fontWeight: 600,
+        minWidth: 0
+    };
+    const metricValueSx = {
+        color: '#2d69c5',
+        fontSize: 14,
+        fontWeight: 700,
+        textAlign: 'right',
+        whiteSpace: 'nowrap'
+    };
+    const summaryMetricBoxSx = {
+        background: '#f4f8ff',
+        border: '1px solid #d8e4f1',
+        borderRadius: '12px',
+        p: 1.25,
+        mb: 1.5
+    };
+    const summaryMetricLabelSx = {
+        color: '#667b98',
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        textTransform: 'uppercase',
+        mb: 0.5
+    };
+    const summaryMetricValueSx = {
+        color: '#1c3458',
+        fontSize: { xs: 24, md: 26 },
+        fontWeight: 700,
+        lineHeight: 1
     };
 
     useEffect(() => {
@@ -959,6 +1006,10 @@ const AnalyticsDashboard = ({ dateRange }) => {
     const refundTracking = analytics?.refundTracking || {};
     const nonRedemption = analytics?.nonRedemption || {};
     const lastUpdatedLabel = formatUpdatedAt(lastUpdated);
+    const totalSales = Number(summary?.totalSales) || 0;
+    const totalLiability = Number(summary?.totalLiability ?? analytics?.totalLiability) || 0;
+    const vatByQuarter = Array.isArray(summary?.vatByQuarter) ? summary.vatByQuarter : [];
+    const totalVat = vatByQuarter.reduce((sum, item) => sum + (Number(item?.vat) || 0), 0) || Number(summary?.totalVAT) || 0;
 
     return (
         <Box sx={{ mt: 3 }}>
@@ -1045,40 +1096,34 @@ const AnalyticsDashboard = ({ dateRange }) => {
                 </Grid>
             </Grid>
             <Grid container spacing={2}>
-                {/* Booking Attempts */}
-                <Grid item xs={12} md={3}>
-                    <Card sx={cardSx}>
-                        <CardContent>
-                            <Typography sx={cardTitleSx}>Booking Attempts</Typography>
-                            <Typography sx={bodyTextSx}>1st attempt: <span style={{color:'#2ecc71'}}>{analytics?.bookingAttempts?.first || 0}%</span></Typography>
-                            <Typography sx={bodyTextSx}>2nd attempt: <span style={{color:'#27ae60'}}>{analytics?.bookingAttempts?.second || 0}%</span></Typography>
-                            <Typography sx={bodyTextSx}>3rd attempt: <span style={{color:'#f1c40f'}}>{analytics?.bookingAttempts?.third || 0}%</span></Typography>
-                            <Typography sx={bodyTextSx}>4th attempt: <span style={{color:'#e67e22'}}>{analytics?.bookingAttempts?.fourth || 0}%</span></Typography>
-                            <Typography sx={bodyTextSx}>5th attempt: <span style={{color:'#e74c3c'}}>{analytics?.bookingAttempts?.fifth || 0}%</span></Typography>
-                            <Typography sx={bodyTextSx}>6+ attempts: <span style={{color:'#c0392b'}}>{analytics?.bookingAttempts?.sixthPlus || 0}%</span></Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
                 {/* Sales */}
                 <Grid item xs={12} md={3}>
                     <Card sx={cardSx}>
-                        <CardContent>
+                        <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                             <Typography sx={cardTitleSx}>Sales</Typography>
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mb: 0.5 }}>
+                            <Box sx={summaryMetricBoxSx}>
+                                <Typography sx={summaryMetricLabelSx}>Total sales</Typography>
+                                <Typography sx={{ ...summaryMetricValueSx, color: '#8e44ad' }}>
+                                    £{formatGbp(totalSales)}
+                                </Typography>
+                            </Box>
+                            <Typography sx={{ ...metricSectionTitleSx, mt: 0 }}>
                                 Sales by Location
                             </Typography>
                             {renderList(analytics?.salesByLocation, (locationRow, index) => (
-                                <Typography key={`sales-location-${index}`} sx={bodyTextSx}>
-                                    {locationRow.location}: <span style={{color:'#8e44ad'}}>{locationRow.percent}%</span>
-                                </Typography>
+                                <Box key={`sales-location-${index}`} sx={metricRowSx}>
+                                    <Typography sx={metricLabelSx}>{locationRow.location}</Typography>
+                                    <Typography sx={{ ...metricValueSx, color: '#8e44ad' }}>{locationRow.percent}%</Typography>
+                                </Box>
                             ))}
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
+                            <Typography sx={metricSectionTitleSx}>
                                 Sales by Booking Type
                             </Typography>
                             {renderList(analytics?.salesByBookingType, (typeRow, index) => (
-                                <Typography key={`sales-type-${index}`} sx={bodyTextSx}>
-                                    {typeRow.type}: <span style={{color:'#27ae60'}}>{typeRow.percent}%</span>
-                                </Typography>
+                                <Box key={`sales-type-${index}`} sx={metricRowSx}>
+                                    <Typography sx={metricLabelSx}>{typeRow.type}</Typography>
+                                    <Typography sx={{ ...metricValueSx, color: '#0f8a5f' }}>{typeRow.percent}%</Typography>
+                                </Box>
                             ))}
                         </CardContent>
                     </Card>
@@ -1086,55 +1131,89 @@ const AnalyticsDashboard = ({ dateRange }) => {
                 {/* Liability */}
                 <Grid item xs={12} md={3}>
                     <Card sx={cardSx}>
-                        <CardContent>
+                        <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                             <Typography sx={cardTitleSx}>Liability</Typography>
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mb: 0.5 }}>
+                            <Box sx={summaryMetricBoxSx}>
+                                <Typography sx={summaryMetricLabelSx}>Total liability</Typography>
+                                <Typography sx={{ ...summaryMetricValueSx, color: '#d78d38' }}>
+                                    £{formatGbp(totalLiability)}
+                                </Typography>
+                            </Box>
+                            <Typography sx={{ ...metricSectionTitleSx, mt: 0 }}>
                                 Liability by Location
                             </Typography>
                             {renderList(analytics?.liabilityByLocation, (locationRow, index) => (
-                                <Typography key={`liability-location-${index}`} sx={bodyTextSx}>
-                                    {locationRow.location}: <span style={{color:'#e67e22'}}>£{formatGbp(locationRow.value)}</span>
-                                </Typography>
+                                <Box key={`liability-location-${index}`} sx={metricRowSx}>
+                                    <Typography sx={metricLabelSx}>{locationRow.location}</Typography>
+                                    <Typography sx={{ ...metricValueSx, color: '#d78d38' }}>£{formatGbp(locationRow.value)}</Typography>
+                                </Box>
                             ))}
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
+                            <Typography sx={metricSectionTitleSx}>
                                 Liability by Flight Type
                             </Typography>
                             {renderList(analytics?.liabilityByFlightType, (typeRow, index) => (
-                                <Typography key={`liability-type-${index}`} sx={bodyTextSx}>
-                                    {typeRow.type}: <span style={{color:'#e67e22'}}>£{formatGbp(typeRow.value)}</span>
-                                </Typography>
+                                <Box key={`liability-type-${index}`} sx={metricRowSx}>
+                                    <Typography sx={metricLabelSx}>{typeRow.type}</Typography>
+                                    <Typography sx={{ ...metricValueSx, color: '#d78d38' }}>£{formatGbp(typeRow.value)}</Typography>
+                                </Box>
                             ))}
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
-                                Refundable Liability
+                            <Typography sx={metricSectionTitleSx}>Liability totals</Typography>
+                            <Box sx={metricRowSx}>
+                                <Typography sx={metricLabelSx}>Refundable</Typography>
+                                <Typography sx={{ ...metricValueSx, color: '#16a085' }}>£{formatGbp(analytics?.refundableLiability || 0)}</Typography>
+                            </Box>
+                            <Box sx={metricRowSx}>
+                                <Typography sx={metricLabelSx}>Voucher</Typography>
+                                <Typography sx={{ ...metricValueSx }}>£{formatGbp(analytics?.voucherLiability)}</Typography>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Grid>
+                {/* VAT */}
+                <Grid item xs={12} md={3}>
+                    <Card sx={cardSx}>
+                        <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                            <Typography sx={cardTitleSx}>VAT</Typography>
+                            <Box sx={summaryMetricBoxSx}>
+                                <Typography sx={summaryMetricLabelSx}>Total VAT</Typography>
+                                <Typography sx={{ ...summaryMetricValueSx, color: '#0f8a5f' }}>
+                                    £{formatGbp(totalVat)}
+                                </Typography>
+                            </Box>
+                            <Typography sx={{ ...metricSectionTitleSx, mt: 0 }}>
+                                VAT by Quarter
                             </Typography>
-                            <Typography sx={bodyTextSx}>
-                                <span style={{color:'#16a085'}}>£{formatGbp(analytics?.refundableLiability || 0)}</span>
-                            </Typography>
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mt: 2, mb: 0.5 }}>
-                                Voucher Liability
-                            </Typography>
-                            <Typography sx={bodyTextSx}>
-                                <span style={{color:'#2980b9'}}>£{formatGbp(analytics?.voucherLiability)}</span>
-                            </Typography>
+                            {renderList(vatByQuarter, (quarterRow, index) => (
+                                <Box key={quarterRow.key || `vat-quarter-${index}`} sx={metricRowSx}>
+                                    <Typography sx={metricLabelSx}>
+                                        {quarterRow.label || `Q${quarterRow.quarter} ${quarterRow.year}`}
+                                    </Typography>
+                                    <Typography sx={{ ...metricValueSx, color: '#0f8a5f' }}>
+                                        £{formatGbp(quarterRow.vat)}
+                                    </Typography>
+                                </Box>
+                            ))}
                         </CardContent>
                     </Card>
                 </Grid>
                 {/* Extras */}
                 <Grid item xs={12} md={3}>
                     <Card sx={cardSx}>
-                        <CardContent>
+                        <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                             <Typography sx={cardTitleSx}>Extras</Typography>
-                            <Typography sx={{ ...bodyTextSx, fontWeight: 700, color: '#1c3458', mb: 0.5 }}>
+                            <Typography sx={{ ...metricSectionTitleSx, mt: 0 }}>
                                 Add On's
                             </Typography>
                             {renderList(analytics?.addOns, (addOnRow, index) => (
-                                <Typography key={`add-on-${index}`} sx={bodyTextSx}>
-                                    {addOnRow.name}: <span style={{color:'#16a085'}}>£{formatGbp(addOnRow.value)}</span>
-                                </Typography>
+                                <Box key={`add-on-${index}`} sx={metricRowSx}>
+                                    <Typography sx={metricLabelSx}>{addOnRow.name}</Typography>
+                                    <Typography sx={{ ...metricValueSx, color: '#16a085' }}>£{formatGbp(addOnRow.value)}</Typography>
+                                </Box>
                             ))}
-                            <Typography sx={{ ...bodyTextSx, mt: 1, fontWeight: 700 }}>
-                                Total: <span style={{color:'#16a085'}}>£{formatGbp(analytics?.addOnsTotal)}</span>
-                            </Typography>
+                            <Box sx={{ ...metricRowSx, mt: 1 }}>
+                                <Typography sx={{ ...metricLabelSx, fontWeight: 700 }}>Total</Typography>
+                                <Typography sx={{ ...metricValueSx, color: '#16a085' }}>£{formatGbp(analytics?.addOnsTotal)}</Typography>
+                            </Box>
                         </CardContent>
                     </Card>
                 </Grid>

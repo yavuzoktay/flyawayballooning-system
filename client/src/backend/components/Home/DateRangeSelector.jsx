@@ -2,17 +2,16 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import config from "../../../config";
 import { ADMIN_MANUAL_BOOKING_AUTH } from "../../auth/adminCredentials";
-import { formatGbp } from "../../utils/formatGbp";
 import { isAdminDateExpired, parseAdminDate } from "../../utils/adminDateUtils";
 
 const ANALYTICS_LIVE_DATA_START_DATE =
     process.env.REACT_APP_ANALYTICS_LIVE_DATA_START_DATE || "2026-01-01";
+const VAT_RATE = 0.2;
 
-const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
+const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange, onSummaryChange }) => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [activeQuickFilter, setActiveQuickFilter] = useState("allTime");
-    const [summary, setSummary] = useState({});
     const [isMobile, setIsMobile] = useState(false);
     const [isLaunchingManualBooking, setIsLaunchingManualBooking] = useState(false);
     const API_BASE_URL = config.API_BASE_URL;
@@ -57,6 +56,59 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
     const isRedeemedLikeYes = (raw) => {
         const v = raw === null || raw === undefined ? '' : String(raw).trim().toLowerCase();
         return v === 'yes' || v === 'redeemed' || v === 'true' || v === '1';
+    };
+
+    const isRedeemedVoucherBooking = (item) =>
+        isRedeemedLikeYes(item?.redeemed_voucher) ||
+        isRedeemedLikeYes(item?.voucher_redeemed) ||
+        isRedeemedLikeYes(item?.is_voucher_redeemed);
+
+    const getCreatedDate = (item) => parseLooseDate(item?.created || item?.created_at || null);
+
+    const getVatPortion = (grossAmount) => grossAmount * VAT_RATE / (1 + VAT_RATE);
+
+    const calculateVatByQuarter = (bookings = [], vouchers = []) => {
+        const quarters = {};
+
+        const addPaymentToQuarter = (item) => {
+            const paid = parseMoney(item?.paid);
+            if (paid <= 0) return;
+
+            const createdDate = getCreatedDate(item);
+            if (!createdDate) return;
+
+            const year = createdDate.getFullYear();
+            const quarter = Math.floor(createdDate.getMonth() / 3) + 1;
+            const key = `${year}-Q${quarter}`;
+
+            if (!quarters[key]) {
+                quarters[key] = {
+                    key,
+                    label: `Q${quarter} ${year}`,
+                    year,
+                    quarter,
+                    gross: 0,
+                    vat: 0,
+                    count: 0
+                };
+            }
+
+            quarters[key].gross += paid;
+            quarters[key].vat += getVatPortion(paid);
+            quarters[key].count += 1;
+        };
+
+        (bookings || []).forEach((item) => {
+            if (isRedeemedVoucherBooking(item)) return;
+            addPaymentToQuarter(item);
+        });
+
+        (vouchers || []).forEach(addPaymentToQuarter);
+
+        return Object.values(quarters).sort((a, b) => {
+            if (a.year !== b.year) return a.year - b.year;
+            return a.quarter - b.quarter;
+        });
     };
 
     const isExpired = (rawDate) => isAdminDateExpired(rawDate);
@@ -284,12 +336,7 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             // When a voucher is redeemed into a booking, the booking's `paid` reflects that same purchase,
             // so we must NOT add redeemed-voucher bookings again to avoid double-counting.
             const bookingSales = data?.reduce((sum, item) => {
-                const redeemedLike =
-                    isRedeemedLikeYes(item?.redeemed_voucher) ||
-                    isRedeemedLikeYes(item?.voucher_redeemed) ||
-                    isRedeemedLikeYes(item?.is_voucher_redeemed);
-
-                if (redeemedLike) return sum;
+                if (isRedeemedVoucherBooking(item)) return sum;
                 return sum + parseMoney(item?.paid);
             }, 0) || 0;
             const voucherSales = (vouchers || []).reduce((sum, item) => {
@@ -299,9 +346,9 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
             // Liability must always reflect the current live balance, not the selected sales date range.
             const totalLiability = computeTotalLiability(liveBookings || [], liveVouchers || []);
 
-            // VAT Portion: extract VAT from completed flights gross (paid includes VAT)
-            const VAT_RATE = 0.2;
-            const totalVAT = completedFlightsGross * VAT_RATE / (1 + VAT_RATE);
+            // VAT is split by payment quarter from gross sales values, where paid includes VAT.
+            const vatByQuarter = calculateVatByQuarter(data || [], vouchers || []);
+            const totalVAT = vatByQuarter.reduce((sum, item) => sum + item.vat, 0);
             
             const summary = {
                 totalFlights: flownFlights?.length || 0,
@@ -310,8 +357,9 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                 totalSales: totalSales,
                 totalLiability: totalLiability,
                 totalVAT: totalVAT,
+                vatByQuarter,
             };
-            setSummary(summary);
+            if (onSummaryChange) onSummaryChange(summary);
         }
     };
 
@@ -523,69 +571,40 @@ const DateRangeSelector = ({ bookingData, voucherData, onDateRangeChange }) => {
                 </div>
             </div>
 
-            {/* Display Filtered Data */}
-            <div style={{ marginTop: "20px" }}>
-                <div className="home-filter-data-wrap">
-                    <div style={{ display: 'flex', flexDirection: 'row', width: '100%', alignItems: 'center' }} className="totals-container">
-                        <div className="home-filter-data-table" style={{ flex: 1 }}>
-                            <h3 style={{ fontFamily: "Gilroy Light" }}>Totals:</h3>
-                            {Object.keys(summary).length > 0 ? (
-                                <div style={{ overflowX: 'auto', width: '100%' }} className="totals-table-wrapper">
-                                    <table border="0" style={{ width: "100%", background: "#FFF", marginTop: "10px", borderCollapse: "separate", borderSpacing: 0, minWidth: '500px' }} className="totals-table">
-                                        <thead style={{ background: "#2d69c5", color: "#FFF" }}>
-                                            <tr>
-                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Pax Flown</th>
-                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Flights Completed</th>
-                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Sales</th>
-                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>Total Liability</th>
-                                                <th style={{ padding: "8px", fontSize: "14px", whiteSpace: "nowrap" }}>VAT</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>{summary.totalPax}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.completedFlights)}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.totalSales)}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.totalLiability)}</td>
-                                                <td style={{ textAlign: "center", padding: "8px", fontSize: "14px" }}>£{formatGbp(summary.totalVAT)}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <p>No data found for the selected range.</p>
-                            )}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, minWidth: 210, marginLeft: 32, marginTop: 38 }} className="manual-booking-button-container">
-                            <button
-                                type="button"
-                                onClick={handleManualBookingClick}
-                                disabled={isLaunchingManualBooking}
-                                style={{
-                                    display: 'inline-block',
-                                    background: 'linear-gradient(135deg, #2d69c5 0%, #1f57ad 100%)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 10,
-                                    padding: '10px 20px',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    letterSpacing: '0.04em',
-                                    textTransform: 'uppercase',
-                                    textAlign: 'center',
-                                    textDecoration: 'none',
-                                    cursor: isLaunchingManualBooking ? 'wait' : 'pointer',
-                                    boxShadow: '0 8px 20px rgba(31, 87, 173, 0.2)',
-                                    width: '100%',
-                                    maxWidth: 210,
-                                    opacity: isLaunchingManualBooking ? 0.75 : 1
-                                }}
-                            >
-                                {isLaunchingManualBooking ? 'Opening...' : 'Manual Booking'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: isMobile ? 'stretch' : 'flex-end',
+                    marginTop: "20px"
+                }}
+                className="manual-booking-button-container"
+            >
+                <button
+                    type="button"
+                    onClick={handleManualBookingClick}
+                    disabled={isLaunchingManualBooking}
+                    style={{
+                        display: 'inline-block',
+                        background: 'linear-gradient(135deg, #2d69c5 0%, #1f57ad 100%)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 10,
+                        padding: '10px 20px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        cursor: isLaunchingManualBooking ? 'wait' : 'pointer',
+                        boxShadow: '0 8px 20px rgba(31, 87, 173, 0.2)',
+                        width: isMobile ? '100%' : 210,
+                        maxWidth: isMobile ? '100%' : 210,
+                        opacity: isLaunchingManualBooking ? 0.75 : 1
+                    }}
+                >
+                    {isLaunchingManualBooking ? 'Opening...' : 'Manual Booking'}
+                </button>
             </div>
         </div>
     );

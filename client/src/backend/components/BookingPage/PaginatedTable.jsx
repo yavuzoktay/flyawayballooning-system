@@ -1261,11 +1261,16 @@ const PaginatedTable = ({
                                                                     const hasRefund = hasBookingRefund(item);
                                                                     const isFullyRefunded = hasRefund && paidValue <= 0.01;
                                                                     const hasNormalPayment = !hasRefund && paidValue > 0.01;
+                                                                    const priceTextStyle = {
+                                                                        fontWeight: 400,
+                                                                        fontSize: '16px',
+                                                                        fontFamily: "'Gilroy', sans-serif"
+                                                                    };
 
                                                                     if (shouldShowDueAmount) {
                                                                         return (
                                                                             <span
-                                                                                style={{ color: '#2d69c5', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}
+                                                                                style={{ ...priceTextStyle, color: '#2d69c5' }}
                                                                                 title="Due amount"
                                                                             >
                                                                                 {formatAmount(dueAmount)}
@@ -1277,31 +1282,27 @@ const PaginatedTable = ({
                                                                     // so it's clear this amount came from a voucher redemption (sale already counted).
                                                                     if (isVoucherRedeemed(item) && !hasRefund) {
                                                                         return (
-                                                                            <span style={{ color: '#9ca3af', fontWeight: 'normal', fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
+                                                                            <span style={{ ...priceTextStyle, color: '#9ca3af' }}>
                                                                                 {item[id]}
                                                                             </span>
                                                                         );
                                                                     }
 
                                                                     let color = 'inherit';
-                                                                    let fontWeight = 'normal';
 
                                                                     if (isFullyRefunded) {
                                                                         // Full refund: red
                                                                         color = '#dc3545';
-                                                                        fontWeight = 'normal';
                                                                     } else if (hasRefund && paidValue > 0.01) {
                                                                         // Partial refund / retained fee: green
                                                                         color = '#28a745';
-                                                                        fontWeight = 600;
                                                                     } else if (hasNormalPayment) {
                                                                         // Normal payment: green
                                                                         color = '#28a745';
-                                                                        fontWeight = 'normal';
                                                                     }
 
                                                                     return (
-                                                                        <span style={{ color, fontWeight, fontSize: '16px', fontFamily: "'Gilroy', sans-serif" }}>
+                                                                        <span style={{ ...priceTextStyle, color }}>
                                                                             {item[id]}
                                                                         </span>
                                                                     );

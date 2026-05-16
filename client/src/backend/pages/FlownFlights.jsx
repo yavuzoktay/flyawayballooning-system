@@ -857,7 +857,7 @@ const FlownFlights = () => {
                     <h2>FLOWN FLIGHTS</h2>
                     <hr />
                 </div>
-                <Box sx={{ padding: isMobile ? 1 : 2 }}>
+                <Box className="flown-flights-page-content" sx={{ padding: isMobile ? 1 : 2 }}>
 
             <Box
                 sx={{

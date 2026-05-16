@@ -922,22 +922,6 @@ const ActivityList = ({ activity, setActivity }) => {
                 }}
                 className="activity-create-button-wrap"
             >
-                <Box>
-                    <Typography
-                        sx={{
-                            fontSize: { xs: '20px', md: '24px' },
-                            fontWeight: ACTIVITY_FONT_WEIGHTS.pageTitle,
-                            letterSpacing: '-0.03em',
-                            color: '#0f172a',
-                            mb: 0.5
-                        }}
-                    >
-                        Live Activity Setup
-                    </Typography>
-                    <Typography sx={{ color: '#64748b', fontSize: '14px' }}>
-                        Review your activity rows, update pricing flows and jump into availability setup from a cleaner control table.
-                    </Typography>
-                </Box>
                 <Stack direction="row" spacing={1.25} alignItems="center">
                     <Chip
                         label={`${rows.length} activities`}
